@@ -1,0 +1,11 @@
+# local research notes — not for the repo
+/notes
+/design
+
+# Secrets
+.env
+.env.local
+.env*.local
+
+# macOS
+.DS_Store
