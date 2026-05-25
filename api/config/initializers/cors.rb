@@ -10,7 +10,7 @@ Rails.application.config.middleware.insert_before 0, Rack::Cors do
     origins ENV.fetch("FRONTEND_URL", "http://localhost:3000")
 
     resource "*",
-      headers: :any,
+      headers: %w[Content-Type Authorization],
       methods: [:get, :post, :put, :patch, :delete, :options, :head],
       expose: ["Authorization"]
   end

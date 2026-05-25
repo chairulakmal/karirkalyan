@@ -2,6 +2,7 @@ module Api
   module V1
     class ApplicationsController < ApplicationController
       before_action :set_application, only: %i[show update destroy transition resume cover_letter]
+      before_action :set_nosniff_header, only: %i[resume cover_letter]
 
       def index
         applications = current_user.applications.order(created_at: :desc)
@@ -71,6 +72,10 @@ module Api
 
       def set_application
         @application = current_user.applications.find(params[:id])
+      end
+
+      def set_nosniff_header
+        response.headers["X-Content-Type-Options"] = "nosniff"
       end
 
       def application_params
