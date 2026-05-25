@@ -1,0 +1,7 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 1024" width="1024" height="1024">
+  <rect width="1024" height="1024" rx="230" ry="230" fill="#F7F3EA"></rect>
+  <rect width="1024" height="1024" rx="230" ry="230" fill="none" stroke="#CFC8B8" stroke-width="6"></rect>
+  <text x="512" y="680" text-anchor="middle" font-family="Fraunces, &#39;Times New Roman&#39;, serif" font-size="560" font-weight="400" fill="#1A2F6B" style="font-variation-settings: &#39;opsz&#39; 144;">kk</text>
+  <path d="M 680 290 L 770 290 L 770 380" stroke="#1A2F6B" stroke-width="22" fill="none" stroke-linecap="round" stroke-linejoin="round"></path>
+  <path d="M 770 290 L 680 380" stroke="#1A2F6B" stroke-width="22" fill="none" stroke-linecap="round" stroke-linejoin="round"></path>
+</svg>

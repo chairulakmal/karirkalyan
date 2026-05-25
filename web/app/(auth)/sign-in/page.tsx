@@ -4,12 +4,15 @@ import { SignInForm } from "./sign-in-form";
 export default function SignInPage() {
   return (
     <>
-      <h1 className="text-2xl font-semibold tracking-tight">Sign in</h1>
-      <p className="mt-1 text-sm text-zinc-500">Track your applications, transitions, and reminders.</p>
+      <p className="kk-label">Welcome back</p>
+      <h1 className="mt-2 text-2xl">Sign in</h1>
+      <p className="mt-1 text-sm text-ink-soft">
+        Track applications, transitions, and reminders.
+      </p>
       <SignInForm />
-      <p className="mt-6 text-sm text-zinc-500">
+      <p className="mt-6 text-sm text-ink-soft">
         Don&apos;t have an account?{" "}
-        <Link href="/sign-up" className="font-medium text-zinc-900 underline underline-offset-4">
+        <Link href="/sign-up" className="font-medium text-cobalt underline underline-offset-4 hover:text-cobalt-2">
           Sign up
         </Link>
       </p>

@@ -16,21 +16,28 @@ const STATUS_LABEL: Record<Status, string> = {
   archived: "Archived",
 };
 
-// Tailwind classes keyed by status family — kept short on purpose.
+/**
+ * Status badge colours, mapped onto the Cobalt brand palette.
+ *
+ * - dune/ink-soft  → neutral / inactive (wishlist, draft, withdrawn, archived)
+ * - cobalt         → in-pipeline (applied, phone_screen, technical, final_round)
+ * - saffron        → celebratory (offer, accepted)
+ * - red            → terminal-negative (rejected, ghosted, declined)
+ */
 const STATUS_CLASS: Record<Status, string> = {
-  wishlist: "bg-zinc-100 text-zinc-700 ring-zinc-200",
-  draft: "bg-zinc-100 text-zinc-700 ring-zinc-200",
-  applied: "bg-sky-100 text-sky-800 ring-sky-200",
-  phone_screen: "bg-amber-100 text-amber-800 ring-amber-200",
-  technical: "bg-amber-100 text-amber-800 ring-amber-200",
-  final_round: "bg-amber-100 text-amber-800 ring-amber-200",
-  offer: "bg-emerald-100 text-emerald-800 ring-emerald-200",
-  accepted: "bg-emerald-200 text-emerald-900 ring-emerald-300",
-  rejected: "bg-rose-100 text-rose-800 ring-rose-200",
-  ghosted: "bg-rose-100 text-rose-800 ring-rose-200",
-  declined: "bg-rose-100 text-rose-800 ring-rose-200",
-  withdrawn: "bg-zinc-200 text-zinc-700 ring-zinc-300",
-  archived: "bg-zinc-200 text-zinc-700 ring-zinc-300",
+  wishlist: "bg-dune/40 text-ink-soft ring-dune",
+  draft: "bg-dune/40 text-ink-soft ring-dune",
+  applied: "bg-cobalt/10 text-cobalt ring-cobalt/30",
+  phone_screen: "bg-cobalt/10 text-cobalt ring-cobalt/30",
+  technical: "bg-cobalt/10 text-cobalt ring-cobalt/30",
+  final_round: "bg-cobalt/10 text-cobalt ring-cobalt/30",
+  offer: "bg-saffron-2/40 text-[#7a4d10] ring-saffron",
+  accepted: "bg-saffron text-midnight ring-saffron",
+  rejected: "bg-red-100 text-red-800 ring-red-200",
+  ghosted: "bg-red-50 text-red-700 ring-red-200",
+  declined: "bg-red-50 text-red-700 ring-red-200",
+  withdrawn: "bg-dune/60 text-ink-soft ring-dune",
+  archived: "bg-dune/60 text-ink-soft ring-dune",
 };
 
 export function statusLabel(s: Status): string {
@@ -38,7 +45,7 @@ export function statusLabel(s: Status): string {
 }
 
 export function statusBadgeClass(s: Status): string {
-  return STATUS_CLASS[s] ?? "bg-zinc-100 text-zinc-700 ring-zinc-200";
+  return STATUS_CLASS[s] ?? "bg-dune/40 text-ink-soft ring-dune";
 }
 
 const RELATIVE = new Intl.RelativeTimeFormat("en", { numeric: "auto" });

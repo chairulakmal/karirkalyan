@@ -34,13 +34,13 @@ export function TransitionButtons({
             type="button"
             onClick={() => go(status)}
             disabled={pending}
-            className={`inline-flex items-center rounded-full px-3 py-1 text-xs font-medium ring-1 ring-inset transition hover:opacity-80 disabled:opacity-50 ${statusBadgeClass(status)}`}
+            className={`inline-flex items-center px-3 py-1 text-xs font-medium ring-1 ring-inset transition hover:opacity-80 disabled:opacity-50 ${statusBadgeClass(status)}`}
           >
             → {statusLabel(status)}
           </button>
         ))}
       </div>
-      {error ? <p className="mt-3 text-sm text-rose-600">{error}</p> : null}
+      {error ? <p className="mt-3 text-sm text-red-700">{error}</p> : null}
     </div>
   );
 }

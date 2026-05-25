@@ -18,7 +18,7 @@ export default async function ApplicationDetailPage({
   if (!res.ok) {
     if (res.status === 404) notFound();
     return (
-      <div className="rounded-lg border border-rose-300 bg-rose-50 p-5 text-sm text-rose-800">
+      <div className="border border-red-300 bg-red-50 p-5 text-sm text-red-800">
         Failed to load: {res.error}
       </div>
     );
@@ -27,24 +27,25 @@ export default async function ApplicationDetailPage({
   const numId = Number(id);
 
   return (
-    <div className="space-y-8">
-      <header className="flex items-start justify-between gap-4">
+    <div className="space-y-10">
+      <header className="flex items-start justify-between gap-4 border-b border-dune pb-6">
         <div className="min-w-0">
-          <div className="flex items-center gap-3">
-            <h1 className="truncate text-2xl font-semibold tracking-tight">{app.company}</h1>
+          <p className="kk-label">Application</p>
+          <div className="mt-1 flex items-center gap-3">
+            <h1 className="truncate text-3xl">{app.company}</h1>
             <span
-              className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium ring-1 ring-inset ${statusBadgeClass(app.status)}`}
+              className={`inline-flex items-center px-2.5 py-0.5 text-xs font-medium ring-1 ring-inset ${statusBadgeClass(app.status)}`}
             >
               {statusLabel(app.status)}
             </span>
           </div>
-          <p className="mt-1 text-zinc-600">{app.role}</p>
+          <p className="mt-1 text-ink-soft">{app.role}</p>
           {app.url ? (
             <a
               href={app.url}
               target="_blank"
               rel="noopener noreferrer"
-              className="mt-1 inline-block text-sm text-zinc-500 underline underline-offset-4 hover:text-zinc-900"
+              className="mt-1 inline-block font-mono text-xs text-cobalt underline underline-offset-4 hover:text-cobalt-2"
             >
               {app.url}
             </a>
@@ -53,7 +54,7 @@ export default async function ApplicationDetailPage({
         <div className="flex shrink-0 items-center gap-2">
           <Link
             href="/dashboard"
-            className="rounded-md border border-zinc-300 bg-white px-3 py-1.5 text-sm text-zinc-700 hover:bg-zinc-50"
+            className="border border-dune bg-linen px-3 py-1.5 text-sm text-ink-soft hover:bg-sand"
           >
             ← Dashboard
           </Link>
@@ -61,11 +62,11 @@ export default async function ApplicationDetailPage({
         </div>
       </header>
 
-      <section className="rounded-lg border border-zinc-200 bg-white p-5">
-        <h2 className="text-sm font-medium text-zinc-700">Transition</h2>
+      <section className="border border-dune bg-linen p-5">
+        <p className="kk-label">Transition</p>
         {app.valid_next_states.length === 0 ? (
-          <p className="mt-2 text-sm text-zinc-500">
-            <code>{app.status}</code> is terminal — no further transitions allowed.
+          <p className="mt-3 text-sm text-ink-soft">
+            <code className="font-mono">{app.status}</code> is terminal — no further transitions allowed.
           </p>
         ) : (
           <TransitionButtons
@@ -77,15 +78,15 @@ export default async function ApplicationDetailPage({
       </section>
 
       <section className="grid grid-cols-1 gap-6 md:grid-cols-2">
-        <div className="rounded-lg border border-zinc-200 bg-white p-5">
-          <h2 className="text-sm font-medium text-zinc-700">Details</h2>
+        <div className="border border-dune bg-linen p-5">
+          <p className="kk-label">Details</p>
           <dl className="mt-3 space-y-2 text-sm">
             <Row label="Applied" value={app.applied_at ? formatDate(app.applied_at) : "—"} />
             <Row
               label="Follow up"
               value={
                 app.follow_up_at ? (
-                  <span className="font-medium text-amber-700">{formatDate(app.follow_up_at)}</span>
+                  <span className="font-medium text-saffron">{formatDate(app.follow_up_at)}</span>
                 ) : (
                   "—"
                 )
@@ -95,14 +96,14 @@ export default async function ApplicationDetailPage({
           </dl>
           {app.notes ? (
             <>
-              <h3 className="mt-5 text-sm font-medium text-zinc-700">Notes</h3>
-              <p className="mt-2 whitespace-pre-wrap text-sm text-zinc-700">{app.notes}</p>
+              <p className="kk-label mt-5">Notes</p>
+              <p className="mt-2 whitespace-pre-wrap text-sm text-midnight">{app.notes}</p>
             </>
           ) : null}
         </div>
 
-        <div className="rounded-lg border border-zinc-200 bg-white p-5">
-          <h2 className="text-sm font-medium text-zinc-700">Documents</h2>
+        <div className="border border-dune bg-linen p-5">
+          <p className="kk-label">Documents</p>
           <FileUpload
             id={numId}
             field="resume"
@@ -118,30 +119,30 @@ export default async function ApplicationDetailPage({
         </div>
       </section>
 
-      <section className="rounded-lg border border-zinc-200 bg-white p-5">
-        <h2 className="text-sm font-medium text-zinc-700">Timeline</h2>
+      <section className="border border-dune bg-linen p-5">
+        <p className="kk-label">Timeline</p>
         {app.timeline_entries.length === 0 ? (
-          <p className="mt-2 text-sm text-zinc-500">No transitions yet.</p>
+          <p className="mt-3 text-sm text-ink-soft">No transitions yet.</p>
         ) : (
           <ol className="mt-3 space-y-3">
             {app.timeline_entries.map((entry) => (
               <li key={entry.id} className="flex items-baseline gap-3 text-sm">
-                <span className="font-mono text-xs text-zinc-400">
+                <span className="font-mono text-xs text-ink-soft">
                   {formatDate(entry.created_at)}
                 </span>
-                <span className="text-zinc-700">
-                  <code className="rounded bg-zinc-100 px-1.5 py-0.5 text-xs">
+                <span className="text-midnight">
+                  <code className="bg-sand px-1.5 py-0.5 font-mono text-xs">
                     {statusLabel(entry.from_status)}
                   </code>{" "}
                   →{" "}
-                  <code className="rounded bg-zinc-100 px-1.5 py-0.5 text-xs">
+                  <code className="bg-sand px-1.5 py-0.5 font-mono text-xs">
                     {statusLabel(entry.to_status)}
                   </code>
                 </span>
                 {entry.note ? (
-                  <span className="text-zinc-500">— {entry.note}</span>
+                  <span className="text-ink-soft">— {entry.note}</span>
                 ) : null}
-                <span className="ml-auto text-xs text-zinc-400">{timeAgo(entry.created_at)}</span>
+                <span className="ml-auto font-mono text-xs text-ink-soft">{timeAgo(entry.created_at)}</span>
               </li>
             ))}
           </ol>
@@ -154,8 +155,8 @@ export default async function ApplicationDetailPage({
 function Row({ label, value }: { label: string; value: React.ReactNode }) {
   return (
     <div className="flex justify-between gap-4">
-      <dt className="text-zinc-500">{label}</dt>
-      <dd className="text-right text-zinc-900">{value}</dd>
+      <dt className="text-ink-soft">{label}</dt>
+      <dd className="text-right text-midnight">{value}</dd>
     </div>
   );
 }

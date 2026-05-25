@@ -30,7 +30,9 @@ export function proxy(request: NextRequest) {
 }
 
 export const config = {
-  // Run on every route except Next internals and api routes.
+  // Run on every route except Next internals, api routes, and static assets.
   // The api route handlers manage their own auth (they need to see /api/auth/* unauth).
-  matcher: ["/((?!api|_next/static|_next/image|favicon.ico|.*\\.svg$|.*\\.png$).*)"],
+  matcher: [
+    "/((?!api|_next/static|_next/image|favicon.ico|manifest.webmanifest|brand/|.*\\.svg$|.*\\.png$).*)",
+  ],
 };

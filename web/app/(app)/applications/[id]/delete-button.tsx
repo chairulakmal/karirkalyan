@@ -22,11 +22,11 @@ export function DeleteButton({ id }: { id: number }) {
         type="button"
         onClick={onClick}
         disabled={pending}
-        className="rounded-md border border-rose-300 bg-white px-3 py-1.5 text-sm text-rose-700 hover:bg-rose-50 disabled:opacity-50"
+        className="border border-red-300 bg-linen px-3 py-1.5 text-sm text-red-700 hover:bg-red-50 disabled:opacity-50"
       >
         {pending ? "Deleting…" : "Delete"}
       </button>
-      {error ? <p className="mt-1 text-xs text-rose-600">{error}</p> : null}
+      {error ? <p className="mt-1 text-xs text-red-700">{error}</p> : null}
     </div>
   );
 }

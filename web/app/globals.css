@@ -1,26 +1,67 @@
 @import "tailwindcss";
 
-:root {
-  --background: #ffffff;
-  --foreground: #171717;
-}
+/* ─── Cobalt brand tokens (v1.0) ─────────────────────────────────────────
+ * Source of truth: design/assets/tokens.css
+ * Exposed to Tailwind via @theme so `bg-cobalt`, `text-saffron`, etc. work.
+ */
 
 @theme inline {
-  --color-background: var(--background);
-  --color-foreground: var(--foreground);
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
+  --color-cobalt: #1a2f6b;
+  --color-cobalt-2: #2543a1;
+  --color-midnight: #0e1730;
+  --color-ink-soft: #424b65;
+  --color-saffron: #e8a04a;
+  --color-saffron-2: #f0bc7a;
+  --color-linen: #f7f3ea;
+  --color-sand: #ece8df;
+  --color-dune: #cfc8b8;
+
+  --font-serif: var(--font-fraunces), "Times New Roman", serif;
+  --font-sans: var(--font-manrope), system-ui, -apple-system, sans-serif;
+  --font-mono: var(--font-plex-mono), ui-monospace, monospace;
+
+  --radius-card: 0;
+  --radius-button: 0;
 }
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
-  }
+:root {
+  color-scheme: light;
+  background: var(--color-sand);
+  color: var(--color-midnight);
 }
 
 body {
-  background: var(--background);
-  color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+  font-family: var(--font-sans);
+  font-size: 17px;
+  line-height: 1.5;
+}
+
+h1, h2, h3 {
+  font-family: var(--font-serif);
+  font-variation-settings: "opsz" 36, "wght" 500;
+  letter-spacing: -0.02em;
+}
+
+/* Editorial wordmark — "karir" upright + "kalyan" italic-cobalt. */
+.kk-wordmark {
+  font-family: var(--font-serif);
+  font-variation-settings: "opsz" 144, "wght" 400;
+  letter-spacing: -0.045em;
+  line-height: 0.92;
+  color: var(--color-midnight);
+  white-space: nowrap;
+}
+.kk-wordmark .kalyan {
+  font-style: italic;
+  font-variation-settings: "opsz" 144, "wght" 300;
+  color: var(--color-cobalt);
+}
+
+/* Mono eyebrow label — used for section headers and metadata. */
+.kk-label {
+  font-family: var(--font-mono);
+  font-size: 10px;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  color: var(--color-ink-soft);
 }
