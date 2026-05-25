@@ -4,7 +4,7 @@ Rails 8 API-only backend for KarirKalyan. Handles auth, application tracking, ba
 
 ## Stack
 
-- Ruby 3.4.9 (managed via mise)
+- Ruby 3.4.9
 - Rails 8.1, API-only
 - PostgreSQL 16
 - Devise + devise-jwt (JTI revocation)
@@ -13,10 +13,10 @@ Rails 8 API-only backend for KarirKalyan. Handles auth, application tracking, ba
 
 ## Local setup
 
-**Prerequisites:** Docker, Ruby 3.4.9 via [mise](https://mise.jdx.dev/), Bundler
+**Prerequisites:** Docker, Ruby 3.4.9, Bundler
 
 ```bash
-# Start PostgreSQL and Redis
+# Start PostgreSQL and Redis (docker-compose.yml lives here, reads .env automatically)
 docker compose up -d
 
 # Install dependencies and set up the database

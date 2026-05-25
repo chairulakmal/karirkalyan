@@ -2,27 +2,25 @@
 
 A full-stack job application tracker — Rails 8 API + Next.js 16 frontend.
 
-Built to demonstrate Rails backend engineering for the Tokyo job market: state machines, transactional audit trails, background jobs, and a two-tier test strategy, all in a codebase a Rails engineer can read end-to-end.
-
-**Live:** [karirkalyan.chairulakmal.com](https://karirkalyan.chairulakmal.com) · **API docs:** `/api-docs`
+**Live:** [kk.chairulakmal.com](https://kk.chairulakmal.com) *(deploying soon)* · **API docs:** `/api-docs`
 
 ---
 
-## What this project demonstrates
+## Technical highlights
 
 | Concern | Approach |
 |---|---|
-| State machine | Custom PORO — no gem; transitions are a plain array you can read |
+| State machine | Custom PORO — no gem; transitions are a plain array, easy to audit |
 | Audit trail | `TimelineEntry` written atomically with every status change |
-| Auth | Devise + devise-jwt with JTI revocation (real logout) |
+| Auth | Devise + devise-jwt with JTI revocation — stateless JWT with real logout |
 | Concurrency | Optimistic locking (`lock_version`) → `409 Conflict` |
 | Background jobs | Sidekiq + idempotency key (at-least-once safe) |
-| File storage | PostgreSQL `bytea`, 1 MB cap — no object storage for personal scale |
+| File storage | PostgreSQL `bytea`, 1 MB cap, PDF magic-byte validation |
 | Dashboard | Pure SQL aggregation — no N+1, no records loaded into Ruby |
 | API docs | rswag — request specs and OpenAPI spec share one source |
 | Testing | Unit specs (no DB) + request specs (real PostgreSQL) |
 
-This project intentionally mirrors [Awano](https://github.com/chairulakmal/awano), a Next.js multi-tenant support desk. The same patterns — FSM, transactional audit trail, service layer, two-tier testing — expressed in two different stacks.
+Also see [Awano](https://github.com/chairulakmal/awano) — a Next.js multi-tenant support desk using the same patterns (FSM, transactional audit trail, service layer, two-tier testing) in a different stack.
 
 ---
 
