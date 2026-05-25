@@ -93,8 +93,8 @@ RSpec.describe "Applications", type: :request do
 
       response "200", "application found" do
         let(:Authorization) { jwt_for(user) }
-        let(:app)           { create(:application, :applied, user: user) }
-        let(:id)            { app.id }
+        let(:record)           { create(:application, :applied, user: user) }
+        let(:id)            { record.id }
         run_test!
       end
 
@@ -106,8 +106,8 @@ RSpec.describe "Applications", type: :request do
 
       response "401", "not authenticated" do
         let(:Authorization) { nil }
-        let(:app)           { create(:application, user: user) }
-        let(:id)            { app.id }
+        let(:record)           { create(:application, user: user) }
+        let(:id)            { record.id }
         run_test!
       end
     end
@@ -138,32 +138,32 @@ RSpec.describe "Applications", type: :request do
 
       response "200", "application updated" do
         let(:Authorization) { jwt_for(user) }
-        let(:app)           { create(:application, :applied, user: user) }
-        let(:id)            { app.id }
-        let(:body)          { { application: { notes: "Strong Rails background", lock_version: app.lock_version } } }
+        let(:record)           { create(:application, :applied, user: user) }
+        let(:id)            { record.id }
+        let(:body)          { { application: { notes: "Strong Rails background", lock_version: record.lock_version } } }
         run_test!
       end
 
       response "409", "stale record — another request updated first; refresh and retry" do
         let(:Authorization) { jwt_for(user) }
-        let(:app)           { create(:application, :applied, user: user) }
-        let(:id)            { app.id }
+        let(:record)           { create(:application, :applied, user: user) }
+        let(:id)            { record.id }
         let(:body)          { { application: { notes: "Concurrent edit", lock_version: -1 } } }
         run_test!
       end
 
       response "422", "validation failed" do
         let(:Authorization) { jwt_for(user) }
-        let(:app)           { create(:application, :applied, user: user) }
-        let(:id)            { app.id }
-        let(:body)          { { application: { company: "", lock_version: app.lock_version } } }
+        let(:record)           { create(:application, :applied, user: user) }
+        let(:id)            { record.id }
+        let(:body)          { { application: { company: "", lock_version: record.lock_version } } }
         run_test!
       end
 
       response "401", "not authenticated" do
         let(:Authorization) { nil }
-        let(:app)           { create(:application, user: user) }
-        let(:id)            { app.id }
+        let(:record)           { create(:application, user: user) }
+        let(:id)            { record.id }
         let(:body)          { { application: { notes: "test" } } }
         run_test!
       end
@@ -175,15 +175,15 @@ RSpec.describe "Applications", type: :request do
 
       response "204", "application deleted" do
         let(:Authorization) { jwt_for(user) }
-        let(:app)           { create(:application, user: user) }
-        let(:id)            { app.id }
+        let(:record)           { create(:application, user: user) }
+        let(:id)            { record.id }
         run_test!
       end
 
       response "401", "not authenticated" do
         let(:Authorization) { nil }
-        let(:app)           { create(:application, user: user) }
-        let(:id)            { app.id }
+        let(:record)           { create(:application, user: user) }
+        let(:id)            { record.id }
         run_test!
       end
     end
@@ -211,37 +211,37 @@ RSpec.describe "Applications", type: :request do
 
       response "200", "status transitioned and timeline entry written" do
         let(:Authorization) { jwt_for(user) }
-        let(:app)           { create(:application, :draft, user: user) }
-        let(:id)            { app.id }
+        let(:record)           { create(:application, :draft, user: user) }
+        let(:id)            { record.id }
         let(:body)          { { status: "applied" } }
 
         run_test! do |response|
           data = JSON.parse(response.body)
           expect(data["status"]).to eq("applied")
-          expect(TimelineEntry.where(application_id: app.id).count).to eq(1)
+          expect(TimelineEntry.where(application_id: record.id).count).to eq(1)
         end
       end
 
       response "422", "invalid transition (e.g. draft → offer)" do
         let(:Authorization) { jwt_for(user) }
-        let(:app)           { create(:application, :draft, user: user) }
-        let(:id)            { app.id }
+        let(:record)           { create(:application, :draft, user: user) }
+        let(:id)            { record.id }
         let(:body)          { { status: "offer" } }
         run_test!
       end
 
       response "409", "stale record" do
         let(:Authorization) { jwt_for(user) }
-        let(:app)           { create(:application, :draft, user: user) }
-        let(:id)            { app.id }
+        let(:record)           { create(:application, :draft, user: user) }
+        let(:id)            { record.id }
         let(:body)          { { status: "applied", lock_version: -1 } }
         run_test!
       end
 
       response "401", "not authenticated" do
         let(:Authorization) { nil }
-        let(:app)           { create(:application, user: user) }
-        let(:id)            { app.id }
+        let(:record)           { create(:application, user: user) }
+        let(:id)            { record.id }
         let(:body)          { { status: "applied" } }
         run_test!
       end
@@ -258,8 +258,8 @@ RSpec.describe "Applications", type: :request do
 
       response "200", "resume binary (Content-Disposition: attachment)" do
         let(:Authorization) { jwt_for(user) }
-        let(:app)           { create(:application, :with_resume, user: user) }
-        let(:id)            { app.id }
+        let(:record)           { create(:application, :with_resume, user: user) }
+        let(:id)            { record.id }
         run_test! do |response|
           expect(response.content_type).to include("application/pdf")
         end
@@ -267,15 +267,15 @@ RSpec.describe "Applications", type: :request do
 
       response "404", "no resume uploaded for this application" do
         let(:Authorization) { jwt_for(user) }
-        let(:app)           { create(:application, user: user) }
-        let(:id)            { app.id }
+        let(:record)           { create(:application, user: user) }
+        let(:id)            { record.id }
         run_test!
       end
 
       response "401", "not authenticated" do
         let(:Authorization) { nil }
-        let(:app)           { create(:application, :with_resume, user: user) }
-        let(:id)            { app.id }
+        let(:record)           { create(:application, :with_resume, user: user) }
+        let(:id)            { record.id }
         run_test!
       end
     end
@@ -291,8 +291,8 @@ RSpec.describe "Applications", type: :request do
 
       response "200", "cover letter binary (Content-Disposition: attachment)" do
         let(:Authorization) { jwt_for(user) }
-        let(:app)           { create(:application, :with_cover_letter, user: user) }
-        let(:id)            { app.id }
+        let(:record)           { create(:application, :with_cover_letter, user: user) }
+        let(:id)            { record.id }
         run_test! do |response|
           expect(response.content_type).to include("application/pdf")
         end
@@ -300,15 +300,15 @@ RSpec.describe "Applications", type: :request do
 
       response "404", "no cover letter uploaded" do
         let(:Authorization) { jwt_for(user) }
-        let(:app)           { create(:application, user: user) }
-        let(:id)            { app.id }
+        let(:record)           { create(:application, user: user) }
+        let(:id)            { record.id }
         run_test!
       end
 
       response "401", "not authenticated" do
         let(:Authorization) { nil }
-        let(:app)           { create(:application, :with_cover_letter, user: user) }
-        let(:id)            { app.id }
+        let(:record)           { create(:application, :with_cover_letter, user: user) }
+        let(:id)            { record.id }
         run_test!
       end
     end
@@ -316,22 +316,22 @@ RSpec.describe "Applications", type: :request do
 
   # File upload — tested directly (multipart/form-data, not in OpenAPI spec)
   describe "file upload" do
-    let(:app) { create(:application, :draft, user: user) }
+    let(:record) { create(:application, :draft, user: user) }
 
     describe "PATCH /api/v1/applications/:id (resume)" do
       it "stores a valid PDF and sets resume_updated_at" do
-        patch "/api/v1/applications/#{app.id}",
+        patch "/api/v1/applications/#{record.id}",
           params: { application: { resume: fake_pdf } },
           headers: { "Authorization" => jwt_for(user) }
 
         expect(response).to have_http_status(:ok)
-        expect(app.reload.resume).to be_present
-        expect(app.resume_updated_at).to be_present
+        expect(record.reload.resume).to be_present
+        expect(record.resume_updated_at).to be_present
       end
 
       it "rejects a non-PDF file" do
-        fake_txt = Rack::Test::UploadedFile.new(StringIO.new("not a pdf"), "text/plain")
-        patch "/api/v1/applications/#{app.id}",
+        fake_txt = Rack::Test::UploadedFile.new(StringIO.new("not a pdf"), "text/plain", original_filename: "fake.txt")
+        patch "/api/v1/applications/#{record.id}",
           params: { application: { resume: fake_txt } },
           headers: { "Authorization" => jwt_for(user) }
 
@@ -341,13 +341,13 @@ RSpec.describe "Applications", type: :request do
 
     describe "PATCH /api/v1/applications/:id (cover_letter)" do
       it "stores a valid PDF and sets cover_letter_updated_at" do
-        patch "/api/v1/applications/#{app.id}",
+        patch "/api/v1/applications/#{record.id}",
           params: { application: { cover_letter: fake_pdf } },
           headers: { "Authorization" => jwt_for(user) }
 
         expect(response).to have_http_status(:ok)
-        expect(app.reload.cover_letter).to be_present
-        expect(app.cover_letter_updated_at).to be_present
+        expect(record.reload.cover_letter).to be_present
+        expect(record.cover_letter_updated_at).to be_present
       end
     end
   end

@@ -38,6 +38,7 @@ module Api
       end
 
       def transition
+        @application.lock_version = params[:lock_version] if params.key?(:lock_version)
         Applications::TransitionService.new(
           application: @application,
           to:          params.require(:status),
