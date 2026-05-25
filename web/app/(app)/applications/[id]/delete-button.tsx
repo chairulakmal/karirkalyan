@@ -1,0 +1,32 @@
+"use client";
+
+import { useState, useTransition } from "react";
+import { deleteApplication } from "@/app/lib/actions";
+
+export function DeleteButton({ id }: { id: number }) {
+  const [error, setError] = useState<string | null>(null);
+  const [pending, startTransition] = useTransition();
+
+  function onClick() {
+    if (!window.confirm("Delete this application? This cannot be undone.")) return;
+    setError(null);
+    startTransition(async () => {
+      const result = await deleteApplication(id);
+      if (result && !result.ok) setError(result.error);
+    });
+  }
+
+  return (
+    <div>
+      <button
+        type="button"
+        onClick={onClick}
+        disabled={pending}
+        className="rounded-md border border-rose-300 bg-white px-3 py-1.5 text-sm text-rose-700 hover:bg-rose-50 disabled:opacity-50"
+      >
+        {pending ? "Deleting…" : "Delete"}
+      </button>
+      {error ? <p className="mt-1 text-xs text-rose-600">{error}</p> : null}
+    </div>
+  );
+}
