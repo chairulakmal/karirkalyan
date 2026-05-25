@@ -1,0 +1,321 @@
+---
+openapi: 3.0.1
+info:
+  title: KarirKalyan API
+  version: v1
+  description: Job application tracker API — Rails 8, Devise + JWT
+servers:
+- url: http://localhost:3001
+  description: Local development
+- url: https://kk.chairulakmal.com
+  description: Production
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+      description: 'JWT issued on sign-in. Pass as: Authorization: Bearer <token>'
+paths:
+  "/api/v1/applications":
+    get:
+      summary: List applications (scoped to current user)
+      tags:
+      - Applications
+      security:
+      - bearerAuth: []
+      responses:
+        '200':
+          description: does not return another user's applications
+        '401':
+          description: not authenticated
+    post:
+      summary: Create an application
+      tags:
+      - Applications
+      security:
+      - bearerAuth: []
+      parameters: []
+      responses:
+        '201':
+          description: application created
+        '422':
+          description: validation failed (blank company or role)
+        '401':
+          description: not authenticated
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                application:
+                  type: object
+                  properties:
+                    company:
+                      type: string
+                      example: Basecamp
+                    role:
+                      type: string
+                      example: Rails Engineer
+                    status:
+                      type: string
+                      example: wishlist
+                    url:
+                      type: string
+                    notes:
+                      type: string
+                    follow_up_at:
+                      type: string
+                      format: date-time
+                  required:
+                  - company
+                  - role
+              required:
+              - application
+  "/api/v1/applications/{id}":
+    parameters:
+    - name: id
+      in: path
+      required: true
+      schema:
+        type: integer
+    get:
+      summary: Get a single application
+      tags:
+      - Applications
+      security:
+      - bearerAuth: []
+      responses:
+        '200':
+          description: application found
+        '404':
+          description: not found or belongs to another user
+        '401':
+          description: not authenticated
+    patch:
+      summary: Update an application (text fields + file upload)
+      tags:
+      - Applications
+      security:
+      - bearerAuth: []
+      parameters: []
+      responses:
+        '200':
+          description: application updated
+        '409':
+          description: stale record — another request updated first; refresh and retry
+        '422':
+          description: validation failed
+        '401':
+          description: not authenticated
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                application:
+                  type: object
+                  properties:
+                    company:
+                      type: string
+                    role:
+                      type: string
+                    url:
+                      type: string
+                    notes:
+                      type: string
+                    follow_up_at:
+                      type: string
+                      format: date-time
+                    lock_version:
+                      type: integer
+                      description: Must match current record version to prevent concurrent
+                        overwrites
+              required:
+              - application
+    delete:
+      summary: Delete an application
+      tags:
+      - Applications
+      security:
+      - bearerAuth: []
+      responses:
+        '204':
+          description: application deleted
+        '401':
+          description: not authenticated
+  "/api/v1/applications/{id}/transition":
+    parameters:
+    - name: id
+      in: path
+      required: true
+      schema:
+        type: integer
+    patch:
+      summary: Transition status via FSM
+      tags:
+      - Applications
+      security:
+      - bearerAuth: []
+      parameters: []
+      responses:
+        '200':
+          description: status transitioned and timeline entry written
+        '422':
+          description: invalid transition (e.g. draft → offer)
+        '409':
+          description: stale record
+        '401':
+          description: not authenticated
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                status:
+                  type: string
+                  enum:
+                  - wishlist
+                  - draft
+                  - applied
+                  - phone_screen
+                  - technical
+                  - final_round
+                  - offer
+                  - accepted
+                  - declined
+                  - rejected
+                  - ghosted
+                  - withdrawn
+                  - archived
+                  description: Target state. Must be a valid FSM transition from the
+                    current status.
+              required:
+              - status
+  "/api/v1/applications/{id}/resume":
+    parameters:
+    - name: id
+      in: path
+      required: true
+      schema:
+        type: integer
+    get:
+      summary: Download resume PDF
+      tags:
+      - Applications
+      security:
+      - bearerAuth: []
+      responses:
+        '200':
+          description: 'resume binary (Content-Disposition: attachment)'
+        '404':
+          description: no resume uploaded for this application
+        '401':
+          description: not authenticated
+  "/api/v1/applications/{id}/cover_letter":
+    parameters:
+    - name: id
+      in: path
+      required: true
+      schema:
+        type: integer
+    get:
+      summary: Download cover letter PDF
+      tags:
+      - Applications
+      security:
+      - bearerAuth: []
+      responses:
+        '200':
+          description: 'cover letter binary (Content-Disposition: attachment)'
+        '404':
+          description: no cover letter uploaded
+        '401':
+          description: not authenticated
+  "/api/v1/auth/sign_up":
+    post:
+      summary: Register a new account
+      tags:
+      - Auth
+      parameters: []
+      responses:
+        '201':
+          description: account created
+        '422':
+          description: validation failed (duplicate email or blank password)
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                user:
+                  type: object
+                  properties:
+                    email:
+                      type: string
+                      example: user@example.com
+                    password:
+                      type: string
+                      example: password123
+                  required:
+                  - email
+                  - password
+              required:
+              - user
+  "/api/v1/auth/sign_in":
+    post:
+      summary: Sign in
+      tags:
+      - Auth
+      parameters: []
+      responses:
+        '200':
+          description: signed in — JWT returned in Authorization header
+        '401':
+          description: invalid credentials
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                user:
+                  type: object
+                  properties:
+                    email:
+                      type: string
+                    password:
+                      type: string
+                  required:
+                  - email
+                  - password
+              required:
+              - user
+  "/api/v1/auth/sign_out":
+    delete:
+      summary: Sign out — rotates JTI to invalidate the token
+      tags:
+      - Auth
+      security:
+      - bearerAuth: []
+      responses:
+        '204':
+          description: signed out
+        '401':
+          description: not authenticated
+  "/api/v1/dashboard":
+    get:
+      summary: Application stats for the current user
+      tags:
+      - Dashboard
+      security:
+      - bearerAuth: []
+      responses:
+        '200':
+          description: empty stats when user has no applications
+        '401':
+          description: not authenticated
