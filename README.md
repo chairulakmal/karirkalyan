@@ -22,7 +22,7 @@ A full-stack job application tracker — Rails 8 API + Next.js 16 frontend.
 
 ---
 
-## State machine
+## Finite State Machine
 
 The FSM lives in [`app/lib/application_fsm.rb`](api/app/lib/application_fsm.rb) — a plain Ruby module with a `TRANSITIONS` array. No gem. Open the file and you can read every allowed transition in one pass.
 

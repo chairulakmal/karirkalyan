@@ -1,18 +1,20 @@
 import { NextResponse, type NextRequest } from "next/server";
 
-const PUBLIC_PATHS = ["/sign-in", "/sign-up"];
+const PUBLIC_PATHS = ["/", "/sign-in", "/sign-up"];
 
 export function proxy(request: NextRequest) {
   const { pathname } = request.nextUrl;
   const token = request.cookies.get("session")?.value;
 
-  if (pathname === "/") {
+  if (pathname === "/" && token) {
     const url = request.nextUrl.clone();
-    url.pathname = token ? "/dashboard" : "/sign-in";
+    url.pathname = "/dashboard";
     return NextResponse.redirect(url);
   }
 
-  const isPublic = PUBLIC_PATHS.some((p) => pathname === p || pathname.startsWith(`${p}/`));
+  const isPublic = PUBLIC_PATHS.some(
+    (p) => pathname === p || (p !== "/" && pathname.startsWith(`${p}/`)),
+  );
 
   if (!isPublic && !token) {
     const url = request.nextUrl.clone();
