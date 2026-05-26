@@ -32,41 +32,30 @@ The state model follows industry-standard ATS pipelines (Greenhouse, Lever, Work
 stateDiagram-v2
     direction LR
     [*] --> wishlist
-
     wishlist --> draft
     draft --> applied
-    applied --> phone_screen
-    phone_screen --> technical
-    technical --> final_round
+
+    state "Interview pipeline" as pipeline {
+        direction LR
+        applied --> phone_screen
+        phone_screen --> technical
+        technical --> final_round
+    }
+
     final_round --> offer
     offer --> accepted
     offer --> declined
-
-    applied --> rejected
-    phone_screen --> rejected
-    technical --> rejected
-    final_round --> rejected
     offer --> rejected
-
-    applied --> ghosted
-    phone_screen --> ghosted
-    technical --> ghosted
-    final_round --> ghosted
+    pipeline --> rejected : company passes
+    pipeline --> ghosted : no response
     ghosted --> applied : revive
-
-    wishlist --> withdrawn
-    draft --> withdrawn
-    applied --> withdrawn
-    phone_screen --> withdrawn
-    technical --> withdrawn
-    final_round --> withdrawn
 
     accepted --> [*]
     rejected --> [*]
     declined --> [*]
-    withdrawn --> [*]
-    archived --> [*]
 ```
+
+Two transitions are omitted from the diagram to keep it readable: any non-terminal state can also move to `withdrawn` (candidate exits early) or `archived` (housekeeping). Both are terminal.
 
 ### States
 
