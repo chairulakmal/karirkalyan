@@ -99,6 +99,16 @@ Also see [Awano](https://github.com/chairulakmal/awano) — a Next.js multi-tena
 
 ---
 
+## Where to find what
+
+| Looking for | Go to |
+|---|---|
+| API endpoint shapes, params, responses | `/api-docs` (Swagger UI) or `api/swagger/v1/swagger.yaml` |
+| Architecture decisions and design rationale | [notes/PLAN.md](notes/PLAN.md) |
+| Local setup and running tests | [api/README.md](api/README.md), [web/README.md](web/README.md) |
+
+---
+
 ## Stack
 
 - **Backend:** Rails 8 API-only, Ruby 3.4.9, PostgreSQL 16, Devise + devise-jwt, Sidekiq

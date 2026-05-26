@@ -1,2 +1,2 @@
-web:    bundle exec thrust ./bin/rails server
+web:    bundle exec rails server -b 0.0.0.0 -p ${PORT:-3001}
 worker: bundle exec sidekiq -C config/sidekiq.yml

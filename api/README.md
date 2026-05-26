@@ -29,6 +29,16 @@ bin/rails server
 
 API docs available at `http://localhost:3001/api-docs` once running.
 
+## Deployment env vars
+
+| Variable | Source |
+|---|---|
+| `DATABASE_URL` | Railway managed Postgres (reference variable) |
+| `REDIS_URL` | Railway managed Redis (reference variable) |
+| `DEVISE_JWT_SECRET_KEY` | Generate: `ruby -e "require 'securerandom'; puts SecureRandom.hex(64)"` |
+| `FRONTEND_URL` | URL of the deployed `web` service |
+| `SECRET_KEY_BASE` | Generate: `bin/rails secret`. Preferred over `RAILS_MASTER_KEY` — this app stores no secrets in `credentials.yml.enc`, so sharing the master key with production is unnecessary. |
+
 ## Running tests
 
 ```bash
