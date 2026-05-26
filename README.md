@@ -29,31 +29,23 @@ The FSM lives in [`app/lib/application_fsm.rb`](api/app/lib/application_fsm.rb) 
 The state model follows industry-standard ATS pipelines (Greenhouse, Lever, Workday) for the recruiter-driven stages, combined with the candidate-side states (`wishlist`, `withdrawn`, `ghosted`) that personal trackers like Huntr and Teal add on top.
 
 ```mermaid
-stateDiagram-v2
-    direction LR
-    [*] --> wishlist
-    wishlist --> draft
-    draft --> applied
-
-    state "Interview pipeline" as pipeline {
+flowchart LR
+    subgraph pipeline [Interview pipeline]
         direction LR
-        applied --> phone_screen
-        phone_screen --> technical
-        technical --> final_round
-    }
+        applied --> phone_screen --> technical --> final_round
+    end
 
+    wishlist --> draft --> applied
     final_round --> offer
+
     offer --> accepted
     offer --> declined
     offer --> rejected
-    pipeline --> rejected : company passes
-    pipeline --> ghosted : no response
-    ghosted --> applied : revive
-
-    accepted --> [*]
-    rejected --> [*]
-    declined --> [*]
+    pipeline -- company passes --> rejected
+    pipeline -- no response --> ghosted
 ```
+
+A third transition is omitted from the diagram for readability: `ghosted → applied` (a stalled application that the company eventually reaches back out on).
 
 Two transitions are omitted from the diagram to keep it readable: any non-terminal state can also move to `withdrawn` (candidate exits early) or `archived` (housekeeping). Both are terminal.
 
