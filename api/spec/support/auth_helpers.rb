@@ -14,7 +14,7 @@ module AuthHelpers
   end
 
   def fake_pdf
-    file = Tempfile.new(["test", ".pdf"])
+    file = Tempfile.new([ "test", ".pdf" ])
     file.binmode
     file.write("%PDF-1.4 fake content for testing")
     file.rewind

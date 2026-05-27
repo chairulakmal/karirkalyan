@@ -25,7 +25,7 @@ This pattern requires a server component — it's one reason Next.js was chosen 
 
 ## Local setup
 
-**Prerequisites:** Node 20+
+**Prerequisites:** Node 22+ (matches Railway production)
 
 ```bash
 npm install

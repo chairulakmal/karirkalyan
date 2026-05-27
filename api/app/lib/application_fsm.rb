@@ -33,7 +33,7 @@ module ApplicationFSM
   ].freeze
 
   TERMINAL_STATES = %w[accepted rejected declined withdrawn archived].freeze
-  VALID_STATES    = (TRANSITIONS.flat_map { |t| [t[:from], t[:to]] } + TERMINAL_STATES).uniq.freeze
+  VALID_STATES    = (TRANSITIONS.flat_map { |t| [ t[:from], t[:to] ] } + TERMINAL_STATES).uniq.freeze
 
   def self.assert_transition!(from, to)
     return if to == "archived" && !TERMINAL_STATES.include?(from)

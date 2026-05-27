@@ -6,7 +6,7 @@ RSpec.describe "Applications", type: :request do
   path "/api/v1/applications" do
     get "List applications (scoped to current user)" do
       tags "Applications"
-      security [bearerAuth: []]
+      security [ bearerAuth: [] ]
       produces "application/json"
 
       response "200", "array of applications" do
@@ -41,7 +41,7 @@ RSpec.describe "Applications", type: :request do
 
     post "Create an application" do
       tags "Applications"
-      security [bearerAuth: []]
+      security [ bearerAuth: [] ]
       consumes "application/json"
       produces "application/json"
       parameter name: :body, in: :body, schema: {
@@ -88,7 +88,7 @@ RSpec.describe "Applications", type: :request do
 
     get "Get a single application" do
       tags "Applications"
-      security [bearerAuth: []]
+      security [ bearerAuth: [] ]
       produces "application/json"
 
       response "200", "application found" do
@@ -114,7 +114,7 @@ RSpec.describe "Applications", type: :request do
 
     patch "Update an application (text fields + file upload)" do
       tags "Applications"
-      security [bearerAuth: []]
+      security [ bearerAuth: [] ]
       consumes "application/json"
       produces "application/json"
       parameter name: :body, in: :body, schema: {
@@ -171,7 +171,7 @@ RSpec.describe "Applications", type: :request do
 
     delete "Delete an application" do
       tags "Applications"
-      security [bearerAuth: []]
+      security [ bearerAuth: [] ]
 
       response "204", "application deleted" do
         let(:Authorization) { jwt_for(user) }
@@ -194,7 +194,7 @@ RSpec.describe "Applications", type: :request do
 
     patch "Transition status via FSM" do
       tags "Applications"
-      security [bearerAuth: []]
+      security [ bearerAuth: [] ]
       consumes "application/json"
       produces "application/json"
       parameter name: :body, in: :body, schema: {
@@ -253,7 +253,7 @@ RSpec.describe "Applications", type: :request do
 
     get "Download resume PDF" do
       tags "Applications"
-      security [bearerAuth: []]
+      security [ bearerAuth: [] ]
       produces "application/pdf"
 
       response "200", "resume binary (Content-Disposition: attachment)" do
@@ -286,7 +286,7 @@ RSpec.describe "Applications", type: :request do
 
     get "Download cover letter PDF" do
       tags "Applications"
-      security [bearerAuth: []]
+      security [ bearerAuth: [] ]
       produces "application/pdf"
 
       response "200", "cover letter binary (Content-Disposition: attachment)" do

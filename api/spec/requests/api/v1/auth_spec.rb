@@ -74,7 +74,7 @@ RSpec.describe "Auth", type: :request do
   path "/api/v1/auth/sign_out" do
     delete "Sign out — rotates JTI to invalidate the token" do
       tags "Auth"
-      security [bearerAuth: []]
+      security [ bearerAuth: [] ]
 
       response "204", "signed out" do
         let(:user)          { create(:user) }

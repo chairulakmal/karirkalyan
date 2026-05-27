@@ -16,52 +16,7 @@ defaults:
     working-directory: api
 
 jobs:
-  scan_ruby:
-    runs-on: ubuntu-latest
-    steps:
-      - name: Checkout code
-        uses: actions/checkout@v6
-
-      - name: Set up Ruby
-        uses: ruby/setup-ruby@v1
-        with:
-          bundler-cache: true
-          working-directory: api
-
-      - name: Scan for common Rails security vulnerabilities using static analysis
-        run: bin/brakeman --no-pager
-
-      - name: Scan for known security vulnerabilities in gems used
-        run: bin/bundler-audit
-
-  lint:
-    runs-on: ubuntu-latest
-    env:
-      RUBOCOP_CACHE_ROOT: tmp/rubocop
-    steps:
-      - name: Checkout code
-        uses: actions/checkout@v6
-
-      - name: Set up Ruby
-        uses: ruby/setup-ruby@v1
-        with:
-          bundler-cache: true
-          working-directory: api
-
-      - name: Prepare RuboCop cache
-        uses: actions/cache@v4
-        env:
-          DEPENDENCIES_HASH: ${{ hashFiles('api/.ruby-version', 'api/**/.rubocop.yml', 'api/**/.rubocop_todo.yml', 'api/Gemfile.lock') }}
-        with:
-          path: api/tmp/rubocop
-          key: rubocop-${{ runner.os }}-${{ env.DEPENDENCIES_HASH }}-${{ github.ref_name == github.event.repository.default_branch && github.run_id || 'default' }}
-          restore-keys: |
-            rubocop-${{ runner.os }}-${{ env.DEPENDENCIES_HASH }}-
-
-      - name: Lint code for consistent style
-        run: bin/rubocop -f github
-
-  rspec:
+  check:
     runs-on: ubuntu-latest
 
     services:
@@ -91,6 +46,7 @@ jobs:
 
     env:
       RAILS_ENV: test
+      RUBOCOP_CACHE_ROOT: tmp/rubocop
       DB_HOST: localhost
       DB_PORT: 5432
       DB_USERNAME: karirkalyan
@@ -108,8 +64,27 @@ jobs:
           bundler-cache: true
           working-directory: api
 
+      - name: Prepare RuboCop cache
+        uses: actions/cache@v4
+        env:
+          DEPENDENCIES_HASH: ${{ hashFiles('api/.ruby-version', 'api/**/.rubocop.yml', 'api/**/.rubocop_todo.yml', 'api/Gemfile.lock') }}
+        with:
+          path: api/tmp/rubocop
+          key: rubocop-${{ runner.os }}-${{ env.DEPENDENCIES_HASH }}-${{ github.ref_name == github.event.repository.default_branch && github.run_id || 'default' }}
+          restore-keys: |
+            rubocop-${{ runner.os }}-${{ env.DEPENDENCIES_HASH }}-
+
+      - name: Brakeman (Rails security scan)
+        run: bin/brakeman --no-pager
+
+      - name: bundler-audit (gem CVE scan)
+        run: bin/bundler-audit
+
+      - name: RuboCop
+        run: bin/rubocop -f github
+
       - name: Prepare test database
         run: bin/rails db:test:prepare
 
-      - name: Run RSpec
+      - name: RSpec
         run: bundle exec rspec

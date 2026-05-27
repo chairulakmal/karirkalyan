@@ -3,9 +3,9 @@ Devise.setup do |config|
 
   require "devise/orm/active_record"
 
-  config.case_insensitive_keys = [:email]
-  config.strip_whitespace_keys = [:email]
-  config.skip_session_storage = [:http_auth, :params_auth]
+  config.case_insensitive_keys = [ :email ]
+  config.strip_whitespace_keys = [ :email ]
+  config.skip_session_storage = [ :http_auth, :params_auth ]
   config.navigational_formats = []
   config.stretches = Rails.env.test? ? 1 : 12
   config.reconfirmable = false
@@ -19,8 +19,8 @@ Devise.setup do |config|
 
   config.jwt do |jwt|
     jwt.secret = ENV.fetch("DEVISE_JWT_SECRET_KEY")
-    jwt.dispatch_requests = [["POST", %r{^/api/v1/auth/sign_in$}]]
-    jwt.revocation_requests = [["DELETE", %r{^/api/v1/auth/sign_out$}]]
+    jwt.dispatch_requests = [ [ "POST", %r{^/api/v1/auth/sign_in$} ] ]
+    jwt.revocation_requests = [ [ "DELETE", %r{^/api/v1/auth/sign_out$} ] ]
     jwt.expiration_time = 1.day.to_i
   end
 end

@@ -1,0 +1,26 @@
+{
+  "ignored_warnings": [
+    {
+      "warning_type": "Mass Assignment",
+      "warning_code": 70,
+      "fingerprint": "09fbd2d71b03c06a206dbdfd86f178a572ba9295c15747dae95a1fc3bdff7f55",
+      "check_name": "PermitAttributes",
+      "message": "Potentially dangerous key allowed for mass assignment",
+      "file": "app/controllers/api/v1/applications_controller.rb",
+      "line": 83,
+      "link": "https://brakemanscanner.org/docs/warning_types/mass_assignment/",
+      "code": "params.require(:application).permit(:company, :role, :url, :notes, :follow_up_at, :lock_version)",
+      "render_path": null,
+      "location": {
+        "type": "method",
+        "class": "Api::V1::ApplicationsController",
+        "method": "application_params"
+      },
+      "user_input": ":lock_version",
+      "confidence": "Medium",
+      "cwe_id": [915],
+      "note": "lock_version is intentionally permitted. The optimistic locking pattern requires the client to send back the version it last saw so Rails can detect concurrent writes and raise StaleObjectError → 409 Conflict. See notes/PLAN.md 'Optimistic Locking' section."
+    }
+  ],
+  "brakeman_version": "8.0.4"
+}

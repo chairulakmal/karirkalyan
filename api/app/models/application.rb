@@ -7,7 +7,7 @@ class Application < ApplicationRecord
   MAX_FILE_SIZE = 1.megabyte
 
   validates :company, :role, :status, presence: true
-  validates :status, inclusion: { in: -> (_) { ApplicationFSM::VALID_STATES } }
+  validates :status, inclusion: { in: ->(_) { ApplicationFSM::VALID_STATES } }
   validates :resume,       length: { maximum: MAX_FILE_SIZE, message: "must be under 1 MB" }, allow_nil: true
   validates :cover_letter, length: { maximum: MAX_FILE_SIZE, message: "must be under 1 MB" }, allow_nil: true
   validate :resume_must_be_pdf,       if: -> { resume.present? && will_save_change_to_resume? }

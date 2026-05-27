@@ -6,7 +6,7 @@ RSpec.describe "Dashboard", type: :request do
   path "/api/v1/dashboard" do
     get "Application stats for the current user" do
       tags "Dashboard"
-      security [bearerAuth: []]
+      security [ bearerAuth: [] ]
       produces "application/json"
 
       response "200", "stats aggregation" do
