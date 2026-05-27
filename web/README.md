@@ -33,3 +33,18 @@ npm run dev   # :3000
 ```
 
 Expects the Rails API on `:3001`. Copy `.env.example` to `.env.local` if you need to override `NEXT_PUBLIC_API_URL`.
+
+## End-to-end tests (Playwright)
+
+A single smoke test covers the critical path: sign up → land on dashboard → create application → transition status. Runs in ~2 seconds.
+
+```bash
+# Prereq: Postgres + Redis running (cd ../api && docker compose up -d)
+
+npm run test:e2e            # headless run
+npm run test:e2e:ui         # interactive UI mode for debugging
+```
+
+Playwright auto-starts the Rails API (`:3001`) and Next.js (`:3000`) via its `webServer` config; if they're already running, it reuses them. Each test run registers a unique email (`e2e-<timestamp>@example.com`) so the DB stays usable across runs without cleanup.
+
+Test files live in `e2e/`. Browser binaries are installed into `~/.cache/ms-playwright/` (not the repo).
