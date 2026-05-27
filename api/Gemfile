@@ -21,6 +21,9 @@ gem "sidekiq-cron"
 gem "rswag-api"
 gem "rswag-ui"
 
+# Structured single-line JSON logs in production for Railway log aggregation
+gem "lograge"
+
 group :development, :test do
   gem "dotenv-rails"
   gem "debug", platforms: %i[ mri windows ], require: "debug/prelude"
@@ -35,4 +38,7 @@ end
 group :test do
   gem "database_cleaner-active_record"
   gem "rswag-specs"
+  gem "simplecov", require: false
+  gem "prosopite"
+  gem "pg_query"
 end

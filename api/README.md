@@ -45,14 +45,19 @@ API docs available at `http://localhost:3001/api-docs` once running.
 # First time (or after a new migration): prepare the test database
 bin/rails db:test:prepare
 
-bundle exec rspec                          # full suite
+bundle exec rspec                          # full suite (coverage + N+1 detection on by default)
 bundle exec rspec spec/lib spec/services   # unit specs only (no DB, fast)
 bundle exec rspec spec/requests            # request specs only (real PostgreSQL)
+COVERAGE=false bundle exec rspec           # skip SimpleCov for a faster run
 ```
 
 Two-tier strategy:
 - `spec/lib/`, `spec/services/` — unit specs, no database, pure logic
 - `spec/requests/` — request specs against a real PostgreSQL database (also the rswag source for OpenAPI generation)
+
+**Coverage:** SimpleCov runs by default and writes to `/coverage/` (gitignored). Open `coverage/index.html` in a browser after a run. Branch coverage enabled; 80% line minimum enforced.
+
+**N+1 detection:** `prosopite` wraps every request spec and raises `Prosopite::NPlusOneQueriesError` on detection. Opt-out per spec with `RSpec.describe "...", type: :request, skip_n_plus_one: true do` (use sparingly — usually a real signal).
 
 ## Regenerating API docs
 

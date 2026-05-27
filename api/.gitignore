@@ -24,3 +24,6 @@
 
 # Ignore key files for decrypting credentials and more.
 /config/*.key
+
+# SimpleCov output (regenerated each test run).
+/coverage/
