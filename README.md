@@ -1,8 +1,12 @@
 # KarirKalyan
 
+[![API CI](https://github.com/chairulakmal/karirkalyan/actions/workflows/api.yml/badge.svg)](https://github.com/chairulakmal/karirkalyan/actions/workflows/api.yml)
+[![Web CI](https://github.com/chairulakmal/karirkalyan/actions/workflows/web.yml/badge.svg)](https://github.com/chairulakmal/karirkalyan/actions/workflows/web.yml)
+[![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
+
 A full-stack job application tracker — Rails 8 API + Next.js 16 frontend.
 
-**Live:** [kk.chairulakmal.com](https://kk.chairulakmal.com) *(deploying soon)* · **API docs:** `/api-docs`
+**Live:** [kk.chairulakmal.com](https://kk.chairulakmal.com) · **API docs:** Swagger UI at [`/api-docs`](https://api-production-4899.up.railway.app/api-docs) on the API service
 
 ---
 
@@ -77,6 +81,38 @@ Status changes go through `Applications::TransitionService`, which asserts the t
 ---
 
 Also see [Awano](https://github.com/chairulakmal/awano) — a Next.js multi-tenant support desk using the same patterns (FSM, transactional audit trail, service layer, two-tier testing) in a different stack.
+
+---
+
+## Codebase tour
+
+A 90-second walkthrough for reviewers landing cold. Read these files in order and you'll have the whole picture.
+
+```
+api/
+  app/lib/application_fsm.rb              ← FSM: a TRANSITIONS array, no gem, read top to bottom
+  app/services/applications/
+    transition_service.rb                 ← Status change + audit row in one DB transaction
+  app/jobs/follow_up_reminder_job.rb      ← Idempotent Sidekiq job (idempotency_key pattern)
+  app/controllers/api/v1/
+    applications_controller.rb            ← REST + transition + binary file download
+    dashboard_controller.rb               ← Pure SQL aggregation — no N+1, no records loaded
+  app/models/
+    application.rb                        ← FSM-controlled status, bytea file columns + magic-byte validation
+    timeline_entry.rb                     ← Append-only audit log
+  spec/
+    lib/, services/                       ← Unit specs — no DB, fast
+    requests/                             ← Real-DB specs — also the rswag source for OpenAPI
+
+web/
+  proxy.ts                                ← Auth route guard (Next.js 16 renamed middleware.ts)
+  app/api/auth/session/route.ts           ← Receives JWT from Rails, sets httpOnly cookie
+  app/lib/api.ts                          ← Server-side fetch helper — JWT never reaches the browser
+  app/(app)/dashboard/page.tsx            ← Applications list + stats
+  app/(app)/applications/[id]/page.tsx    ← Detail + timeline + FSM-driven transition buttons
+```
+
+Architecture rationale for every decision lives in [notes/PLAN.md](notes/PLAN.md).
 
 ---
 

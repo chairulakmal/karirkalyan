@@ -1,0 +1,115 @@
+name: API
+
+on:
+  pull_request:
+    paths:
+      - 'api/**'
+      - '.github/workflows/api.yml'
+  push:
+    branches: [main]
+    paths:
+      - 'api/**'
+      - '.github/workflows/api.yml'
+
+defaults:
+  run:
+    working-directory: api
+
+jobs:
+  scan_ruby:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v6
+
+      - name: Set up Ruby
+        uses: ruby/setup-ruby@v1
+        with:
+          bundler-cache: true
+          working-directory: api
+
+      - name: Scan for common Rails security vulnerabilities using static analysis
+        run: bin/brakeman --no-pager
+
+      - name: Scan for known security vulnerabilities in gems used
+        run: bin/bundler-audit
+
+  lint:
+    runs-on: ubuntu-latest
+    env:
+      RUBOCOP_CACHE_ROOT: tmp/rubocop
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v6
+
+      - name: Set up Ruby
+        uses: ruby/setup-ruby@v1
+        with:
+          bundler-cache: true
+          working-directory: api
+
+      - name: Prepare RuboCop cache
+        uses: actions/cache@v4
+        env:
+          DEPENDENCIES_HASH: ${{ hashFiles('api/.ruby-version', 'api/**/.rubocop.yml', 'api/**/.rubocop_todo.yml', 'api/Gemfile.lock') }}
+        with:
+          path: api/tmp/rubocop
+          key: rubocop-${{ runner.os }}-${{ env.DEPENDENCIES_HASH }}-${{ github.ref_name == github.event.repository.default_branch && github.run_id || 'default' }}
+          restore-keys: |
+            rubocop-${{ runner.os }}-${{ env.DEPENDENCIES_HASH }}-
+
+      - name: Lint code for consistent style
+        run: bin/rubocop -f github
+
+  rspec:
+    runs-on: ubuntu-latest
+
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_USER: karirkalyan
+          POSTGRES_PASSWORD: karirkalyan
+          POSTGRES_DB: api_test
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U karirkalyan"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+
+      redis:
+        image: redis:7
+        ports:
+          - 6379:6379
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+
+    env:
+      RAILS_ENV: test
+      DB_HOST: localhost
+      DB_PORT: 5432
+      DB_USERNAME: karirkalyan
+      DB_PASSWORD: karirkalyan
+      REDIS_URL: redis://localhost:6379/0
+      DEVISE_JWT_SECRET_KEY: ci-only-not-a-real-secret
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v6
+
+      - name: Set up Ruby
+        uses: ruby/setup-ruby@v1
+        with:
+          bundler-cache: true
+          working-directory: api
+
+      - name: Prepare test database
+        run: bin/rails db:test:prepare
+
+      - name: Run RSpec
+        run: bundle exec rspec
