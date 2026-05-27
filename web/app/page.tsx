@@ -13,16 +13,6 @@ export default function Home() {
         </div>
         <nav className="flex items-center gap-6 text-sm">
           <Link
-            href={REPO_URL}
-            target="_blank"
-            rel="noreferrer noopener"
-            className="flex items-center gap-2 text-ink-soft transition hover:text-midnight"
-            aria-label="View source on GitHub"
-          >
-            <GitHubIcon className="h-4 w-4" />
-            <span className="hidden sm:inline">Source</span>
-          </Link>
-          <Link
             href="/sign-in"
             className="font-medium text-cobalt underline underline-offset-4 hover:text-cobalt-2"
           >
@@ -65,7 +55,7 @@ export default function Home() {
               className="ml-1 inline-flex items-center gap-2 px-2 py-3 text-sm text-ink-soft transition hover:text-midnight"
             >
               <GitHubIcon className="h-4 w-4" />
-              View source
+              Source code
             </Link>
           </div>
 

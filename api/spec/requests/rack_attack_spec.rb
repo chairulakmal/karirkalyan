@@ -1,6 +1,6 @@
 require "rails_helper"
 
-RSpec.describe "Rack::Attack throttling", type: :request do
+RSpec.describe "Rack::Attack throttling", type: :request, skip_n_plus_one: true do
   before do
     Rack::Attack.enabled     = true
     Rack::Attack.cache.store = ActiveSupport::Cache::MemoryStore.new
