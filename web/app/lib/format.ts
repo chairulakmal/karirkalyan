@@ -41,11 +41,11 @@ const STATUS_CLASS: Record<Status, string> = {
 };
 
 export function statusLabel(s: Status): string {
-  return STATUS_LABEL[s] ?? s;
+  return STATUS_LABEL[s];
 }
 
 export function statusBadgeClass(s: Status): string {
-  return STATUS_CLASS[s] ?? "bg-dune/40 text-ink-soft ring-dune";
+  return STATUS_CLASS[s];
 }
 
 const RELATIVE = new Intl.RelativeTimeFormat("en", { numeric: "auto" });

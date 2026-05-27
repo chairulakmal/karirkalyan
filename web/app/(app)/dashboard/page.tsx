@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { apiFetch } from "@/app/lib/api";
 import { formatDate, statusBadgeClass, statusLabel, timeAgo } from "@/app/lib/format";
-import type { Application, DashboardStats } from "@/app/lib/types";
+import type { Application, DashboardStats, Status } from "@/app/lib/types";
 
 export default async function Dashboard() {
   const [appsRes, statsRes] = await Promise.all([
@@ -80,7 +80,7 @@ export default async function Dashboard() {
 }
 
 function Stats({ stats }: { stats: DashboardStats }) {
-  const buckets = Object.entries(stats.by_status);
+  const buckets = Object.entries(stats.by_status) as [Status, number][];
   if (buckets.length === 0) return null;
   return (
     <section className="border border-dune bg-linen p-5">
@@ -89,9 +89,9 @@ function Stats({ stats }: { stats: DashboardStats }) {
         {buckets.map(([status, count]) => (
           <li
             key={status}
-            className={`inline-flex items-center gap-2 px-3 py-1 text-xs font-medium ring-1 ring-inset ${statusBadgeClass(status as never)}`}
+            className={`inline-flex items-center gap-2 px-3 py-1 text-xs font-medium ring-1 ring-inset ${statusBadgeClass(status)}`}
           >
-            {statusLabel(status as never)}
+            {statusLabel(status)}
             <span className="font-mono">{count}</span>
           </li>
         ))}
