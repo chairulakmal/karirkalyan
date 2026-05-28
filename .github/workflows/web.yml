@@ -2,14 +2,8 @@ name: Web
 
 on:
   pull_request:
-    paths:
-      - 'web/**'
-      - '.github/workflows/web.yml'
   push:
     branches: [main]
-    paths:
-      - 'web/**'
-      - '.github/workflows/web.yml'
 
 defaults:
   run:
@@ -17,6 +11,7 @@ defaults:
 
 jobs:
   check:
+    name: Lint, typecheck & build
     runs-on: ubuntu-latest
     env:
       # Build-time placeholder; real value comes from Railway in production.

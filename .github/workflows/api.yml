@@ -2,14 +2,8 @@ name: API
 
 on:
   pull_request:
-    paths:
-      - 'api/**'
-      - '.github/workflows/api.yml'
   push:
     branches: [main]
-    paths:
-      - 'api/**'
-      - '.github/workflows/api.yml'
 
 defaults:
   run:
@@ -17,6 +11,7 @@ defaults:
 
 jobs:
   check:
+    name: Lint, security & test
     runs-on: ubuntu-latest
 
     services:
