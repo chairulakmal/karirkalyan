@@ -42,3 +42,5 @@ group :test do
   gem "prosopite"
   gem "pg_query"
 end
+
+gem "honeybadger", "~> 6.6"
