@@ -60,9 +60,11 @@ Rails.application.configure do
   config.active_record.attributes_for_inspect = [ :id ]
 
   # DNS-rebinding protection. Production domain + Railway-issued preview/prod
-  # subdomains. An additional host can be supplied at runtime via APP_HOST.
+  # subdomains + private-network hostnames for service-to-service calls.
+  # An additional host can be supplied at runtime via APP_HOST.
   config.hosts << "kk.chairulakmal.com"
   config.hosts << /.*\.railway\.app/
+  config.hosts << /.*\.railway\.internal/
   config.hosts << ENV["APP_HOST"] if ENV["APP_HOST"].present?
 
   # Health check endpoint skips host authorization so the platform's prober
