@@ -3,11 +3,11 @@ class FollowUpReminderJob < ApplicationJob
 
   def perform
     due = Application
-      .where("DATE(follow_up_at) = ?", Date.today)
+      .where("DATE(follow_up_at) = ?", Date.current)
       .where.not(status: ApplicationFSM::TERMINAL_STATES)
 
     due.find_each do |application|
-      key = "reminder-#{application.id}-#{Date.today}"
+      key = "reminder-#{application.id}-#{Date.current}"
       next if TimelineEntry.exists?(idempotency_key: key)
 
       TimelineEntry.create!(

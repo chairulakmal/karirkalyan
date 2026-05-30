@@ -57,9 +57,20 @@ RSpec.describe Applications::TransitionService do
       it "writes a timeline entry" do
         allow(application).to receive(:update!)
         expect(entries).to receive(:create!).with(
-          hash_including(actor: actor, from_status: "draft", to_status: "applied")
+          hash_including(actor: actor, from_status: "draft", to_status: "applied", note: nil)
         )
         service.call
+      end
+
+      it "writes the note to the timeline entry when provided" do
+        allow(application).to receive(:update!)
+        service_with_note = described_class.new(
+          application: application, to: "applied", actor: actor, note: "Company reached back out"
+        )
+        expect(entries).to receive(:create!).with(
+          hash_including(note: "Company reached back out")
+        )
+        service_with_note.call
       end
 
       it "returns the application" do

@@ -73,6 +73,7 @@ export default async function ApplicationDetailPage({
             id={numId}
             lockVersion={app.lock_version}
             validNextStates={app.valid_next_states}
+            currentStatus={app.status}
           />
         )}
       </section>

@@ -29,10 +29,13 @@ module ApplicationFSM
     { from: "applied",      to: "withdrawn"    },
     { from: "phone_screen", to: "withdrawn"    },
     { from: "technical",    to: "withdrawn"    },
-    { from: "final_round",  to: "withdrawn"    }
+    { from: "final_round",  to: "withdrawn"    },
+
+    { from: "rejected",     to: "applied"      },
+    { from: "withdrawn",    to: "applied"      }
   ].freeze
 
-  TERMINAL_STATES = %w[accepted rejected declined withdrawn archived].freeze
+  TERMINAL_STATES = %w[accepted declined archived].freeze
   VALID_STATES    = (TRANSITIONS.flat_map { |t| [ t[:from], t[:to] ] } + TERMINAL_STATES).uniq.freeze
 
   def self.assert_transition!(from, to)
