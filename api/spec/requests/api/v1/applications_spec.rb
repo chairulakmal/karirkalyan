@@ -9,15 +9,16 @@ RSpec.describe "Applications", type: :request do
       security [ bearerAuth: [] ]
       produces "application/json"
 
-      response "200", "array of applications" do
+      response "200", "paginated envelope with data + meta" do
         let(:Authorization) { jwt_for(user) }
         before { create_list(:application, 2, :applied, user: user) }
 
         run_test! do |response|
-          data = JSON.parse(response.body)
-          expect(data.length).to eq(2)
-          expect(data.first.keys).to include("id", "company", "role", "status")
-          expect(data.first.keys).not_to include("resume", "cover_letter")
+          body = JSON.parse(response.body)
+          expect(body["data"].length).to eq(2)
+          expect(body["data"].first.keys).to include("id", "company", "role", "status")
+          expect(body["data"].first.keys).not_to include("resume", "cover_letter")
+          expect(body["meta"]).to include("has_more" => false, "next_cursor" => nil)
         end
       end
 
@@ -29,7 +30,7 @@ RSpec.describe "Applications", type: :request do
         end
 
         run_test! do |response|
-          expect(JSON.parse(response.body).length).to eq(1)
+          expect(JSON.parse(response.body)["data"].length).to eq(1)
         end
       end
 
@@ -311,6 +312,42 @@ RSpec.describe "Applications", type: :request do
         let(:id)            { record.id }
         run_test!
       end
+    end
+  end
+
+  # Cursor-based pagination
+  describe "GET /api/v1/applications — cursor pagination" do
+    let(:headers) { { "Authorization" => jwt_for(user) } }
+
+    before do
+      3.times { |i| create(:application, user: user, created_at: (3 - i).hours.ago) }
+    end
+
+    it "returns data envelope and meta.has_more false when records fit in one page" do
+      get "/api/v1/applications", headers: headers
+      body = JSON.parse(response.body)
+      expect(response).to have_http_status(:ok)
+      expect(body["data"].length).to eq(3)
+      expect(body["meta"]["has_more"]).to be false
+      expect(body["meta"]["next_cursor"]).to be_nil
+    end
+
+    it "returns has_more true and a next_cursor when records exceed the limit" do
+      get "/api/v1/applications?limit=2", headers: headers
+      body = JSON.parse(response.body)
+      expect(body["data"].length).to eq(2)
+      expect(body["meta"]["has_more"]).to be true
+      expect(body["meta"]["next_cursor"]).to be_a(String)
+    end
+
+    it "returns the correct next page when given an after cursor" do
+      get "/api/v1/applications?limit=2", headers: headers
+      cursor = JSON.parse(response.body)["meta"]["next_cursor"]
+
+      get "/api/v1/applications?limit=2&after=#{cursor}", headers: headers
+      body = JSON.parse(response.body)
+      expect(body["data"].length).to eq(1)
+      expect(body["meta"]["has_more"]).to be false
     end
   end
 

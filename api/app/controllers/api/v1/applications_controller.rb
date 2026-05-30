@@ -5,8 +5,24 @@ module Api
       before_action :set_nosniff_header, only: %i[resume cover_letter]
 
       def index
-        applications = current_user.applications.order(created_at: :desc)
-        render json: applications
+        limit = [ [ params.fetch(:limit, 20).to_i, 1 ].max, 100 ].min
+        scope = current_user.applications.order(created_at: :desc)
+
+        if params[:after].present?
+          begin
+            cursor_time = Time.zone.parse(Base64.urlsafe_decode64(params[:after]))
+            scope = scope.where("created_at < ?", cursor_time)
+          rescue ArgumentError
+            # malformed cursor — ignore, return first page
+          end
+        end
+
+        records     = scope.limit(limit + 1).to_a
+        has_more    = records.size > limit
+        records     = records.first(limit)
+        next_cursor = has_more ? Base64.urlsafe_encode64(records.last.created_at.iso8601(6)) : nil
+
+        render json: { data: records, meta: { next_cursor: next_cursor, has_more: has_more } }
       end
 
       def show
@@ -21,7 +37,7 @@ module Api
         if application.save
           render json: application, status: :created
         else
-          render json: { errors: application.errors.full_messages }, status: :unprocessable_entity
+          render json: { error: application.errors.full_messages.join(". ") }, status: :unprocessable_entity
         end
       end
 
@@ -29,7 +45,7 @@ module Api
         if @application.update(application_params)
           render json: @application
         else
-          render json: { errors: @application.errors.full_messages }, status: :unprocessable_entity
+          render json: { error: @application.errors.full_messages.join(". ") }, status: :unprocessable_entity
         end
       end
 

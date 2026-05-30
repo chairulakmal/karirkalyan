@@ -102,8 +102,5 @@ function extractError(body: unknown): string | null {
   if (!body || typeof body !== "object") return null;
   const obj = body as Record<string, unknown>;
   if (typeof obj.error === "string") return obj.error;
-  if (Array.isArray(obj.errors) && obj.errors.every((m) => typeof m === "string")) {
-    return (obj.errors as string[]).join(", ");
-  }
   return null;
 }
