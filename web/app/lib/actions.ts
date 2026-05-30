@@ -8,14 +8,38 @@ import type { Application } from "./types";
 export type ActionResult = { ok: true } | { ok: false; error: string };
 
 export async function createApplication(formData: FormData): Promise<ActionResult> {
-  const application = pickApplicationFields(formData);
-  if (!application.company || !application.role) {
+  const company = formData.get("company")?.toString().trim();
+  const role = formData.get("role")?.toString().trim();
+  if (!company || !role) {
     return { ok: false, error: "Company and role are required" };
+  }
+
+  const body = new FormData();
+  body.append("application[company]", company);
+  body.append("application[role]", role);
+
+  const url = formData.get("url")?.toString().trim();
+  if (url) body.append("application[url]", url);
+
+  const notes = formData.get("notes")?.toString().trim();
+  if (notes) body.append("application[notes]", notes);
+
+  const followUpAt = formData.get("follow_up_at")?.toString().trim();
+  if (followUpAt) body.append("application[follow_up_at]", followUpAt);
+
+  const resume = formData.get("resume");
+  if (resume instanceof File && resume.size > 0) {
+    body.append("application[resume]", resume);
+  }
+
+  const coverLetter = formData.get("cover_letter");
+  if (coverLetter instanceof File && coverLetter.size > 0) {
+    body.append("application[cover_letter]", coverLetter);
   }
 
   const res = await apiFetch<Application>("/applications", {
     method: "POST",
-    body: JSON.stringify({ application }),
+    body,
   });
 
   if (!res.ok) return { ok: false, error: res.error };
