@@ -14,7 +14,7 @@ RSpec.describe FollowUpReminderJob, type: :job do
     it "sets the idempotency key" do
       application # force creation before job runs
       described_class.new.perform
-      key = "reminder-#{application.id}-#{Date.today}"
+      key = "reminder-#{application.id}-#{Date.current}"
       expect(TimelineEntry.exists?(idempotency_key: key)).to be true
     end
 
@@ -31,7 +31,7 @@ RSpec.describe FollowUpReminderJob, type: :job do
     end
 
     it "skips terminal-state applications" do
-      create(:application, user: user, status: "rejected", follow_up_at: Time.current)
+      create(:application, user: user, status: "declined", follow_up_at: Time.current)
       expect { described_class.new.perform }
         .not_to change(TimelineEntry, :count)
     end

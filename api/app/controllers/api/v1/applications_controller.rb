@@ -63,7 +63,8 @@ module Api
         Applications::TransitionService.new(
           application: @application,
           to:          params.require(:status),
-          actor:       current_user
+          actor:       current_user,
+          note:        params[:note].presence
         ).call
         render json: @application.reload.as_json.merge(
           valid_next_states: ApplicationFSM.valid_next_states(@application.status)

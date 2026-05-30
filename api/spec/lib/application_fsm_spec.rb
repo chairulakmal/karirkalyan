@@ -57,7 +57,7 @@ RSpec.describe ApplicationFSM do
       end
 
       it "allows any non-terminal state → archived" do
-        %w[wishlist draft applied phone_screen technical final_round offer ghosted].each do |state|
+        %w[wishlist draft applied phone_screen technical final_round offer ghosted rejected withdrawn].each do |state|
           expect { described_class.assert_transition!(state, "archived") }.not_to raise_error
         end
       end
@@ -66,6 +66,14 @@ RSpec.describe ApplicationFSM do
     context "valid transitions — revival" do
       it "allows ghosted → applied (company reaches back out)" do
         expect { described_class.assert_transition!("ghosted", "applied") }.not_to raise_error
+      end
+
+      it "allows rejected → applied (recruiter rescinds rejection)" do
+        expect { described_class.assert_transition!("rejected", "applied") }.not_to raise_error
+      end
+
+      it "allows withdrawn → applied (candidate re-engages)" do
+        expect { described_class.assert_transition!("withdrawn", "applied") }.not_to raise_error
       end
     end
 
@@ -90,8 +98,8 @@ RSpec.describe ApplicationFSM do
           .to raise_error(ApplicationFSM::InvalidTransitionError)
       end
 
-      it "raises on rejected → anything (terminal)" do
-        expect { described_class.assert_transition!("rejected", "applied") }
+      it "raises on rejected → non-applied state (only revival to applied allowed)" do
+        expect { described_class.assert_transition!("rejected", "phone_screen") }
           .to raise_error(ApplicationFSM::InvalidTransitionError)
       end
 
@@ -100,8 +108,8 @@ RSpec.describe ApplicationFSM do
           .to raise_error(ApplicationFSM::InvalidTransitionError)
       end
 
-      it "raises on withdrawn → anything (terminal)" do
-        expect { described_class.assert_transition!("withdrawn", "applied") }
+      it "raises on withdrawn → non-applied state (only revival to applied allowed)" do
+        expect { described_class.assert_transition!("withdrawn", "phone_screen") }
           .to raise_error(ApplicationFSM::InvalidTransitionError)
       end
 
@@ -153,8 +161,18 @@ RSpec.describe ApplicationFSM do
         .to contain_exactly("applied", "archived")
     end
 
-    it "returns empty array for all terminal states" do
-      %w[accepted rejected declined withdrawn archived].each do |state|
+    it "returns [applied, archived] for rejected (recruiter re-engagement)" do
+      expect(described_class.valid_next_states("rejected"))
+        .to contain_exactly("applied", "archived")
+    end
+
+    it "returns [applied, archived] for withdrawn (candidate re-engagement)" do
+      expect(described_class.valid_next_states("withdrawn"))
+        .to contain_exactly("applied", "archived")
+    end
+
+    it "returns empty array for hard terminal states" do
+      %w[accepted declined archived].each do |state|
         expect(described_class.valid_next_states(state)).to be_empty
       end
     end

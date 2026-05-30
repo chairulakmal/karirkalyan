@@ -47,10 +47,11 @@ export async function transitionStatus(
   id: number,
   to: string,
   lockVersion: number,
+  note?: string,
 ): Promise<ActionResult> {
   const res = await apiFetch<Application>(`/applications/${id}/transition`, {
     method: "PATCH",
-    body: JSON.stringify({ status: to, lock_version: lockVersion }),
+    body: JSON.stringify({ status: to, lock_version: lockVersion, note: note ?? null }),
   });
   if (!res.ok) return { ok: false, error: res.error };
   revalidatePath(`/applications/${id}`);

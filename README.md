@@ -53,9 +53,7 @@ flowchart LR
     pipeline -- no response --> ghosted
 ```
 
-A third transition is omitted from the diagram for readability: `ghosted → applied` (a stalled application that the company eventually reaches back out on).
-
-Two transitions are omitted from the diagram to keep it readable: any non-terminal state can also move to `withdrawn` (candidate exits early) or `archived` (housekeeping). Both are terminal.
+Several transitions are omitted from the diagram to keep it readable: any non-terminal state can also move to `withdrawn` (candidate exits early) or `archived` (housekeeping); `ghosted → applied` covers the company reaching back out; and `rejected → applied` / `withdrawn → applied` cover re-engagement after a negative outcome.
 
 ### States
 
@@ -70,15 +68,16 @@ Two transitions are omitted from the diagram to keep it readable: any non-termin
 | `offer` | company | Offer extended |
 | `accepted` | candidate | Offer accepted — terminal |
 | `declined` | candidate | Offer received but declined — terminal |
-| `rejected` | company | Company declined the candidate — terminal |
+| `rejected` | company | Company declined the candidate — revivable to `applied` |
 | `ghosted` | — | No response after a reasonable window — revivable to `applied` |
-| `withdrawn` | candidate | Candidate withdrew before any decision — terminal |
+| `withdrawn` | candidate | Candidate withdrew before any decision — revivable to `applied` |
 | `archived` | candidate | Hidden from default views without losing history — terminal |
 
 **Design notes:**
-- `ghosted` is not terminal — companies do reach back out, so the FSM allows `ghosted → applied`.
-- `rejected` (company-initiated), `declined` (candidate refuses offer), and `withdrawn` (candidate exits early) are kept distinct. This matches how real ATS pipelines model outcomes — collapsing them into one "closed" state loses the signal a recruiter looks for in cohort analytics.
-- Any non-terminal state can move to `archived` for housekeeping without deleting timeline history.
+- `rejected`, `ghosted`, and `withdrawn` are not hard terminal — each can transition back to `applied`. Recruiters rescind rejections; companies reach back out to ghosted candidates; candidates re-engage after withdrawing. Every reversal is logged in the `TimelineEntry` audit trail, so the history stays intact.
+- Only `accepted`, `declined`, and `archived` are hard terminal. You don't un-accept a job offer, and a candidate declining an offer is a deliberate final outcome, not a mistake.
+- `rejected` (company-initiated), `declined` (candidate refuses offer), and `withdrawn` (candidate exits early) are kept distinct. Collapsing them into one "closed" state loses the signal a recruiter looks for in cohort analytics.
+- Any non-hard-terminal state can move to `archived` for housekeeping without deleting timeline history.
 
 Status changes go through `Applications::TransitionService`, which asserts the transition before touching the database, then writes the status update and a `TimelineEntry` in a single transaction. Direct attribute writes to `status` are not used anywhere.
 
