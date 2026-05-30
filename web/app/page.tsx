@@ -35,9 +35,15 @@ export default function Home() {
         <nav className="flex items-center gap-6 text-sm">
           <Link
             href="/sign-in"
-            className="font-medium text-cobalt underline underline-offset-4 hover:text-cobalt-2"
+            className="font-medium text-ink-soft hover:text-midnight"
           >
             Sign in
+          </Link>
+          <Link
+            href="/sign-in"
+            className="bg-cobalt px-4 py-1.5 font-medium text-linen transition hover:bg-cobalt-2"
+          >
+            Try demo
           </Link>
         </nav>
       </header>
@@ -58,10 +64,10 @@ export default function Home() {
 
           <div className="mt-10 flex flex-wrap items-center gap-3">
             <Link
-              href="/sign-up"
+              href="/sign-in"
               className="inline-flex items-center justify-center bg-cobalt px-6 py-3 text-sm font-medium text-linen transition hover:bg-cobalt-2"
             >
-              Get started
+              Try demo
             </Link>
             <Link
               href="/sign-in"
