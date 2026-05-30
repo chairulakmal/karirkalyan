@@ -40,6 +40,13 @@ export default async function Dashboard() {
         <p className="font-mono text-xs text-ink-soft">
           Average days from apply → offer:{" "}
           <span className="text-midnight">{stats.avg_days_to_offer}</span>
+          <span className="group relative ml-2 inline-block align-middle">
+            <span className="cursor-help select-none text-ink-soft/50 hover:text-ink-soft">ⓘ</span>
+            <span className="pointer-events-none absolute bottom-full left-1/2 z-10 mb-2 w-56 -translate-x-1/2 rounded bg-midnight px-3 py-2 font-sans leading-relaxed text-linen opacity-0 shadow-lg transition-opacity group-hover:opacity-100">
+              Counts applications that reached offer, accepted, or declined. Measured from your
+              applied date to when the offer status was recorded in the audit log.
+            </span>
+          </span>
         </p>
       )}
 
