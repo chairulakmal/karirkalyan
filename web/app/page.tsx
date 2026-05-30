@@ -3,9 +3,30 @@ import { Mark, Wordmark } from "@/app/components/wordmark";
 
 const REPO_URL = "https://github.com/chairulakmal/karirkalyan";
 
+const jsonLd = {
+  "@context": "https://schema.org",
+  "@type": "WebApplication",
+  name: "KarirKalyan",
+  description:
+    "Track every job application from wishlist to offer. Status pipeline, audit trail, and follow-up reminders — built for a focused job search.",
+  url: "https://kk.chairulakmal.com",
+  applicationCategory: "BusinessApplication",
+  operatingSystem: "Web Browser",
+  offers: { "@type": "Offer", price: "0", priceCurrency: "USD" },
+  author: {
+    "@type": "Person",
+    name: "Chairul Akmal",
+    url: "https://github.com/chairulakmal",
+  },
+};
+
 export default function Home() {
   return (
     <div className="flex flex-1 flex-col">
+      <script
+        type="application/ld+json"
+        dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }}
+      />
       <header className="flex items-center justify-between px-6 py-6 md:px-12">
         <div className="flex items-center gap-3">
           <Mark size={32} />
