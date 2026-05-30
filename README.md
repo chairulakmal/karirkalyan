@@ -4,9 +4,13 @@
 [![Web CI](https://github.com/chairulakmal/karirkalyan/actions/workflows/web.yml/badge.svg)](https://github.com/chairulakmal/karirkalyan/actions/workflows/web.yml)
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
 
+[🇯🇵 日本語](README.ja.md)
+
 A full-stack job application tracker — Rails 8 API + Next.js 16 frontend.
 
 **Live:** [kk.chairulakmal.com](https://kk.chairulakmal.com) · **API docs:** Swagger UI at [`/api-docs`](https://api-production-4899.up.railway.app/api-docs) on the API service
+
+**Demo account** — sign in as `demo@karirkalyan.com` / `oretachinomachida` to explore a prefilled Tokyo tech job search (12 mock applications across Marcari, Vine Corp, Rokuton, and more — all FSM states covered). Or click **Try demo account** on the sign-in page.
 
 ---
 

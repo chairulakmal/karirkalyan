@@ -39,3 +39,81 @@ jobs:
 
       - name: Build
         run: npm run build
+
+  e2e:
+    name: Playwright E2E
+    if: github.event_name == 'push'
+    needs: check
+    runs-on: ubuntu-latest
+
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_USER: karirkalyan
+          POSTGRES_PASSWORD: karirkalyan
+          POSTGRES_DB: api_development
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U karirkalyan"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+
+      redis:
+        image: redis:8
+        ports:
+          - 6379:6379
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+
+    env:
+      RAILS_ENV: development
+      DB_HOST: localhost
+      DB_PORT: 5432
+      DB_USERNAME: karirkalyan
+      DB_PASSWORD: karirkalyan
+      DATABASE_URL: postgresql://karirkalyan:karirkalyan@localhost:5432/api_development
+      REDIS_URL: redis://localhost:6379/0
+      DEVISE_JWT_SECRET_KEY: ci-only-not-a-real-secret
+      API_URL: http://localhost:3001
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v6
+
+      - name: Set up Ruby
+        uses: ruby/setup-ruby@v1
+        with:
+          bundler-cache: true
+          working-directory: api
+
+      - name: Prepare database
+        run: bin/rails db:create db:migrate
+        working-directory: api
+
+      - name: Set up Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: web/package-lock.json
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Cache Playwright browsers
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/ms-playwright
+          key: playwright-chromium-${{ runner.os }}-${{ hashFiles('web/package-lock.json') }}
+
+      - name: Install Playwright browsers
+        run: npx playwright install --with-deps chromium
+
+      - name: Run E2E tests
+        run: npm run test:e2e

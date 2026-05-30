@@ -5,14 +5,14 @@ import type { Application, DashboardStats, Status } from "@/app/lib/types";
 
 export default async function Dashboard() {
   const [appsRes, statsRes] = await Promise.all([
-    apiFetch<Application[]>("/applications"),
+    apiFetch<{ data: Application[]; meta: { next_cursor: string | null; has_more: boolean } }>("/applications"),
     apiFetch<DashboardStats>("/dashboard"),
   ]);
 
   if (!appsRes.ok) {
     return <ErrorBlock message={appsRes.error} />;
   }
-  const applications = appsRes.data;
+  const { data: applications } = appsRes.data;
   const stats = statsRes.ok ? statsRes.data : null;
 
   return (
