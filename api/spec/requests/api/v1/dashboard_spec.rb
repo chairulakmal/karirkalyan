@@ -46,4 +46,30 @@ RSpec.describe "Dashboard", type: :request do
       end
     end
   end
+
+  describe "avg_days_to_offer uses the timeline entry timestamp" do
+    let(:headers) { { "Authorization" => jwt_for(user) } }
+
+    it "calculates days from applied_at to the offer timeline entry, not updated_at" do
+      app = create(:application, user: user, status: "accepted",
+                   applied_at: 30.days.ago, updated_at: 1.day.ago)
+      create(:timeline_entry, application: app, actor: user,
+             from_status: "final_round", to_status: "offer",
+             created_at: 10.days.ago)
+
+      get "/api/v1/dashboard", headers: headers
+      data = JSON.parse(response.body)
+
+      # 30 days ago → offer 10 days ago = ~20 days, not ~29 days (updated_at drift)
+      expect(data["avg_days_to_offer"]).to be_within(0.5).of(20.0)
+    end
+
+    it "returns nil when no qualifying applications exist" do
+      create(:application, user: user, status: "applied")
+
+      get "/api/v1/dashboard", headers: headers
+      data = JSON.parse(response.body)
+      expect(data["avg_days_to_offer"]).to be_nil
+    end
+  end
 end

@@ -5,8 +5,12 @@ module Api
       before_action :set_nosniff_header, only: %i[resume cover_letter]
 
       def index
-        limit = [ [ params.fetch(:limit, 20).to_i, 1 ].max, 100 ].min
+        limit = [ [ params.fetch(:limit, 10).to_i, 1 ].max, 100 ].min
         scope = current_user.applications.order(created_at: :desc)
+
+        if params[:status].present? && ApplicationFSM::VALID_STATES.include?(params[:status])
+          scope = scope.where(status: params[:status])
+        end
 
         if params[:after].present?
           begin

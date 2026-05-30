@@ -351,6 +351,43 @@ RSpec.describe "Applications", type: :request do
     end
   end
 
+  describe "GET /api/v1/applications — status filter" do
+    let(:headers) { { "Authorization" => jwt_for(user) } }
+
+    before do
+      create(:application, user: user, status: "applied",      created_at: 3.hours.ago)
+      create(:application, user: user, status: "applied",      created_at: 2.hours.ago)
+      create(:application, user: user, status: "phone_screen", created_at: 1.hour.ago)
+    end
+
+    it "returns only applications matching the requested status" do
+      get "/api/v1/applications?status=applied", headers: headers
+      body = JSON.parse(response.body)
+      expect(response).to have_http_status(:ok)
+      expect(body["data"].length).to eq(2)
+      expect(body["data"].map { |a| a["status"] }.uniq).to eq([ "applied" ])
+    end
+
+    it "ignores unrecognised status values and returns all applications" do
+      get "/api/v1/applications?status=invalid", headers: headers
+      body = JSON.parse(response.body)
+      expect(response).to have_http_status(:ok)
+      expect(body["data"].length).to eq(3)
+    end
+
+    it "combines status filter with cursor pagination" do
+      get "/api/v1/applications?status=applied&limit=1", headers: headers
+      body = JSON.parse(response.body)
+      expect(body["meta"]["has_more"]).to be true
+      cursor = body["meta"]["next_cursor"]
+
+      get "/api/v1/applications?status=applied&limit=1&after=#{cursor}", headers: headers
+      body2 = JSON.parse(response.body)
+      expect(body2["data"].length).to eq(1)
+      expect(body2["meta"]["has_more"]).to be false
+    end
+  end
+
   # File upload — tested directly (multipart/form-data, not in OpenAPI spec)
   describe "file upload" do
     let(:record) { create(:application, :draft, user: user) }
