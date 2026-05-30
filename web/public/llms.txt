@@ -1,0 +1,38 @@
+# KarirKalyan
+
+> Full-stack job application tracker — Rails 8 API + Next.js 16 frontend
+
+KarirKalyan is a web application for tracking job applications through a finite state machine (FSM)
+pipeline. Built as a portfolio project by Chairul Akmal.
+
+## What it does
+
+- Tracks job applications across 13 FSM states: wishlist → draft → applied → phone_screen →
+  technical → final_round → offer → accepted/declined/rejected/ghosted/withdrawn/archived
+- Writes an immutable TimelineEntry on every status transition (full audit trail)
+- Sends follow-up reminders via idempotent Sidekiq background jobs
+- Stores resume and cover letter as PostgreSQL bytea per application
+- Exposes a stats dashboard via pure SQL aggregation (no N+1)
+- Cursor-based pagination on the applications list
+
+## Tech stack
+
+- Backend: Rails 8 API-only, Ruby 3.4.9, PostgreSQL 16, Devise + devise-jwt, Sidekiq + Redis 8
+- Frontend: Next.js 16 App Router, TypeScript, Tailwind CSS
+- Auth: JWT issued by Rails, stored in httpOnly cookie by Next.js — never reaches client JS
+- Deploy: Railway (API service + web service + managed PostgreSQL + managed Redis)
+- Tests: RSpec (unit + request specs against real DB), Playwright E2E
+
+## Live
+
+- App: https://kk.chairulakmal.com
+- API docs (Swagger UI): https://api-production-4899.up.railway.app/api-docs
+- Demo account: demo@karirkalyan.com / oretachinomachida (12 pre-loaded Tokyo tech applications)
+
+## Source
+
+https://github.com/chairulakmal/karirkalyan
+
+## Author
+
+Chairul Akmal — https://github.com/chairulakmal

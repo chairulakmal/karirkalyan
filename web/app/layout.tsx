@@ -24,9 +24,29 @@ const plexMono = IBM_Plex_Mono({
   display: "swap",
 });
 
+const BASE_URL = "https://kk.chairulakmal.com";
+const TITLE = "KarirKalyan — Job Application Tracker";
+const DESCRIPTION =
+  "Track every job application from wishlist to offer. Status pipeline, audit trail, and follow-up reminders — built for a focused job search.";
+
 export const metadata: Metadata = {
-  title: "KarirKalyan",
-  description: "Job application tracker — FSM-backed, audited, idempotent.",
+  metadataBase: new URL(BASE_URL),
+  title: { default: TITLE, template: "%s — KarirKalyan" },
+  description: DESCRIPTION,
+  openGraph: {
+    title: TITLE,
+    description: DESCRIPTION,
+    url: BASE_URL,
+    siteName: "KarirKalyan",
+    type: "website",
+    locale: "en_US",
+  },
+  twitter: {
+    card: "summary",
+    title: TITLE,
+    description: DESCRIPTION,
+  },
+  robots: { index: true, follow: true },
   icons: {
     icon: [
       { url: "/favicon.png", sizes: "32x32", type: "image/png" },

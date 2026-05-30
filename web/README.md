@@ -14,14 +14,14 @@ The Rails API issues a JWT in the `Authorization` response header on sign-in. Ra
 
 This pattern requires a server component — it's one reason Next.js was chosen over a pure Vite/SPA setup.
 
-## Planned screens
+## Screens
 
 | Route | Content |
 |---|---|
 | `/sign-in`, `/sign-up` | Auth forms — POST to Rails, exchange token through `/api/auth/session` |
-| `/` | Applications board — status badges, `follow_up_at` indicator |
-| `/applications/[id]` | Detail view — FSM transition buttons (from `valid_next_states`), timeline entries |
-| `/applications/[id]` | File upload inputs (`accept=".pdf"`), displays `resume_updated_at` as "uploaded N days ago" |
+| `/dashboard` | Applications list with status badges and `follow_up_at` indicators, plus stats summary |
+| `/applications/new` | Create a new application |
+| `/applications/[id]` | Detail view — FSM transition buttons (from `valid_next_states`), timeline entries, resume/cover letter upload |
 
 ## Local setup
 
@@ -32,7 +32,7 @@ npm install
 npm run dev   # :3000
 ```
 
-Expects the Rails API on `:3001`. Copy `.env.example` to `.env.local` if you need to override `NEXT_PUBLIC_API_URL`.
+Expects the Rails API on `:3001`. Copy `.env.example` to `.env.local` if you need to override `API_URL` (server-side only — never exposed to the browser).
 
 ## End-to-end tests (Playwright)
 
