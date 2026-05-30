@@ -1,4 +1,4 @@
-name: Web
+name: web-ci
 
 on:
   pull_request:
