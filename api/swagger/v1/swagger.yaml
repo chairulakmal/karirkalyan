@@ -319,3 +319,15 @@ paths:
           description: empty stats when user has no applications
         '401':
           description: not authenticated
+  "/api/v1/me":
+    get:
+      summary: Get the authenticated user's profile
+      tags:
+      - Me
+      security:
+      - bearerAuth: []
+      responses:
+        '200':
+          description: current user profile
+        '401':
+          description: not authenticated

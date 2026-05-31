@@ -72,4 +72,30 @@ RSpec.describe "Dashboard", type: :request do
       expect(data["avg_days_to_offer"]).to be_nil
     end
   end
+
+  describe "Redis caching" do
+    let(:headers) { { "Authorization" => jwt_for(user) } }
+    # Test env runs :null_store (no-op); swap in a real store to exercise caching.
+    before { allow(Rails).to receive(:cache).and_return(ActiveSupport::Cache::MemoryStore.new) }
+
+    it "serves a repeated request from cache without recomputing" do
+      create(:application, :applied, user: user)
+      get "/api/v1/dashboard", headers: headers
+      expect(JSON.parse(response.body)["total"]).to eq(1)
+
+      expect_any_instance_of(Api::V1::DashboardController).not_to receive(:compute_stats)
+      get "/api/v1/dashboard", headers: headers
+      expect(JSON.parse(response.body)["total"]).to eq(1)
+    end
+
+    it "recomputes when the user's applications change (cache key invalidates)" do
+      create(:application, :applied, user: user)
+      get "/api/v1/dashboard", headers: headers
+      expect(JSON.parse(response.body)["total"]).to eq(1)
+
+      create(:application, :applied, user: user)
+      get "/api/v1/dashboard", headers: headers
+      expect(JSON.parse(response.body)["total"]).to eq(2)
+    end
+  end
 end

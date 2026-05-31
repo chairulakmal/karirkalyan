@@ -1,7 +1,6 @@
 import Link from "next/link";
 import { Mark, Wordmark } from "@/app/components/wordmark";
-
-const REPO_URL = "https://github.com/chairulakmal/karirkalyan";
+import { REPO_URL, API_DOCS_URL } from "@/app/lib/links";
 
 const jsonLd = {
   "@context": "https://schema.org",
@@ -116,6 +115,14 @@ export default function Home() {
         <div className="mx-auto flex max-w-3xl flex-wrap items-center justify-between gap-3">
           <p>&copy; 2026 Chairul Akmal</p>
           <p className="flex items-center gap-4">
+            <Link
+              href={API_DOCS_URL}
+              target="_blank"
+              rel="noreferrer noopener"
+              className="underline underline-offset-4 hover:text-midnight"
+            >
+              API docs
+            </Link>
             <Link
               href={`${REPO_URL}/blob/main/LICENSE`}
               target="_blank"

@@ -1,14 +1,15 @@
 import Link from "next/link";
 import { apiFetch } from "@/app/lib/api";
-import type { Application, DashboardStats, Status } from "@/app/lib/types";
+import type { Application, DashboardStats, Status, User } from "@/app/lib/types";
 import { ApplicationsList } from "./applications-list";
 
 export default async function Dashboard() {
-  const [appsRes, statsRes] = await Promise.all([
+  const [appsRes, statsRes, meRes] = await Promise.all([
     apiFetch<{ data: Application[]; meta: { next_cursor: string | null; has_more: boolean } }>(
       "/applications?limit=10",
     ),
     apiFetch<DashboardStats>("/dashboard"),
+    apiFetch<User>("/me"),
   ]);
 
   if (!appsRes.ok) {
@@ -17,6 +18,7 @@ export default async function Dashboard() {
 
   const { data: applications, meta } = appsRes.data;
   const stats = statsRes.ok ? statsRes.data : null;
+  const me = meRes.ok ? meRes.data : null;
   const statusBuckets = stats ? (Object.entries(stats.by_status) as [Status, number][]) : [];
   const total = stats?.total ?? applications.length;
 
@@ -35,6 +37,28 @@ export default async function Dashboard() {
           New application
         </Link>
       </header>
+
+      {me && (
+        <section className="border border-dune bg-linen p-5">
+          <p className="kk-label">Profile</p>
+          <dl className="mt-3 flex flex-wrap gap-x-10 gap-y-2 text-sm">
+            <div>
+              <dt className="font-mono text-xs text-ink-soft">Email</dt>
+              <dd className="mt-0.5 text-midnight">{me.email}</dd>
+            </div>
+            <div>
+              <dt className="font-mono text-xs text-ink-soft">Member since</dt>
+              <dd className="mt-0.5 text-midnight">
+                {new Date(me.created_at).toLocaleDateString(undefined, {
+                  year: "numeric",
+                  month: "long",
+                  day: "numeric",
+                })}
+              </dd>
+            </div>
+          </dl>
+        </section>
+      )}
 
       {stats?.avg_days_to_offer != null && (
         <p className="font-mono text-xs text-ink-soft">

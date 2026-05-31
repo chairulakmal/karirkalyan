@@ -57,10 +57,22 @@ Rails.application.configure do
     enable_starttls_auto: true
   }
 
-  # Cache store — in-process memory is enough at personal-use scale.
-  # Switch to :redis_cache_store later if cross-process cache invalidation becomes useful
-  # (Redis is already a dependency for Sidekiq).
-  config.cache_store = :memory_store
+  # Redis-backed cache, shared across the Puma workers and the Sidekiq process
+  # (Redis is already present for Sidekiq). This also gives Rack::Attack a shared
+  # throttle store — see config/initializers/rack_attack.rb. Short timeouts keep a
+  # slow/unreachable Redis from stalling requests, and the error_handler degrades
+  # to a cache miss (reporting to Honeybadger) instead of raising.
+  config.cache_store = :redis_cache_store, {
+    url:                ENV.fetch("REDIS_URL"),
+    namespace:          "kk:cache",
+    connect_timeout:    1,
+    read_timeout:       1,
+    write_timeout:      1,
+    reconnect_attempts: 1,
+    error_handler: ->(method:, returning:, exception:) {
+      Honeybadger.notify(exception, context: { cache_method: method }) if defined?(Honeybadger)
+    }
+  }
 
   # ActiveJob queue adapter is set to :sidekiq in config/application.rb — no override needed here.
   # Solid Queue/Cache were removed in favour of Sidekiq + Redis (see notes/PLAN.md).
