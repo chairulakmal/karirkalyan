@@ -392,6 +392,38 @@ RSpec.describe "Applications", type: :request do
   describe "file upload" do
     let(:record) { create(:application, :draft, user: user) }
 
+    describe "POST /api/v1/applications (with files at creation)" do
+      it "stores a resume when provided at creation" do
+        post "/api/v1/applications",
+          params: { application: { company: "Mercari", role: "Backend Engineer", resume: fake_pdf } },
+          headers: { "Authorization" => jwt_for(user) }
+
+        expect(response).to have_http_status(:created)
+        expect(Application.last.resume).to be_present
+        expect(Application.last.resume_updated_at).to be_present
+      end
+
+      it "stores both resume and cover letter when provided at creation" do
+        post "/api/v1/applications",
+          params: { application: { company: "Mercari", role: "Backend Engineer", resume: fake_pdf, cover_letter: fake_pdf } },
+          headers: { "Authorization" => jwt_for(user) }
+
+        expect(response).to have_http_status(:created)
+        app = Application.last
+        expect(app.resume).to be_present
+        expect(app.cover_letter).to be_present
+      end
+
+      it "rejects a non-PDF file on create" do
+        fake_txt = Rack::Test::UploadedFile.new(StringIO.new("not a pdf"), "text/plain", original_filename: "fake.txt")
+        post "/api/v1/applications",
+          params: { application: { company: "Mercari", role: "Backend Engineer", resume: fake_txt } },
+          headers: { "Authorization" => jwt_for(user) }
+
+        expect(response).to have_http_status(:unprocessable_entity)
+      end
+    end
+
     describe "PATCH /api/v1/applications/:id (resume)" do
       it "stores a valid PDF and sets resume_updated_at" do
         patch "/api/v1/applications/#{record.id}",
