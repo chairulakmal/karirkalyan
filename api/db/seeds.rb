@@ -3,8 +3,10 @@
 # Idempotent demo seed. Safe to re-run at any time.
 # Run: bin/rails db:seed
 
-DEMO_EMAIL    = "demo@karirkalyan.com"
-DEMO_PASSWORD = "oretachinomachida"
+# Guarded so re-running the seed in one process (e.g. Demo::ResetService
+# calling load_seed) doesn't emit "already initialized constant" warnings.
+DEMO_EMAIL    = "demo@karirkalyan.com" unless defined?(DEMO_EMAIL)
+DEMO_PASSWORD = "oretachinomachida"    unless defined?(DEMO_PASSWORD)
 
 demo = User.find_or_create_by!(email: DEMO_EMAIL) do |u|
   u.password              = DEMO_PASSWORD

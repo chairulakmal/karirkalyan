@@ -51,6 +51,18 @@ API docs available at `http://localhost:3001/api-docs` once running.
 
 Locally, mail is **not** sent by default — preview rendered email at `http://localhost:3001/rails/mailers`. Set the `SMTP_*` env vars in development to send real mail (e.g. to test Resend end-to-end).
 
+## Demo data
+
+The "Try demo account" button signs every visitor into one shared user (`demo@karirkalyan.com`), so its data drifts as people explore. Seeds are idempotent (`find_or_create_by!`), but only *create* — they won't refresh rows that already exist.
+
+```bash
+bin/rails db:seed       # idempotent: adds any missing demo data, never duplicates
+bin/rails demo:reset    # full refresh: destroys the demo user (cascades to its
+                        # applications + timeline) and reseeds — real users untouched
+```
+
+On Railway, run the reset against production via `railway ssh --service api bin/rails demo:reset`. Note that `db:reset`/`db:drop` do **not** work on Railway's managed Postgres (the role can't drop the connected database) — `demo:reset` sidesteps that by deleting only the demo user's records. Logic lives in `Demo::ResetService`.
+
 ## Running tests
 
 ```bash
