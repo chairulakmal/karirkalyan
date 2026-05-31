@@ -39,4 +39,12 @@ Rails.application.configure do
 
   # Raise error when a before_action's only/except options reference missing actions.
   config.action_controller.raise_on_missing_callback_actions = true
+
+  # Email: collect in ActionMailer::Base.deliveries instead of sending.
+  config.action_mailer.delivery_method     = :test
+  config.action_mailer.default_url_options = { host: "localhost", port: 3000 }
+
+  # Use the ActiveJob test adapter so `deliver_later` enqueues to an in-memory
+  # queue we can assert on (have_enqueued_mail) rather than pushing to Sidekiq.
+  config.active_job.queue_adapter = :test
 end

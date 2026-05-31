@@ -41,6 +41,22 @@ Rails.application.configure do
   # Don't log any deprecations.
   config.active_support.report_deprecations = false
 
+  # Outbound email via SMTP (Resend in production; any SMTP host works — the
+  # code is provider-agnostic, only the env vars change). Delivery failures
+  # raise so they surface in Honeybadger rather than failing silently.
+  config.action_mailer.delivery_method        = :smtp
+  config.action_mailer.perform_deliveries     = true
+  config.action_mailer.raise_delivery_errors  = true
+  config.action_mailer.default_url_options     = { host: ENV.fetch("FRONTEND_URL", "https://kk.chairulakmal.com").sub(%r{\Ahttps?://}, ""), protocol: "https" }
+  config.action_mailer.smtp_settings = {
+    address:              ENV["SMTP_HOST"],
+    port:                 ENV.fetch("SMTP_PORT", 587).to_i,
+    user_name:            ENV["SMTP_USER"],
+    password:             ENV["SMTP_PASS"],
+    authentication:       :plain,
+    enable_starttls_auto: true
+  }
+
   # Cache store — in-process memory is enough at personal-use scale.
   # Switch to :redis_cache_store later if cross-process cache invalidation becomes useful
   # (Redis is already a dependency for Sidekiq).

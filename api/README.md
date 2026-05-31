@@ -37,8 +37,19 @@ API docs available at `http://localhost:3001/api-docs` once running.
 | `DATABASE_URL` | Railway managed Postgres (reference variable) |
 | `REDIS_URL` | Railway managed Redis (reference variable) |
 | `DEVISE_JWT_SECRET_KEY` | Generate: `ruby -e "require 'securerandom'; puts SecureRandom.hex(64)"` |
-| `FRONTEND_URL` | URL of the deployed `web` service |
+| `FRONTEND_URL` | URL of the deployed `web` service (also used as the link host in reminder emails) |
 | `SECRET_KEY_BASE` | Generate: `bin/rails secret`. Preferred over `RAILS_MASTER_KEY` — this app stores no secrets in `credentials.yml.enc`, so sharing the master key with production is unnecessary. |
+| `SMTP_HOST` | SMTP server for outbound mail. Resend: `smtp.resend.com`. The mailer is provider-agnostic — any SMTP host works. |
+| `SMTP_PORT` | SMTP port. Defaults to `587` (STARTTLS). |
+| `SMTP_USER` | SMTP username. For Resend this is the literal string `resend`. |
+| `SMTP_PASS` | SMTP password / API key. For Resend, a `re_…` API key. |
+| `MAILER_FROM` | `From:` address for outbound mail, e.g. `KarirKalyan <reminders@kk.chairulakmal.com>`. Must be on a domain verified with the SMTP provider. |
+
+### Email & scheduled reminders
+
+`FollowUpReminderJob` runs daily via **sidekiq-cron** (`config/sidekiq_cron.yml`, loaded by `config/initializers/sidekiq.rb` in the Sidekiq server process only) at `15 23 * * *` UTC — 08:15 JST, the user's morning. For each application whose `follow_up_at` falls due, it writes a `TimelineEntry` (the exactly-once idempotency anchor) and enqueues a `FollowUpMailer.reminder` email via `deliver_later` on the `mailers` queue. Decoupling delivery means a transient SMTP failure retries the email without ever duplicating the timeline entry.
+
+Locally, mail is **not** sent by default — preview rendered email at `http://localhost:3001/rails/mailers`. Set the `SMTP_*` env vars in development to send real mail (e.g. to test Resend end-to-end).
 
 ## Running tests
 

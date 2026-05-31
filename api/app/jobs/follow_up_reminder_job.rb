@@ -18,6 +18,12 @@ class FollowUpReminderJob < ApplicationJob
         note:            "Follow-up reminder",
         idempotency_key: key
       )
+
+      # The TimelineEntry above is the exactly-once anchor (unique idempotency
+      # key). Email delivery is decoupled via deliver_later — a separate,
+      # independently-retriable mail job — so a transient SMTP failure retries
+      # the email without ever duplicating the timeline entry.
+      FollowUpMailer.reminder(application).deliver_later
     end
   end
 end

@@ -35,5 +35,25 @@ RSpec.describe FollowUpReminderJob, type: :job do
       expect { described_class.new.perform }
         .not_to change(TimelineEntry, :count)
     end
+
+    describe "email delivery" do
+      it "enqueues a reminder email for a due application" do
+        application
+        expect { described_class.new.perform }
+          .to have_enqueued_mail(FollowUpMailer, :reminder).with(application)
+      end
+
+      it "does not enqueue a duplicate email on retry" do
+        described_class.new.perform
+        expect { described_class.new.perform }
+          .not_to have_enqueued_mail(FollowUpMailer, :reminder)
+      end
+
+      it "does not enqueue an email for a terminal-state application" do
+        create(:application, user: user, status: "declined", follow_up_at: Time.current)
+        expect { described_class.new.perform }
+          .not_to have_enqueued_mail(FollowUpMailer, :reminder)
+      end
+    end
   end
 end
