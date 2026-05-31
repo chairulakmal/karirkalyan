@@ -44,12 +44,22 @@ API docs available at `http://localhost:3001/api-docs` once running.
 | `SMTP_USER` | SMTP username. For Resend this is the literal string `resend`. |
 | `SMTP_PASS` | SMTP password / API key. For Resend, a `re_…` API key. |
 | `MAILER_FROM` | `From:` address for outbound mail, e.g. `KarirKalyan <reminders@kk.chairulakmal.com>`. Must be on a domain verified with the SMTP provider. |
+| `SIDEKIQ_USERNAME` | HTTP basic-auth user for the `/sidekiq` dashboard. **Required in production** — the dashboard fails closed (401) if unset. |
+| `SIDEKIQ_PASSWORD` | HTTP basic-auth password for `/sidekiq`. |
 
 ### Email & scheduled reminders
 
 `FollowUpReminderJob` runs daily via **sidekiq-cron** (`config/sidekiq_cron.yml`, loaded by `config/initializers/sidekiq.rb` in the Sidekiq server process only) at `15 23 * * *` UTC — 08:15 JST, the user's morning. For each application whose `follow_up_at` falls due, it writes a `TimelineEntry` (the exactly-once idempotency anchor) and enqueues a `FollowUpMailer.reminder` email via `deliver_later` on the `mailers` queue. Decoupling delivery means a transient SMTP failure retries the email without ever duplicating the timeline entry.
 
 Locally, mail is **not** sent by default — preview rendered email at `http://localhost:3001/rails/mailers`. Set the `SMTP_*` env vars in development to send real mail (e.g. to test Resend end-to-end).
+
+### Sidekiq dashboard
+
+Live job/queue/retry/cron view at `GET /sidekiq` (`Sidekiq::Web`). Protected by HTTP basic auth in production via `SIDEKIQ_USERNAME` / `SIDEKIQ_PASSWORD` (fails closed if unset); open on localhost in dev. API-only Rails omits the session middleware Sidekiq::Web's CSRF protection needs, so it's mounted with its own cookie session (`config/routes.rb`).
+
+### Caching
+
+Production `Rails.cache` is `:redis_cache_store` (same Redis as Sidekiq), shared across Puma workers and also backing Rack::Attack's throttle counters. The dashboard's heavy aggregation query is cached with a key derived from the user's application count + latest `updated_at`, so it self-invalidates on any change. Short client timeouts + an `error_handler` mean an unreachable Redis degrades to a cache miss rather than erroring the request.
 
 ## Demo data
 

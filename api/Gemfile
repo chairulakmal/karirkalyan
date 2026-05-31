@@ -17,6 +17,10 @@ gem "devise-jwt"
 gem "sidekiq"
 gem "sidekiq-cron"
 
+# Redis-backed Rails.cache in production (also backs Rack::Attack throttling).
+# Required by ActiveSupport's :redis_cache_store; redis-client alone isn't enough.
+gem "redis"
+
 # API docs — needed in production to serve /api-docs
 gem "rswag-api"
 gem "rswag-ui"
