@@ -22,8 +22,9 @@ A full-stack job application tracker — Rails 8 API + Next.js 16 frontend.
 | Audit trail | `TimelineEntry` written atomically with every status change |
 | Auth | Devise + devise-jwt with JTI revocation — stateless JWT with real logout |
 | Concurrency | Optimistic locking (`lock_version`) → `409 Conflict` |
-| Background jobs | Sidekiq + idempotency key (at-least-once safe) |
+| Background jobs | Sidekiq + idempotency key (at-least-once safe); runs in a dedicated `sidekiq` service in production |
 | Email | ActionMailer over SMTP (Resend) — welcome email on sign-up + daily follow-up reminders scheduled via sidekiq-cron, delivered with `deliver_later` |
+| Caching | Redis-backed `Rails.cache` in production — self-invalidating dashboard query cache + shared Rack::Attack throttle store |
 | File storage | PostgreSQL `bytea`, 1 MB cap, PDF magic-byte validation |
 | Dashboard | Pure SQL aggregation — no N+1, no records loaded into Ruby |
 | API docs | rswag — request specs and OpenAPI spec share one source |
@@ -116,7 +117,7 @@ web/
   app/(app)/applications/[id]/page.tsx    ← Detail + timeline + FSM-driven transition buttons
 ```
 
-Architecture rationale for every decision lives in [notes/PLAN.md](notes/PLAN.md).
+Architecture rationale for every decision lives in [PLAN.md](PLAN.md).
 
 ---
 
@@ -125,7 +126,7 @@ Architecture rationale for every decision lives in [notes/PLAN.md](notes/PLAN.md
 | Looking for | Go to |
 |---|---|
 | API endpoint shapes, params, responses | [`/api-docs`](https://api-production-4899.up.railway.app/api-docs) (Swagger UI) or `api/swagger/v1/swagger.yaml` |
-| Architecture decisions and design rationale | [notes/PLAN.md](notes/PLAN.md) |
+| Architecture decisions and design rationale | [PLAN.md](PLAN.md) |
 | Local setup and running tests | [api/README.md](api/README.md), [web/README.md](web/README.md) |
 
 ---
@@ -134,7 +135,7 @@ Architecture rationale for every decision lives in [notes/PLAN.md](notes/PLAN.md
 
 - **Backend:** Rails 8 API-only, Ruby 3.4.9, PostgreSQL 16, Devise + devise-jwt, Sidekiq
 - **Frontend:** Next.js 16 App Router, Tailwind CSS
-- **Infra:** Docker Compose (local), Railway (production)
+- **Infra:** Docker Compose (local); Railway (production) — separate `api` (Puma) and `sidekiq` (worker) services, managed PostgreSQL + Redis
 
 ---
 
