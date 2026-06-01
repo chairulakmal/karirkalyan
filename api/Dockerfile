@@ -1,8 +1,12 @@
 # syntax=docker/dockerfile:1
 # check=error=true
 
-# Production image for Railway.
-# Railway reads Procfile to start both Puma (web) and Sidekiq (worker).
+# Production image for Railway. One image, two services:
+#   - `api` service runs this image's default CMD (Puma).
+#   - `sidekiq` service runs the SAME image with a Start Command override
+#     (`bundle exec sidekiq -C config/sidekiq.yml`) set in the Railway dashboard.
+# NOTE: with a Dockerfile present, Railway runs this CMD and IGNORES the Procfile,
+# so background jobs only run because of the dedicated `sidekiq` service.
 # For local dev, use docker-compose.yml at the repo root (Postgres + Redis only).
 
 ARG RUBY_VERSION=3.4.9
@@ -51,6 +55,7 @@ COPY --chown=rails:rails --from=build /rails /rails
 
 ENTRYPOINT ["/rails/bin/docker-entrypoint"]
 
-# Railway overrides this via Procfile. Fallback for plain `docker run`.
+# Default command = the `api` (Puma) service. The `sidekiq` service overrides
+# this with a Start Command in the Railway dashboard.
 EXPOSE 8080
 CMD ["bundle", "exec", "rails", "server", "-b", "0.0.0.0", "-p", "8080"]
