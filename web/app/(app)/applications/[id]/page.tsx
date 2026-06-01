@@ -6,6 +6,7 @@ import type { ApplicationWithDetail } from "@/app/lib/types";
 import { TransitionButtons } from "./transition-buttons";
 import { FileUpload } from "./file-upload";
 import { DeleteButton } from "./delete-button";
+import { DetailsEditor } from "./details-editor";
 
 export default async function ApplicationDetailPage({
   params,
@@ -79,29 +80,17 @@ export default async function ApplicationDetailPage({
       </section>
 
       <section className="grid grid-cols-1 gap-6 md:grid-cols-2">
-        <div className="border border-dune bg-linen p-5">
-          <p className="kk-label">Details</p>
-          <dl className="mt-3 space-y-2 text-sm">
-            <Row label="Applied" value={app.applied_at ? formatDate(app.applied_at) : "—"} />
-            <Row
-              label="Follow up"
-              value={
-                app.follow_up_at ? (
-                  <span className="font-medium text-saffron">{formatDate(app.follow_up_at)}</span>
-                ) : (
-                  "—"
-                )
-              }
-            />
-            <Row label="Created" value={formatDate(app.created_at)} />
-          </dl>
-          {app.notes ? (
-            <>
-              <p className="kk-label mt-5">Notes</p>
-              <p className="mt-2 whitespace-pre-wrap text-sm text-midnight">{app.notes}</p>
-            </>
-          ) : null}
-        </div>
+        <DetailsEditor
+          id={numId}
+          lockVersion={app.lock_version}
+          company={app.company}
+          role={app.role}
+          url={app.url}
+          notes={app.notes}
+          followUpAt={app.follow_up_at}
+          appliedAt={app.applied_at}
+          createdAt={app.created_at}
+        />
 
         <div className="border border-dune bg-linen p-5">
           <p className="kk-label">Documents</p>
@@ -149,15 +138,6 @@ export default async function ApplicationDetailPage({
           </ol>
         )}
       </section>
-    </div>
-  );
-}
-
-function Row({ label, value }: { label: string; value: React.ReactNode }) {
-  return (
-    <div className="flex justify-between gap-4">
-      <dt className="text-ink-soft">{label}</dt>
-      <dd className="text-right text-midnight">{value}</dd>
     </div>
   );
 }
