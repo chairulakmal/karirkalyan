@@ -56,44 +56,34 @@ Created a Railway project with `api` (rooted at `api/`), `web` (rooted at `web/`
 - Cloudflare custom domain (`kk.chairulakmal.com`): grey cloud (DNS only) required for Railway's Let's Encrypt ACME HTTP-01 challenge; orange cloud intercepts the `.well-known/acme-challenge/` request and breaks provisioning.
 - DNSSEC was previously set up but had drifted (Cloudflare key rotation; DS at Njalla no longer matched), causing SERVFAIL on validating resolvers (1.1.1.1, most VPN DNS). Disabled cleanly — remove DS at registrar first, then disable DNSSEC in Cloudflare.
 
-### Phase 7 — Job-search enhancements (Tokyo market)
+### Phase 7 — Production-readiness and Tokyo-market polish
 
-Polish that signals production-readiness and Tokyo-market awareness to a Rails recruiter. Prioritised by effort-to-impact ratio. None of these are required to use the app; they exist purely to make the GitHub repo a stronger interview asset.
+None of this is needed to use the app. It's the work that makes the repo read like something built for production, plus a couple of things aimed at the Tokyo market.
 
-**Tier 1 — High impact, low effort** ✓
+**Tooling and CI**
 
-- [x] **CI runs RSpec.** Single `check` job at `.github/workflows/api.yml` runs Brakeman, bundler-audit, Rubocop, and the full RSpec suite (87 examples) against Postgres 16 + Redis 7 service containers.
-- [x] **CI for `web/`.** Single `check` job at `.github/workflows/web.yml` runs ESLint, `tsc --noEmit`, and `next build` on Node 22 (matches Railway).
-- [x] **README badges.** API CI, Web CI, MIT license badges at top of root README.
-- [x] **Repo-root `.github/`.** Workflows, `PULL_REQUEST_TEMPLATE.md`, and `ISSUE_TEMPLATE/{bug_report,feature_request}.md` live at repo root. Old `api/.github/` (which GitHub silently ignored) was deleted. `dependabot.yml` removed — `bundler-audit` in CI covers CVEs without the PR noise.
-- [x] **"Codebase tour" section in root README.** Annotated tree of the 10 most important files in reading order.
-- [x] **Brakeman ignore** at `api/config/brakeman.ignore` documenting why `lock_version` is intentionally permitted (optimistic locking pattern). 0 security warnings, 1 ignored.
-- [x] **Rubocop autocorrect** applied across 9 files (whitespace-only). 0 offenses.
-- [x] **LICENSE** updated from `kai` placeholder to full attribution.
+- [x] **CI runs RSpec.** One `check` job in `.github/workflows/api.yml` runs Brakeman, bundler-audit, Rubocop, and the full RSpec suite against Postgres 16 + Redis 7 containers.
+- [x] **CI for `web/`.** One `check` job in `.github/workflows/web.yml` runs ESLint, `tsc --noEmit`, and `next build` on Node 22 (matches Railway).
+- [x] **Repo hygiene.** Root `.github/` with workflows and PR/issue templates, README badges, a filled-in LICENSE, and a Brakeman ignore file documenting the one intentional `lock_version` allowance.
 
-**Tier 2 — Production-readiness signals**
+**Production readiness**
 
-- [x] **`/up` health endpoint with dependency checks.** `HealthController` at `app/controllers/health_controller.rb` pings Postgres + Redis. Returns 200 with `{status: "ok", checks: {...}}` when healthy, 503 + `degraded` when any dep is down. Replaces Rails 8 default (which only checks boot). 3 specs in `spec/requests/health_spec.rb`. Railway healthchecks now fail fast on dependency loss.
-- [x] **Structured JSON logging.** `lograge` (gem) configured at `config/initializers/lograge.rb` for production only. Single-line JSON entries with `time`, `request_id`, controller, action, params, status, duration. `request_id` already exposed as a log tag in `production.rb`; payload carries it through for cross-service tracing.
-- [x] **SimpleCov for coverage.** Loaded at the top of `spec/spec_helper.rb` so it instruments before any app code. `add_filter` excludes `/spec/`, `/config/`, `/db/`, `/bin/`; branch coverage enabled; 80% minimum line threshold. `/coverage/` gitignored. Current: **99.44% line / 90.48% branch**. Skippable with `COVERAGE=false` if needed.
-- [x] **N+1 detection in test env.** `prosopite` (with `pg_query`) wraps every `type: :request` example via `spec/support/prosopite.rb`. Raises `Prosopite::NPlusOneQueriesError` on detection. Per-spec opt-out via `skip_n_plus_one: true` metadata (used on the Rack::Attack throttling spec which intentionally repeats the same query to trigger rate limiting).
-- [x] **Honeybadger.** `gem "honeybadger"` added to Gemfile. Config at `config/honeybadger.yml` — reports in production only (test/development suppressed). API key read from `HONEYBADGER_API_KEY` env var (never hardcoded). Set in Railway `api` service.
-- [x] **One Playwright E2E test.** `web/e2e/smoke.spec.ts` covers sign up → dashboard → create application → transition to `applied` → see timeline entry. Playwright's `webServer` config auto-boots Rails (`:3001`) and Next.js (`:3000`) with `reuseExistingServer: true` for fast local re-runs. Each test uses a unique email so no DB cleanup is needed between runs. Full flow runs in ~2 seconds. Scripts: `npm run test:e2e` (headless) and `test:e2e:ui` (interactive). Browsers installed into `~/.cache/ms-playwright/`, not the repo. **CI approach (Phase 8):** runs as a second job (`e2e`, `needs: check`) inside the existing `web.yml` — no standalone workflow. Triggers only on `push` to `main` (not PRs) to preserve free-tier CI minutes. Needs Postgres + Redis service containers + Ruby setup alongside existing Node steps; Chromium cached via `actions/cache`.
+- [x] **`/up` health endpoint** that pings Postgres + Redis — 200 when healthy, 503 when a dependency is down, so Railway's healthcheck fails fast. The Rails 8 default only checks that the app booted.
+- [x] **Structured JSON logging** via `lograge` in production: one line per request with `request_id`, controller, action, status, and duration.
+- [x] **Test coverage** with SimpleCov (branch coverage on, 80% floor) and **N+1 detection** with `prosopite` wrapping every request spec.
+- [x] **Error tracking** with Honeybadger in production; API key comes from an env var, never hardcoded.
+- [x] **One Playwright E2E test**: sign up → create application → transition → see the timeline entry. Runs in CI on push to `main` only, to keep free-tier minutes low.
 
-**Tier 3 — Tokyo-specific differentiators**
+**For the Tokyo market**
 
-- **`README.ja.md`.** Even a brief Japanese translation of the top section. Doesn't have to be flawless — the signal is "I'm serious about working here." Highest-leverage single change for the Tokyo market; almost no one bothers. *→ Phase 8.*
-- **i18n scaffolding.** Add `rails-i18n` on the API and `next-intl` on the web. Wire at least one user-facing string in both locales with a locale switcher. Cultural-awareness signal. *Deprioritised — complex, marginal signal vs. effort.*
-- **JST-aware reminders.** Add `user.timezone` (default `"Asia/Tokyo"`) and have `FollowUpReminderJob` fire in the user's local morning. Mention in the README. *Deprioritised — requires migration + job rework; low ROI for portfolio.*
-- **Seed data with Japanese tech companies.** `db/seeds.rb` populated with Mercari, Sansan, freee, Money Forward, GMO, etc. instead of "Acme Corp". Hiring managers see it in screenshots and demo videos. *→ Phase 8.*
+- [x] **`README.ja.md`** — a Japanese version of the top of the README. Small thing, but most portfolios skip it.
+- [x] **Seed data uses recognisable Japanese tech companies** instead of "Acme Corp", so the demo and screenshots look like a real Tokyo job search.
 
-**Deliberately deprioritised**
+**Skipped on purpose**
 
-- Feature expansion (Company / Platform / Tag models — adds CRUD without new patterns; the `source` string already covers it)
-- Kubernetes / Terraform — overkill for project scale; reads as cargo-culting
-- Heavy refactors — the architecture is already clean; further changes hit diminishing returns
-- i18n scaffolding — complex, marginal signal vs. effort at this stage
-- JST-aware reminders — requires migration + job rework; not worth the noise before other gaps are closed
+- i18n / locale switcher and JST-aware reminders — both are real work (migrations, job rework) for a small payoff right now.
+- Company / Platform / Tag models — more CRUD, no new patterns; a `source` string already covers it.
+- Kubernetes / Terraform — overkill at this scale.
 
 ---
 
@@ -134,7 +124,7 @@ Closes the remaining gaps identified by post-Phase-7 gap analysis. All items fit
 
 ---
 
-### Phase 9 — Product depth (dogfood + portfolio signal)
+### Phase 9 — Product depth
 
 Four features I scoped after Phase 8 to make the app genuinely useful for a real job search. The first is built; the rest are the direction I'd take it next.
 
@@ -153,65 +143,28 @@ Env vars (documented in `api/README.md`): `SMTP_HOST`, `SMTP_PORT`, `SMTP_USER`,
 
 ---
 
-**2. Analytics dashboard — funnel + conversion stats**
+**2. Analytics dashboard**
 
-The FSM + timeline data already exists. Surface it as a second dashboard view showing:
-- Application funnel: count per status, stacked or step-chart
-- Response rate: `(phone_screen + technical + final_round + offer) / applied * 100`
-- Ghosting rate: `ghosted / applied * 100`
-- Avg days applied → first response (applied_at → first phone_screen timeline entry)
-- Avg days applied → offer (applied_at → offer timeline entry)
-
-Backend: extend `GET /api/v1/dashboard` (or add `GET /api/v1/dashboard/analytics`) with SQL aggregations — one query each, no Ruby loops. Timeline-based averages use `EXTRACT(EPOCH FROM ...)` on joined rows.
-
-Frontend: one chart component (consider Recharts or a lightweight SVG bar chart with no library). Stats cards for the rate metrics. Placed as a second tab or collapsible section on the dashboard.
-
-No new models. No migrations.
+The status and timeline data is already there; this turns it into a second dashboard view: a funnel (count per status), a response rate, a ghosting rate, and the average days from applied to first response and to offer. It's all SQL aggregation over data I already store — no new models or migrations, and one chart component on the frontend.
 
 ---
 
-**3. AI job URL pre-fill — Claude API**
+**3. AI job URL pre-fill (Claude API)**
 
-User pastes a job posting URL into a field on the new-application form. On "Import":
-1. Next.js server action fetches the URL's HTML server-side (avoids CORS)
-2. Strips to readable text (title, meta description, visible body — skip nav/footer/scripts)
-3. Passes to Claude (`claude-haiku-4-5`) with a structured prompt: extract `company`, `role`, and a 2–3 sentence `notes` summary (stack, team, key requirements)
-4. Returns `{ company, role, notes }` JSON → pre-fills the form fields; user reviews before submitting
-
-Implementation:
-- `npm install @anthropic-ai/sdk` in `web/`
-- New server action `parseJobPosting(url: string)` — fetch → strip HTML → Claude call → return structured data
-- `ANTHROPIC_API_KEY` env var (Railway `web` service)
-- "Paste job URL" field + "Import" button above the company/role fields; button shows loading state; fields populate on success; user can still edit everything
-- Falls back gracefully: if fetch fails or Claude returns malformed JSON, show an error and let the user fill fields manually
-- Cost: ~2–5k tokens per parse at Haiku pricing — fractions of a cent each
-
-Handles Japanese job postings natively (Claude reads Japanese without extra configuration). Works across Wantedly, Greenhouse, company career pages without site-specific parsers.
+Paste a job posting URL on the new-application form and have it fill in the company, role, and a short notes summary. A server action fetches the page, strips it to text, and asks Claude to pull out the fields; the user reviews before saving. Claude reads Japanese postings natively, so it works across Wantedly, Greenhouse, and company career pages without writing a parser per site.
 
 ---
 
-**4. AI cover letter / notes assist — Claude API**
+**4. AI cover letter / notes assist (Claude API)**
 
-On the application detail page, a "Draft with AI" button alongside the notes textarea. Takes the application's `company`, `role`, and any existing `notes`, optionally the uploaded resume bytes, and prompts Claude to:
-- Draft a tailored cover letter paragraph (3–4 sentences)
-- Suggest interview prep notes (likely questions, key talking points based on the role)
-
-Output appears in a side panel or modal — user copies what they want into the notes field or downloads as text. Nothing is saved automatically; the user remains in control.
-
-Implementation:
-- Streaming response (`claude-sonnet-4-6`) for perceived speed — pipe `ReadableStream` from the server action to the client via React's experimental `use(stream)` or a simple textarea append loop
-- Prompt includes: role, company, notes, resume text (extracted from the PDF bytes server-side using a basic text extraction — `pdf-parse` npm package)
-- `ANTHROPIC_API_KEY` reused from feature 3
-- No new DB columns
-
-Paired with the URL pre-fill, the whole new-application flow becomes: paste a job URL → import the fields → draft a cover letter → attach a resume, in one pass. It's the feature I'm most interested in building next.
+A "Draft with AI" button on the application detail page that takes the company, role, notes, and resume and drafts a tailored cover-letter paragraph plus a few interview-prep notes. The output streams into a panel the user can copy from — nothing is saved automatically. Paired with the URL pre-fill, the whole flow becomes: paste a job URL → import the fields → draft a cover letter → attach a resume, in one pass. It's the feature I'm most interested in building next.
 
 ---
 
-**Deliberately deferred from Phase 9:**
-- Email notifications for status transitions (not just reminders) — low signal-to-noise for personal use
-- Bulk operations (archive all ghosted) — useful but not impressive
-- i18n / locale switcher — effort disproportionate to signal at this stage
+**Deferred for now**
+- Email on every status change (not just reminders) — too noisy for personal use.
+- Bulk actions like "archive all ghosted" — handy, but not interesting to build.
+- i18n / locale switcher — too much effort for the payoff right now.
 
 ---
 
@@ -242,7 +195,7 @@ I started with a single `api` service meant to run both Puma and Sidekiq from th
 A follow-up reminder writes a `TimelineEntry` on the application detail page, and the same job also sends an email (Phase 9). I started in-app only — for a tracker you check daily, a timeline entry is enough and avoids spam and unsubscribe handling. I added email once I wanted the nudge to reach me when the app *wasn't* open, which is the point of a reminder. The `TimelineEntry` is still the source of truth (written first, with the idempotency key); the email is decoupled onto its own queue so a delivery failure retries without duplicating the entry.
 
 ### No Company / Platform / Tag models
-These would add CRUD without adding new patterns. The portfolio goal is to demonstrate FSM, transactional writes, background jobs, and two-tier testing — not to maximise model count. A `source` string column on `applications` is sufficient for tracking job platforms.
+These would add CRUD without adding new patterns. The goal is to show FSM, transactional writes, background jobs, and two-tier testing — not to maximise model count. A `source` string column on `applications` is sufficient for tracking job platforms.
 
 ---
 
