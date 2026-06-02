@@ -75,6 +75,16 @@ Because the server fetches a user-supplied URL, two safeguards apply:
 
 Errors are typed and mapped to HTTP status: bad/private URL → `422`, missing `ANTHROPIC_API_KEY` → `503`, AI failure → `502`. The model only ever receives text the server already fetched — Anthropic's server-side web-search/fetch tools are deliberately **not** used, which keeps the SSRF guard, rate limiting, and cost under the app's control. Haiku 4.5 is chosen because extraction is a small, well-defined task: a typical posting costs a fraction of a cent.
 
+**Fetch behaviour & limitations.** The fetch sends an honest, identifying `User-Agent` (`KarirKalyan-Prefill/1.0 (+https://kk.chairulakmal.com)`) rather than impersonating a browser — a site that wants to recognise the request can. Because it's a plain server-side `Net::HTTP` GET, it works on pages that serve their content as static HTML, but it will **not** reliably fetch every site, and that's by design rather than a bug:
+
+- **Bot-managed sites** (Cloudflare / Akamai challenge pages) return a `403` or a JS-challenge page instead of content.
+- **Aggressive anti-scraping** (e.g. LinkedIn) returns a login wall — effectively unfetchable server-side without authentication.
+- **JS-rendered SPAs** return a near-empty HTML shell, since the job text is loaded by client-side JavaScript the server doesn't execute.
+
+In every one of these cases the failure is graceful: a challenge/403 surfaces as `FetchError` ("couldn't fetch that page") and an empty shell as `FetchError` ("no readable text"), so the user simply falls back to filling the form by hand. Defeating bot management or rendering SPAs would mean a headless browser or a third-party scraping API — heavier infrastructure that isn't worth it for a personal tracker, so the limitation is accepted deliberately.
+
+The service also does **not** consult `robots.txt`. This is a single, user-initiated fetch of a URL the user themselves pasted — closer to a link-preview "unfurl" than to autonomous crawling — so it's treated as out of scope; it would be the first thing to add if pre-fill ever fetched URLs on its own.
+
 ## Demo data
 
 The "Try demo account" button signs every visitor into one shared user (`demo@karirkalyan.com`), so its data drifts as people explore. Seeds are idempotent (`find_or_create_by!`), but only *create* — they won't refresh rows that already exist.

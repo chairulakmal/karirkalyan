@@ -52,11 +52,13 @@ module Api
 
       def create
         application = current_user.applications.build(application_params)
-        if application.save
-          render json: application, status: :created
-        else
-          render json: { error: application.errors.full_messages.join(". ") }, status: :unprocessable_entity
+        apply_initial_status(application)
+
+        if application.errors.any? || !application.save
+          return render json: { error: application.errors.full_messages.join(". ") }, status: :unprocessable_entity
         end
+
+        render json: application, status: :created
       end
 
       def update
@@ -120,6 +122,31 @@ module Api
         attrs[:resume]       = params[:application][:resume].read       if params.dig(:application, :resume).respond_to?(:read)
         attrs[:cover_letter] = params[:application][:cover_letter].read if params.dig(:application, :cover_letter).respond_to?(:read)
         attrs
+      end
+
+      # Creation sets the initial state (the FSM only governs later transitions).
+      # `status` is restricted to the curated entry set — `status` is never mass-
+      # assignable, so a client can't POST its way straight to "offer". When the
+      # entry state is "applied", record the real applied date (defaults to now)
+      # so the dashboard's apply→response/offer timing stays honest for jobs
+      # added after the fact.
+      def apply_initial_status(application)
+        requested = params.dig(:application, :status).presence || "draft"
+
+        unless ApplicationFSM::ENTRY_STATES.include?(requested)
+          application.errors.add(:status, "must be one of: #{ApplicationFSM::ENTRY_STATES.join(', ')}")
+          return
+        end
+
+        application.status = requested
+        application.applied_at = requested_applied_at || Time.current if requested == "applied"
+      end
+
+      def requested_applied_at
+        raw = params.dig(:application, :applied_at).presence
+        raw && Time.zone.parse(raw.to_s)
+      rescue ArgumentError
+        nil
       end
     end
   end

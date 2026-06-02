@@ -38,7 +38,7 @@ paths:
       parameters: []
       responses:
         '201':
-          description: application created
+          description: defaults to draft when status is omitted
         '422':
           description: validation failed (blank company or role)
         '401':
@@ -60,7 +60,18 @@ paths:
                       example: Rails Engineer
                     status:
                       type: string
-                      example: wishlist
+                      enum:
+                      - wishlist
+                      - draft
+                      - applied
+                      example: applied
+                      description: Initial state — one of the entry states (defaults
+                        to draft). Later changes go through /transition.
+                    applied_at:
+                      type: string
+                      format: date-time
+                      description: Optional; only used when status is 'applied'. Backdates
+                        applied_at (defaults to now).
                     url:
                       type: string
                     notes:

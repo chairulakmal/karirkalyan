@@ -53,7 +53,10 @@ RSpec.describe "Applications", type: :request do
             properties: {
               company:      { type: :string, example: "Basecamp" },
               role:         { type: :string, example: "Rails Engineer" },
-              status:       { type: :string, example: "wishlist" },
+              status:       { type: :string, enum: ApplicationFSM::ENTRY_STATES, example: "applied",
+                              description: "Initial state — one of the entry states (defaults to draft). Later changes go through /transition." },
+              applied_at:   { type: :string, format: "date-time",
+                              description: "Optional; only used when status is 'applied'. Backdates applied_at (defaults to now)." },
               url:          { type: :string },
               notes:        { type: :string },
               follow_up_at: { type: :string, format: "date-time" }
@@ -64,10 +67,38 @@ RSpec.describe "Applications", type: :request do
         required: %w[application]
       }
 
-      response "201", "application created" do
+      response "201", "created in a chosen entry state (wishlist)" do
         let(:Authorization) { jwt_for(user) }
         let(:body) { { application: { company: "Basecamp", role: "Rails Engineer", status: "wishlist" } } }
-        run_test!
+        run_test! do |response|
+          expect(JSON.parse(response.body)["status"]).to eq("wishlist")
+        end
+      end
+
+      response "201", "created as applied with a backdated applied_at" do
+        let(:Authorization) { jwt_for(user) }
+        let(:body) { { application: { company: "Mercari", role: "Backend Engineer", status: "applied", applied_at: "2026-05-20" } } }
+        run_test! do |_response|
+          record = user.applications.order(:created_at).last
+          expect(record.status).to eq("applied")
+          expect(record.applied_at.to_date).to eq(Date.new(2026, 5, 20))
+        end
+      end
+
+      response "201", "defaults to draft when status is omitted" do
+        let(:Authorization) { jwt_for(user) }
+        let(:body) { { application: { company: "Cookpad", role: "SRE" } } }
+        run_test! do |response|
+          expect(JSON.parse(response.body)["status"]).to eq("draft")
+        end
+      end
+
+      response "422", "rejects a non-entry initial state" do
+        let(:Authorization) { jwt_for(user) }
+        let(:body) { { application: { company: "DeNA", role: "PM", status: "offer" } } }
+        run_test! do |response|
+          expect(JSON.parse(response.body)["error"]).to match(/must be one of/)
+        end
       end
 
       response "422", "validation failed (blank company or role)" do
