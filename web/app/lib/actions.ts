@@ -27,6 +27,16 @@ export async function createApplication(formData: FormData): Promise<ActionResul
   const followUpAt = formData.get("follow_up_at")?.toString().trim();
   if (followUpAt) body.append("application[follow_up_at]", followUpAt);
 
+  const status = formData.get("status")?.toString().trim();
+  if (status) body.append("application[status]", status);
+
+  // Only meaningful when starting in "applied" — backdates applied_at so the
+  // dashboard timing stays accurate for jobs added after the fact.
+  const appliedAt = formData.get("applied_at")?.toString().trim();
+  if (status === "applied" && appliedAt) {
+    body.append("application[applied_at]", appliedAt);
+  }
+
   const resume = formData.get("resume");
   if (resume instanceof File && resume.size > 0) {
     body.append("application[resume]", resume);

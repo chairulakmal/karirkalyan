@@ -38,6 +38,13 @@ module ApplicationFSM
   TERMINAL_STATES = %w[accepted declined archived].freeze
   VALID_STATES    = (TRANSITIONS.flat_map { |t| [ t[:from], t[:to] ] } + TERMINAL_STATES).uniq.freeze
 
+  # States an application may be *created* in. The FSM governs transitions
+  # (changes after creation); creation sets the initial state. A tracker's users
+  # add jobs at whatever stage they're really at — saved, preparing, or already
+  # applied — so all three are valid entry points. Later stages are reachable
+  # only by transitioning, which keeps the audit trail honest.
+  ENTRY_STATES = %w[wishlist draft applied].freeze
+
   def self.assert_transition!(from, to)
     return if to == "archived" && !TERMINAL_STATES.include?(from)
     unless TRANSITIONS.any? { |t| t[:from] == from && t[:to] == to }

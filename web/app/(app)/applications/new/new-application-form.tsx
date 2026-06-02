@@ -14,6 +14,10 @@ export function NewApplicationForm() {
   const [role, setRole] = useState("");
   const [notes, setNotes] = useState("");
 
+  // Creation sets the initial state; the FSM governs every change after that.
+  const [status, setStatus] = useState("draft");
+  const [appliedAt, setAppliedAt] = useState(todayISO());
+
   const [prefilling, startPrefill] = useTransition();
   const [prefillError, setPrefillError] = useState<string | null>(null);
   const [prefilled, setPrefilled] = useState(false);
@@ -98,6 +102,31 @@ export function NewApplicationForm() {
           onChange={(e) => setRole(e.target.value)}
         />
       </Row>
+      <label className="block text-sm">
+        <span className="kk-label">Status</span>
+        <select
+          name="status"
+          value={status}
+          onChange={(e) => setStatus(e.target.value)}
+          className="mt-1.5 block w-full border border-dune bg-linen px-3 py-2 text-sm text-midnight focus:border-cobalt focus:outline-none focus:ring-1 focus:ring-cobalt"
+        >
+          <option value="wishlist">Wishlist — saved, might apply</option>
+          <option value="draft">Draft — preparing my application</option>
+          <option value="applied">Applied — already submitted</option>
+        </select>
+        <span className="mt-1 block text-xs text-ink-soft">
+          You can advance the status later from the application page.
+        </span>
+      </label>
+      {status === "applied" ? (
+        <Field
+          name="applied_at"
+          label="Applied on"
+          type="date"
+          value={appliedAt}
+          onChange={(e) => setAppliedAt(e.target.value)}
+        />
+      ) : null}
       <Field name="follow_up_at" label="Follow-up date" type="date" />
       <label className="block text-sm">
         <span className="kk-label">Notes</span>
@@ -123,6 +152,12 @@ export function NewApplicationForm() {
       </button>
     </form>
   );
+}
+
+// Local date (not UTC) so "today" matches the user's calendar near midnight.
+function todayISO() {
+  const d = new Date();
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
 }
 
 function Row({ children }: { children: React.ReactNode }) {

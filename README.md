@@ -84,6 +84,8 @@ Several transitions are omitted from the diagram to keep it readable: any non-te
 
 Status changes go through `Applications::TransitionService`, which asserts the transition before touching the database, then writes the status update and a `TimelineEntry` in a single transaction. Direct attribute writes to `status` are not used anywhere.
 
+**Creation vs. transitions.** The FSM governs *changes*; *creation* sets the initial state. Since people add jobs at whatever stage they're really at, a new application can start in one of three entry states — `wishlist`, `draft`, or `applied` — chosen on the form. `status` is never mass-assignable (the entry value is validated against a curated allow-list), so creation can't be used to jump straight to a later stage; everything past the entry states is reachable only by transitioning. When you add a job you've already applied to, an optional applied date backdates `applied_at` so the dashboard's timing metrics stay accurate.
+
 ---
 
 Also see [Awano](https://github.com/chairulakmal/awano) — a Next.js multi-tenant support desk using the same patterns (FSM, transactional audit trail, service layer, two-tier testing) in a different stack.
