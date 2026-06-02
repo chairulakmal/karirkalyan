@@ -46,6 +46,7 @@ POST   /api/v1/auth/sign_up|sign_in
 DELETE /api/v1/auth/sign_out
 
 GET|POST        /api/v1/applications
+POST            /api/v1/applications/prefill          # AI URL pre-fill (Claude)
 GET|PATCH|DELETE /api/v1/applications/:id
 PATCH           /api/v1/applications/:id/transition
 GET             /api/v1/applications/:id/resume

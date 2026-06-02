@@ -28,6 +28,10 @@ gem "rswag-ui"
 # Structured single-line JSON logs in production for Railway log aggregation
 gem "lograge"
 
+# AI job-URL pre-fill — extracts company/role/notes from a pasted posting URL.
+# Official Anthropic SDK; key from ANTHROPIC_API_KEY (no-ops/raises cleanly if unset).
+gem "anthropic", "~> 1.44"
+
 group :development, :test do
   gem "dotenv-rails"
   gem "debug", platforms: %i[ mri windows ], require: "debug/prelude"

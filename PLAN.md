@@ -16,7 +16,7 @@
 - [x] Phase 6 — Deploy (Railway services, env vars, custom domain, SSL)
 - [x] Phase 7 — Job-search enhancements (Tokyo market)
 - [x] Phase 8 — API maturity & final portfolio polish
-- [~] Phase 9 — Product depth — email delivery + reminders shipped; analytics and AI assists are the roadmap
+- [~] Phase 9 — Product depth — email delivery + reminders and AI URL pre-fill shipped; the analytics dashboard and AI cover-letter assist are the roadmap
 
 ---
 
@@ -126,7 +126,7 @@ Closes the remaining gaps identified by post-Phase-7 gap analysis. All items fit
 
 ### Phase 9 — Product depth
 
-Four features I scoped after Phase 8 to make the app genuinely useful for a real job search. The first is built; the rest are the direction I'd take it next.
+Four features I scoped after Phase 8 to make the app genuinely useful for a real job search. The first two are built; the rest are the direction I'd take it next.
 
 ---
 
@@ -149,9 +149,19 @@ The status and timeline data is already there; this turns it into a second dashb
 
 ---
 
-**3. AI job URL pre-fill (Claude API)**
+**3. AI job URL pre-fill (Claude API)** *(built — Claude Haiku 4.5)*
 
-Paste a job posting URL on the new-application form and have it fill in the company, role, and a short notes summary. A server action fetches the page, strips it to text, and asks Claude to pull out the fields; the user reviews before saving. Claude reads Japanese postings natively, so it works across Wantedly, Greenhouse, and company career pages without writing a parser per site.
+Paste a job posting URL on the new-application form and it fills in the company, role, and a short notes summary. You review and edit the values before anything is saved — the AI fills the form, it doesn't save for you.
+
+The work lives in `Applications::UrlPrefillService` (a plain service object, matching the rest of the app — no AI logic in the controller). It fetches the page, strips the HTML to text, and asks Claude — via the official `anthropic` gem — to return `{ company, role, notes }` through a tool/JSON schema, so I get structured fields back instead of free text I'd have to parse. I picked **Haiku 4.5**: extraction is a small, well-defined job, so the cheapest fast model is the right tool, and a typical posting costs a fraction of a cent.
+
+I chose Claude specifically because it reads Japanese postings natively — the same flow works on a Wantedly listing, a Greenhouse page, or a company careers page without me writing a parser per site. For a Tokyo job search that's the whole point.
+
+Two things I was careful about, because the server fetches a URL the user supplies:
+- **SSRF guard.** The service resolves the host and refuses any private, loopback, or link-local address (including the cloud metadata endpoint `169.254.169.254`), and re-checks on every redirect hop — so a public hostname that points at an internal IP is still blocked.
+- **Cost and abuse.** The endpoint is auth-gated and rate-limited (Rack::Attack, 10/min per IP), with a body-size cap on the fetch and a character cap on the text sent to Claude to keep token usage bounded.
+
+Errors are typed and mapped to the right HTTP status — a bad or private URL is `422`, a missing `ANTHROPIC_API_KEY` is `503` (the rest of the app keeps working without it), and an AI failure is `502` — so the frontend can show a useful message and the user can always just fill the form in by hand. Specs: 9 service examples (happy path, SSRF, blank text, AI failure, missing key) plus 3 request examples; the endpoint is in the OpenAPI doc.
 
 ---
 
@@ -193,6 +203,9 @@ I started with a single `api` service meant to run both Puma and Sidekiq from th
 
 ### Reminders surface both in-app and by email
 A follow-up reminder writes a `TimelineEntry` on the application detail page, and the same job also sends an email (Phase 9). I started in-app only — for a tracker you check daily, a timeline entry is enough and avoids spam and unsubscribe handling. I added email once I wanted the nudge to reach me when the app *wasn't* open, which is the point of a reminder. The `TimelineEntry` is still the source of truth (written first, with the idempotency key); the email is decoupled onto its own queue so a delivery failure retries without duplicating the entry.
+
+### AI URL pre-fill — Claude Haiku 4.5, server-side, SSRF-guarded
+The pre-fill runs entirely server-side in a service object, not from the browser, so the Anthropic key never leaves the server and I can rate-limit and guard the outbound fetch in one place. I used a tool/JSON schema rather than asking for free-form text, so Claude returns structured fields I can trust without parsing. Haiku 4.5 because extraction is a small job — paying for a larger model here would be spending money for no benefit. Claude over the alternatives specifically for native Japanese comprehension, which is what makes the feature useful for a Tokyo job search. Because the user supplies the URL, the fetch refuses private/internal addresses (re-checked on each redirect) to prevent SSRF, and the whole thing degrades gracefully — with no API key the endpoint returns 503 and the rest of the app is unaffected.
 
 ### No Company / Platform / Tag models
 These would add CRUD without adding new patterns. The goal is to show FSM, transactional writes, background jobs, and two-tier testing — not to maximise model count. A `source` string column on `applications` is sufficient for tracking job platforms.
@@ -516,6 +529,7 @@ api/
     services/
       applications/
         transition_service.rb         ← FSM assert → transaction
+        url_prefill_service.rb        ← fetch URL → strip → Claude extract (SSRF-guarded)
     jobs/
       follow_up_reminder_job.rb       ← daily Sidekiq job, idempotency key
     lib/
@@ -604,6 +618,7 @@ DELETE /api/v1/auth/sign_out
 
 GET    /api/v1/applications                       ← paginated, cursor-based
 POST   /api/v1/applications
+POST   /api/v1/applications/prefill               ← AI URL pre-fill (Claude)
 GET    /api/v1/applications/:id
 PATCH  /api/v1/applications/:id
 DELETE /api/v1/applications/:id

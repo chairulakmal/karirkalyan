@@ -84,6 +84,62 @@ RSpec.describe "Applications", type: :request do
     end
   end
 
+  path "/api/v1/applications/prefill" do
+    post "Pre-fill application fields from a job URL (AI extraction)" do
+      tags "Applications"
+      security [ bearerAuth: [] ]
+      consumes "application/json"
+      produces "application/json"
+      parameter name: :body, in: :body, schema: {
+        type: :object,
+        properties: { url: { type: :string, example: "https://example.com/jobs/42" } },
+        required: %w[url]
+      }
+
+      # The service fans out to an outbound fetch + a paid Claude call, so it is
+      # stubbed here — request specs must not hit the network or the AI API.
+      response "200", "extracted fields returned for the user to review" do
+        let(:Authorization) { jwt_for(user) }
+        let(:body)          { { url: "https://example.com/jobs/42" } }
+        before do
+          allow(Applications::UrlPrefillService).to receive(:new).and_return(
+            instance_double(
+              Applications::UrlPrefillService,
+              call: { company: "Mercari", role: "Backend Engineer",
+                      notes: "Tokyo, full-time.", url: "https://example.com/jobs/42" }
+            )
+          )
+        end
+
+        run_test! do |response|
+          payload = JSON.parse(response.body)
+          expect(payload).to include("company" => "Mercari", "role" => "Backend Engineer")
+        end
+      end
+
+      response "422", "bad or private/internal URL" do
+        let(:Authorization) { jwt_for(user) }
+        let(:body)          { { url: "http://10.0.0.1/admin" } }
+        before do
+          service = instance_double(Applications::UrlPrefillService)
+          allow(service).to receive(:call)
+            .and_raise(Applications::UrlPrefillService::InvalidUrlError, "That URL points to a private or internal address.")
+          allow(Applications::UrlPrefillService).to receive(:new).and_return(service)
+        end
+
+        run_test! do |response|
+          expect(JSON.parse(response.body)).to include("error")
+        end
+      end
+
+      response "401", "not authenticated" do
+        let(:Authorization) { nil }
+        let(:body)          { { url: "https://example.com/jobs/42" } }
+        run_test!
+      end
+    end
+  end
+
   path "/api/v1/applications/{id}" do
     parameter name: :id, in: :path, type: :integer
 

@@ -1,11 +1,39 @@
 "use client";
 
 import { useState, useTransition } from "react";
-import { createApplication } from "@/app/lib/actions";
+import { createApplication, prefillFromUrl } from "@/app/lib/actions";
 
 export function NewApplicationForm() {
   const [error, setError] = useState<string | null>(null);
   const [pending, startTransition] = useTransition();
+
+  // Controlled so the AI pre-fill can populate them. The URL field doubles as
+  // the pre-fill source.
+  const [url, setUrl] = useState("");
+  const [company, setCompany] = useState("");
+  const [role, setRole] = useState("");
+  const [notes, setNotes] = useState("");
+
+  const [prefilling, startPrefill] = useTransition();
+  const [prefillError, setPrefillError] = useState<string | null>(null);
+  const [prefilled, setPrefilled] = useState(false);
+
+  function onPrefill() {
+    setPrefillError(null);
+    setPrefilled(false);
+    startPrefill(async () => {
+      const result = await prefillFromUrl(url);
+      if (!result.ok) {
+        setPrefillError(result.error);
+        return;
+      }
+      if (result.company) setCompany(result.company);
+      if (result.role) setRole(result.role);
+      if (result.notes) setNotes(result.notes);
+      if (result.url) setUrl(result.url);
+      setPrefilled(true);
+    });
+  }
 
   function onSubmit(formData: FormData) {
     setError(null);
@@ -17,17 +45,67 @@ export function NewApplicationForm() {
 
   return (
     <form action={onSubmit} className="mt-6 space-y-5 border border-dune bg-linen p-6">
+      <div className="border border-cobalt/30 bg-cobalt/5 p-4">
+        <span className="kk-label">
+          Pre-fill from a job URL{" "}
+          <span className="font-normal text-ink-soft">(optional · AI)</span>
+        </span>
+        <div className="mt-1.5 flex flex-col gap-2 sm:flex-row">
+          <input
+            name="url"
+            type="url"
+            value={url}
+            onChange={(e) => setUrl(e.target.value)}
+            placeholder="https://…"
+            className="block w-full border border-dune bg-linen px-3 py-2 text-sm text-midnight placeholder:text-ink-soft focus:border-cobalt focus:outline-none focus:ring-1 focus:ring-cobalt"
+          />
+          <button
+            type="button"
+            onClick={onPrefill}
+            disabled={prefilling || !url.trim()}
+            className="shrink-0 border border-cobalt bg-cobalt px-4 py-2 text-sm font-medium text-linen transition hover:bg-cobalt-2 disabled:opacity-50"
+          >
+            {prefilling ? "Reading…" : "Pre-fill with AI"}
+          </button>
+        </div>
+        <p className="mt-2 text-xs text-ink-soft">
+          Paste a Wantedly, LinkedIn, or company posting — Claude reads Japanese
+          too. Review the fields before saving.
+        </p>
+        {prefillError ? (
+          <p className="mt-2 text-sm text-red-700">{prefillError}</p>
+        ) : null}
+        {prefilled ? (
+          <p className="mt-2 text-sm text-cobalt">
+            Filled from the posting — review and edit before saving.
+          </p>
+        ) : null}
+      </div>
+
       <Row>
-        <Field name="company" label="Company" required />
-        <Field name="role" label="Role" required />
+        <Field
+          name="company"
+          label="Company"
+          required
+          value={company}
+          onChange={(e) => setCompany(e.target.value)}
+        />
+        <Field
+          name="role"
+          label="Role"
+          required
+          value={role}
+          onChange={(e) => setRole(e.target.value)}
+        />
       </Row>
-      <Field name="url" label="Job posting URL" type="url" placeholder="https://…" />
       <Field name="follow_up_at" label="Follow-up date" type="date" />
       <label className="block text-sm">
         <span className="kk-label">Notes</span>
         <textarea
           name="notes"
           rows={4}
+          value={notes}
+          onChange={(e) => setNotes(e.target.value)}
           className="mt-1.5 block w-full border border-dune bg-linen px-3 py-2 text-sm text-midnight placeholder:text-ink-soft focus:border-cobalt focus:outline-none focus:ring-1 focus:ring-cobalt"
         />
       </label>
