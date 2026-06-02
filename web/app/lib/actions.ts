@@ -48,6 +48,28 @@ export async function createApplication(formData: FormData): Promise<ActionResul
   redirect(`/applications/${res.data.id}`);
 }
 
+export type PrefillResult =
+  | { ok: true; company: string; role: string; notes: string; url: string }
+  | { ok: false; error: string };
+
+export async function prefillFromUrl(url: string): Promise<PrefillResult> {
+  const trimmed = url.trim();
+  if (!trimmed) return { ok: false, error: "Paste a job posting URL first." };
+
+  const res = await apiFetch<{
+    company: string;
+    role: string;
+    notes: string;
+    url: string;
+  }>("/applications/prefill", {
+    method: "POST",
+    body: JSON.stringify({ url: trimmed }),
+  });
+
+  if (!res.ok) return { ok: false, error: res.error };
+  return { ok: true, ...res.data };
+}
+
 export async function updateApplication(
   id: number,
   formData: FormData,

@@ -29,6 +29,20 @@ module Api
         render json: { data: records, meta: { next_cursor: next_cursor, has_more: has_more } }
       end
 
+      # POST /api/v1/applications/prefill — extracts company/role/notes from a
+      # pasted job-posting URL via Claude. Returns the fields for the user to
+      # review and edit in the new-application form; nothing is persisted here.
+      def prefill
+        fields = Applications::UrlPrefillService.new(params[:url]).call
+        render json: fields
+      rescue Applications::UrlPrefillService::ConfigError => e
+        render json: { error: e.message }, status: :service_unavailable
+      rescue Applications::UrlPrefillService::ExtractionError => e
+        render json: { error: e.message }, status: :bad_gateway
+      rescue Applications::UrlPrefillService::Error => e
+        render json: { error: e.message }, status: :unprocessable_entity
+      end
+
       def show
         render json: @application.as_json.merge(
           valid_next_states: ApplicationFSM.valid_next_states(@application.status),

@@ -23,6 +23,12 @@ class Rack::Attack
     req.ip if req.path == "/api/v1/auth/sign_up" && req.post?
   end
 
+  # AI URL pre-fill fans out to a paid Claude call + an outbound HTTP fetch.
+  # Throttle by IP to cap cost/abuse (the endpoint is already auth-gated).
+  throttle("ai/prefill", limit: 10, period: 1.minute) do |req|
+    req.ip if req.path == "/api/v1/applications/prefill" && req.post?
+  end
+
   self.throttled_responder = lambda do |request|
     match_data  = request.env["rack.attack.match_data"] || {}
     retry_after = match_data[:period] || 60

@@ -9,6 +9,7 @@ Rails 8 API-only backend for KarirKalyan. Handles auth, application tracking, ba
 - PostgreSQL 16
 - Devise + devise-jwt (JTI revocation)
 - Sidekiq + sidekiq-cron
+- Anthropic SDK — Claude Haiku 4.5 for AI job-URL pre-fill
 - RSpec + FactoryBot + rswag
 
 ## Local setup
@@ -44,6 +45,7 @@ API docs available at `http://localhost:3001/api-docs` once running.
 | `SMTP_USER` | SMTP username. For Resend this is the literal string `resend`. |
 | `SMTP_PASS` | SMTP password / API key. For Resend, a `re_…` API key. |
 | `MAILER_FROM` | `From:` address for outbound mail, e.g. `KarirKalyan <reminders@kk.chairulakmal.com>`. Must be on a domain verified with the SMTP provider. |
+| `ANTHROPIC_API_KEY` | Anthropic API key (pay-as-you-go, from console.anthropic.com) for the AI job-URL pre-fill. **Only the `api` service needs it** — pre-fill is a synchronous request, not a Sidekiq job. If unset, `POST /applications/prefill` returns `503` and the rest of the app is unaffected. |
 | `SIDEKIQ_USERNAME` | HTTP basic-auth user for the `/sidekiq` dashboard. **Required in production** — the dashboard fails closed (401) if unset. |
 | `SIDEKIQ_PASSWORD` | HTTP basic-auth password for `/sidekiq`. |
 
@@ -62,6 +64,16 @@ Live job/queue/retry/cron view at `GET /sidekiq` (`Sidekiq::Web`). Protected by 
 ### Caching
 
 Production `Rails.cache` is `:redis_cache_store` (same Redis as Sidekiq), shared across Puma workers and also backing Rack::Attack's throttle counters. The dashboard's heavy aggregation query is cached with a key derived from the user's application count + latest `updated_at`, so it self-invalidates on any change. Short client timeouts + an `error_handler` mean an unreachable Redis degrades to a cache miss rather than erroring the request.
+
+### AI job-URL pre-fill
+
+`POST /api/v1/applications/prefill` takes a job-posting URL and returns `{ company, role, notes }` for the user to review and edit before saving — the AI fills the form, it never writes to the database. Logic lives in `Applications::UrlPrefillService`: it fetches the page, strips the HTML to text, and asks **Claude Haiku 4.5** (official `anthropic` gem) to extract the fields via a tool/JSON schema, so the response is structured data rather than free text to parse. Claude reads Japanese postings natively — the same flow works on a Wantedly listing, a Greenhouse page, or a company careers site without a per-site parser, which is the point for a Tokyo job search.
+
+Because the server fetches a user-supplied URL, two safeguards apply:
+- **SSRF guard** — the host is resolved and any private / loopback / link-local address (including the cloud metadata endpoint `169.254.169.254`) is refused, re-checked on every redirect hop.
+- **Cost & abuse control** — the endpoint is auth-gated and rate-limited via Rack::Attack (10/min per IP), with a body-size cap on the fetch and a character cap on the text sent to Claude to bound token usage.
+
+Errors are typed and mapped to HTTP status: bad/private URL → `422`, missing `ANTHROPIC_API_KEY` → `503`, AI failure → `502`. The model only ever receives text the server already fetched — Anthropic's server-side web-search/fetch tools are deliberately **not** used, which keeps the SSRF guard, rate limiting, and cost under the app's control. Haiku 4.5 is chosen because extraction is a small, well-defined task: a typical posting costs a fraction of a cent.
 
 ## Demo data
 
@@ -109,6 +121,7 @@ Outputs to `swagger/v1/swagger.yaml`.
 |---|---|
 | `app/lib/application_fsm.rb` | FSM — `TRANSITIONS` array + `assert_transition!` |
 | `app/services/applications/transition_service.rb` | Status change + audit entry in one transaction |
+| `app/services/applications/url_prefill_service.rb` | AI URL pre-fill — fetch + strip + Claude extraction, SSRF-guarded |
 | `app/jobs/follow_up_reminder_job.rb` | Daily Sidekiq job with idempotency key |
 | `spec/requests/api/v1/applications_spec.rb` | Request specs — also source for OpenAPI generation |
 
@@ -121,6 +134,7 @@ DELETE /api/v1/auth/sign_out
 
 GET    /api/v1/applications
 POST   /api/v1/applications
+POST   /api/v1/applications/prefill        # AI URL pre-fill (Claude)
 GET    /api/v1/applications/:id
 PATCH  /api/v1/applications/:id
 DELETE /api/v1/applications/:id

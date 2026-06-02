@@ -73,6 +73,32 @@ paths:
                   - role
               required:
               - application
+  "/api/v1/applications/prefill":
+    post:
+      summary: Pre-fill application fields from a job URL (AI extraction)
+      tags:
+      - Applications
+      security:
+      - bearerAuth: []
+      parameters: []
+      responses:
+        '200':
+          description: extracted fields returned for the user to review
+        '422':
+          description: bad or private/internal URL
+        '401':
+          description: not authenticated
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                url:
+                  type: string
+                  example: https://example.com/jobs/42
+              required:
+              - url
   "/api/v1/applications/{id}":
     parameters:
     - name: id
