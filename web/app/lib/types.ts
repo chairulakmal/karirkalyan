@@ -59,6 +59,9 @@ export type ApplicationWithDetail = Application & {
 
 export type DashboardStats = {
   by_status: Partial<Record<Status, number>>;
+  // [company, board-host] for every application — drives the interdependent
+  // company/board dropdowns. Board host is "(none)" for applications with no link.
+  facets: [string, string][];
   total: number;
   avg_days_to_offer: number | null;
 };

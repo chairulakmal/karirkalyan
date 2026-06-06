@@ -72,6 +72,33 @@ export function formatDate(iso: string | null | undefined): string {
   });
 }
 
+// Sentinel for applications with no link — must match Ruby's JobBoard::NONE.
+export const NO_BOARD = "(none)";
+
+// Friendly names for hosts we recognise. Anything else falls back to the bare
+// host, so the filter still works for boards/companies not listed here.
+const BOARD_LABELS: Record<string, string> = {
+  "linkedin.com": "LinkedIn",
+  "tokyodev.com": "TokyoDev",
+  "japan-dev.com": "Japan Dev",
+  "wantedly.com": "Wantedly",
+  "indeed.com": "Indeed",
+  "jp.indeed.com": "Indeed",
+  "glassdoor.com": "Glassdoor",
+  "greenhouse.io": "Greenhouse",
+  "boards.greenhouse.io": "Greenhouse",
+  "lever.co": "Lever",
+  "jobs.lever.co": "Lever",
+  "gaijinpot.com": "GaijinPot",
+  "daijob.com": "Daijob",
+};
+
+/** Maps a URL host (the dashboard's `by_source` key) to a display label. */
+export function jobBoardLabel(host: string): string {
+  if (host === NO_BOARD) return "No link";
+  return BOARD_LABELS[host] ?? host;
+}
+
 /**
  * A readable label for a link: drops the protocol, a leading "www.", the query
  * string, and the hash — the noise that makes tracking-laden job URLs ugly —

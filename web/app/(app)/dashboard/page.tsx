@@ -20,6 +20,7 @@ export default async function Dashboard() {
   const stats = statsRes.ok ? statsRes.data : null;
   const me = meRes.ok ? meRes.data : null;
   const statusBuckets = stats ? (Object.entries(stats.by_status) as [Status, number][]) : [];
+  const facets = stats?.facets ?? [];
   const total = stats?.total ?? applications.length;
 
   return (
@@ -78,6 +79,7 @@ export default async function Dashboard() {
         initialItems={applications}
         initialMeta={meta}
         statusBuckets={statusBuckets}
+        facets={facets}
         total={total}
       />
     </div>
