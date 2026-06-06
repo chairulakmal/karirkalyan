@@ -13,10 +13,14 @@ export async function GET(request: NextRequest) {
   const limit = searchParams.get("limit") ?? "10";
 
   const status = searchParams.get("status");
+  const company = searchParams.get("company");
+  const source = searchParams.get("source");
 
   const qs = new URLSearchParams({ limit });
   if (after) qs.set("after", after);
   if (status) qs.set("status", status);
+  if (company) qs.set("company", company);
+  if (source) qs.set("source", source);
 
   const result = await apiFetch<PagedResponse>(`/applications?${qs}`);
 

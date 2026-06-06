@@ -2,40 +2,53 @@
 
 import { useState } from "react";
 import Link from "next/link";
-import { formatDate, statusBadgeClass, statusLabel, timeAgo } from "@/app/lib/format";
+import { formatDate, jobBoardLabel, statusBadgeClass, statusLabel, timeAgo } from "@/app/lib/format";
 import type { Application, Status } from "@/app/lib/types";
 
 type Meta = { next_cursor: string | null; has_more: boolean };
+
+type Filters = { status: Status | null; company: string | null; source: string | null };
+
+const NO_FILTERS: Filters = { status: null, company: null, source: null };
 
 interface Props {
   initialItems: Application[];
   initialMeta: Meta;
   statusBuckets: [Status, number][];
+  facets: [string, string][]; // [company, board-host] per application
   total: number;
 }
 
-export function ApplicationsList({ initialItems, initialMeta, statusBuckets, total }: Props) {
+export function ApplicationsList({
+  initialItems,
+  initialMeta,
+  statusBuckets,
+  facets,
+  total,
+}: Props) {
   const [items, setItems] = useState(initialItems);
   const [meta, setMeta] = useState(initialMeta);
-  const [activeStatus, setActiveStatus] = useState<Status | null>(null);
+  const [filters, setFilters] = useState<Filters>(NO_FILTERS);
   const [loading, setLoading] = useState(false);
 
-  async function fetchPage(status: Status | null, after?: string) {
+  async function fetchPage(f: Filters, after?: string) {
     const qs = new URLSearchParams({ limit: "10" });
     if (after) qs.set("after", after);
-    if (status) qs.set("status", status);
+    if (f.status) qs.set("status", f.status);
+    if (f.company) qs.set("company", f.company);
+    if (f.source) qs.set("source", f.source);
     const res = await fetch(`/api/applications?${qs}`);
     if (!res.ok) return null;
     return (await res.json()) as { data: Application[]; meta: Meta };
   }
 
-  async function handleFilter(status: Status | null) {
-    if (status === activeStatus || loading) return;
+  async function applyFilters(next: Filters) {
+    if (loading) return;
     setLoading(true);
     try {
-      const body = await fetchPage(status);
+      const body = await fetchPage(next);
       if (!body) return;
-      setActiveStatus(status);
+      setFilters(next);
       setItems(body.data);
       setMeta(body.meta);
     } finally {
@@ -47,7 +60,7 @@ export function ApplicationsList({ initialItems, initialMeta, statusBuckets, tot
     if (!meta.next_cursor || loading) return;
     setLoading(true);
     try {
-      const body = await fetchPage(activeStatus, meta.next_cursor);
+      const body = await fetchPage(filters, meta.next_cursor);
       if (!body) return;
       setItems((prev) => [...prev, ...body.data]);
       setMeta(body.meta);
@@ -56,15 +69,80 @@ export function ApplicationsList({ initialItems, initialMeta, statusBuckets, tot
     }
   }
 
+  const hasActiveFilter = filters.status !== null || filters.company !== null || filters.source !== null;
+
+  // Each dropdown's options reflect the OTHER active filter, so picking a board
+  // narrows the company list and vice versa; counts reflect the narrowed set.
+  function buckets(pick: "company" | "board", constrainTo: string | null): [string, number][] {
+    const counts = new Map<string, number>();
+    for (const [company, board] of facets) {
+      if (constrainTo && (pick === "company" ? board : company) !== constrainTo) continue;
+      const key = pick === "company" ? company : board;
+      counts.set(key, (counts.get(key) ?? 0) + 1);
+    }
+    return [...counts.entries()].sort((a, b) => b[1] - a[1]);
+  }
+
+  const companyOptions = buckets("company", filters.source);
+  const boardOptions = buckets("board", filters.company);
+
+  // When a change makes the other selection impossible (no app has both), drop
+  // it so the dropdown value can never point at an option that isn't shown.
+  function changeCompany(company: string | null) {
+    let { source } = filters;
+    if (company && source && !facets.some(([c, s]) => c === company && s === source)) source = null;
+    applyFilters({ ...filters, company, source });
+  }
+
+  function changeSource(source: string | null) {
+    let { company } = filters;
+    if (source && company && !facets.some(([c, s]) => c === company && s === source)) company = null;
+    applyFilters({ ...filters, company, source });
+  }
+
   return (
     <div className="space-y-4">
+      {facets.length > 0 && (
+        <div className="flex flex-wrap items-end gap-3">
+          <FilterSelect
+            label="Company"
+            value={filters.company ?? ""}
+            disabled={loading}
+            allLabel="All companies"
+            options={companyOptions.map(([name, count]) => ({ value: name, label: name, count }))}
+            onChange={(value) => changeCompany(value || null)}
+          />
+          <FilterSelect
+            label="Job board"
+            value={filters.source ?? ""}
+            disabled={loading}
+            allLabel="All boards"
+            options={boardOptions.map(([host, count]) => ({
+              value: host,
+              label: jobBoardLabel(host),
+              count,
+            }))}
+            onChange={(value) => changeSource(value || null)}
+          />
+          {hasActiveFilter && (
+            <button
+              onClick={() => applyFilters(NO_FILTERS)}
+              disabled={loading}
+              className="px-2 py-1.5 text-xs text-ink-soft underline underline-offset-4 transition hover:text-midnight disabled:opacity-50"
+            >
+              Clear filters
+            </button>
+          )}
+        </div>
+      )}
+
       {statusBuckets.length > 0 && (
         <div className="flex flex-wrap gap-2">
           <button
-            onClick={() => handleFilter(null)}
+            onClick={() => applyFilters({ ...filters, status: null })}
             disabled={loading}
             className={`inline-flex items-center gap-2 px-3 py-1 text-xs font-medium ring-1 ring-inset ring-midnight/20 transition disabled:cursor-wait ${
-              activeStatus === null ? "bg-sand text-midnight" : "bg-sand/40 text-ink-soft hover:text-midnight"
+              filters.status === null ? "bg-sand text-midnight" : "bg-sand/40 text-ink-soft hover:text-midnight"
             }`}
           >
             All <span className="font-mono">{total}</span>
@@ -72,10 +150,10 @@ export function ApplicationsList({ initialItems, initialMeta, statusBuckets, tot
           {statusBuckets.map(([status, count]) => (
             <button
               key={status}
-              onClick={() => handleFilter(status)}
+              onClick={() => applyFilters({ ...filters, status })}
               disabled={loading}
               className={`inline-flex items-center gap-2 px-3 py-1 text-xs font-medium ring-1 ring-inset transition disabled:cursor-wait ${statusBadgeClass(status)} ${
-                activeStatus === status ? "" : "opacity-40 hover:opacity-70"
+                filters.status === status ? "" : "opacity-40 hover:opacity-70"
               }`}
             >
               {statusLabel(status)} <span className="font-mono">{count}</span>
@@ -86,10 +164,8 @@ export function ApplicationsList({ initialItems, initialMeta, statusBuckets, tot
 
       {items.length === 0 ? (
         <div className="border border-dashed border-dune bg-linen p-12 text-center">
-          {activeStatus ? (
-            <p className="text-ink-soft">
-              No <span className="font-medium">{statusLabel(activeStatus)}</span> applications.
-            </p>
+          {hasActiveFilter ? (
+            <p className="text-ink-soft">No applications match these filters.</p>
           ) : (
             <>
               <p className="text-ink-soft">No applications yet.</p>
@@ -153,5 +229,42 @@ export function ApplicationsList({ initialItems, initialMeta, statusBuckets, tot
         </div>
       )}
     </div>
+  );
+}
+
+type Option = { value: string; label: string; count: number };
+
+function FilterSelect({
+  label,
+  value,
+  options,
+  allLabel,
+  disabled,
+  onChange,
+}: {
+  label: string;
+  value: string;
+  options: Option[];
+  allLabel: string;
+  disabled: boolean;
+  onChange: (value: string) => void;
+}) {
+  return (
+    <label className="block text-sm">
+      <span className="kk-label">{label}</span>
+      <select
+        value={value}
+        disabled={disabled}
+        onChange={(e) => onChange(e.target.value)}
+        className="mt-1.5 block min-w-44 border border-dune bg-linen px-3 py-1.5 text-sm text-midnight focus:border-cobalt focus:outline-none focus:ring-1 focus:ring-cobalt disabled:opacity-50"
+      >
+        <option value="">{allLabel}</option>
+        {options.map((o) => (
+          <option key={o.value} value={o.value}>
+            {o.label} ({o.count})
+          </option>
+        ))}
+      </select>
+    </label>
   );
 }

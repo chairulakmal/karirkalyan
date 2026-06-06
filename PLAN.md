@@ -213,6 +213,11 @@ A job tracker's users add roles at whatever stage they're really at — saved, s
 ### No Company / Platform / Tag models
 These would add CRUD without adding new patterns. The goal is to show FSM, transactional writes, background jobs, and two-tier testing — not to maximise model count. A `source` string column on `applications` is sufficient for tracking job platforms.
 
+### Dashboard filters by company and job board — derived from the URL, no new column
+The dashboard filters applications by company and by "job board" (LinkedIn, TokyoDev, Wantedly, …). Company is a stored field; the job board is derived *crudely from the URL host* I already store — no `source` column, no migration, no per-board parser. `JobBoard.from_url` strips the host to a key (`linkedin.com`); the frontend maps the host to a friendly label and passes it back as a filter. Filtering stays server-side and consistent with the existing status filter — `company` is an exact match, `source` a host substring (`ILIKE`) — so it composes with status and respects cursor pagination rather than only filtering the loaded page.
+
+The two dropdowns are **interdependent** (faceted): picking TokyoDev narrows the company list to TokyoDev companies, and vice versa. Rather than re-query per selection, the cached stats endpoint ships a compact `facets` array — one `[company, board]` pair per application — and the dropdowns are computed from it on the client, so narrowing is instant and needs no round-trip. If a change makes the other selection impossible, it's cleared so a dropdown value can never point at a hidden option. The tradeoff is honest: host-substring matching is approximate (a job added without a link buckets under "No link"), and shipping one facet pair per row doesn't scale forever — but at personal-tracker volume it's the right amount of effort, and deriving from data I already have beats asking the user to tag every row.
+
 ---
 
 ## What I focused on

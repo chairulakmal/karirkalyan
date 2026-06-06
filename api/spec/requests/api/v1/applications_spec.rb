@@ -115,6 +115,51 @@ RSpec.describe "Applications", type: :request do
     end
   end
 
+  describe "GET /api/v1/applications — filtering" do
+    let(:headers) { { "Authorization" => jwt_for(user) } }
+
+    it "filters by company (exact match)" do
+      create(:application, company: "Mercari", user: user)
+      create(:application, company: "Cookpad", user: user)
+
+      get "/api/v1/applications", params: { company: "Mercari" }, headers: headers
+
+      companies = JSON.parse(response.body)["data"].map { |a| a["company"] }
+      expect(companies).to eq([ "Mercari" ])
+    end
+
+    it "filters by job board (URL host substring)" do
+      create(:application, company: "Via LinkedIn", url: "https://www.linkedin.com/jobs/1", user: user)
+      create(:application, company: "Via TokyoDev", url: "https://tokyodev.com/jobs/9", user: user)
+
+      get "/api/v1/applications", params: { source: "linkedin.com" }, headers: headers
+
+      companies = JSON.parse(response.body)["data"].map { |a| a["company"] }
+      expect(companies).to eq([ "Via LinkedIn" ])
+    end
+
+    it "filters to applications with no link via the NONE sentinel" do
+      create(:application, company: "No Link", url: nil, user: user)
+      create(:application, company: "Has Link", url: "https://tokyodev.com/x", user: user)
+
+      get "/api/v1/applications", params: { source: JobBoard::NONE }, headers: headers
+
+      companies = JSON.parse(response.body)["data"].map { |a| a["company"] }
+      expect(companies).to eq([ "No Link" ])
+    end
+
+    it "combines company and source filters" do
+      create(:application, company: "Mercari", url: "https://www.linkedin.com/jobs/1", user: user)
+      create(:application, company: "Mercari", url: "https://tokyodev.com/jobs/2", user: user)
+
+      get "/api/v1/applications", params: { company: "Mercari", source: "tokyodev.com" }, headers: headers
+
+      data = JSON.parse(response.body)["data"]
+      expect(data.length).to eq(1)
+      expect(data.first["url"]).to include("tokyodev.com")
+    end
+  end
+
   path "/api/v1/applications/prefill" do
     post "Pre-fill application fields from a job URL (AI extraction)" do
       tags "Applications"

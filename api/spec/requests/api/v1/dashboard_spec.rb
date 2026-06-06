@@ -47,6 +47,25 @@ RSpec.describe "Dashboard", type: :request do
     end
   end
 
+  describe "filter facets" do
+    let(:headers) { { "Authorization" => jwt_for(user) } }
+
+    it "returns a [company, board-host] pair for every application" do
+      create(:application, company: "Mercari", url: "https://www.linkedin.com/jobs/1", user: user)
+      create(:application, company: "Mercari", url: "https://tokyodev.com/jobs/2", user: user)
+      create(:application, company: "Cookpad", url: nil, user: user)
+
+      get "/api/v1/dashboard", headers: headers
+      facets = JSON.parse(response.body)["facets"]
+
+      expect(facets).to contain_exactly(
+        [ "Mercari", "linkedin.com" ],
+        [ "Mercari", "tokyodev.com" ],
+        [ "Cookpad", "(none)" ]
+      )
+    end
+  end
+
   describe "avg_days_to_offer uses the timeline entry timestamp" do
     let(:headers) { { "Authorization" => jwt_for(user) } }
 
