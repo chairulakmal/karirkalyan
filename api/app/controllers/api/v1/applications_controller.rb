@@ -12,6 +12,20 @@ module Api
           scope = scope.where(status: params[:status])
         end
 
+        scope = scope.where(company: params[:company]) if params[:company].present?
+
+        # Crude "job board" filter: match the URL host as a substring. The
+        # NONE sentinel selects applications added without a link.
+        if params[:source].present?
+          scope =
+            if params[:source] == JobBoard::NONE
+              scope.where("url IS NULL OR url = ''")
+            else
+              like = "%#{ActiveRecord::Base.sanitize_sql_like(params[:source])}%"
+              scope.where("url ILIKE ?", like)
+            end
+        end
+
         if params[:after].present?
           begin
             cursor_time = Time.zone.parse(Base64.urlsafe_decode64(params[:after]))
