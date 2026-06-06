@@ -71,3 +71,23 @@ export function formatDate(iso: string | null | undefined): string {
     day: "numeric",
   });
 }
+
+/**
+ * A readable label for a link: drops the protocol, a leading "www.", the query
+ * string, and the hash — the noise that makes tracking-laden job URLs ugly —
+ * keeping host + path. Truncated so it never blows out the layout. Always keep
+ * the original URL as the anchor's href (and title); this is display only.
+ * Falls back to the raw string if it isn't a parseable URL.
+ */
+export function prettyUrl(raw: string, maxLength = 48): string {
+  let display: string;
+  try {
+    const u = new URL(raw);
+    const host = u.hostname.replace(/^www\./, "");
+    const path = u.pathname.replace(/\/$/, ""); // drop trailing slash
+    display = host + path;
+  } catch {
+    display = raw;
+  }
+  return display.length > maxLength ? `${display.slice(0, maxLength - 1)}…` : display;
+}

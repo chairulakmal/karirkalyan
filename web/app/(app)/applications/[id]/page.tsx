@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { apiFetch } from "@/app/lib/api";
-import { formatDate, statusBadgeClass, statusLabel, timeAgo } from "@/app/lib/format";
+import { formatDate, prettyUrl, statusBadgeClass, statusLabel, timeAgo } from "@/app/lib/format";
 import type { ApplicationWithDetail } from "@/app/lib/types";
 import { TransitionButtons } from "./transition-buttons";
 import { FileUpload } from "./file-upload";
@@ -46,9 +46,10 @@ export default async function ApplicationDetailPage({
               href={app.url}
               target="_blank"
               rel="noopener noreferrer"
-              className="mt-1 inline-block font-mono text-xs text-cobalt underline underline-offset-4 hover:text-cobalt-2"
+              title={app.url}
+              className="mt-1 inline-block max-w-full truncate font-mono text-xs text-cobalt underline underline-offset-4 hover:text-cobalt-2"
             >
-              {app.url}
+              {prettyUrl(app.url)}
             </a>
           ) : null}
         </div>
