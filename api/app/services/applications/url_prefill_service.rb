@@ -46,7 +46,7 @@ module Applications
         properties: {
           company: { type: "string", description: "Hiring company name. Empty string if not present." },
           role:    { type: "string", description: "Job title / role. Empty string if not present." },
-          notes:   { type: "string", description: "A 2-4 sentence plain-text summary: location, employment type, key requirements, and salary if listed. Empty string if not present." }
+          notes:   { type: "string", description: "Start with one line summarising the tech stack and industry/product type (e.g. 'Tech: React, Rails, PostgreSQL | Industry: B2B SaaS / Fintech'). Then 2-4 sentences covering location, employment type, key requirements, and salary if listed. Empty string if not present." }
         },
         required: %w[company role notes]
       }
@@ -57,6 +57,9 @@ module Applications
       The posting may be written in Japanese or English — return the company and role in
       their original language. Keep notes concise. Use an empty string for any field you
       cannot find on the page; never guess or invent values.
+      For the notes field, the very first line must be a tech-stack and industry summary
+      in this format: "Tech: <stack> | Industry: <industry/product type>". Follow it with
+      a blank line, then the rest of the summary.
     PROMPT
 
     def initialize(url, client: nil)
