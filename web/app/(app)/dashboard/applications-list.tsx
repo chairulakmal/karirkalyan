@@ -9,6 +9,26 @@ type Meta = { next_cursor: string | null; has_more: boolean };
 
 type Filters = { status: Status | null; company: string | null; source: string | null };
 
+const STATUS_PRIORITY: Record<Status, number> = {
+  phone_screen: 0,
+  technical: 0,
+  final_round: 0,
+  offer: 0,
+  accepted: 1,
+  applied: 1,
+  draft: 1,
+  wishlist: 2,
+  declined: 2,
+  rejected: 2,
+  withdrawn: 2,
+  ghosted: 3,
+  archived: 3,
+};
+
+function sortByImportance(apps: Application[]): Application[] {
+  return [...apps].sort((a, b) => STATUS_PRIORITY[a.status] - STATUS_PRIORITY[b.status]);
+}
+
 const NO_FILTERS: Filters = { status: null, company: null, source: null };
 
 interface Props {
@@ -26,7 +46,7 @@ export function ApplicationsList({
   facets,
   total,
 }: Props) {
-  const [items, setItems] = useState(initialItems);
+  const [items, setItems] = useState(() => sortByImportance(initialItems));
   const [meta, setMeta] = useState(initialMeta);
   const [filters, setFilters] = useState<Filters>(NO_FILTERS);
   const [loading, setLoading] = useState(false);
@@ -49,7 +69,7 @@ export function ApplicationsList({
       const body = await fetchPage(next);
       if (!body) return;
       setFilters(next);
-      setItems(body.data);
+      setItems(sortByImportance(body.data));
       setMeta(body.meta);
     } finally {
       setLoading(false);
@@ -62,7 +82,7 @@ export function ApplicationsList({
     try {
       const body = await fetchPage(filters, meta.next_cursor);
       if (!body) return;
-      setItems((prev) => [...prev, ...body.data]);
+      setItems((prev) => sortByImportance([...prev, ...body.data]));
       setMeta(body.meta);
     } finally {
       setLoading(false);
@@ -141,9 +161,8 @@ export function ApplicationsList({
           <button
             onClick={() => applyFilters({ ...filters, status: null })}
             disabled={loading}
-            className={`inline-flex items-center gap-2 px-3 py-1 text-xs font-medium ring-1 ring-inset ring-midnight/20 transition disabled:cursor-wait ${
-              filters.status === null ? "bg-sand text-midnight" : "bg-sand/40 text-ink-soft hover:text-midnight"
-            }`}
+            className={`inline-flex items-center gap-2 px-3 py-1 text-xs font-medium ring-1 ring-inset ring-midnight/20 transition disabled:cursor-wait ${filters.status === null ? "bg-sand text-midnight" : "bg-sand/40 text-ink-soft hover:text-midnight"
+              }`}
           >
             All <span className="font-mono">{total}</span>
           </button>
@@ -152,9 +171,8 @@ export function ApplicationsList({
               key={status}
               onClick={() => applyFilters({ ...filters, status })}
               disabled={loading}
-              className={`inline-flex items-center gap-2 px-3 py-1 text-xs font-medium ring-1 ring-inset transition disabled:cursor-wait ${statusBadgeClass(status)} ${
-                filters.status === status ? "" : "opacity-40 hover:opacity-70"
-              }`}
+              className={`inline-flex items-center gap-2 px-3 py-1 text-xs font-medium ring-1 ring-inset transition disabled:cursor-wait ${statusBadgeClass(status)} ${filters.status === status ? "" : "opacity-40 hover:opacity-70"
+                }`}
             >
               {statusLabel(status)} <span className="font-mono">{count}</span>
             </button>
