@@ -13,13 +13,11 @@ gem "rack-attack"
 gem "devise"
 gem "devise-jwt"
 
-# Background jobs
-gem "sidekiq"
-gem "sidekiq-cron"
-
-# Redis-backed Rails.cache in production (also backs Rack::Attack throttling).
-# Required by ActiveSupport's :redis_cache_store; redis-client alone isn't enough.
-gem "redis"
+# Background jobs — disabled. Uncomment + run `bundle install` to re-enable
+# (also see CLAUDE.md "Re-enabling Sidekiq").
+# gem "sidekiq"
+# gem "sidekiq-cron"
+# gem "redis"  # required by :redis_cache_store and Sidekiq
 
 # API docs — needed in production to serve /api-docs
 gem "rswag-api"

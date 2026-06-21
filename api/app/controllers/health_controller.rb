@@ -1,9 +1,6 @@
 class HealthController < ActionController::API
   def show
-    checks = {
-      database: postgres_ok?,
-      redis:    redis_ok?
-    }
+    checks = { database: postgres_ok? }
 
     if checks.values.all?
       render json: { status: "ok", checks: checks }, status: :ok
@@ -22,10 +19,6 @@ class HealthController < ActionController::API
     false
   end
 
-  def redis_ok?
-    Sidekiq.redis { |c| c.call("PING") } == "PONG"
-  rescue StandardError => e
-    Rails.logger.error("Health check: redis failed — #{e.class}: #{e.message}")
-    false
-  end
+  # Redis health check removed — Sidekiq is disabled. Restore when re-enabling
+  # Sidekiq (see CLAUDE.md). Previous impl: Sidekiq.redis { |c| c.call("PING") }
 end

@@ -8,7 +8,7 @@ module Api
           build_resource(sign_up_params)
 
           if resource.save
-            WelcomeMailer.welcome(resource).deliver_later
+            WelcomeMailer.welcome(resource).deliver_now
             render json: { user: { id: resource.id, email: resource.email } }, status: :created
           else
             render json: { errors: resource.errors.full_messages }, status: :unprocessable_entity
