@@ -57,25 +57,11 @@ Rails.application.configure do
     enable_starttls_auto: true
   }
 
-  # Redis-backed cache, shared across the Puma workers and the Sidekiq process
-  # (Redis is already present for Sidekiq). This also gives Rack::Attack a shared
-  # throttle store — see config/initializers/rack_attack.rb. Short timeouts keep a
-  # slow/unreachable Redis from stalling requests, and the error_handler degrades
-  # to a cache miss (reporting to Honeybadger) instead of raising.
-  config.cache_store = :redis_cache_store, {
-    url:                ENV.fetch("REDIS_URL"),
-    namespace:          "kk:cache",
-    connect_timeout:    1,
-    read_timeout:       1,
-    write_timeout:      1,
-    reconnect_attempts: 1,
-    error_handler: ->(method:, returning:, exception:) {
-      Honeybadger.notify(exception, context: { cache_method: method }) if defined?(Honeybadger)
-    }
-  }
-
-  # ActiveJob queue adapter is set to :sidekiq in config/application.rb — no override needed here.
-  # Solid Queue/Cache were removed in favour of Sidekiq + Redis (see notes/PLAN.md).
+  # Memory cache — Sidekiq/Redis is disabled so there is no shared Redis instance.
+  # Rack::Attack throttle counters are per-Puma-worker (not shared), which is
+  # acceptable at low traffic. Re-enable :redis_cache_store when Sidekiq is restored
+  # (see CLAUDE.md "Re-enabling Sidekiq").
+  config.cache_store = :memory_store
 
   # Enable locale fallbacks for I18n (makes lookups for any locale fall back to
   # the I18n.default_locale when a translation cannot be found).

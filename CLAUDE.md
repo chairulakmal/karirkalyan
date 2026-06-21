@@ -8,12 +8,28 @@ Full-stack job application tracker. Rails 8 API (`api/`) + Next.js 16 frontend (
 
 - **Backend:** Rails 8 API-only, Ruby 3.4.9 (mise), PostgreSQL 16, Devise + devise-jwt
 - **Frontend:** Next.js 16 App Router, Tailwind CSS, JWT in `httpOnly` cookie
-- **Infra:** Sidekiq + Redis for background jobs, Railway for deployment
+- **Infra:** Railway for deployment (Sidekiq + Redis disabled — see below)
+
+## Re-enabling Sidekiq
+
+Sidekiq (and Redis) are disabled to reduce infra cost and complexity. To restore:
+
+1. **`api/Gemfile`** — uncomment `sidekiq`, `sidekiq-cron`, `redis`; run `bundle install`
+2. **`api/config/application.rb`** — change `queue_adapter` back to `:sidekiq`
+3. **`api/config/initializers/sidekiq.rb`** — uncomment the `configure_server` block
+4. **`api/config/routes.rb`** — restore the `Sidekiq::Web` mount (check git history)
+5. **`api/app/controllers/health_controller.rb`** — restore the `redis_ok?` check
+6. **`api/config/environments/production.rb`** — switch `cache_store` back to `:redis_cache_store`
+7. **`api/docker-compose.yml`** — uncomment the `redis` service and `redis_data` volume
+8. **Railway** — provision a Redis service and set `REDIS_URL` env var
+
+The `FollowUpReminderJob` cron (daily 23:15 UTC → 08:15 JST) and `FollowUpMailer` are
+preserved in code — they will resume working once the above steps are complete.
 
 ## Local Dev
 
 ```bash
-docker compose up -d        # postgres + redis
+docker compose up -d        # postgres only (redis commented out while Sidekiq is disabled)
 
 cd api && bundle install && bin/rails db:create db:migrate && bin/rails server  # :3001
 cd web && npm install && npm run dev                                            # :3000

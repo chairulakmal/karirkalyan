@@ -22,10 +22,10 @@ A full-stack job application tracker — Rails 8 API + Next.js 16 frontend.
 | Audit trail | `TimelineEntry` written atomically with every status change |
 | Auth | Devise + devise-jwt with JTI revocation — stateless JWT with real logout |
 | Concurrency | Optimistic locking (`lock_version`) → `409 Conflict` |
-| Background jobs | Sidekiq + idempotency key (at-least-once safe); runs in a dedicated `sidekiq` service in production |
-| Email | ActionMailer over SMTP (Resend) — welcome email on sign-up + daily follow-up reminders scheduled via sidekiq-cron, delivered with `deliver_later` |
+| Background jobs | Idempotency key pattern (at-least-once safe); Sidekiq disabled — jobs run via `:async` adapter in-process |
+| Email | ActionMailer over SMTP (Resend) — welcome email on sign-up + daily follow-up reminder job (currently inactive while Sidekiq is off) |
 | AI pre-fill | Paste a job URL → Claude Haiku 4.5 extracts company/role/notes for review before saving; server-side service, SSRF-guarded + rate-limited, reads Japanese postings natively |
-| Caching | Redis-backed `Rails.cache` in production — self-invalidating dashboard query cache + shared Rack::Attack throttle store |
+| Caching | `:memory_store` (Redis removed while Sidekiq is disabled; Rack::Attack throttle store is per-process) |
 | File storage | PostgreSQL `bytea`, 1 MB cap, PDF magic-byte validation |
 | Dashboard | Pure SQL aggregation — no N+1, no records loaded into Ruby |
 | API docs | rswag — request specs and OpenAPI spec share one source |
@@ -136,9 +136,9 @@ Architecture rationale for every decision lives in [PLAN.md](PLAN.md).
 
 ## Stack
 
-- **Backend:** Rails 8 API-only, Ruby 3.4.9, PostgreSQL 16, Devise + devise-jwt, Sidekiq
+- **Backend:** Rails 8 API-only, Ruby 3.4.9, PostgreSQL 16, Devise + devise-jwt
 - **Frontend:** Next.js 16 App Router, Tailwind CSS
-- **Infra:** Docker Compose (local); Railway (production) — separate `api` (Puma) and `sidekiq` (worker) services, managed PostgreSQL + Redis
+- **Infra:** Docker Compose (local); Railway (production) — managed PostgreSQL; Redis/Sidekiq disabled
 
 ---
 
