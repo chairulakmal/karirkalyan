@@ -1,13 +1,9 @@
 import Link from "next/link";
 import { Mark, Wordmark } from "@/app/components/wordmark";
 import { SignOutButton } from "./sign-out-button";
-import { API_DOCS_URL, SIDEKIQ_URL, REPO_URL } from "@/app/lib/links";
+import { API_DOCS_URL, REPO_URL } from "@/app/lib/links";
 
 export default function AppLayout({ children }: { children: React.ReactNode }) {
-  // Read server-side (this is a server component) so the demo creds never ship
-  // as a client bundle var. Fall back to the documented reviewer/reviewer demo.
-  const sidekiqUser = process.env.SIDEKIQ_USERNAME ?? "reviewer";
-  const sidekiqPass = process.env.SIDEKIQ_PASSWORD ?? "reviewer";
 
   return (
     <>
@@ -40,14 +36,8 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
           <div className="flex flex-wrap items-center gap-x-5 gap-y-2">
             <span className="kk-label">For reviewers</span>
             <ReviewerLink href={API_DOCS_URL}>API docs (Swagger)</ReviewerLink>
-            <ReviewerLink href={SIDEKIQ_URL}>Background jobs (Sidekiq)</ReviewerLink>
             <ReviewerLink href={REPO_URL}>Source</ReviewerLink>
           </div>
-          <p className="mt-2 text-ink-soft/80">
-            Sidekiq is password-protected — demo login{" "}
-            <code className="font-mono text-midnight">{sidekiqUser}</code> /{" "}
-            <code className="font-mono text-midnight">{sidekiqPass}</code>
-          </p>
         </div>
       </footer>
     </>
