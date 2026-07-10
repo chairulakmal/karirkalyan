@@ -24,12 +24,13 @@ fixes it produces. No features; anything non-security that surfaces goes to the 
 
 Ordered by severity. File references are `path:line` at `9708df6`.
 
-- [ ] **[med] No account-level brute-force backstop** — throttling is IP-only
-  (`api/config/initializers/rack_attack.rb:19`, `sign_in` 5/min per IP). A botnet or a
-  shared NAT egress defeats it; there's no per-account lockout or email-keyed throttle.
-  Add Devise `:lockable`, or throttle on the email once the JSON body is parsed
-  (a controller-level `before_action` throttle sees `params`, unlike the Rack layer —
-  see the "throttle by IP only" note in the initializer). Confirmed.
+- [x] **[med] No account-level brute-force backstop** — throttling was IP-only
+  (`api/config/initializers/rack_attack.rb`, `sign_in` 5/min per IP), which a botnet or
+  shared NAT egress defeats. **Fixed:** added email-keyed throttles that cap guesses
+  against a *single* account across all IPs (`10/5min` + `50/hour`). Reads and rewinds
+  `rack.input` in the initializer to get the email from the JSON body (`.sign_in_email`),
+  so it works at the Rack layer without a controller `before_action`.
+  *(chore/security-review-v1.0.1)*
 - [x] **[med] Login-CSRF on the auth route handlers** — `web/app/api/auth/session/route.ts`
   and `.../register/route.ts` parsed a JSON body and forwarded it to Rails with no `Origin`
   check. Next's built-in CSRF protection covers Server Actions, not route handlers, so a
@@ -37,7 +38,7 @@ Ordered by severity. File references are `path:line` at `9708df6`.
   `Origin` allowlist check (`web/app/lib/csrf.ts`, same-origin by default, `ALLOWED_ORIGIN`
   to pin) on both `POST` handlers and the session `DELETE`; cross-origin → 403.
   *(chore/security-review-v1.0.1, 885e50b)*
-- [ ] **[med] Demo account is a shared, writable account** (partly fixed) — the "Try demo"
+- [x] **[med] Demo account is a shared, writable account** — the "Try demo"
   button signs every visitor into one shared user with credentials hardcoded in the
   client bundle (`web/app/(auth)/sign-in/sign-in-form.tsx:62`). That much is inherent to
   a public demo, but two things made it worse than intended:
@@ -45,23 +46,29 @@ Ordered by severity. File references are `path:line` at `9708df6`.
        account accumulated every visitor's data indefinitely.~~ **Fixed:** added
        `DemoResetJob`, scheduled hourly in `config/recurring.yml`.
        *(chore/security-review-v1.0.1, 885e50b)*
-    2. **Still open:** the demo user has the **same capabilities as a real user**, including
-       the paid AI prefill endpoint (Claude call + outbound fetch), rate-limited by IP only.
-       Distributed use of the demo login is an uncapped cost/abuse vector. Gate AI prefill
-       for the demo user or give the demo account a tighter per-account throttle.
-- [ ] **[low] Tighten CSP** — `web/next.config.ts:9` still ships `script-src 'unsafe-inline'`
-  for the Next bootstrap. Move to a nonce-based policy (per-request nonce via `proxy.ts`,
-  drop `'unsafe-inline'`). `object-src 'none'`, `frame-ancestors 'none'`, and `base-uri`
-  are already set, so this is the last soft spot. Confirmed.
-- [ ] **[low] Unanchored host-authorization regexes** — `api/config/environments/production.rb:79-80`
-  use `/.*\.railway\.app/` and `/.*\.railway\.internal/` with no `\z` anchor, so
-  `foo.railway.app.attacker.com` is accepted as a trusted Host. Impact is limited here
-  (mailer links use `FRONTEND_URL`, not the request host), but anchor them
-  (`/\A([a-z0-9-]+\.)*railway\.app\z/`) while touching this file. New finding.
-- [ ] **[doc] Document JWT semantics** — single JTI per user via `JTIMatcher`
-  (`api/app/models/user.rb:2`), so sign-out revokes **all** devices; 1-day expiry, no
-  refresh flow (`api/config/initializers/devise.rb:20-25`). Fine as designed — note it in
-  the README so the single-session behaviour isn't mistaken for a bug. Confirmed.
+    2. ~~The demo user had the **same capabilities as a real user**, including the paid AI
+       prefill endpoint (Claude call + outbound fetch), rate-limited by IP only — so
+       distributed use of the demo login was an uncapped cost/abuse vector.~~ **Fixed:**
+       added **per-account** prefill caps for *every* user (10/min, 50/hour, 100/day),
+       keyed on the JWT `sub` decoded in `rack_attack.rb` (`.prefill_user_id`). The demo
+       account is bounded like any other. *(chore/security-review-v1.0.1)*
+- [~] **[low] Tighten CSP** — `web/next.config.ts` shipped `script-src 'unsafe-inline'`
+  for the Next bootstrap. **Fixed (pending browser verification):** moved the CSP to a
+  per-request nonce in `web/proxy.ts` (`script-src 'self' 'nonce-…' 'strict-dynamic'`,
+  dropped `'unsafe-inline'`; dev keeps `'unsafe-eval'` for HMR). On branch
+  `fix/csp-nonces` — **not yet merged.** Caveat: with `'strict-dynamic'` + nonce, Next's
+  *statically* prerendered pages (`/`, `/applications/new`, `/sign-up`) don't get a nonce,
+  so they must be visually checked for CSP console errors before merge; if any break,
+  force those routes dynamic.
+- [x] **[low] Unanchored host-authorization regexes** — `api/config/environments/production.rb`
+  used `/.*\.railway\.app/` and `/.*\.railway\.internal/` with no `\z` anchor, so
+  `foo.railway.app.attacker.com` was accepted as a trusted Host. **Fixed:** anchored to
+  `/\A([a-z0-9-]+\.)+railway\.app\z/i` (and `.internal`). *(chore/security-review-v1.0.1)*
+- [x] **[doc] Document JWT semantics** — single JTI per user via `JTIMatcher`
+  (`api/app/models/user.rb`), so sign-out revokes **all** devices; 1-day expiry, no
+  refresh flow. **Fixed:** added an `## Authentication` section to `README.md` and mirrored
+  it in `README.ja.md`, spelling out the single-session behaviour so it isn't mistaken for
+  a bug. On branch `docs/jwt-semantics` — not yet merged. *(chore/security-review-v1.0.1)*
 
 ### Reviewed and found sound (no action)
 
