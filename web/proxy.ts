@@ -32,9 +32,10 @@ export function proxy(request: NextRequest) {
 }
 
 export const config = {
-  // Run on every route except Next internals, api routes, and static assets.
+  // Run on every route except Next internals, api routes, static assets, and
+  // crawler metadata (robots/sitemap/llms.txt must stay reachable unauthenticated).
   // The api route handlers manage their own auth (they need to see /api/auth/* unauth).
   matcher: [
-    "/((?!api|_next/static|_next/image|favicon.ico|manifest.webmanifest|brand/|.*\\.svg$|.*\\.png$).*)",
+    "/((?!api|_next/static|_next/image|favicon.ico|manifest.webmanifest|robots.txt|sitemap.xml|llms.txt|brand/|.*\\.svg$|.*\\.png$).*)",
   ],
 };

@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[8.1].define(version: 2026_05_25_000005) do
+ActiveRecord::Schema[8.1].define(version: 2026_07_10_000001) do
   # These are extensions that must be enabled in order to support this database
   enable_extension "pg_catalog.plpgsql"
   enable_extension "pgcrypto"
@@ -33,7 +33,7 @@ ActiveRecord::Schema[8.1].define(version: 2026_05_25_000005) do
     t.bigint "user_id", null: false
     t.index ["follow_up_at"], name: "index_applications_on_follow_up_at"
     t.index ["status"], name: "index_applications_on_status"
-    t.index ["user_id"], name: "index_applications_on_user_id"
+    t.index ["user_id", "created_at"], name: "index_applications_on_user_id_and_created_at", order: { created_at: :desc }
   end
 
   create_table "timeline_entries", force: :cascade do |t|

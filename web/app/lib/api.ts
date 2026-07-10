@@ -1,4 +1,5 @@
 import { cookies } from "next/headers";
+import { redirect } from "next/navigation";
 
 const API_URL = process.env.API_URL ?? "http://localhost:3001";
 const SESSION_COOKIE = "session";
@@ -34,6 +35,13 @@ export async function apiFetch<T = unknown>(
     headers,
     cache: "no-store",
   });
+
+  // Expired/revoked JWT. The cookie can only be cleared in a route handler or
+  // server action (not during render), so bounce through /api/auth/expired,
+  // which deletes it and lands on /sign-in.
+  if (response.status === 401) {
+    redirect("/api/auth/expired");
+  }
 
   const authHeader = response.headers.get("Authorization");
 
