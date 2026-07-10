@@ -33,7 +33,11 @@ module Api
     # These settings can be overridden in specific environments using the files
     # in config/environments, which are processed later.
     #
-    # config.time_zone = "Central Time (US & Canada)"
+    # App-facing times are Japan Standard Time (the users are Tokyo-based). We
+    # deliberately do NOT set active_record.default_timezone, so timestamps are
+    # still stored in UTC — only presentation and Time.zone-based queries (e.g.
+    # the follow-up reminder job's "today") are JST.
+    config.time_zone = "Tokyo"
     # config.eager_load_paths << Rails.root.join("extras")
 
     # Only loads a smaller set of middleware suitable for API only apps.
