@@ -6,12 +6,40 @@ Full-stack job application tracker. Rails 8 API (`api/`) + Next.js 16 frontend (
 
 ## Status
 
-**v1.0.0 released** 2026-07-10 (tag `v1.0.0`). All review findings from the initial
-security / performance / UX pass are resolved except four security items.
+**v1.0.1 released** 2026-07-10 (tag `v1.0.1`). Security review and its fixes; every finding
+from that pass and from the initial v1.0.0 review is resolved.
 
-**v1.0.1 is the next release** — a dedicated security review plus the fixes it produces.
-Scope is security only; non-security findings go to the backlog. Open items, the shipped
-changelog, and the backlog all live in `TODO.md` — read it before starting work.
+**v1.1.0 is the next release** — Japanese UI (i18n), then a homepage + about/docs revamp,
+then a Kanban board view of the FSM. That order matters; `TODO.md` explains why.
+Open work lives in `TODO.md`; shipped work lives in `CHANGELOG.md`. Read `TODO.md` before
+starting work.
+
+## Branching & PRs
+
+How much ceremony a change gets depends on what kind of change it is:
+
+| Change type | Branch + PR? |
+| --- | --- |
+| Features | **Must** — always a feature branch and a PR |
+| Security fixes | **Must** — always a feature branch and a PR |
+| Bug fixes | **Should** — default to a PR; skip only for something trivial |
+| Chores | **May** — a PR is fine, so is committing straight to `main` |
+| Docs | **No** — commit directly to `main`, no branch, no PR |
+
+"Docs" means documentation only: `*.md`, comments, `llms.txt`. A change that touches docs
+*and* code is not a docs change — classify it by the code.
+
+### What actually enforces this
+
+`main` is governed by a **ruleset** named `conserve-main`, not classic branch protection —
+`gh api repos/.../branches/main/protection` returns a misleading `404`. Inspect it with
+`gh api repos/chairulakmal/karirkalyan/rules/branches/main`.
+
+It requires a pull request (0 approvals), requires the `Lint, security & test` and
+`Lint, typecheck & build` checks, and blocks deletion and force-pushes. The **Admin**
+repository role has `bypass_mode: always`, so Akmal can push straight to `main` — that is
+what makes the docs row above possible. The bypass applies to *every* rule, so the table is
+still discipline rather than a wall: don't reach for it outside the docs row.
 
 ## Subagents
 
@@ -21,7 +49,7 @@ dumps you don't need, or a review that benefits from a cold read of the diff:
 - **`Explore`** — broad searches across `api/` and `web/` when you need the conclusion,
   not the file contents.
 - **`code-reviewer`** — senior review of a finished unit of TypeScript or Rails work.
-  Worth running on the v1.0.1 security fixes before they land.
+  Worth running on anything headed for a PR under the table above.
 - **`docs-auditor`** — check docs against implementation after a behavior change.
 
 Not for tasks you can do inline. Each subagent starts cold and re-derives context you
