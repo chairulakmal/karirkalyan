@@ -2,6 +2,7 @@
 
 import { useState, useTransition } from "react";
 import { createApplication, prefillFromUrl } from "@/app/lib/actions";
+import { fileTooLargeMessage, MAX_FILE_BYTES } from "@/app/lib/files";
 import { Field } from "@/app/components/field";
 
 export function NewApplicationForm() {
@@ -166,17 +167,33 @@ function Row({ children }: { children: React.ReactNode }) {
 }
 
 function FileField({ name, label }: { name: string; label: string }) {
+  const [error, setError] = useState<string | null>(null);
+
+  // Rejecting oversize files here (and clearing the input so an invalid file
+  // can't ride along on submit) beats a server round-trip that would fail.
+  function onChange(event: React.ChangeEvent<HTMLInputElement>) {
+    const file = event.currentTarget.files?.[0];
+    if (file && file.size > MAX_FILE_BYTES) {
+      setError(fileTooLargeMessage(file.size));
+      event.currentTarget.value = "";
+    } else {
+      setError(null);
+    }
+  }
+
   return (
     <label className="block text-sm">
       <span className="kk-label">
-        {label} <span className="font-normal text-ink-soft">(optional, PDF)</span>
+        {label} <span className="font-normal text-ink-soft">(optional · PDF, max 1 MB)</span>
       </span>
       <input
         type="file"
         name={name}
         accept=".pdf,application/pdf"
+        onChange={onChange}
         className="mt-1.5 block w-full border border-dune bg-linen px-3 py-2 text-sm text-midnight file:mr-3 file:border-0 file:bg-transparent file:text-sm file:font-medium file:text-cobalt"
       />
+      {error ? <p className="mt-1 text-xs text-red-700">{error}</p> : null}
     </label>
   );
 }

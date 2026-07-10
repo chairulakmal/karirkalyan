@@ -2,7 +2,16 @@
 
 import { useState } from "react";
 import Link from "next/link";
-import { formatDate, jobBoardLabel, statusBadgeClass, statusLabel, timeAgo } from "@/app/lib/format";
+import {
+  ACTIVE_STATUSES,
+  formatDate,
+  isOverdue,
+  jobBoardLabel,
+  statusBadgeClass,
+  statusDescription,
+  statusLabel,
+  timeAgo,
+} from "@/app/lib/format";
 import type { Application, PageMeta, Status } from "@/app/lib/types";
 
 type Filters = { status: Status | null; company: string | null; source: string | null };
@@ -175,6 +184,7 @@ export function ApplicationsList({
               key={status}
               onClick={() => applyFilters({ ...filters, status })}
               disabled={loading}
+              title={statusDescription(status)}
               className={`inline-flex min-h-10 items-center gap-2 px-3 py-1 text-xs font-medium ring-1 ring-inset transition disabled:cursor-wait ${statusBadgeClass(status)} ${filters.status === status ? "" : "opacity-40 hover:opacity-70"
                 }`}
             >
@@ -214,6 +224,7 @@ export function ApplicationsList({
                       {app.company}
                     </p>
                     <span
+                      title={statusDescription(app.status)}
                       className={`inline-flex items-center px-2 py-0.5 text-xs font-medium ring-1 ring-inset ${statusBadgeClass(app.status)}`}
                     >
                       {statusLabel(app.status)}
@@ -228,9 +239,17 @@ export function ApplicationsList({
                     <p>Created {timeAgo(app.created_at)}</p>
                   )}
                   {app.follow_up_at ? (
-                    <p className="mt-0.5 font-medium text-saffron">
-                      Follow up {formatDate(app.follow_up_at)}
-                    </p>
+                    // Overdue only shouts on applications still in play — a
+                    // stale date on a rejected/closed one isn't actionable.
+                    ACTIVE_STATUSES.has(app.status) && isOverdue(app.follow_up_at) ? (
+                      <p className="mt-0.5 font-medium text-red-700">
+                        Follow up overdue · {formatDate(app.follow_up_at)}
+                      </p>
+                    ) : (
+                      <p className="mt-0.5 font-medium text-saffron">
+                        Follow up {formatDate(app.follow_up_at)}
+                      </p>
+                    )
                   ) : null}
                 </div>
               </Link>

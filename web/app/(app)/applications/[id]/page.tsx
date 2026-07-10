@@ -1,8 +1,16 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { apiFetch } from "@/app/lib/api";
-import { formatDate, prettyUrl, statusBadgeClass, statusLabel, timeAgo } from "@/app/lib/format";
+import {
+  formatDate,
+  prettyUrl,
+  statusBadgeClass,
+  statusDescription,
+  statusLabel,
+  timeAgo,
+} from "@/app/lib/format";
 import type { ApplicationWithDetail } from "@/app/lib/types";
+import { StatusHelp } from "@/app/components/status-help";
 import { TransitionButtons } from "./transition-buttons";
 import { FileUpload } from "./file-upload";
 import { DeleteButton } from "./delete-button";
@@ -35,6 +43,7 @@ export default async function ApplicationDetailPage({
           <div className="mt-1 flex items-center gap-3">
             <h1 className="truncate text-3xl">{app.company}</h1>
             <span
+              title={statusDescription(app.status)}
               className={`inline-flex items-center px-2.5 py-0.5 text-xs font-medium ring-1 ring-inset ${statusBadgeClass(app.status)}`}
             >
               {statusLabel(app.status)}
@@ -65,10 +74,15 @@ export default async function ApplicationDetailPage({
       </header>
 
       <section className="border border-dune bg-linen p-5">
-        <p className="kk-label">Transition</p>
+        <div className="flex items-center gap-2">
+          <p className="kk-label">Transition</p>
+          <StatusHelp current={app.status} nextStates={app.valid_next_states} />
+        </div>
         {app.valid_next_states.length === 0 ? (
           <p className="mt-3 text-sm text-ink-soft">
-            <code className="font-mono">{app.status}</code> is terminal — no further transitions allowed.
+            <span className="font-medium text-midnight">{statusLabel(app.status)}</span> —{" "}
+            {statusDescription(app.status)} This is a final state, so the status can no
+            longer change.
           </p>
         ) : (
           <TransitionButtons
@@ -84,6 +98,7 @@ export default async function ApplicationDetailPage({
         <DetailsEditor
           id={numId}
           lockVersion={app.lock_version}
+          status={app.status}
           company={app.company}
           role={app.role}
           url={app.url}
@@ -121,14 +136,21 @@ export default async function ApplicationDetailPage({
                 <span className="font-mono text-xs text-ink-soft">
                   {formatDate(entry.created_at)}
                 </span>
+                {/* Same-status entries are events (e.g. the follow-up reminder),
+                    not transitions — "Applied → Applied" would read like a bug. */}
                 <span className="text-midnight">
                   <code className="bg-sand px-1.5 py-0.5 font-mono text-xs">
                     {statusLabel(entry.from_status)}
-                  </code>{" "}
-                  →{" "}
-                  <code className="bg-sand px-1.5 py-0.5 font-mono text-xs">
-                    {statusLabel(entry.to_status)}
                   </code>
+                  {entry.from_status !== entry.to_status ? (
+                    <>
+                      {" "}
+                      →{" "}
+                      <code className="bg-sand px-1.5 py-0.5 font-mono text-xs">
+                        {statusLabel(entry.to_status)}
+                      </code>
+                    </>
+                  ) : null}
                 </span>
                 {entry.note ? (
                   <span className="text-ink-soft">— {entry.note}</span>

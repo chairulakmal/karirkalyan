@@ -3,12 +3,14 @@
 import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { updateApplication } from "@/app/lib/actions";
-import { formatDate } from "@/app/lib/format";
+import { ACTIVE_STATUSES, formatDate, isOverdue } from "@/app/lib/format";
 import { Field } from "@/app/components/field";
+import type { Status } from "@/app/lib/types";
 
 type Props = {
   id: number;
   lockVersion: number;
+  status: Status;
   company: string;
   role: string;
   url: string | null;
@@ -66,7 +68,13 @@ export function DetailsEditor(props: Props) {
             label="Follow up"
             value={
               props.followUpAt ? (
-                <span className="font-medium text-saffron">{formatDate(props.followUpAt)}</span>
+                ACTIVE_STATUSES.has(props.status) && isOverdue(props.followUpAt) ? (
+                  <span className="font-medium text-red-700">
+                    {formatDate(props.followUpAt)} · overdue
+                  </span>
+                ) : (
+                  <span className="font-medium text-saffron">{formatDate(props.followUpAt)}</span>
+                )
               ) : (
                 "—"
               )
