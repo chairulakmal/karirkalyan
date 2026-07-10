@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import { connection } from "next/server";
 import { Fraunces, IBM_Plex_Mono, Manrope } from "next/font/google";
 import "./globals.css";
 
@@ -61,7 +62,13 @@ export const viewport = {
   themeColor: "#1A2F6B",
 };
 
-export default function RootLayout({ children }: Readonly<{ children: React.ReactNode }>) {
+export default async function RootLayout({ children }: Readonly<{ children: React.ReactNode }>) {
+  // Opt every route into dynamic rendering so the per-request CSP nonce from
+  // proxy.ts reaches each page's scripts. Nonces are applied during SSR; a
+  // statically prerendered page is built with no nonce and would be blocked by
+  // the strict script-src in production (dev always renders dynamically, so
+  // this only bites a production build). See web/proxy.ts.
+  await connection();
   return (
     <html
       lang="en"
