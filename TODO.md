@@ -10,28 +10,80 @@ Roadmap and open findings. Items are grouped by release; everything under
 
 ## v1.0.1 — Security review & fixes (next)
 
-The full-app review (2026-07-10) left four security findings unresolved. `v1.0.1` is
-scoped to a dedicated security pass over the API and frontend, plus these fixes. No
-features; anything non-security that surfaces goes to the backlog.
+`v1.0.1` is scoped to a dedicated security pass over the API and frontend, plus the
+fixes it produces. No features; anything non-security that surfaces goes to the backlog.
 
 ### Planned work
 
-- [ ] **Run a focused security review** of `api/` and `web/` — auth flows, the JWT
+- [x] **Run a focused security review** of `api/` and `web/` — auth flows, the JWT
   lifecycle, upload handling, the AI prefill SSRF surface, and the Next.js route
-  handlers. Record findings here before fixing.
+  handlers. Done 2026-07-10; findings recorded below. Severity is triaged for a
+  single-user portfolio app behind Railway/Cloudflare, not a multi-tenant SaaS.
 
-### Known findings to fix
+### Findings to fix
 
-- [ ] **No account-level brute-force backstop** — throttling is IP-only; add Devise
-  `:lockable` or an email-keyed throttle.
-- [ ] **Login-CSRF residual on auth route handlers** — `web/app/api/auth/session|register`
-  don't verify `Origin` (Server Actions do get Next's built-in check); add an allowlist check.
-- [ ] **Demo credentials ship in the client bundle** (`sign-in-form.tsx`) — ensure the demo
-  account is sandboxed, or move behind a dedicated `/api/auth/demo` route.
-- [ ] **Tighten CSP** — the baseline set added in PR #37 still allows `'unsafe-inline'`
-  scripts for the Next bootstrap; move to nonces.
-- [ ] **Document JWT semantics** — single JTI per user (sign-out revokes all devices),
-  1-day expiry, no refresh flow. Fine as designed, but note it in the README.
+Ordered by severity. File references are `path:line` at `9708df6`.
+
+- [ ] **[med] No account-level brute-force backstop** — throttling is IP-only
+  (`api/config/initializers/rack_attack.rb:19`, `sign_in` 5/min per IP). A botnet or a
+  shared NAT egress defeats it; there's no per-account lockout or email-keyed throttle.
+  Add Devise `:lockable`, or throttle on the email once the JSON body is parsed
+  (a controller-level `before_action` throttle sees `params`, unlike the Rack layer —
+  see the "throttle by IP only" note in the initializer). Confirmed.
+- [ ] **[med] Login-CSRF on the auth route handlers** — `web/app/api/auth/session/route.ts`
+  and `.../register/route.ts` parse a JSON body and forward it to Rails with no `Origin`
+  or `Sec-Fetch-Site` check. Next's built-in CSRF protection covers Server Actions, not
+  route handlers, so a cross-site form/fetch can drive a login (classic login-CSRF: log
+  the victim into an attacker-controlled account) or a sign-up. Add an allowlist `Origin`
+  check against `FRONTEND_URL` in both `POST` handlers (and the session `DELETE`). Confirmed.
+- [ ] **[med] Demo account is a shared, writable, un-reset account** — the "Try demo"
+  button signs every visitor into one shared user with credentials hardcoded in the
+  client bundle (`web/app/(auth)/sign-in/sign-in-form.tsx:62`). That much is inherent to
+  a public demo, but two things make it worse than intended:
+    1. `Demo::ResetService` (`api/app/services/demo/reset_service.rb`) is **never invoked** —
+       no route, no job, not in `config/recurring.yml`. The reset that's supposed to keep
+       the demo clean does not run, so the shared account accumulates every visitor's data
+       indefinitely.
+    2. The demo user has the **same capabilities as a real user**, including the paid AI
+       prefill endpoint (Claude call + outbound fetch), rate-limited by IP only. Distributed
+       use of the demo login is an uncapped cost/abuse vector.
+  Fix: wire `Demo::ResetService` into a recurring Solid Queue task (e.g. hourly), and either
+  gate AI prefill for the demo user or give the demo account a tighter per-account throttle.
+  Confirmed.
+- [ ] **[low] Tighten CSP** — `web/next.config.ts:9` still ships `script-src 'unsafe-inline'`
+  for the Next bootstrap. Move to a nonce-based policy (per-request nonce via `proxy.ts`,
+  drop `'unsafe-inline'`). `object-src 'none'`, `frame-ancestors 'none'`, and `base-uri`
+  are already set, so this is the last soft spot. Confirmed.
+- [ ] **[low] Unanchored host-authorization regexes** — `api/config/environments/production.rb:79-80`
+  use `/.*\.railway\.app/` and `/.*\.railway\.internal/` with no `\z` anchor, so
+  `foo.railway.app.attacker.com` is accepted as a trusted Host. Impact is limited here
+  (mailer links use `FRONTEND_URL`, not the request host), but anchor them
+  (`/\A([a-z0-9-]+\.)*railway\.app\z/`) while touching this file. New finding.
+- [ ] **[doc] Document JWT semantics** — single JTI per user via `JTIMatcher`
+  (`api/app/models/user.rb:2`), so sign-out revokes **all** devices; 1-day expiry, no
+  refresh flow (`api/config/initializers/devise.rb:20-25`). Fine as designed — note it in
+  the README so the single-session behaviour isn't mistaken for a bug. Confirmed.
+
+### Reviewed and found sound (no action)
+
+Recorded so a re-review doesn't re-litigate them:
+
+- **SSRF surface (AI prefill)** — `url_prefill_service.rb` resolves, validates every
+  resolved address against loopback/private/link-local + extra blocked ranges, pins the
+  connection to the validated IP (`http.ipaddr`), restricts to ports 80/443, and
+  re-validates on each redirect hop. The DNS-rebinding TOCTOU fixed in PR #39 holds.
+- **Upload handling** — size checked from multipart metadata *before* `.read`
+  (`applications_controller.rb:154`), 1 MB model cap, and PDF magic-byte validation
+  (`application.rb:36`). Downloads are `current_user`-scoped, `nosniff`, PDF-only.
+- **Tenant isolation / IDOR** — every record is reached through
+  `current_user.applications` (`set_application`, dashboard, list), so cross-user access
+  404s. `status` is not mass-assignable; entry states are restricted and later changes go
+  through `TransitionService`.
+- **Password logging** — checked the actual Rails source: AC instrumentation logs
+  `request.filtered_parameters`, and `filter_parameter_logging.rb` filters `passw`/`email`,
+  so lograge (`params: event.payload[:params]`) does not leak credentials.
+- **Sign-up auth** — the global `authenticate_user!` is a no-op inside Devise controllers,
+  so registration is reachable (verified via `spec/requests/api/v1/auth_spec.rb`, green).
 
 ---
 
