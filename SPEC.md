@@ -32,7 +32,7 @@ Two consequences worth stating plainly:
   [`CHANGELOG.md`](CHANGELOG.md), including the pre-1.0.0 build phases that used to sit at the
   top of this file.
 
-Last synced against the code: **2026-07-10**, at `v1.0.1`.
+Last synced against the code: **2026-07-11**, at `v1.1.0`.
 
 ---
 
