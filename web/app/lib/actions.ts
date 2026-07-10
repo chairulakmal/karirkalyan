@@ -5,9 +5,15 @@ import { redirect } from "next/navigation";
 import { apiFetch } from "./api";
 import type { Application } from "./types";
 
-export type ActionResult = { ok: true } | { ok: false; error: string };
+// A failed action; `status` is the upstream HTTP status when the failure came
+// from the API (absent for local validation failures). Callers key off it to
+// recover from a 409 optimistic-lock conflict.
+export type ActionFailure = { ok: false; error: string; status?: number };
+export type ActionResult = { ok: true } | ActionFailure;
 
-export async function createApplication(formData: FormData): Promise<ActionResult> {
+// Resolves only on failure — the success path ends in redirect(), which throws
+// and never returns. Typing it as ActionFailure keeps call sites honest.
+export async function createApplication(formData: FormData): Promise<ActionFailure> {
   const company = formData.get("company")?.toString().trim();
   const role = formData.get("role")?.toString().trim();
   if (!company || !role) {
@@ -52,7 +58,7 @@ export async function createApplication(formData: FormData): Promise<ActionResul
     body,
   });
 
-  if (!res.ok) return { ok: false, error: res.error };
+  if (!res.ok) return { ok: false, error: res.error, status: res.status };
 
   revalidatePath("/dashboard");
   redirect(`/applications/${res.data.id}`);
@@ -92,7 +98,7 @@ export async function updateApplication(
     body: JSON.stringify({ application }),
   });
 
-  if (!res.ok) return { ok: false, error: res.error };
+  if (!res.ok) return { ok: false, error: res.error, status: res.status };
 
   revalidatePath(`/applications/${id}`);
   revalidatePath("/dashboard");
@@ -109,7 +115,7 @@ export async function transitionStatus(
     method: "PATCH",
     body: JSON.stringify({ status: to, lock_version: lockVersion, note: note ?? null }),
   });
-  if (!res.ok) return { ok: false, error: res.error };
+  if (!res.ok) return { ok: false, error: res.error, status: res.status };
   revalidatePath(`/applications/${id}`);
   revalidatePath("/dashboard");
   return { ok: true };
@@ -133,14 +139,15 @@ export async function uploadFile(
     body: upstream,
   });
 
-  if (!res.ok) return { ok: false, error: res.error };
+  if (!res.ok) return { ok: false, error: res.error, status: res.status };
   revalidatePath(`/applications/${id}`);
   return { ok: true };
 }
 
-export async function deleteApplication(id: number): Promise<ActionResult> {
+// Resolves only on failure — the success path ends in redirect(), which throws.
+export async function deleteApplication(id: number): Promise<ActionFailure> {
   const res = await apiFetch(`/applications/${id}`, { method: "DELETE" });
-  if (!res.ok) return { ok: false, error: res.error };
+  if (!res.ok) return { ok: false, error: res.error, status: res.status };
   revalidatePath("/dashboard");
   redirect("/dashboard");
 }
