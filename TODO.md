@@ -52,14 +52,13 @@ Ordered by severity. File references are `path:line` at `9708df6`.
        added **per-account** prefill caps for *every* user (10/min, 50/hour, 100/day),
        keyed on the JWT `sub` decoded in `rack_attack.rb` (`.prefill_user_id`). The demo
        account is bounded like any other. *(chore/security-review-v1.0.1)*
-- [~] **[low] Tighten CSP** — `web/next.config.ts` shipped `script-src 'unsafe-inline'`
-  for the Next bootstrap. **Fixed (pending browser verification):** moved the CSP to a
-  per-request nonce in `web/proxy.ts` (`script-src 'self' 'nonce-…' 'strict-dynamic'`,
-  dropped `'unsafe-inline'`; dev keeps `'unsafe-eval'` for HMR). On branch
-  `fix/csp-nonces` — **not yet merged.** Caveat: with `'strict-dynamic'` + nonce, Next's
-  *statically* prerendered pages (`/`, `/applications/new`, `/sign-up`) don't get a nonce,
-  so they must be visually checked for CSP console errors before merge; if any break,
-  force those routes dynamic.
+- [x] **[low] Tighten CSP** — `web/next.config.ts` shipped `script-src 'unsafe-inline'`
+  for the Next bootstrap. **Fixed:** moved the CSP to a per-request nonce in `web/proxy.ts`
+  (`script-src 'self' 'nonce-…' 'strict-dynamic'`, dropped `'unsafe-inline'`; dev keeps
+  `'unsafe-eval'` for HMR). Because nonces are only applied during SSR, `await connection()`
+  in the root layout opts the whole app into dynamic rendering so every page's scripts get
+  the nonce — verified via `next build` that `/`, `/sign-up`, `/applications/new` and the
+  404 render dynamically (they were static before). *(chore/security-review-v1.0.1)*
 - [x] **[low] Unanchored host-authorization regexes** — `api/config/environments/production.rb`
   used `/.*\.railway\.app/` and `/.*\.railway\.internal/` with no `\z` anchor, so
   `foo.railway.app.attacker.com` was accepted as a trusted Host. **Fixed:** anchored to
