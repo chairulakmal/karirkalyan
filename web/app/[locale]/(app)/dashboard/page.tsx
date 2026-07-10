@@ -1,9 +1,12 @@
+import { getLocale, getTranslations } from "next-intl/server";
 import { Link } from "@/i18n/navigation";
 import { apiFetch } from "@/app/lib/api";
 import type { Application, DashboardStats, Paginated, Status, User } from "@/app/lib/types";
+import { InfoPopover } from "@/app/components/info-popover";
 import { ApplicationsList } from "./applications-list";
 
 export default async function Dashboard() {
+  const [t, locale] = await Promise.all([getTranslations("dashboard"), getLocale()]);
   const [appsRes, statsRes, meRes] = await Promise.all([
     apiFetch<Paginated<Application>>("/applications?limit=10"),
     apiFetch<DashboardStats>("/dashboard"),
@@ -11,7 +14,11 @@ export default async function Dashboard() {
   ]);
 
   if (!appsRes.ok) {
-    return <ErrorBlock message={appsRes.error} />;
+    return (
+      <div className="border border-danger/40 bg-danger/10 p-5 text-sm text-danger">
+        {t("failedToLoad", { message: appsRes.error })}
+      </div>
+    );
   }
 
   const { data: applications, meta } = appsRes.data;
@@ -23,35 +30,37 @@ export default async function Dashboard() {
 
   return (
     <div className="space-y-10">
-      <header className="flex items-end justify-between border-b border-dune pb-6">
+      <header className="flex flex-wrap items-end justify-between gap-4 border-b border-dune pb-6">
         <div>
-          <p className="kk-label">Overview</p>
-          <h1 className="mt-1 text-3xl">Dashboard</h1>
-          <p className="mt-1 font-mono text-xs text-ink-soft">{total} applications tracked</p>
+          <p className="kk-label">{t("eyebrow")}</p>
+          <h1 className="mt-1 text-3xl">{t("title")}</h1>
+          <p className="mt-1 font-mono text-xs text-ink-soft">{t("tracked", { count: total })}</p>
         </div>
         <Link
           href="/applications/new"
           className="bg-cobalt px-4 py-2 text-sm font-medium text-linen transition hover:bg-cobalt-2"
         >
-          New application
+          {t("newApplication")}
         </Link>
       </header>
 
       {me && (
         <section className="border border-dune bg-linen p-5">
-          <p className="kk-label">Profile</p>
+          <p className="kk-label">{t("profile")}</p>
           <dl className="mt-3 flex flex-wrap gap-x-10 gap-y-2 text-sm">
             <div>
-              <dt className="font-mono text-xs text-ink-soft">Email</dt>
+              <dt className="font-mono text-xs text-ink-soft">{t("email")}</dt>
               <dd className="mt-0.5 text-midnight">{me.email}</dd>
             </div>
             <div>
-              <dt className="font-mono text-xs text-ink-soft">Member since</dt>
+              <dt className="font-mono text-xs text-ink-soft">{t("memberSince")}</dt>
               <dd className="mt-0.5 text-midnight">
-                {new Date(me.created_at).toLocaleDateString(undefined, {
+                {new Date(me.created_at).toLocaleDateString(locale, {
                   year: "numeric",
                   month: "long",
                   day: "numeric",
+                  // Pinned like formatDate() — the API serialises in app time.
+                  timeZone: "Asia/Tokyo",
                 })}
               </dd>
             </div>
@@ -60,28 +69,18 @@ export default async function Dashboard() {
       )}
 
       {stats?.avg_days_to_offer != null && (
-        <p className="font-mono text-xs text-ink-soft">
-          Average days from apply → offer:{" "}
-          <span className="text-midnight">{stats.avg_days_to_offer}</span>
-          <span className="group relative ml-2 inline-block align-middle">
-            <button
-              type="button"
-              aria-label="What counts toward this average"
-              aria-describedby="avg-days-tooltip"
-              className="cursor-help select-none text-ink-soft/50 transition-colors hover:text-ink-soft focus-visible:text-ink-soft focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-cobalt"
-            >
-              ⓘ
-            </button>
-            <span
-              id="avg-days-tooltip"
-              role="tooltip"
-              className="pointer-events-none absolute bottom-full left-1/2 z-10 mb-2 w-56 -translate-x-1/2 rounded bg-midnight px-3 py-2 font-sans leading-relaxed text-linen opacity-0 shadow-lg transition-opacity group-hover:opacity-100 group-focus-within:opacity-100"
-            >
-              Counts applications that reached offer, accepted, or declined. Measured from your
-              applied date to when the offer status was recorded in the audit log.
-            </span>
+        // <div>, not <p>: InfoPopover renders a <details>, which is flow
+        // content and invalid inside a paragraph (React would warn on hydrate).
+        <div className="font-mono text-xs text-ink-soft">
+          {t("avgDays")} <span className="text-midnight">{stats.avg_days_to_offer}</span>
+          <span className="ml-2 inline-block align-middle">
+            <InfoPopover label={t("avgDaysAria")}>
+              <p className="font-sans text-sm leading-relaxed text-ink-soft">
+                {t("avgDaysTooltip")}
+              </p>
+            </InfoPopover>
           </span>
-        </p>
+        </div>
       )}
 
       <ApplicationsList
@@ -91,14 +90,6 @@ export default async function Dashboard() {
         facets={facets}
         total={total}
       />
-    </div>
-  );
-}
-
-function ErrorBlock({ message }: { message: string }) {
-  return (
-    <div className="border border-red-300 bg-red-50 p-5 text-sm text-red-800">
-      Failed to load: {message}
     </div>
   );
 }

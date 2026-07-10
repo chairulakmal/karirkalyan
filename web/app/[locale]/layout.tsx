@@ -3,6 +3,7 @@ import { notFound } from "next/navigation";
 import { connection } from "next/server";
 import { Fraunces, IBM_Plex_Mono, Manrope } from "next/font/google";
 import { hasLocale, NextIntlClientProvider } from "next-intl";
+import { getTranslations } from "next-intl/server";
 import { routing } from "@/i18n/routing";
 import "../globals.css";
 
@@ -30,8 +31,6 @@ const plexMono = IBM_Plex_Mono({
 
 const BASE_URL = "https://kk.chairulakmal.com";
 const TITLE = "KarirKalyan — Job Application Tracker";
-const DESCRIPTION =
-  "Track every job application from wishlist to offer. Status pipeline, audit trail, and follow-up reminders — built for a focused job search.";
 
 // OpenGraph wants a full language_TERRITORY tag, not the bare locale segment.
 const OG_LOCALE: Record<string, string> = { en: "en_US", ja: "ja_JP" };
@@ -42,6 +41,12 @@ export async function generateMetadata({
   params: Promise<{ locale: string }>;
 }): Promise<Metadata> {
   const { locale } = await params;
+
+  // The description is the homepage tagline, read from the catalog rather than
+  // kept as a second copy here — a search result in Japanese should say what the
+  // Japanese homepage says.
+  const t = await getTranslations({ locale, namespace: "home" });
+  const DESCRIPTION = t("tagline");
 
   return {
     metadataBase: new URL(BASE_URL),

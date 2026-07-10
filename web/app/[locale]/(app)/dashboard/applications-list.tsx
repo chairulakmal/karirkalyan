@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { useLocale, useTranslations } from "next-intl";
 import { Link } from "@/i18n/navigation";
 import {
   ACTIVE_STATUSES,
@@ -8,8 +9,6 @@ import {
   isOverdue,
   jobBoardLabel,
   statusBadgeClass,
-  statusDescription,
-  statusLabel,
   timeAgo,
 } from "@/app/lib/format";
 import type { Application, PageMeta, Status } from "@/app/lib/types";
@@ -58,6 +57,9 @@ export function ApplicationsList({
   facets,
   total,
 }: Props) {
+  const t = useTranslations("list");
+  const ts = useTranslations("status");
+  const locale = useLocale();
   const [items, setItems] = useState(() => sortByImportance(initialItems));
   const [meta, setMeta] = useState(initialMeta);
   const [filters, setFilters] = useState<Filters>(NO_FILTERS);
@@ -138,21 +140,21 @@ export function ApplicationsList({
       {facets.length > 0 && (
         <div className="flex flex-wrap items-end gap-3">
           <FilterSelect
-            label="Company"
+            label={t("company")}
             value={filters.company ?? ""}
             disabled={loading}
-            allLabel="All companies"
+            allLabel={t("allCompanies")}
             options={companyOptions.map(([name, count]) => ({ value: name, label: name, count }))}
             onChange={(value) => changeCompany(value || null)}
           />
           <FilterSelect
-            label="Job board"
+            label={t("jobBoard")}
             value={filters.source ?? ""}
             disabled={loading}
-            allLabel="All boards"
+            allLabel={t("allBoards")}
             options={boardOptions.map(([host, count]) => ({
               value: host,
-              label: jobBoardLabel(host),
+              label: jobBoardLabel(host, t("noBoard")),
               count,
             }))}
             onChange={(value) => changeSource(value || null)}
@@ -163,7 +165,7 @@ export function ApplicationsList({
               disabled={loading}
               className="px-2 py-1.5 text-xs text-ink-soft underline underline-offset-4 transition hover:text-midnight disabled:opacity-50"
             >
-              Clear filters
+              {t("clearFilters")}
             </button>
           )}
         </div>
@@ -177,18 +179,18 @@ export function ApplicationsList({
             className={`inline-flex min-h-10 items-center gap-2 px-3 py-1 text-xs font-medium ring-1 ring-inset ring-midnight/20 transition disabled:cursor-wait ${filters.status === null ? "bg-sand text-midnight" : "bg-sand/40 text-ink-soft hover:text-midnight"
               }`}
           >
-            All <span className="font-mono">{total}</span>
+            {t("all")} <span className="font-mono">{total}</span>
           </button>
           {statusBuckets.map(([status, count]) => (
             <button
               key={status}
               onClick={() => applyFilters({ ...filters, status })}
               disabled={loading}
-              title={statusDescription(status)}
+              title={ts(`description.${status}`)}
               className={`inline-flex min-h-10 items-center gap-2 px-3 py-1 text-xs font-medium ring-1 ring-inset transition disabled:cursor-wait ${statusBadgeClass(status)} ${filters.status === status ? "" : "opacity-40 hover:opacity-70"
                 }`}
             >
-              {statusLabel(status)} <span className="font-mono">{count}</span>
+              {ts(`label.${status}`)} <span className="font-mono">{count}</span>
             </button>
           ))}
         </div>
@@ -197,15 +199,15 @@ export function ApplicationsList({
       {items.length === 0 ? (
         <div className="border border-dashed border-dune bg-linen p-12 text-center">
           {hasActiveFilter ? (
-            <p className="text-ink-soft">No applications match these filters.</p>
+            <p className="text-ink-soft">{t("noMatches")}</p>
           ) : (
             <>
-              <p className="text-ink-soft">No applications yet.</p>
+              <p className="text-ink-soft">{t("empty")}</p>
               <Link
                 href="/applications/new"
                 className="mt-3 inline-block text-sm font-medium text-cobalt underline underline-offset-4 hover:text-cobalt-2"
               >
-                Add your first one →
+                {t("addFirst")}
               </Link>
             </>
           )}
@@ -224,30 +226,30 @@ export function ApplicationsList({
                       {app.company}
                     </p>
                     <span
-                      title={statusDescription(app.status)}
+                      title={ts(`description.${app.status}`)}
                       className={`inline-flex items-center px-2 py-0.5 text-xs font-medium ring-1 ring-inset ${statusBadgeClass(app.status)}`}
                     >
-                      {statusLabel(app.status)}
+                      {ts(`label.${app.status}`)}
                     </span>
                   </div>
                   <p className="mt-1 truncate text-sm text-ink-soft">{app.role}</p>
                 </div>
                 <div className="hidden text-right font-mono text-xs text-ink-soft sm:block">
                   {app.applied_at ? (
-                    <p>Applied {timeAgo(app.applied_at)}</p>
+                    <p>{t("appliedAgo", { ago: timeAgo(app.applied_at, locale) })}</p>
                   ) : (
-                    <p>Created {timeAgo(app.created_at)}</p>
+                    <p>{t("createdAgo", { ago: timeAgo(app.created_at, locale) })}</p>
                   )}
                   {app.follow_up_at ? (
                     // Overdue only shouts on applications still in play — a
                     // stale date on a rejected/closed one isn't actionable.
                     ACTIVE_STATUSES.has(app.status) && isOverdue(app.follow_up_at) ? (
-                      <p className="mt-0.5 font-medium text-red-700">
-                        Follow up overdue · {formatDate(app.follow_up_at)}
+                      <p className="mt-0.5 font-medium text-danger">
+                        {t("followUpOverdue", { date: formatDate(app.follow_up_at, locale) })}
                       </p>
                     ) : (
                       <p className="mt-0.5 font-medium text-saffron">
-                        Follow up {formatDate(app.follow_up_at)}
+                        {t("followUp", { date: formatDate(app.follow_up_at, locale) })}
                       </p>
                     )
                   ) : null}
@@ -265,7 +267,7 @@ export function ApplicationsList({
             disabled={loading}
             className="border border-dune px-6 py-2 text-sm font-medium text-midnight transition hover:bg-dune disabled:opacity-50"
           >
-            {loading ? "Loading…" : "Load more"}
+            {loading ? t("loading") : t("loadMore")}
           </button>
         </div>
       )}
@@ -290,6 +292,7 @@ function FilterSelect({
   disabled: boolean;
   onChange: (value: string) => void;
 }) {
+  const t = useTranslations("list");
   return (
     <label className="block text-sm">
       <span className="kk-label">{label}</span>
@@ -297,12 +300,12 @@ function FilterSelect({
         value={value}
         disabled={disabled}
         onChange={(e) => onChange(e.target.value)}
-        className="mt-1.5 block min-w-44 border border-dune bg-linen px-3 py-1.5 text-sm text-midnight focus:border-cobalt focus:outline-none focus:ring-1 focus:ring-cobalt disabled:opacity-50"
+        className="mt-1.5 block min-w-44 border border-dune bg-linen px-3 py-1.5 text-sm text-midnight disabled:opacity-50"
       >
         <option value="">{allLabel}</option>
         {options.map((o) => (
           <option key={o.value} value={o.value}>
-            {o.label} ({o.count})
+            {t("option", { label: o.label, count: o.count })}
           </option>
         ))}
       </select>

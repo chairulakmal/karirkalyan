@@ -2,11 +2,21 @@
 
 import { useRouter } from "@/i18n/navigation";
 import { useState, useTransition } from "react";
+import { useTranslations } from "next-intl";
 import { Field } from "@/app/components/field";
 
 type Mode = "sign-in" | "sign-up";
 
+// `/api/auth/*` answers with `{ error: "<English sentence>" }` and a status,
+// exactly like the Rails API behind it — the status is the only part that can
+// be translated off. Statuses listed here have a catalog entry of their own;
+// anything else falls back to `errors.unknown`. Never string-match the
+// sentence to recover a pseudo-code.
+const KEYED_STATUSES = new Set([403, 404, 409, 422, 429, 502, 503]);
+
 export function AuthForm({ defaultMode = "sign-in" }: { defaultMode?: Mode }) {
+  const t = useTranslations("auth");
+  const tErrors = useTranslations("errors");
   const router = useRouter();
   const [mode, setMode] = useState<Mode>(defaultMode);
   const [error, setError] = useState<string | null>(null);
@@ -14,6 +24,14 @@ export function AuthForm({ defaultMode = "sign-in" }: { defaultMode?: Mode }) {
   const [demoPending, setDemoPending] = useState(false);
 
   const busy = pending || demoPending;
+
+  // `overrides` names a catalog entry that reads better than the generic one
+  // for that status — a 401 here means bad credentials, not a dead session.
+  function errorMessage(status: number, overrides: Record<number, string> = {}): string {
+    return tErrors(
+      overrides[status] ?? (KEYED_STATUSES.has(status) ? String(status) : "unknown"),
+    );
+  }
 
   async function doSignIn(email: string, password: string): Promise<boolean> {
     setError(null);
@@ -23,8 +41,7 @@ export function AuthForm({ defaultMode = "sign-in" }: { defaultMode?: Mode }) {
       body: JSON.stringify({ email, password }),
     });
     if (!res.ok) {
-      const body = (await res.json().catch(() => ({}))) as { error?: string };
-      setError(body.error ?? "Sign in failed");
+      setError(errorMessage(res.status, { 401: "invalidCredentials" }));
       return false;
     }
     startTransition(() => {
@@ -50,8 +67,7 @@ export function AuthForm({ defaultMode = "sign-in" }: { defaultMode?: Mode }) {
       body: JSON.stringify({ email, password }),
     });
     if (!register.ok) {
-      const body = (await register.json().catch(() => ({}))) as { error?: string };
-      setError(body.error ?? "Sign up failed");
+      setError(errorMessage(register.status, { 409: "signUpFailed", 422: "signUpFailed" }));
       return;
     }
     await doSignIn(email, password);
@@ -76,12 +92,12 @@ export function AuthForm({ defaultMode = "sign-in" }: { defaultMode?: Mode }) {
         disabled={busy}
         className="w-full border border-cobalt px-4 py-2.5 text-sm font-medium text-cobalt transition hover:bg-cobalt hover:text-linen disabled:opacity-50"
       >
-        {demoPending ? "Loading demo…" : "Try demo account"}
+        {demoPending ? t("loadingDemo") : t("tryDemoAccount")}
       </button>
 
       <div className="relative flex items-center">
         <div className="flex-grow border-t border-dune" />
-        <span className="mx-3 flex-shrink-0 text-xs text-ink-soft">or</span>
+        <span className="mx-3 flex-shrink-0 text-xs text-ink-soft">{t("or")}</span>
         <div className="flex-grow border-t border-dune" />
       </div>
 
@@ -95,7 +111,7 @@ export function AuthForm({ defaultMode = "sign-in" }: { defaultMode?: Mode }) {
               : "text-ink-soft hover:text-midnight"
           }`}
         >
-          Sign in
+          {t("signIn")}
         </button>
         <button
           type="button"
@@ -106,29 +122,29 @@ export function AuthForm({ defaultMode = "sign-in" }: { defaultMode?: Mode }) {
               : "text-ink-soft hover:text-midnight"
           }`}
         >
-          Create account
+          {t("createAccount")}
         </button>
       </div>
 
       <form action={onSubmit} className="space-y-4">
-        <Field name="email" label="Email" type="email" autoComplete="email" required />
+        <Field name="email" label={t("email")} type="email" autoComplete="email" required />
         <Field
           name="password"
-          label="Password"
+          label={t("password")}
           type="password"
           autoComplete={mode === "sign-in" ? "current-password" : "new-password"}
           required
           minLength={8}
         />
-        {error ? <p className="text-sm text-red-700">{error}</p> : null}
+        {error ? <p className="text-sm text-danger">{error}</p> : null}
         <button
           type="submit"
           disabled={busy}
           className="w-full bg-cobalt px-4 py-2.5 text-sm font-medium text-linen transition hover:bg-cobalt-2 disabled:opacity-50"
         >
           {pending
-            ? mode === "sign-in" ? "Signing in…" : "Creating…"
-            : mode === "sign-in" ? "Sign in" : "Create account"}
+            ? mode === "sign-in" ? t("signingIn") : t("creating")
+            : mode === "sign-in" ? t("signIn") : t("createAccount")}
         </button>
       </form>
     </div>

@@ -4,9 +4,18 @@ import { routing } from "./i18n/routing";
 
 const handleI18n = createMiddleware(routing);
 
-// Locale-stripped paths. The guard never sees a `/ja` prefix, so this stays a
-// list of three rather than one entry per locale.
+// Locale-stripped paths. The guard never sees a `/ja` prefix, so these stay
+// lists of a few entries rather than one entry per locale.
+//
+// PUBLIC: reachable *only* without a session. A signed-in visitor is bounced to
+// the dashboard, so they never see the marketing or auth pages again.
 const PUBLIC_PATHS = ["/", "/sign-in", "/sign-up"];
+
+// OPEN: reachable either way, with no redirect in either direction. `/about` and
+// `/docs` describe the project rather than selling it, so bouncing a signed-in
+// reader to the dashboard would be hiding them from the people most likely to
+// read them. This is why they are not simply more PUBLIC_PATHS entries.
+const OPEN_PATHS = ["/about", "/docs"];
 
 const isDev = process.env.NODE_ENV === "development";
 
@@ -69,20 +78,20 @@ export function proxy(request: NextRequest) {
     return response;
   };
 
-  if (path === "/" && token) {
-    return redirectTo("/dashboard");
-  }
+  const matches = (paths: readonly string[]) =>
+    paths.some((p) => path === p || (p !== "/" && path.startsWith(`${p}/`)));
 
-  const isPublic = PUBLIC_PATHS.some(
-    (p) => path === p || (p !== "/" && path.startsWith(`${p}/`)),
-  );
+  // Checked first: an open path skips both redirects below, whatever the token.
+  if (!matches(OPEN_PATHS)) {
+    const isPublic = matches(PUBLIC_PATHS);
 
-  if (!isPublic && !token) {
-    return redirectTo("/sign-in");
-  }
+    if (!isPublic && !token) {
+      return redirectTo("/sign-in");
+    }
 
-  if (isPublic && token) {
-    return redirectTo("/dashboard");
+    if (isPublic && token) {
+      return redirectTo("/dashboard");
+    }
   }
 
   // The guard passed. Hand off to next-intl, which resolves the locale and

@@ -1,14 +1,8 @@
+import { getLocale, getTranslations } from "next-intl/server";
 import { Link } from "@/i18n/navigation";
 import { notFound } from "next/navigation";
 import { apiFetch } from "@/app/lib/api";
-import {
-  formatDate,
-  prettyUrl,
-  statusBadgeClass,
-  statusDescription,
-  statusLabel,
-  timeAgo,
-} from "@/app/lib/format";
+import { formatDate, prettyUrl, statusBadgeClass, timeAgo } from "@/app/lib/format";
 import type { ApplicationWithDetail } from "@/app/lib/types";
 import { StatusHelp } from "@/app/components/status-help";
 import { TransitionButtons } from "./transition-buttons";
@@ -22,13 +16,18 @@ export default async function ApplicationDetailPage({
   params: Promise<{ id: string }>;
 }) {
   const { id } = await params;
+  const [t, ts, locale] = await Promise.all([
+    getTranslations("detail"),
+    getTranslations("status"),
+    getLocale(),
+  ]);
   const res = await apiFetch<ApplicationWithDetail>(`/applications/${id}`);
 
   if (!res.ok) {
     if (res.status === 404) notFound();
     return (
-      <div className="border border-red-300 bg-red-50 p-5 text-sm text-red-800">
-        Failed to load: {res.error}
+      <div className="border border-danger/40 bg-danger/10 p-5 text-sm text-danger">
+        {t("failedToLoad", { message: res.error })}
       </div>
     );
   }
@@ -37,16 +36,16 @@ export default async function ApplicationDetailPage({
 
   return (
     <div className="space-y-10">
-      <header className="flex items-start justify-between gap-4 border-b border-dune pb-6">
+      <header className="flex flex-wrap items-start justify-between gap-4 border-b border-dune pb-6">
         <div className="min-w-0">
-          <p className="kk-label">Application</p>
+          <p className="kk-label">{t("eyebrow")}</p>
           <div className="mt-1 flex items-center gap-3">
             <h1 className="truncate text-3xl">{app.company}</h1>
             <span
-              title={statusDescription(app.status)}
+              title={ts(`description.${app.status}`)}
               className={`inline-flex items-center px-2.5 py-0.5 text-xs font-medium ring-1 ring-inset ${statusBadgeClass(app.status)}`}
             >
-              {statusLabel(app.status)}
+              {ts(`label.${app.status}`)}
             </span>
           </div>
           <p className="mt-1 text-ink-soft">{app.role}</p>
@@ -67,7 +66,7 @@ export default async function ApplicationDetailPage({
             href="/dashboard"
             className="border border-dune bg-linen px-3 py-1.5 text-sm text-ink-soft hover:bg-sand"
           >
-            ← Dashboard
+            {t("backToDashboard")}
           </Link>
           <DeleteButton id={numId} />
         </div>
@@ -75,14 +74,16 @@ export default async function ApplicationDetailPage({
 
       <section className="border border-dune bg-linen p-5">
         <div className="flex items-center gap-2">
-          <p className="kk-label">Transition</p>
+          <p className="kk-label">{t("transition")}</p>
           <StatusHelp current={app.status} nextStates={app.valid_next_states} />
         </div>
         {app.valid_next_states.length === 0 ? (
           <p className="mt-3 text-sm text-ink-soft">
-            <span className="font-medium text-midnight">{statusLabel(app.status)}</span> —{" "}
-            {statusDescription(app.status)} This is a final state, so the status can no
-            longer change.
+            {t.rich("finalState", {
+              label: ts(`label.${app.status}`),
+              description: ts(`description.${app.status}`),
+              b: (chunks) => <span className="font-medium text-midnight">{chunks}</span>,
+            })}
           </p>
         ) : (
           <TransitionButtons
@@ -109,45 +110,45 @@ export default async function ApplicationDetailPage({
         />
 
         <div className="border border-dune bg-linen p-5">
-          <p className="kk-label">Documents</p>
+          <p className="kk-label">{t("documents")}</p>
           <FileUpload
             id={numId}
             field="resume"
-            label="Resume"
+            label={t("resume")}
             uploadedAt={app.resume_updated_at}
           />
           <FileUpload
             id={numId}
             field="cover_letter"
-            label="Cover letter"
+            label={t("coverLetter")}
             uploadedAt={app.cover_letter_updated_at}
           />
         </div>
       </section>
 
       <section className="border border-dune bg-linen p-5">
-        <p className="kk-label">Timeline</p>
+        <p className="kk-label">{t("timeline")}</p>
         {app.timeline_entries.length === 0 ? (
-          <p className="mt-3 text-sm text-ink-soft">No transitions yet.</p>
+          <p className="mt-3 text-sm text-ink-soft">{t("noTransitions")}</p>
         ) : (
           <ol className="mt-3 space-y-3">
             {app.timeline_entries.map((entry) => (
               <li key={entry.id} className="flex items-baseline gap-3 text-sm">
                 <span className="font-mono text-xs text-ink-soft">
-                  {formatDate(entry.created_at)}
+                  {formatDate(entry.created_at, locale)}
                 </span>
                 {/* Same-status entries are events (e.g. the follow-up reminder),
                     not transitions — "Applied → Applied" would read like a bug. */}
                 <span className="text-midnight">
                   <code className="bg-sand px-1.5 py-0.5 font-mono text-xs">
-                    {statusLabel(entry.from_status)}
+                    {ts(`label.${entry.from_status}`)}
                   </code>
                   {entry.from_status !== entry.to_status ? (
                     <>
                       {" "}
                       →{" "}
                       <code className="bg-sand px-1.5 py-0.5 font-mono text-xs">
-                        {statusLabel(entry.to_status)}
+                        {ts(`label.${entry.to_status}`)}
                       </code>
                     </>
                   ) : null}
@@ -155,7 +156,9 @@ export default async function ApplicationDetailPage({
                 {entry.note ? (
                   <span className="text-ink-soft">— {entry.note}</span>
                 ) : null}
-                <span className="ml-auto font-mono text-xs text-ink-soft">{timeAgo(entry.created_at)}</span>
+                <span className="ml-auto font-mono text-xs text-ink-soft">
+                  {timeAgo(entry.created_at, locale)}
+                </span>
               </li>
             ))}
           </ol>

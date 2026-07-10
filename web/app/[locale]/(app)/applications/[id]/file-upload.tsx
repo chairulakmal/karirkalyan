@@ -1,8 +1,9 @@
 "use client";
 
 import { useRef, useState, useTransition } from "react";
+import { useLocale, useTranslations } from "next-intl";
 import { uploadFile } from "@/app/lib/actions";
-import { fileTooLargeMessage, MAX_FILE_BYTES } from "@/app/lib/files";
+import { fileSizeMb, MAX_FILE_BYTES } from "@/app/lib/files";
 import { timeAgo } from "@/app/lib/format";
 
 export function FileUpload({
@@ -16,6 +17,8 @@ export function FileUpload({
   label: string;
   uploadedAt: string | null;
 }) {
+  const t = useTranslations("files");
+  const locale = useLocale();
   const inputRef = useRef<HTMLInputElement>(null);
   const [error, setError] = useState<string | null>(null);
   const [pending, startTransition] = useTransition();
@@ -25,7 +28,7 @@ export function FileUpload({
     if (!file) return;
     setError(null);
     if (file.size > MAX_FILE_BYTES) {
-      setError(fileTooLargeMessage(file.size));
+      setError(t("tooLarge", { size: fileSizeMb(file.size) }));
       event.currentTarget.value = "";
       return;
     }
@@ -44,7 +47,7 @@ export function FileUpload({
     <div className="mt-4 first:mt-3">
       <div className="flex items-baseline justify-between">
         <span className="text-sm font-medium text-midnight">
-          {label} <span className="font-mono text-xs font-normal text-ink-soft">PDF · max 1 MB</span>
+          {label} <span className="font-mono text-xs font-normal text-ink-soft">{t("hint")}</span>
         </span>
         {uploadedAt ? (
           <a
@@ -53,10 +56,10 @@ export function FileUpload({
             rel="noopener noreferrer"
             className="font-mono text-xs text-cobalt underline underline-offset-4 hover:text-cobalt-2"
           >
-            View · uploaded {timeAgo(uploadedAt)}
+            {t("view", { ago: timeAgo(uploadedAt, locale) })}
           </a>
         ) : (
-          <span className="font-mono text-xs text-ink-soft">Not uploaded</span>
+          <span className="font-mono text-xs text-ink-soft">{t("notUploaded")}</span>
         )}
       </div>
       <input
@@ -67,8 +70,8 @@ export function FileUpload({
         disabled={pending}
         className="mt-2 block w-full text-sm text-ink-soft file:mr-3 file:border-0 file:bg-cobalt file:px-3 file:py-1.5 file:text-sm file:font-medium file:text-linen hover:file:bg-cobalt-2 disabled:opacity-50"
       />
-      {pending ? <p className="mt-1 font-mono text-xs text-ink-soft">Uploading…</p> : null}
-      {error ? <p className="mt-1 text-xs text-red-700">{error}</p> : null}
+      {pending ? <p className="mt-1 font-mono text-xs text-ink-soft">{t("uploading")}</p> : null}
+      {error ? <p className="mt-1 text-xs text-danger">{error}</p> : null}
     </div>
   );
 }

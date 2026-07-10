@@ -12,6 +12,11 @@ import { routing, type Locale } from "@/i18n/routing";
  *
  * `replace`, not `push`: switching language is a correction, not a step in the
  * visitor's history.
+ *
+ * With two locales the control is a toggle showing only the language you are
+ * *not* reading, named in that language. Rendering the active one too would
+ * restate what the surrounding page already says. A third locale turns this
+ * into a menu — `target` would stop being a single value.
  */
 export function LocaleSwitcher() {
   const t = useTranslations("locale");
@@ -19,27 +24,20 @@ export function LocaleSwitcher() {
   const pathname = usePathname();
   const router = useRouter();
 
+  const target: Locale =
+    routing.locales.find((locale) => locale !== active) ?? routing.defaultLocale;
+
   return (
-    <div className="flex items-center gap-1" role="group" aria-label={t("switchAria")}>
-      {routing.locales.map((locale, index) => (
-        <span key={locale} className="flex items-center gap-1">
-          {index > 0 ? <span aria-hidden className="text-dune">/</span> : null}
-          <button
-            type="button"
-            lang={locale}
-            aria-current={locale === active ? "true" : undefined}
-            disabled={locale === active}
-            onClick={() => router.replace(pathname, { locale: locale as Locale })}
-            className={
-              locale === active
-                ? "font-medium text-cobalt"
-                : "text-ink-soft hover:text-cobalt focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-cobalt"
-            }
-          >
-            {t(locale)}
-          </button>
-        </span>
-      ))}
-    </div>
+    <button
+      type="button"
+      lang={target}
+      // The visible label is a bare language name, which could be read as a
+      // statement rather than an action; the accessible name supplies the verb.
+      aria-label={t("switchTo", { language: t(target) })}
+      onClick={() => router.replace(pathname, { locale: target })}
+      className="text-ink-soft transition hover:text-cobalt"
+    >
+      {t(target)}
+    </button>
   );
 }

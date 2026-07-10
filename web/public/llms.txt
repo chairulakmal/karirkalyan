@@ -7,26 +7,34 @@ pipeline. Built as a portfolio project by Chairul Akmal.
 
 ## What it does
 
-- Tracks job applications across 13 FSM states: wishlist → draft → applied → phone_screen →
-  technical → final_round → offer → accepted/declined/rejected/ghosted/withdrawn/archived
+- Tracks job applications across 13 FSM states. The pipeline runs wishlist → draft → applied →
+  phone_screen → technical → final_round → offer, ending in accepted, declined, rejected,
+  ghosted, withdrawn or archived. It is not linear: ghosted, rejected and withdrawn can all
+  return to applied. The transition table in api/app/lib/application_fsm.rb is the only
+  authority on which moves are legal — this list is a summary and may lag it.
 - Writes an immutable TimelineEntry on every status transition (full audit trail)
-- Sends follow-up reminders via idempotent Sidekiq background jobs
+- Sends follow-up reminders via idempotent Solid Queue background jobs
 - Stores resume and cover letter as PostgreSQL bytea per application
 - Exposes a stats dashboard via pure SQL aggregation (no N+1)
 - Cursor-based pagination on the applications list
 
 ## Tech stack
 
-- Backend: Rails 8 API-only, Ruby 3.4.9, PostgreSQL 16, Devise + devise-jwt, Sidekiq + Redis 8
+- Backend: Rails 8 API-only, Ruby 3.4.9, PostgreSQL 16, Devise + devise-jwt
+- Jobs & cache: Solid Queue + Solid Cache, both Postgres-backed — no Redis, no Sidekiq.
+  Workers run inside Puma, so there is no separate worker service.
 - Frontend: Next.js 16 App Router, TypeScript, Tailwind CSS
 - Auth: JWT issued by Rails, stored in httpOnly cookie by Next.js — never reaches client JS
-- Deploy: Railway (API service + web service + managed PostgreSQL + managed Redis)
+- Deploy: Railway (API service + web service + managed PostgreSQL)
 - Tests: RSpec (unit + request specs against real DB), Playwright E2E
 
 ## Live
 
 - App: https://kk.chairulakmal.com
-- API docs (Swagger UI): https://api-production-4899.up.railway.app/api-docs
+- Architecture, and the reasoning behind it: https://kk.chairulakmal.com/about
+- API overview: https://kk.chairulakmal.com/docs
+- API reference (Swagger UI): https://api-production-4899.up.railway.app/api-docs
+- Japanese: the same pages under /ja (e.g. https://kk.chairulakmal.com/ja/about)
 - Demo account: demo@karirkalyan.com / oretachinomachida (12 pre-loaded Tokyo tech applications)
 
 ## Source

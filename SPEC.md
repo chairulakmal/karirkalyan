@@ -485,6 +485,33 @@ toolchains.
 Vite would be right if this were a public app where a stateless token in `localStorage` was
 acceptable, or if a cookie server already existed.
 
+### Design system — `web/app/globals.css`
+
+`design/assets/tokens.css` is the brand book; `globals.css` is the only place those tokens enter the
+app, through Tailwind v4's `@theme inline`. Ten colours — the nine brand hues plus `--color-danger`,
+a warm madder (`#96291D`) for destructive actions, error text, and terminal-negative statuses, always
+applied through opacity modifiers (`text-danger`, `bg-danger/10`, `ring-danger/30`) and never stock
+Tailwind `red-*` — three typefaces (Fraunces display, Manrope body, IBM Plex Mono labels), and
+**radius `0`** — the sharp corners are the editorial voice, not an oversight.
+
+Three things there are easy to get wrong:
+
+- **Motion is set through Tailwind's own variables**, `--default-transition-duration` and
+  `--default-transition-timing-function`. Overriding those means every bare `transition` utility
+  already in the codebase inherits the brand's `cubic-bezier(.2,.6,.2,1)` — no one has to remember a
+  custom `ease-brand` class. A `prefers-reduced-motion` block flattens all of it.
+- **Fraunces is an optical-size variable font, and `opsz` is not a size** — it is how the letterforms
+  are drawn *for* a size. The `h1, h2, h3` rule sets `opsz 36`, a heading cut whose thin joins go
+  weak past ~60px. The homepage hero therefore uses `.kk-display` (`opsz 144`, the wordmark's cut,
+  with tracking pulled in). It is the only display-scale type on the site.
+- **`:focus-visible` is declared once, globally**, as a cobalt ring. Before that each interactive
+  element re-declared its own and anything that forgot fell back to the UA outline, which is
+  invisible against sand.
+
+`.kk-wordmark` (upright "karir" + italic cobalt "kalyan"), `.kk-label` (mono eyebrow), and
+`.kk-num` (mono ordinal, tabular figures) are the only other custom classes; everything else is
+Tailwind utilities.
+
 ### Auth flow — the token never reaches the browser
 
 1. Sign-in and sign-up forms POST plain credentials to Next route handlers
@@ -515,15 +542,58 @@ A `401` from upstream is the *only* thing that may surface as a `401`. Collapsin
 upstream status into `401` once turned a total API outage into "Invalid email or password" for
 every user — see CHANGELOG v1.0.1.
 
+### Public pages — `/`, `/about`, `/docs`
+
+The homepage argues one claim: this is a job tracker **built on a finite state machine** — thirteen
+states, an explicit transition table, an immutable audit trail, the stack named outright. Its primary
+call to action is "Read the architecture" (→ `/about`); the demo is second. It is aimed at a reviewer
+reading the code, not at a jobseeker shopping for a tracker.
+
+Below the hero it draws the machine it claims to be built on:
+`web/app/components/pipeline-diagram.tsx` draws the happy path as a vertical rail of status chips —
+the register of a git log, which is the audit trail's own aesthetic, and a layout that never wraps
+on a phone — with the three closed states below it rejoining the rail at `applied` along a dashed
+cobalt return trace, so "it is not a line" is drawn rather than only stated. **It is an
+illustration, not a second copy of the transition table.** The real table has thirty-three edges and lives only in
+`api/app/lib/application_fsm.rb`; the diagram names that file in its caption, nothing in the app
+reads the diagram, and no behaviour depends on it — a stale arrow there is a wrong drawing, never a
+wrong transition. Mirroring the full table in TypeScript is precisely what deferred the Kanban board
+to v1.2.0, and this does not do it. Chip labels come from the `status` catalog and chip colours from
+`statusBadgeClass`, so the FSM's vocabulary still has one home.
+
+`/about` therefore carries the visit. It states four decisions, each as the cheaper alternative it
+rejected: Rails for a TypeScript developer, a PORO FSM over a state-machine gem, Solid Queue over
+Sidekiq and Redis, `bytea` over object storage. Those arguments are the ones in the decisions log
+below, written for someone who has not read this file.
+
+`/docs` frames the API — auth, per-user scoping, the one-string error shape, cursor pagination, and
+the endpoint table — and then links out to the rswag Swagger UI. Deep-linking raw Swagger on a
+`*.up.railway.app` domain drops the visitor out of the design system; the reference stays reachable,
+one click further in. The endpoint table's methods and paths are code and are not translated; only
+the sentence beside each one is.
+
 ### Route guard — `web/proxy.ts`
 
 Next.js 16 renamed `middleware.ts` → `proxy.ts`; a `middleware.ts` file is **ignored**. Export a
 function named `proxy`.
 
-It redirects `/` to `/dashboard` or `/sign-in` on cookie presence, protects app routes, and bounces
-authenticated users away from the auth pages. Authorization is presence of the `session` cookie —
-there are no roles. `config.matcher` **must** exclude `/robots.txt`, `/sitemap.xml`, and
-`/llms.txt`, or crawlers get a `307` to sign-in and the whole SEO surface becomes unreachable.
+Authorization is presence of the `session` cookie — there are no roles. Paths fall into three
+categories, checked in this order:
+
+| Category | Paths | Without a cookie | With a cookie |
+| --- | --- | --- | --- |
+| `OPEN_PATHS` | `/about`, `/docs` | renders | renders |
+| `PUBLIC_PATHS` | `/`, `/sign-in`, `/sign-up` | renders | `307` → `/dashboard` |
+| everything else | `/dashboard`, `/applications/*`, … | `307` → `/sign-in` | renders |
+
+`OPEN_PATHS` is checked first and skips both redirects. `/about` and `/docs` explain how the system
+is built rather than selling it, so bouncing a signed-in reader to the dashboard would hide them
+from the people most likely to read them — which is why they are not more `PUBLIC_PATHS` entries.
+The signed-in app shell's "For reviewers" footer links to both, and that link only resolves because
+of this. Matching is by segment: `/about` also covers `/about/anything`, but never `/aboutish`.
+
+`config.matcher` **must** exclude `/robots.txt`, `/sitemap.xml`, and `/llms.txt`, or crawlers get a
+`307` to sign-in and the whole SEO surface becomes unreachable.
 
 It also resolves the locale and applies next-intl's rewrite/redirect before the auth check, so the
 guard always sees a locale-stripped pathname. See the i18n section below.
@@ -563,9 +633,10 @@ and a locale segment would break their fixed paths.
 
 1. `splitLocale()` splits the pathname into the prefix to preserve (`/ja`, or empty for English)
    and the path the guard reasons about (`/dashboard`).
-2. The auth guard runs against that **locale-stripped** path, so `PUBLIC_PATHS` stays a list of
-   three entries rather than six, and `/ja/dashboard` is protected exactly as `/dashboard` is. Its
-   redirects re-apply the prefix, so a signed-out `/ja/dashboard` visitor lands on `/ja/sign-in`.
+2. The auth guard runs against that **locale-stripped** path, so `PUBLIC_PATHS` and `OPEN_PATHS`
+   stay lists of a few entries rather than one per locale, and `/ja/dashboard` is protected exactly
+   as `/dashboard` is. Its redirects re-apply the prefix, so a signed-out `/ja/dashboard` visitor
+   lands on `/ja/sign-in`.
 3. If the guard passes, next-intl's middleware resolves the locale and produces the rewrite
    (`/dashboard` → `/en/dashboard`) or redirect (`/en/dashboard` → `/dashboard`).
 4. The CSP with its per-request nonce is set on whatever response comes out of 2 and 3 — including
@@ -598,6 +669,25 @@ Two consequences worth knowing:
   `getPathname` take it explicitly: `actions.ts` calls `getLocale()` and passes it. `revalidatePath`
   gets the same treatment, since the visitor's router cache is keyed on the prefixed URL.
 
+#### Locale switcher
+
+`app/components/locale-switcher.tsx` is a two-locale **toggle**, not a list: it renders only the
+language the visitor is *not* reading, named in that language (`日本語` on an English page,
+`English` on a Japanese one). Showing the active locale as well would restate what the page
+already says in every other word on it. A third locale makes this a menu — the component picks a
+single `target` and that stops being well-defined.
+
+The visible label is a bare language name, which can be read as a statement rather than an
+action, so the accessible name supplies the verb via `locale.switchTo` (`Switch to {language}`).
+
+It switches with `router.replace`, not `push` — changing language corrects the current page
+rather than advancing through the site — and passes the **locale-stripped** `usePathname()`, so
+`/ja/applications/7` and `/applications/7` map onto each other with no string surgery.
+
+It is mounted in the app shell (`(app)/layout.tsx`), the marketing header (`[locale]/page.tsx`),
+and the auth layout (`(auth)/layout.tsx`). The last two matter because a Japanese visitor meets
+the app there, before any session exists to remember a preference.
+
 #### 404s
 
 `app/[locale]/not-found.tsx` handles a bad path *inside* a locale. Paths matching no route at all
@@ -613,20 +703,42 @@ and links out with a plain `<a>` (no client router is mounted to take a soft nav
 with `alternates.languages` producing `hreflang` links for `en`, `ja`, and `x-default`. Prefixes come
 from `getPathname()` rather than string concatenation, so the prefix rule has one source of truth.
 
+Its `ROUTES` list holds only what a signed-out crawler can reach: `/`, `/about`, `/docs`,
+`/sign-up`, `/sign-in`. Everything behind the session cookie is a `307` and has no business being
+advertised.
+
+#### Metadata description comes from the catalog
+
+`generateMetadata` in `app/[locale]/layout.tsx` reads its description from `home.tagline` rather than
+holding a second copy as a constant. A Japanese search result should say what the Japanese homepage
+says. `/about` and `/docs` each override `title` and `description` from their own catalog namespace,
+which the layout's `title.template` renders as `… — KarirKalyan`.
+
 #### Server-side error messages — keyed on HTTP status, not error code
 
 **Rails stays English-only, and `web/` localizes by HTTP status.**
 
 The API has no machine-readable error code. Every failure is `{ error: "<English sentence>" }` plus a
-status (`application_controller.rb:10,14`, `applications_controller.rb:62,64,66,81,91`), and
-`extractError` (`web/app/lib/api.ts:109`) hands that sentence to the UI verbatim. So `web/` maps
-**status → localized copy**: `401`, `409`, `422`, `429`, `502`, `503` each get a catalog entry.
+status (`application_controller.rb:10,14`, `applications_controller.rb:62,64,66,81,91`). So `web/`
+throws the sentence away and maps **status → localized copy**: `401`, `403`, `404`, `409`, `422`,
+`429`, `502`, `503` each get an entry under the `errors` namespace, and anything else falls back to
+`errors.unknown`. Nothing ever string-matches the English sentence to recover a pseudo-code.
+
+Two places do this mapping, because the failure reaches the UI by two paths:
+
+- `apiFailure()` in `app/lib/actions.ts` — every server action localizes before it returns, so the
+  client components that render `result.error` need no translation logic of their own. Failures the
+  action catches *before* the request (empty company/role, no file chosen, no URL to pre-fill) name
+  a catalog key directly through `localFailure()`, since they have no status to key on.
+- `errorMessage()` in `(auth)/sign-in/sign-in-form.tsx` — the auth form talks to the `/api/auth/*`
+  route handlers over `fetch`, not through a server action. It takes per-call overrides, because a
+  `401` there means bad credentials (`errors.invalidCredentials`), not an expired session.
 
 This is a deliberate trade, not an oversight — see the decisions log entry below. The consequence to
-know: a `422` carrying a per-field `errors.full_messages` string (`"Company can't be blank"`) cannot
-be localized this way, because the status alone does not say which field failed. Those remain
-English. In practice the common validation paths never reach Rails — `actions.ts` rejects empty
-company/role client-side first — so the English residue is the uncommon case.
+know: a `422` carrying a per-field `errors.full_messages` string (`"Company can't be blank"`) loses
+that detail, because the status alone does not say which field failed; the user sees the generic
+"check the form" copy. In practice the common validation paths never reach Rails — `actions.ts`
+rejects empty company/role first — so the lossy case is the uncommon one.
 
 Localizing *in Rails* was rejected for the original reason: it would mean an i18n dependency, locale
 negotiation on every request, and a second message catalog to keep in sync, for strings only the
@@ -637,10 +749,20 @@ frontend ever displays.
 `Intl.RelativeTimeFormat` and `toLocaleDateString` in `app/lib/format.ts` take the active locale
 rather than the hardcoded `"en"`. `<html lang>` and OpenGraph `locale` follow the active locale too.
 
+`formatDate()` pins `timeZone: "Asia/Tokyo"`. The API serialises in app time, and a date-only field
+like `follow_up_at` parses as UTC midnight, so without the pin a viewer west of UTC would see the
+previous day — and `isOverdue()`, which compares date strings, would disagree with what is on screen.
+
+`format.ts` holds no copy. Status labels and descriptions live in the `status` namespace of the
+catalogs, keyed by status (`status.label.applied`, `status.description.applied`); an English copy in
+`format.ts` would give the FSM's vocabulary two sources of truth. What stays in the module is what
+cannot be translated: the badge palette, the status sets, and `BOARD_LABELS`. `jobBoardLabel()` takes
+the localized `(none)` label as an argument rather than reaching into a catalog from a pure module.
+
 #### What is not translated
 
-Job-board brand names (`BOARD_LABELS`), schema.org enum values in the `jsonLd` blob, and the
-`KarirKalyan` wordmark.
+Job-board brand names (`BOARD_LABELS`), schema.org enum values in the `jsonLd` blob, the
+`KarirKalyan` wordmark, and the HTTP methods and paths in the `/docs` endpoint table.
 
 See `TODO.md` for remaining scope.
 

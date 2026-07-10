@@ -4,7 +4,9 @@ import { NavLink } from "@/app/components/nav-link";
 import { LocaleSwitcher } from "@/app/components/locale-switcher";
 import { Mark, Wordmark } from "@/app/components/wordmark";
 import { SignOutButton } from "./sign-out-button";
-import { API_DOCS_URL, REPO_URL } from "@/app/lib/links";
+import { REPO_URL } from "@/app/lib/links";
+
+const reviewerLinkClass = "underline underline-offset-4 hover:text-cobalt";
 
 export default async function AppLayout({ children }: { children: React.ReactNode }) {
   const t = await getTranslations("nav");
@@ -30,7 +32,14 @@ export default async function AppLayout({ children }: { children: React.ReactNod
         <div className="mx-auto max-w-5xl px-6 py-5 text-xs text-ink-soft">
           <div className="flex flex-wrap items-center gap-x-5 gap-y-2">
             <span className="kk-label">{t("forReviewers")}</span>
-            <ReviewerLink href={API_DOCS_URL}>{t("apiDocs")}</ReviewerLink>
+            {/* /about and /docs are OPEN paths in proxy.ts, so these resolve for
+                a signed-in reader instead of bouncing back to the dashboard. */}
+            <Link href="/about" className={reviewerLinkClass}>
+              {t("about")}
+            </Link>
+            <Link href="/docs" className={reviewerLinkClass}>
+              {t("apiDocs")}
+            </Link>
             <ReviewerLink href={REPO_URL}>{t("source")}</ReviewerLink>
           </div>
         </div>
@@ -45,7 +54,7 @@ function ReviewerLink({ href, children }: { href: string; children: React.ReactN
       href={href}
       target="_blank"
       rel="noreferrer noopener"
-      className="underline underline-offset-4 hover:text-cobalt"
+      className={reviewerLinkClass}
     >
       {children}
     </a>

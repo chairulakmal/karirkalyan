@@ -8,6 +8,8 @@ const BASE_URL = "https://kk.chairulakmal.com";
 // cookie is a 307 to /sign-in and has no business here.
 const ROUTES = [
   { href: "/", changeFrequency: "monthly", priority: 1 },
+  { href: "/about", changeFrequency: "monthly", priority: 0.8 },
+  { href: "/docs", changeFrequency: "monthly", priority: 0.8 },
   { href: "/sign-up", changeFrequency: "yearly", priority: 0.7 },
   { href: "/sign-in", changeFrequency: "yearly", priority: 0.5 },
 ] as const satisfies ReadonlyArray<{

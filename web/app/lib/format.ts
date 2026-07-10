@@ -1,20 +1,13 @@
 import type { Status } from "./types";
 
-const STATUS_LABEL: Record<Status, string> = {
-  wishlist: "Wishlist",
-  draft: "Draft",
-  applied: "Applied",
-  phone_screen: "Phone screen",
-  technical: "Technical",
-  final_round: "Final round",
-  offer: "Offer",
-  accepted: "Accepted",
-  rejected: "Rejected",
-  ghosted: "Ghosted",
-  declined: "Declined",
-  withdrawn: "Withdrawn",
-  archived: "Archived",
-};
+/*
+ * Status *labels* and *descriptions* are not here — they live in
+ * `messages/{en,ja}.json` under the `status` namespace, read with
+ * `useTranslations("status")` in a client component or `getTranslations("status")`
+ * in a server one. Keeping an English copy here as well would give the FSM's
+ * vocabulary two sources of truth. Only the untranslatable parts remain: the
+ * badge palette and the status sets.
+ */
 
 /**
  * Status badge colours, mapped onto the Cobalt brand palette.
@@ -22,7 +15,7 @@ const STATUS_LABEL: Record<Status, string> = {
  * - dune/ink-soft  → neutral / inactive (wishlist, draft, withdrawn, archived)
  * - cobalt         → in-pipeline (applied, phone_screen, technical, final_round)
  * - saffron        → celebratory (offer, accepted)
- * - red            → terminal-negative (rejected, ghosted, declined)
+ * - danger         → terminal-negative (rejected, ghosted, declined)
  */
 const STATUS_CLASS: Record<Status, string> = {
   wishlist: "bg-dune/40 text-ink-soft ring-dune",
@@ -33,32 +26,11 @@ const STATUS_CLASS: Record<Status, string> = {
   final_round: "bg-cobalt/10 text-cobalt ring-cobalt/30",
   offer: "bg-saffron-2/40 text-[#7a4d10] ring-saffron",
   accepted: "bg-saffron text-midnight ring-saffron",
-  rejected: "bg-red-100 text-red-800 ring-red-200",
-  ghosted: "bg-red-50 text-red-700 ring-red-200",
-  declined: "bg-red-50 text-red-700 ring-red-200",
+  rejected: "bg-danger/15 text-danger ring-danger/30",
+  ghosted: "bg-danger/10 text-danger ring-danger/30",
+  declined: "bg-danger/10 text-danger ring-danger/30",
   withdrawn: "bg-dune/60 text-ink-soft ring-dune",
   archived: "bg-dune/60 text-ink-soft ring-dune",
-};
-
-/**
- * One-line meaning for each status. Surfaced wherever the user reads or picks
- * a status (info bubble, confirm step, badge tooltips) so the FSM's vocabulary
- * is never a guess — "withdrawn" vs "declined" trips people up otherwise.
- */
-const STATUS_DESCRIPTION: Record<Status, string> = {
-  wishlist: "A job you've saved and might apply to — nothing sent yet.",
-  draft: "You're preparing the application but haven't submitted it.",
-  applied: "Application submitted — waiting to hear back.",
-  phone_screen: "First call with a recruiter or hiring manager.",
-  technical: "Technical interview or take-home assignment stage.",
-  final_round: "Last interview stage before the company decides.",
-  offer: "The company made an offer — the decision is yours now.",
-  accepted: "You took their offer — the happy ending.",
-  rejected: "The company decided not to move forward.",
-  ghosted: "The company went silent and stopped responding.",
-  declined: "You turned their offer down.",
-  withdrawn: "You pulled out of the process yourself.",
-  archived: "Closed and hidden from day-to-day tracking.",
 };
 
 // Mirrors ApplicationFSM::TERMINAL_STATES — no transitions out, ever.
@@ -80,16 +52,8 @@ export const ACTIVE_STATUSES: ReadonlySet<Status> = new Set([
   "offer",
 ]);
 
-export function statusLabel(s: Status): string {
-  return STATUS_LABEL[s];
-}
-
 export function statusBadgeClass(s: Status): string {
   return STATUS_CLASS[s];
-}
-
-export function statusDescription(s: Status): string {
-  return STATUS_DESCRIPTION[s];
 }
 
 /**
@@ -104,27 +68,52 @@ export function isOverdue(iso: string | null | undefined): boolean {
   return iso.slice(0, 10) < today;
 }
 
-const RELATIVE = new Intl.RelativeTimeFormat("en", { numeric: "auto" });
+/*
+ * `locale` is typed as a plain string rather than the `Locale` union: every
+ * caller gets it from next-intl's `useLocale()`/`getLocale()`, which are typed
+ * `string` unless the library's `AppConfig` is augmented — and `Intl` takes a
+ * string anyway. next-intl has already rejected anything outside `routing.locales`
+ * before a component renders, so narrowing here would only buy casts.
+ */
 
-export function timeAgo(iso: string | null | undefined): string {
+// Intl formatters are expensive to construct and there are only two locales, so
+// build each one once on first use rather than per render.
+const relativeFormatters = new Map<string, Intl.RelativeTimeFormat>();
+
+function relative(locale: string): Intl.RelativeTimeFormat {
+  let f = relativeFormatters.get(locale);
+  if (!f) {
+    f = new Intl.RelativeTimeFormat(locale, { numeric: "auto" });
+    relativeFormatters.set(locale, f);
+  }
+  return f;
+}
+
+export function timeAgo(iso: string | null | undefined, locale: string): string {
   if (!iso) return "";
+  const r = relative(locale);
   const then = new Date(iso).getTime();
   const diffSec = Math.round((then - Date.now()) / 1000);
   const abs = Math.abs(diffSec);
-  if (abs < 60) return RELATIVE.format(diffSec, "second");
-  if (abs < 3600) return RELATIVE.format(Math.round(diffSec / 60), "minute");
-  if (abs < 86400) return RELATIVE.format(Math.round(diffSec / 3600), "hour");
-  if (abs < 2592000) return RELATIVE.format(Math.round(diffSec / 86400), "day");
-  if (abs < 31536000) return RELATIVE.format(Math.round(diffSec / 2592000), "month");
-  return RELATIVE.format(Math.round(diffSec / 31536000), "year");
+  if (abs < 60) return r.format(diffSec, "second");
+  if (abs < 3600) return r.format(Math.round(diffSec / 60), "minute");
+  if (abs < 86400) return r.format(Math.round(diffSec / 3600), "hour");
+  if (abs < 2592000) return r.format(Math.round(diffSec / 86400), "day");
+  if (abs < 31536000) return r.format(Math.round(diffSec / 2592000), "month");
+  return r.format(Math.round(diffSec / 31536000), "year");
 }
 
-export function formatDate(iso: string | null | undefined): string {
+export function formatDate(iso: string | null | undefined, locale: string): string {
   if (!iso) return "";
-  return new Date(iso).toLocaleDateString("en", {
+  return new Date(iso).toLocaleDateString(locale, {
     year: "numeric",
     month: "short",
     day: "numeric",
+    // The API serialises in app time (Tokyo), and a date-only field like
+    // `follow_up_at` parses as UTC midnight. Without pinning the zone, a viewer
+    // west of UTC sees the previous day — and `isOverdue` above, which compares
+    // date strings, would then disagree with what is on screen.
+    timeZone: "Asia/Tokyo",
   });
 }
 
@@ -149,9 +138,15 @@ const BOARD_LABELS: Record<string, string> = {
   "daijob.com": "Daijob",
 };
 
-/** Maps a URL host (the dashboard's `by_source` key) to a display label. */
-export function jobBoardLabel(host: string): string {
-  if (host === NO_BOARD) return "No link";
+/**
+ * Maps a URL host (the dashboard's `by_source` key) to a display label.
+ *
+ * The board names are brands and stay untranslated. Only the `NO_BOARD`
+ * sentinel needs words, so the caller passes its localized label in rather than
+ * this module reaching for a message catalog.
+ */
+export function jobBoardLabel(host: string, noBoardLabel: string): string {
+  if (host === NO_BOARD) return noBoardLabel;
   return BOARD_LABELS[host] ?? host;
 }
 

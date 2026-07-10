@@ -18,6 +18,9 @@ Next.js 16 renamed `middleware.ts` → `proxy.ts`. Do **not** create `middleware
 The guard lives in `web/proxy.ts` (repo root of `web/` — there is no `src/` directory). It is
 role-free: authorization is a single check for the presence of the `session` cookie.
 
+- `OPEN_PATHS` = `/about`, `/docs` — checked first, renders either way, no redirect in either
+  direction. They describe the project rather than sell it, so a signed-in reader should reach
+  them instead of bouncing to `/dashboard`.
 - `PUBLIC_PATHS` = `/`, `/sign-in`, `/sign-up` — reachable without a cookie.
 - Any other path without a cookie → redirect to `/sign-in`.
 - A public path *with* a cookie → redirect to `/dashboard`, so signed-in users never see the
@@ -50,3 +53,28 @@ dynamic-rendering constraint above; don't switch it on to fix a single component
 
 If it is ever enabled: caching belongs at the component or data-fetch layer, never on a server
 action or a mutation in `app/lib/actions.ts`.
+
+### Styling — brand tokens only, through `globals.css`
+
+`app/globals.css` is the design system's single entry point: the ten brand colours from
+`design/assets/tokens.css` become Tailwind utilities there via `@theme inline` — `bg-cobalt`,
+`text-ink-soft`, `border-dune`, `text-saffron-2`. Style with those, never Tailwind's stock
+palette. Danger UI (destructive actions, errors, terminal-negative statuses) uses the
+`--color-danger` token through opacity modifiers — `text-danger`, `bg-danger/10`,
+`ring-danger/30` — never stock `red-*`.
+
+Rules that are easy to break without noticing:
+
+- **Radius is `0`.** Sharp corners are the brand's editorial voice, not an oversight — don't
+  add `rounded-*`.
+- **Bare `transition` is already branded.** `globals.css` overrides Tailwind's
+  `--default-transition-duration` (200ms) and `--default-transition-timing-function` (the brand
+  cubic-bezier), so plain `transition` utilities inherit the brand motion. Don't add one-off
+  `ease-*` / `duration-*` values.
+- **Exactly four custom classes**: `.kk-wordmark`, `.kk-display` (homepage hero only),
+  `.kk-label` (mono eyebrow), `.kk-num` (mono ordinal). Everything else is Tailwind utilities.
+  A fifth class means updating `globals.css` and SPEC.md § Design system together.
+- **The focus ring is global** — one `:focus-visible` rule, cobalt. Don't re-declare it per
+  component, and never suppress it with `outline-none`.
+- **Display-scale Fraunces needs `.kk-display`.** `h1`–`h3` are cut at `opsz 36`, which goes
+  weak past ~60px; `.kk-display` uses the `opsz 144` cut. See SPEC.md § Design system for why.
