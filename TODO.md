@@ -59,10 +59,19 @@ Ordered by severity. File references are `path:line` at `9708df6`.
   in the root layout opts the whole app into dynamic rendering so every page's scripts get
   the nonce — verified via `next build` that `/`, `/sign-up`, `/applications/new` and the
   404 render dynamically (they were static before). *(chore/security-review-v1.0.1)*
-- [x] **[low] Unanchored host-authorization regexes** — `api/config/environments/production.rb`
-  used `/.*\.railway\.app/` and `/.*\.railway\.internal/` with no `\z` anchor, so
-  `foo.railway.app.attacker.com` was accepted as a trusted Host. **Fixed:** anchored to
-  `/\A([a-z0-9-]+\.)+railway\.app\z/i` (and `.internal`). *(chore/security-review-v1.0.1)*
+- [x] ~~**[low] Unanchored host-authorization regexes**~~ — **WITHDRAWN: this finding was
+  wrong, and "fixing" it took production down.** The claim was that
+  `/.*\.railway\.app/` accepted `foo.railway.app.attacker.com`. It never did:
+  `HostAuthorization::Permissions#sanitize_regexp` wraps every pattern as
+  `/\A#{pattern}(:\d+)?\z/`, so Rails anchors it for you and appends an optional port.
+  Adding our own `\z` made that port group unmatchable, blocking
+  `api.railway.internal:3001` — the Host on every internal web→api call — so the API
+  403'd every request. `web/app/api/auth/session/route.ts` was collapsing all non-OK
+  upstream statuses into `401`, so it surfaced as "Invalid email or password" for every
+  user including the demo account. **Fixed before `v1.0.1` shipped:** patterns un-anchored and moved to
+  `api/app/lib/allowed_hosts.rb` with a regression spec driven through the real
+  `Permissions` class; the session route now only reports `401` on a genuine upstream
+  `401`. *(fix/host-authorization-regression)*
 - [x] **[doc] Document JWT semantics** — single JTI per user via `JTIMatcher`
   (`api/app/models/user.rb`), so sign-out revokes **all** devices; 1-day expiry, no
   refresh flow. **Fixed:** added an `## Authentication` section to `README.md` and mirrored

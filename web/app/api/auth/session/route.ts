@@ -31,8 +31,16 @@ export async function POST(request: Request) {
     );
   }
 
-  if (!upstream.ok) {
+  // Only a genuine 401 means bad credentials. Collapsing every non-OK status
+  // into 401 once disguised a total API outage (host authorization was 403ing
+  // every internal call) as "wrong password" for every user, demo included.
+  if (upstream.status === 401) {
     return Response.json({ error: "Invalid email or password" }, { status: 401 });
+  }
+
+  if (!upstream.ok) {
+    console.error(`sign_in upstream failed: ${upstream.status} ${upstream.statusText}`);
+    return Response.json({ error: "Sign-in is unavailable right now" }, { status: 502 });
   }
 
   const token = upstream.headers.get("Authorization");
