@@ -40,12 +40,68 @@ const STATUS_CLASS: Record<Status, string> = {
   archived: "bg-dune/60 text-ink-soft ring-dune",
 };
 
+/**
+ * One-line meaning for each status. Surfaced wherever the user reads or picks
+ * a status (info bubble, confirm step, badge tooltips) so the FSM's vocabulary
+ * is never a guess — "withdrawn" vs "declined" trips people up otherwise.
+ */
+const STATUS_DESCRIPTION: Record<Status, string> = {
+  wishlist: "A job you've saved and might apply to — nothing sent yet.",
+  draft: "You're preparing the application but haven't submitted it.",
+  applied: "Application submitted — waiting to hear back.",
+  phone_screen: "First call with a recruiter or hiring manager.",
+  technical: "Technical interview or take-home assignment stage.",
+  final_round: "Last interview stage before the company decides.",
+  offer: "The company made an offer — the decision is yours now.",
+  accepted: "You took their offer — the happy ending.",
+  rejected: "The company decided not to move forward.",
+  ghosted: "The company went silent and stopped responding.",
+  declined: "You turned their offer down.",
+  withdrawn: "You pulled out of the process yourself.",
+  archived: "Closed and hidden from day-to-day tracking.",
+};
+
+// Mirrors ApplicationFSM::TERMINAL_STATES — no transitions out, ever.
+export const PERMANENT_STATUSES: ReadonlySet<Status> = new Set([
+  "accepted",
+  "declined",
+  "archived",
+]);
+
+// Statuses where a pending follow-up is actionable — a stale follow-up date on
+// a closed application shouldn't shout "overdue".
+export const ACTIVE_STATUSES: ReadonlySet<Status> = new Set([
+  "wishlist",
+  "draft",
+  "applied",
+  "phone_screen",
+  "technical",
+  "final_round",
+  "offer",
+]);
+
 export function statusLabel(s: Status): string {
   return STATUS_LABEL[s];
 }
 
 export function statusBadgeClass(s: Status): string {
   return STATUS_CLASS[s];
+}
+
+export function statusDescription(s: Status): string {
+  return STATUS_DESCRIPTION[s];
+}
+
+/**
+ * True when a follow-up's calendar date is before today. Compares the date
+ * part as a string (server serialises in app time, Tokyo) so no timezone
+ * arithmetic can shift the day.
+ */
+export function isOverdue(iso: string | null | undefined): boolean {
+  if (!iso) return false;
+  const d = new Date();
+  const today = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+  return iso.slice(0, 10) < today;
 }
 
 const RELATIVE = new Intl.RelativeTimeFormat("en", { numeric: "auto" });

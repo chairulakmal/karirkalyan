@@ -3,7 +3,7 @@
 import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { transitionStatus } from "@/app/lib/actions";
-import { statusBadgeClass, statusLabel } from "@/app/lib/format";
+import { statusBadgeClass, statusDescription, statusLabel } from "@/app/lib/format";
 import type { Status } from "@/app/lib/types";
 
 const CONFIRM_REQUIRED = new Set<Status>(["rejected", "accepted", "declined", "withdrawn", "archived"]);
@@ -133,7 +133,8 @@ export function TransitionButtons({
             return (
               <div key={status} className="space-y-2">
                 <p className="text-xs text-ink-soft">
-                  Mark as <span className="font-medium text-midnight">{statusLabel(status)}</span>?{" "}
+                  Mark as <span className="font-medium text-midnight">{statusLabel(status)}</span>{" "}
+                  <span className="text-ink-soft/80">— {statusDescription(status).toLowerCase()}</span>{" "}
                   {isTerminal ? (
                     <span className="text-red-600/80">No further transitions — permanent.</span>
                   ) : (
@@ -168,6 +169,7 @@ export function TransitionButtons({
               type="button"
               onClick={() => handleClick(status)}
               disabled={pending}
+              title={statusDescription(status)}
               className={`inline-flex min-h-10 items-center px-3 py-1 text-xs font-medium ring-1 ring-inset transition hover:opacity-80 disabled:opacity-50 ${statusBadgeClass(status)}`}
             >
               → {statusLabel(status)}

@@ -2,6 +2,7 @@
 
 import { useRef, useState, useTransition } from "react";
 import { uploadFile } from "@/app/lib/actions";
+import { fileTooLargeMessage, MAX_FILE_BYTES } from "@/app/lib/files";
 import { timeAgo } from "@/app/lib/format";
 
 export function FileUpload({
@@ -23,6 +24,11 @@ export function FileUpload({
     const file = event.currentTarget.files?.[0];
     if (!file) return;
     setError(null);
+    if (file.size > MAX_FILE_BYTES) {
+      setError(fileTooLargeMessage(file.size));
+      event.currentTarget.value = "";
+      return;
+    }
     const formData = new FormData();
     formData.append("file", file);
     startTransition(async () => {
@@ -37,7 +43,9 @@ export function FileUpload({
   return (
     <div className="mt-4 first:mt-3">
       <div className="flex items-baseline justify-between">
-        <span className="text-sm font-medium text-midnight">{label}</span>
+        <span className="text-sm font-medium text-midnight">
+          {label} <span className="font-mono text-xs font-normal text-ink-soft">PDF · max 1 MB</span>
+        </span>
         {uploadedAt ? (
           <a
             href={downloadHref}

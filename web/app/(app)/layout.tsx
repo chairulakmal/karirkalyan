@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { NavLink } from "@/app/components/nav-link";
 import { Mark, Wordmark } from "@/app/components/wordmark";
 import { SignOutButton } from "./sign-out-button";
 import { API_DOCS_URL, REPO_URL } from "@/app/lib/links";
@@ -14,18 +15,8 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
             <Wordmark size="sm" />
           </Link>
           <nav className="flex items-center gap-5 text-sm">
-            <Link
-              href="/dashboard"
-              className="font-medium text-ink-soft hover:text-cobalt"
-            >
-              Dashboard
-            </Link>
-            <Link
-              href="/applications/new"
-              className="font-medium text-ink-soft hover:text-cobalt"
-            >
-              New
-            </Link>
+            <NavLink href="/dashboard">Dashboard</NavLink>
+            <NavLink href="/applications/new">New</NavLink>
             <SignOutButton />
           </nav>
         </div>
