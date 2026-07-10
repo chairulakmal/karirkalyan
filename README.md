@@ -129,7 +129,8 @@ web/
   app/(app)/applications/[id]/page.tsx    ← Detail + timeline + FSM-driven transition buttons
 ```
 
-Architecture rationale for every decision lives in [PLAN.md](PLAN.md).
+Architecture rationale for every decision lives in [SPEC.md](SPEC.md), the technical source of
+truth for this project.
 
 ---
 
@@ -138,7 +139,9 @@ Architecture rationale for every decision lives in [PLAN.md](PLAN.md).
 | Looking for | Go to |
 |---|---|
 | API endpoint shapes, params, responses | [`/api-docs`](https://api-production-4899.up.railway.app/api-docs) (Swagger UI) or `api/swagger/v1/swagger.yaml` |
-| Architecture decisions and design rationale | [PLAN.md](PLAN.md) |
+| Architecture, data model, API contract, design rationale | [SPEC.md](SPEC.md) |
+| Shipped work, release by release | [CHANGELOG.md](CHANGELOG.md) |
+| Open work and the roadmap | [TODO.md](TODO.md) |
 | Local setup and running tests | [api/README.md](api/README.md), [web/README.md](web/README.md) |
 
 ---

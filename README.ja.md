@@ -130,7 +130,8 @@ web/
   app/(app)/applications/[id]/page.tsx    ← 詳細＋タイムライン＋FSM駆動の遷移ボタン
 ```
 
-アーキテクチャの意思決定の詳細は [PLAN.md](PLAN.md) にあります。
+アーキテクチャの意思決定の詳細は、本プロジェクトの技術的な信頼できる唯一の情報源である
+[SPEC.md](SPEC.md) にあります。
 
 ---
 
@@ -139,7 +140,9 @@ web/
 | 探しているもの | 参照先 |
 |---|---|
 | APIエンドポイントの仕様・パラメータ・レスポンス | [`/api-docs`](https://api-production-4899.up.railway.app/api-docs)（Swagger UI）または `api/swagger/v1/swagger.yaml` |
-| アーキテクチャの意思決定・設計根拠 | [PLAN.md](PLAN.md) |
+| アーキテクチャ・データモデル・API仕様・設計根拠 | [SPEC.md](SPEC.md) |
+| リリースごとの実装済みの変更履歴 | [CHANGELOG.md](CHANGELOG.md) |
+| 未着手のタスクとロードマップ | [TODO.md](TODO.md) |
 | ローカルセットアップ・テスト実行 | [api/README.md](api/README.md)、[web/README.md](web/README.md) |
 
 ---

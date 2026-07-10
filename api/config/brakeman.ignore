@@ -19,7 +19,7 @@
       "user_input": ":lock_version",
       "confidence": "Medium",
       "cwe_id": [915],
-      "note": "lock_version is intentionally permitted. The optimistic locking pattern requires the client to send back the version it last saw so Rails can detect concurrent writes and raise StaleObjectError → 409 Conflict. See notes/PLAN.md 'Optimistic Locking' section."
+      "note": "lock_version is intentionally permitted. The optimistic locking pattern requires the client to send back the version it last saw so Rails can detect concurrent writes and raise StaleObjectError → 409 Conflict. See SPEC.md, Security → 'Optimistic locking'."
     }
   ],
   "brakeman_version": "8.0.4"

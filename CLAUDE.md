@@ -4,15 +4,32 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 Full-stack job application tracker. Rails 8 API (`api/`) + Next.js 16 frontend (`web/`).
 
+## Spec-first
+
+`SPEC.md` is the technical source of truth for both `api/` and `web/`. **Change it before you
+change code**: write the change into the spec, get the spec right, then make the code match.
+
+- **If code and `SPEC.md` disagree, one of them is a bug.** Decide which, and fix that one.
+  Do not silently paper over the gap — this file's predecessor, `PLAN.md`, spent an entire
+  release describing Sidekiq and Redis after both had been removed.
+- `SPEC.md` describes the system **as it is**, present tense. Open work goes in `TODO.md`;
+  shipped work goes in `CHANGELOG.md` (which also holds the pre-1.0.0 build phases).
+- Behaviour-changing PRs update `SPEC.md` in the same PR. The PR template has a checkbox.
+
+Read `SPEC.md` and `TODO.md` before starting work.
+
 ## Status
 
 **v1.0.1 released** 2026-07-10 (tag `v1.0.1`). Security review and its fixes; every finding
 from that pass and from the initial v1.0.0 review is resolved.
 
-**v1.1.0 is the next release** — Japanese UI (i18n), then a homepage + about/docs revamp,
-then a Kanban board view of the FSM. That order matters; `TODO.md` explains why.
-Open work lives in `TODO.md`; shipped work lives in `CHANGELOG.md`. Read `TODO.md` before
-starting work.
+**v1.1.0 is the next release** — Japanese UI (i18n), then a homepage + about/docs revamp.
+i18n comes first because it decides how copy is stored. **v1.1.0 is UI/UX only and lives
+entirely in `web/`; it makes no `api/` changes.** The Kanban board was moved to **v1.2.0**
+because it cannot be built without exposing the FSM transition table from the API, and
+mirroring that table in TypeScript would give the state machine two sources of truth.
+
+Open work lives in `TODO.md`; shipped work lives in `CHANGELOG.md`.
 
 ## Branching & PRs
 

@@ -178,3 +178,131 @@ and every fix it produced.
   that nothing used. *(fix/backend-hardening, PR #39)*
 - **E2E status assertions were unscoped** — narrowed to the header badge.
   *(fix/e2e-status-badge-selector, PR #45)*
+
+---
+
+## Pre-1.0.0 — the build phases
+
+Before the repo had a changelog, the work was tracked as nine numbered phases in what was
+then `PLAN.md` (now [`SPEC.md`](SPEC.md)). They are recorded here so the history isn't lost.
+
+**These entries describe the system as it was at the time.** Several of the decisions below
+were later reversed — most visibly Sidekiq and Redis, which v1.0.0 replaced with Solid Queue
+and Solid Cache. For how the system works *now*, read `SPEC.md`; this section is archaeology.
+
+### Phase 1 — Rails API foundation
+
+Scaffolded with `rails new api --api --skip-test` (RSpec, so Minitest's `test/` folder would
+be dead weight). Gemfile: Sidekiq, devise + devise-jwt, rspec-rails, factory_bot_rails, faker,
+database_cleaner-active_record, rswag-api/ui/specs; `solid_queue` and `solid_cache` removed.
+CORS configured to expose the `Authorization` header, origin read from `FRONTEND_URL`. Routes,
+migrations (pgcrypto, users, applications, timeline_entries, file timestamps), models, and the
+`ApplicationFSM` PORO. RSpec set up with a DatabaseCleaner transaction strategy and an
+`auth_headers_for` request-spec helper.
+
+### Phase 2 — Service layer + specs
+
+`Applications::TransitionService` — FSM assertion, then status update and `TimelineEntry`
+creation in one transaction. `FollowUpReminderJob` with the `"reminder-{id}-{date}"`
+idempotency key. FSM unit specs (31 examples, no DB) and TransitionService specs (doubles
+only). 37 request specs written *before* the controllers existed. Support added:
+`spec/swagger_helper.rb`, a `jwt_for(user)` helper that issues a JWT without a controller, and
+a `fake_pdf` helper. Zeitwerk inflections taught to autoload `ApplicationFSM`.
+
+The FSM grew here: `wishlist`, `final_round`, `withdrawn`, and `declined` were added, and
+`ghosted` became revivable (`ghosted → applied`).
+
+### Phase 3 — Controllers
+
+`ApplicationController` rescues `InvalidTransitionError` → 422 and `StaleObjectError` → 409.
+`Auth::SessionsController` returns the JWT in the `Authorization` response header; `destroy`
+overridden for API mode (no flash, no `respond_to`). `Auth::RegistrationsController` overrides
+`create` to skip Devise's automatic `sign_up`, which writes to session. `ApplicationsController`
+applies `lock_version` from params *before* calling `TransitionService`, so the 409 path
+actually fires. `DashboardController` is pure SQL aggregation.
+
+Devise's `config.navigational_formats = []` was the missing piece that makes the gem behave as
+a pure JSON API — otherwise `*/*` is treated as navigational and `set_flash_message!` raises.
+79 specs green.
+
+### Phase 4 — API docs
+
+`rswag_api.rb` + `rswag_ui.rb` initializers; `rake rswag:specs:swaggerize` emits
+`swagger/v1/swagger.yaml` from the request specs. Swagger UI at `GET /api-docs`.
+
+### Phase 5 — Next.js frontend
+
+The auth flow that still stands today: credentials POST to Next route handlers, which proxy to
+Rails, capture the JWT from the `Authorization` header, and store it in an `httpOnly` cookie.
+The browser never sees the token. Route guard in `web/proxy.ts` (Next 16 renamed
+`middleware.ts` → `proxy.ts`). Server-side `apiFetch` + server actions for mutations. File
+downloads proxied so the JWT stays server-side. Tailwind v4; no UI library, no form library, no
+state management.
+
+### Phase 6 — Deploy
+
+Railway project: `api`, `web`, managed PostgreSQL, managed Redis. Puma and Sidekiq ran from a
+single service via the `Procfile` — which turned out not to work under a Dockerfile build, and
+was later split into a dedicated `sidekiq` service before Sidekiq was removed entirely.
+
+The production lessons from this phase (no Thruster; `CMD` overrides `Procfile`;
+`bin/docker-entrypoint` arg matching; Cloudflare grey cloud for ACME; the DNSSEC drift) are
+recorded permanently in `SPEC.md` under Deployment.
+
+### Phase 7 — Production-readiness and Tokyo-market polish
+
+None of it was needed to *use* the app; all of it was needed for the repo to read like
+production work. CI running Brakeman, bundler-audit, Rubocop, and RSpec against Postgres 16 +
+Redis 7; a `web/` workflow running ESLint, `tsc --noEmit`, and `next build`. A `/up` health
+endpoint that pings its dependencies rather than merely proving the app booted. Structured JSON
+logging (`lograge`), SimpleCov at an 80% floor, `prosopite` N+1 detection around every request
+spec, Honeybadger, and one Playwright E2E: sign up → create → transition → timeline entry.
+
+For the Tokyo market: a `README.ja.md`, and seed data using recognisable Japanese tech
+companies rather than "Acme Corp".
+
+Skipped deliberately: i18n and JST-aware reminders (real work, small payoff *then* — both have
+since landed or been scoped); Company/Platform/Tag models (more CRUD, no new patterns);
+Kubernetes and Terraform (overkill).
+
+### Phase 8 — API maturity and portfolio polish
+
+- **Cursor pagination on `GET /applications`** — the index previously loaded every record with
+  no limit. `?after=<base64_cursor>&limit=20`, response wrapped as
+  `{ data, meta: { next_cursor, has_more } }`. ~20 lines, no gem.
+- **Error-envelope consistency** — `create` and `update` returned `{ errors: [...] }` while
+  everything else returned `{ error: "..." }`. Standardised on the single string, which
+  simplified error extraction in `web/app/lib/api.ts` to `body.error ?? text`.
+- **Demo account + "Try demo" shortcut** — idempotent seeds, 12 applications spread across all
+  FSM states using mock Tokyo companies (Marcari, Vine Corp, Rokuton, BeNA Games, CyberFactor,
+  Cansan, greeo, Funds Forward, SlickHR, Cybozo, Wantfully, Cogpal). Seed timeline entries are
+  written directly with `idempotency_key: "seed-<slug>-<n>"`, bypassing `TransitionService` —
+  safe, because historical seed data is not a user action.
+- Playwright E2E promoted into `web.yml` as a second job, push-to-`main` only, to keep
+  free-tier minutes low.
+
+### Phase 9 — Product depth
+
+Four features scoped to make the app genuinely useful for a real job search. Two shipped.
+
+**Email delivery (shipped).** ActionMailer re-enabled (the `--api` default disables the
+railtie). The scheduling gap found here is the interesting part: `sidekiq-cron` was in the
+Gemfile but **no schedule was loaded anywhere**, so the reminder job never fired in production —
+and `config/recurring.yml` was sitting there as a dead Solid Queue artifact. It was added back
+properly, and by v1.0.0 the wheel had turned full circle: Solid Queue returned and `recurring.yml`
+became load-bearing again. Resend over SMTP, on port `2587` because Railway blocks 587 and 465.
+
+**AI job URL pre-fill (shipped).** `Applications::UrlPrefillService` — Claude Haiku 4.5 via the
+official `anthropic` gem, structured output through a tool/JSON schema. Claude specifically
+because it reads Japanese postings natively, so one flow covers Wantedly, Greenhouse, and a
+company careers page with no parser per site. SSRF guard on the outbound fetch; typed errors
+mapped to 422 / 502 / 503. Later hardened in v1.0.0 (IP pinning, per-account rate caps).
+
+**Analytics dashboard (not built).** A funnel, a response rate, a ghosting rate, and mean days
+from applied to first response and to offer. All SQL aggregation over data already stored — no
+new models, no migration. Carried into `TODO.md`.
+
+**AI cover-letter assist (not built).** "Draft with AI" on the detail page, streaming into a
+panel the user copies from; nothing saved automatically. Carried into `TODO.md`.
+
+Deferred on purpose: email on *every* status change — too noisy for personal use.
