@@ -93,6 +93,15 @@ flowchart LR
 
 ---
 
+## 認証
+
+Devise + devise-jwt によるJWT認証です。サインイン時にRailsが `Authorization` ヘッダーでJWTを発行し、Next.jsの `/api/auth/session` ルートがそれを受け取って `httpOnly` Cookieに格納します（[`web/app/api/auth/session/route.ts`](web/app/api/auth/session/route.ts)）— トークンがクライアントサイドJSに渡ることはありません。
+
+- **ユーザーごとに単一セッション。** 失効戦略には devise-jwt の `JTIMatcher` を採用しており、トークンごとの許可リストではなく `users` テーブルの `jti` カラム1つで管理しています（[`api/app/models/user.rb`](api/app/models/user.rb)）。サインアウトするとJTIがローテーションされ、そのユーザーの発行済みトークンがすべて一括で失効します。デバイスごとのセッションという概念がないため、1台でサインアウトすると全デバイスでサインアウトされます。これは意図した挙動であり、バグではありません。
+- **有効期限は1日、リフレッシュフローなし。** トークンは発行から `1.day` で失効します（`jwt.expiration_time`、[`api/config/initializers/devise.rb`](api/config/initializers/devise.rb)）。セッションCookieの `maxAge` もこれに合わせています。リフレッシュトークンのエンドポイントは存在しません — トークンが失効するとAPIは `401` を返し、フロントエンドはCookieを削除した上で `/api/auth/expired` 経由でサインインページへリダイレクトします（[`web/app/lib/api.ts`](web/app/lib/api.ts)）。再ログインする以外に復帰する手段はありません。
+
+---
+
 ## コードベースツアー
 
 レビュアー向けの90秒ガイドです。以下のファイルを順に読むと全体像が掴めます。
