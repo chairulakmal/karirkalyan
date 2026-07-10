@@ -67,7 +67,7 @@ Ordered by severity. File references are `path:line` at `9708df6`.
   (`api/app/models/user.rb`), so sign-out revokes **all** devices; 1-day expiry, no
   refresh flow. **Fixed:** added an `## Authentication` section to `README.md` and mirrored
   it in `README.ja.md`, spelling out the single-session behaviour so it isn't mistaken for
-  a bug. On branch `docs/jwt-semantics` — not yet merged. *(chore/security-review-v1.0.1)*
+  a bug. *(chore/security-review-v1.0.1, 4b5038a)*
 
 ### Reviewed and found sound (no action)
 
