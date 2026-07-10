@@ -2,138 +2,12 @@
 
 Open work only. Shipped work lives in [`CHANGELOG.md`](CHANGELOG.md).
 
-**Current release: `v1.0.1`** — tagged 2026-07-10 at `2980300`. Security review + fixes.
-**Next release: `v1.1.0`** — Japanese UI (i18n) and a homepage + about/docs revamp.
-**Then `v1.1.1`** — mobile view improvements.
+**Current release: `v1.1.0`** — tagged 2026-07-11 at `161b343`. Japanese UI (i18n) + homepage,
+about and docs revamp.
+**Next release: `v1.1.1`** — mobile view improvements.
 **After that: `v1.2.0`** — the Kanban board view.
 
-Everything below is post-1.0.1. The v1.1.0, v1.1.1 and v1.2.0 items are scoped; the backlog is not.
-
----
-
-## v1.1.0 — Japanese UI and marketing pages (next)
-
-**v1.1.0 is a UI/UX release and it lives entirely in `web/`. No `api/` changes.**
-
-That is a hard boundary, not a preference. The backend shipped, was security-reviewed twice,
-and every finding is closed. Reopening it to serve a frontend release trades a settled surface
-for an unsettled one, and drags the Rails suite, rswag regeneration, and a security re-read
-into what should be a `web/`-only diff.
-
-**The Kanban board was cut from this release for exactly that reason** — it cannot be built
-without exposing the FSM transition table, and the `web/`-side workaround is to duplicate that
-table, which means a state machine with two sources of truth that drift apart. Better to move
-the board than to buy a clean API diff with frontend duplication. It is `v1.2.0`, below, and
-it opens with the API change it needs.
-
-So the rule for v1.1.0 is simple: **if an item seems to need an `api/` change, it is either
-solvable in `web/` or it is in the wrong release.** Both remaining candidates are solvable in
-`web/` — the error-message item below says how.
-
-Both items serve a Tokyo-market portfolio directly. i18n shows the app can ship bilingual; the
-homepage and about/docs pages are what a reviewer sees before anything else. Both are
-user-visible, which is the point — the debt in the backlog is not.
-
-**Do i18n first.** It decides how copy is stored, and writing new marketing copy before the
-message catalogs exist means authoring it twice.
-
-### Japanese UI (i18n) — done, pending a PR
-
-All items below are landed on `feat/i18n-japanese-ui` and verified against the dev server: `/`
-serves English, `/ja` serves Japanese, `/en/*` `307`s to the unprefixed canonical path. The
-plumbing is described in `SPEC.md`; the routing decisions are recorded there too.
-
-What is left is not code: **open the PR**, and settle the `phone_screen` translation flagged
-below.
-
-- [x] **Pick and install a library.** `next-intl@4.13.2` — declares `next: ^16.0.0` in its peer
-  dependencies, so Next.js 16 support is stated, not inferred.
-- [x] **Decide routing strategy** — `localePrefix: "as-needed"`: English unprefixed, Japanese at
-  `/ja/*`. No existing URL moves. `/en/*` self-corrects — next-intl `307`s it to the unprefixed
-  path (verified in `middleware.js:131-133`), so each page keeps one canonical address.
-  `config.matcher` needs **no change**: it excludes by prefix segment and `/ja` collides with none
-  of them. The auth guard must run on the locale-stripped pathname so `PUBLIC_PATHS` stays three
-  entries rather than six. Recorded in `SPEC.md`.
-  *Note: the CSP nonce work already forces dynamic rendering app-wide via `await connection()`
-  in the root layout, so locale routing costs no static optimization — there is none left to lose.*
-- [x] **Extract copy into message catalogs.** Every page, form, and component reads from
-  `messages/{en,ja}.json`; `format.ts` holds no copy at all now. The only hardcoded English
-  left in `.tsx` is `global-not-found.tsx` — an unmatched path carries no locale, so it cannot
-  be translated. `en.json` and `ja.json` are key-for-key identical.
-- [x] **Translate the 13 FSM state names.** In the `status` namespace as `label.*` and
-  `description.*`.
-  *`phone_screen` → `カジュアル面談` was questioned and **kept** (2026-07-10). It names a
-  pre-selection chat rather than a 選考 stage, which is a slight mismatch with where the state
-  sits, but it is the term a Japanese jobseeker actually recognises. Recognition beat precision.*
-- [x] **Set `lang` dynamically** from the active locale (`[locale]/layout.tsx`), and add a
-  locale switcher. The switcher is a two-locale toggle showing only the inactive language;
-  mounted in the app shell, the marketing header, and the auth layout. See `SPEC.md`.
-- [x] **Server-side error messages** — mapped in `web/` off the HTTP status, API left
-  English-only. Two mapping sites, because the auth form calls route handlers with `fetch`
-  rather than going through a server action: `apiFailure()`/`localFailure()` in
-  `app/lib/actions.ts`, and `errorMessage()` in `(auth)/sign-in/sign-in-form.tsx`. The English
-  sentence from the API is discarded, never parsed. A `422`'s per-field detail is therefore
-  **lost**, not left in English — it comes back when the error codes land in v1.2.0.
-  *Corrected 2026-07-10: this item used to say "keyed off the error code and HTTP status." There
-  is no error code. Rails returns `{ error: "<English sentence>" }` and a status — nothing else —
-  and `web/app/lib/api.ts:109` passes the sentence straight through. Adding a code is an `api/`
-  change, so it moved to v1.2.0 (below). Status-keyed mapping covers `401`, `409`, `422`, `429`,
-  `502`, `503`; per-field `422` text (`"Company can't be blank"`) stays English until the codes
-  land. Do **not** string-match the English sentences to recover a code — that is a prose parser
-  and it breaks on the first reword. See the decisions log in `SPEC.md`.*
-
-### Homepage + about/docs revamp
-
-Depends on i18n landing first — every string below should be authored into the message
-catalogs bilingually, not written in English and retrofitted.
-
-- [x] **Decided (2026-07-10): reframe the hero at the reviewer.** The homepage argues that this
-  is a job tracker *built on a finite state machine* — 13 states, an immutable audit trail, the
-  stack named outright. The primary call to action is "Read the architecture" (→ `/about`), with
-  the demo second. The jobseeker framing ("without the spreadsheet") is retired.
-  **Consequence to hold onto:** the demo login is no longer the obvious next action, so `/about`
-  now has to carry the visit. It cannot be a stack list — it is the page the whole site points
-  at. Build it before, or with, the hero; a hero whose main CTA 404s is worse than the old one.
-- [x] **Rewrote the hero** (2026-07-10) — `app/[locale]/page.tsx`, both catalogs. Header nav is
-  About / Sign in / locale switcher; the hero names the stack; the cards are the transition
-  table, the immutable history, and Postgres-backed jobs.
-- [x] **Built the `/about` page** (2026-07-10) — four decisions, each stated as the cheaper
-  alternative it rejected: why Rails for a TS developer, why a PORO FSM over a state-machine
-  gem, why Solid Queue instead of Sidekiq/Redis, why `bytea` over object storage.
-  It is an `OPEN_PATHS` entry in `proxy.ts` — it renders with *or* without a session, because
-  bouncing a signed-in reader to `/dashboard` would hide the page from the people most likely
-  to read it.
-- [x] **Built the in-app `/docs` page** (2026-07-10) — auth, per-user scoping, the one-string
-  error shape, cursor pagination, and the endpoint table, then a link out to the rswag UI.
-  Every "API docs" link in the app (homepage footer, `/about`, and the signed-in "For
-  reviewers" footer) now points here rather than off-site; `API_DOCS_URL` survives as the one
-  outbound link on this page. Also an `OPEN_PATHS` entry.
-  Endpoint methods and paths are code and stay untranslated — only the sentence beside each.
-- [x] **The homepage will need a real design pass, not a copy edit.** *(2026-07-10)* There is no
-  `frontend-design` skill installed — that line was aspirational — so the direction came from the
-  real brand book in `design/assets/tokens.css` instead. Three of its decisions had never reached
-  the app: the motion tokens (now Tailwind's `--default-transition-*`, so every existing bare
-  `transition` inherits the brand curve), the display type cut (Fraunces `opsz 144` via
-  `.kk-display` — the global `h1,h2,h3` rule's `opsz 36` is a heading cut that goes weak past 60px),
-  and saffron, reserved for "offers, celebratory" and unused on every marketing page.
-  The biggest gap was argument, not aesthetics: the hero claimed a finite state machine and showed
-  nothing. `pipeline-diagram.tsx` now draws one — and saffron finally appears, on the `offer` and
-  `accepted` chips. It is an **illustration**, not a copy of the 33-edge table; it names
-  `api/app/lib/application_fsm.rb` as the authority, and reuses `statusBadgeClass` plus the `status`
-  catalog so the vocabulary keeps one home. `/about` numbers its four decisions `01`–`04` because
-  the lede promises four; `/docs` colours the verb by risk, with `DELETE` in the same red
-  `format.ts` gives the terminal-negative statuses. Also: one global cobalt `:focus-visible` ring,
-  and a `prefers-reduced-motion` block.
-- [x] **Wire up the SEO surfaces** (2026-07-11) — `web/app/sitemap.ts` now derives entries for
-  all five public pages (`/`, `/about`, `/docs`, `/sign-up`, `/sign-in`) with per-locale
-  `alternates` (hreflang + `x-default`) via `getPathname`, so the prefix rule has one home.
-  The `jsonLd` blob stays local to `page.tsx` — no second page needs it yet.
-- [x] **Fix `web/public/llms.txt`** — Sidekiq/Redis 8 replaced with Solid Queue + Solid Cache
-  in both the feature list and the stack, and the Railway line no longer claims a managed Redis.
-  The FSM state list stays (an LLM reading this file benefits from it) but now says it is a
-  summary and names `api/app/lib/application_fsm.rb` as the authority, and no longer implies the
-  pipeline is linear. Add the bilingual UI here once i18n is merged and deployed — the file
-  describes production, not a branch.
+Everything below is post-1.1.0. The v1.1.1 and v1.2.0 items are scoped; the backlog is not.
 
 ---
 
@@ -167,6 +41,9 @@ preceding it.
   line. Something gives at 375px.
 - [ ] **Verify no page scrolls horizontally.** A single overflowing element does this to the
   whole document, and it is the most common way a desktop-first layout fails on a phone.
+- [ ] **Mention the bilingual UI in `web/public/llms.txt`.** Deferred from v1.1.0 because the
+  file describes production, not a branch; once the v1.1.0 deploy is live this is a one-line
+  docs change.
 
 ---
 

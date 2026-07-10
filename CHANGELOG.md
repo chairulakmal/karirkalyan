@@ -5,6 +5,62 @@ Open work lives in [`TODO.md`](TODO.md).
 
 ---
 
+## v1.1.0 — 2026-07-11
+
+Tagged at `161b343`. Japanese UI (i18n) and the homepage + about/docs revamp. Entirely
+`web/` — no `api/` changes, as scoped; the Kanban board moved to v1.2.0 because it needs
+the FSM transition table exposed from the API. *(feat/i18n-japanese-ui, PR #49)*
+
+### Japanese UI (i18n)
+
+- **next-intl@4.13.2, `localePrefix: "as-needed"`** — English stays unprefixed, Japanese
+  lives at `/ja/*`, and `/en/*` 307s to the unprefixed canonical path, so no existing URL
+  moved. The app moved under `app/[locale]`; the auth guard in `proxy.ts` runs on the
+  locale-stripped pathname, so `PUBLIC_PATHS`/`OPEN_PATHS` stay one entry per path rather
+  than one per locale.
+- **All copy in message catalogs** — every page, form, and component reads
+  `messages/{en,ja}.json`, key-for-key identical; `format.ts` holds no copy. The 13 FSM
+  state names live in the `status` namespace, translated for how Japanese job boards label
+  the stages (`phone_screen` → `カジュアル面談` — recognition beat precision).
+- **Locale switcher** — a two-locale toggle showing only the inactive language, mounted in
+  the app shell, the marketing header, and the auth layout. Switches with `router.replace`
+  on the locale-stripped pathname.
+- **Server-side errors localized by HTTP status** — the API stays English-only; `web/`
+  discards the English sentence and maps status → catalog entry in `apiFailure()`/
+  `localFailure()` (`app/lib/actions.ts`) and `errorMessage()` (sign-in form, which talks
+  to route handlers over `fetch`). Per-field `422` detail is lost until the API grows
+  error codes in v1.2.0.
+- **Dates and `lang` follow the locale** — `Intl` formatters take the active locale;
+  `formatDate()` pins `Asia/Tokyo` so date-only fields don't shift a day west of UTC.
+
+### Homepage, `/about`, `/docs`
+
+- **Hero reframed at the hiring reviewer** — the homepage now argues the FSM claim (13
+  states, immutable audit trail, stack named outright); primary CTA is "Read the
+  architecture" → `/about`, demo second. `pipeline-diagram.tsx` illustrates the machine —
+  labels and colours reuse the `status` catalog and `statusBadgeClass`; the transition
+  table itself stays only in `application_fsm.rb`.
+- **`/about`** — the four architecture decisions, each stated against the cheaper
+  alternative it rejected. **`/docs`** — frames the API (auth, scoping, error shape,
+  cursor pagination, endpoint table) and links out to the rswag UI instead of deep-linking
+  raw Swagger off-site. Both are `OPEN_PATHS` in `proxy.ts`: they render with or without a
+  session.
+- **Design pass from `design/assets/tokens.css`** — brand motion via Tailwind's default
+  transition variables, the Fraunces `opsz 144` display cut (`.kk-display`),
+  `--color-danger` replacing 25 improvised `red-*` utilities, one global cobalt
+  `:focus-visible` ring, and a `prefers-reduced-motion` block.
+- **SEO surfaces** — `sitemap.ts` derives all five public pages with per-locale `hreflang`
+  alternates via `getPathname`; `llms.txt` no longer claims Sidekiq/Redis and names
+  `application_fsm.rb` as the FSM authority.
+
+### Fixed
+
+- **`package-lock.json` was missing a nested `@swc/helpers` resolution** — next-intl's
+  `@swc/core` peers `>=0.5.17` while `next` pins `0.5.15`; CI's npm 10 refused `npm ci`.
+  Regenerated the lock with npm 10. *(42862d9)*
+
+---
+
 ## v1.0.1 — 2026-07-10
 
 Tagged at `2980300`. Scoped to a dedicated security pass over the API and frontend
