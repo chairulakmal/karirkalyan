@@ -1,24 +1,10 @@
 import type { NextConfig } from "next";
 
-const isDev = process.env.NODE_ENV === "development";
-
-// Next.js injects inline bootstrap scripts (plus eval-based HMR in dev), so
-// script-src can't get stricter than 'unsafe-inline' without a nonce setup.
-const csp = [
-  "default-src 'self'",
-  `script-src 'self' 'unsafe-inline'${isDev ? " 'unsafe-eval'" : ""}`,
-  "style-src 'self' 'unsafe-inline'",
-  "img-src 'self' data:",
-  "font-src 'self'",
-  "connect-src 'self'",
-  "frame-ancestors 'none'",
-  "base-uri 'self'",
-  "form-action 'self'",
-  "object-src 'none'",
-].join("; ");
-
+// The Content-Security-Policy lives in proxy.ts, not here: it is generated per
+// request so script-src can carry a fresh nonce (dropping 'unsafe-inline' for
+// scripts) which a static header can't do. The static, request-independent
+// security headers below stay here.
 const securityHeaders = [
-  { key: "Content-Security-Policy", value: csp },
   { key: "X-Frame-Options", value: "DENY" },
   { key: "X-Content-Type-Options", value: "nosniff" },
   { key: "Referrer-Policy", value: "strict-origin-when-cross-origin" },

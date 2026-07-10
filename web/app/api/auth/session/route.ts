@@ -1,10 +1,13 @@
 import { cookies } from "next/headers";
 import { API_BASE, SESSION_COOKIE_NAME } from "@/app/lib/api";
+import { forbiddenOrigin, isAllowedOrigin } from "@/app/lib/csrf";
 
 // POST = sign-in. Proxies email/password to Rails, captures the JWT from the
 // Authorization response header, and stores it in an httpOnly cookie so it
 // never reaches client JS.
 export async function POST(request: Request) {
+  if (!isAllowedOrigin(request)) return forbiddenOrigin();
+
   const body = (await request.json().catch(() => null)) as {
     email?: string;
     password?: string;
@@ -42,7 +45,9 @@ export async function POST(request: Request) {
 }
 
 // DELETE = sign-out. Rotates the JTI on the Rails side, then clears the cookie.
-export async function DELETE() {
+export async function DELETE(request: Request) {
+  if (!isAllowedOrigin(request)) return forbiddenOrigin();
+
   const cookieStore = await cookies();
   const token = cookieStore.get(SESSION_COOKIE_NAME)?.value;
 

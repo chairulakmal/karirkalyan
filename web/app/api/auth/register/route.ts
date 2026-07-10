@@ -1,9 +1,12 @@
 import { API_BASE } from "@/app/lib/api";
+import { forbiddenOrigin, isAllowedOrigin } from "@/app/lib/csrf";
 
 // POST = sign-up. Creates the account on Rails; does NOT sign the user in.
 // Sign-up returns 201 + user JSON only. The client then calls /api/auth/session
 // to obtain a token.
 export async function POST(request: Request) {
+  if (!isAllowedOrigin(request)) return forbiddenOrigin();
+
   const body = (await request.json().catch(() => null)) as {
     email?: string;
     password?: string;

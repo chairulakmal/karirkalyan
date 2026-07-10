@@ -75,9 +75,12 @@ Rails.application.configure do
   # DNS-rebinding protection. Production domain + Railway-issued preview/prod
   # subdomains + private-network hostnames for service-to-service calls.
   # An additional host can be supplied at runtime via APP_HOST.
+  # Anchored (\A…\z) so the pattern must match the *entire* Host, not just a
+  # substring — an unanchored /.*\.railway\.app/ would also accept an attacker
+  # host like "foo.railway.app.evil.com".
   config.hosts << "kk.chairulakmal.com"
-  config.hosts << /.*\.railway\.app/
-  config.hosts << /.*\.railway\.internal/
+  config.hosts << /\A([a-z0-9-]+\.)+railway\.app\z/i
+  config.hosts << /\A([a-z0-9-]+\.)+railway\.internal\z/i
   config.hosts << ENV["APP_HOST"] if ENV["APP_HOST"].present?
 
   # Health check endpoint skips host authorization so the platform's prober
