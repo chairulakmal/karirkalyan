@@ -4,6 +4,29 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 Full-stack job application tracker. Rails 8 API (`api/`) + Next.js 16 frontend (`web/`).
 
+## Status
+
+**v1.0.0 released** 2026-07-10 (tag `v1.0.0`). All review findings from the initial
+security / performance / UX pass are resolved except four security items.
+
+**v1.0.1 is the next release** — a dedicated security review plus the fixes it produces.
+Scope is security only; non-security findings go to the backlog. Open items, the shipped
+changelog, and the backlog all live in `TODO.md` — read it before starting work.
+
+## Subagents
+
+Delegate to a subagent when the task genuinely warrants it — a wide search whose file
+dumps you don't need, or a review that benefits from a cold read of the diff:
+
+- **`Explore`** — broad searches across `api/` and `web/` when you need the conclusion,
+  not the file contents.
+- **`code-reviewer`** — senior review of a finished unit of TypeScript or Rails work.
+  Worth running on the v1.0.1 security fixes before they land.
+- **`docs-auditor`** — check docs against implementation after a behavior change.
+
+Not for tasks you can do inline. Each subagent starts cold and re-derives context you
+already have, so a multi-part task is not by itself a reason to spawn one.
+
 ## Stack
 
 - **Backend:** Rails 8 API-only, Ruby 3.4.9 (mise), PostgreSQL 16, Devise + devise-jwt
