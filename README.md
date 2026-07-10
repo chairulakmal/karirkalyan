@@ -92,6 +92,15 @@ Also see [Awano](https://github.com/chairulakmal/awano) — a Next.js multi-tena
 
 ---
 
+## Authentication
+
+JWT auth via Devise + devise-jwt. Sign-in issues a JWT in the `Authorization` header; the Next.js `/api/auth/session` route captures it and stores it in an `httpOnly` cookie ([`web/app/api/auth/session/route.ts`](web/app/api/auth/session/route.ts)) — the token never reaches client-side JS.
+
+- **Single session per user.** Revocation uses devise-jwt's `JTIMatcher` strategy — one `jti` column on `users` ([`api/app/models/user.rb`](api/app/models/user.rb)), not a per-token allowlist. Signing out rotates the JTI, which invalidates every outstanding token for that user at once — there's no per-device session, so signing out on one device signs you out everywhere. This is deliberate, not a bug.
+- **1-day expiry, no refresh flow.** Tokens expire after `1.day` (`jwt.expiration_time` in [`api/config/initializers/devise.rb`](api/config/initializers/devise.rb)); the session cookie's `maxAge` matches. There's no refresh-token endpoint — once a token expires, the API returns `401` and the frontend clears the cookie and redirects to sign-in via `/api/auth/expired` ([`web/app/lib/api.ts`](web/app/lib/api.ts)). Re-authenticating is the only way back in.
+
+---
+
 ## Codebase tour
 
 A 90-second walkthrough for reviewers landing cold. Read these files in order and you'll have the whole picture.
