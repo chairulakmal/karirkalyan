@@ -3,9 +3,7 @@
 import { useState } from "react";
 import Link from "next/link";
 import { formatDate, jobBoardLabel, statusBadgeClass, statusLabel, timeAgo } from "@/app/lib/format";
-import type { Application, Status } from "@/app/lib/types";
-
-type Meta = { next_cursor: string | null; has_more: boolean };
+import type { Application, PageMeta, Status } from "@/app/lib/types";
 
 type Filters = { status: Status | null; company: string | null; source: string | null };
 
@@ -25,6 +23,11 @@ const STATUS_PRIORITY: Record<Status, number> = {
   archived: 3,
 };
 
+// Surfaces active applications first *within a single page*. We deliberately do
+// NOT re-sort across pages: the API paginates by its own cursor order, so
+// re-sorting the accumulated list would interleave freshly loaded items into
+// the middle of already-seen ones. Applied to the first page (and each filtered
+// reload, which is itself a first page); appended pages keep server order.
 function sortByImportance(apps: Application[]): Application[] {
   return [...apps].sort((a, b) => STATUS_PRIORITY[a.status] - STATUS_PRIORITY[b.status]);
 }
@@ -33,7 +36,7 @@ const NO_FILTERS: Filters = { status: null, company: null, source: null };
 
 interface Props {
   initialItems: Application[];
-  initialMeta: Meta;
+  initialMeta: PageMeta;
   statusBuckets: [Status, number][];
   facets: [string, string][]; // [company, board-host] per application
   total: number;
@@ -59,7 +62,7 @@ export function ApplicationsList({
     if (f.source) qs.set("source", f.source);
     const res = await fetch(`/api/applications?${qs}`);
     if (!res.ok) return null;
-    return (await res.json()) as { data: Application[]; meta: Meta };
+    return (await res.json()) as { data: Application[]; meta: PageMeta };
   }
 
   async function applyFilters(next: Filters) {
@@ -82,7 +85,8 @@ export function ApplicationsList({
     try {
       const body = await fetchPage(filters, meta.next_cursor);
       if (!body) return;
-      setItems((prev) => sortByImportance([...prev, ...body.data]));
+      // Append in server (cursor) order — do not re-sort the accumulated list.
+      setItems((prev) => [...prev, ...body.data]);
       setMeta(body.meta);
     } finally {
       setLoading(false);
@@ -161,7 +165,7 @@ export function ApplicationsList({
           <button
             onClick={() => applyFilters({ ...filters, status: null })}
             disabled={loading}
-            className={`inline-flex items-center gap-2 px-3 py-1 text-xs font-medium ring-1 ring-inset ring-midnight/20 transition disabled:cursor-wait ${filters.status === null ? "bg-sand text-midnight" : "bg-sand/40 text-ink-soft hover:text-midnight"
+            className={`inline-flex min-h-10 items-center gap-2 px-3 py-1 text-xs font-medium ring-1 ring-inset ring-midnight/20 transition disabled:cursor-wait ${filters.status === null ? "bg-sand text-midnight" : "bg-sand/40 text-ink-soft hover:text-midnight"
               }`}
           >
             All <span className="font-mono">{total}</span>
@@ -171,7 +175,7 @@ export function ApplicationsList({
               key={status}
               onClick={() => applyFilters({ ...filters, status })}
               disabled={loading}
-              className={`inline-flex items-center gap-2 px-3 py-1 text-xs font-medium ring-1 ring-inset transition disabled:cursor-wait ${statusBadgeClass(status)} ${filters.status === status ? "" : "opacity-40 hover:opacity-70"
+              className={`inline-flex min-h-10 items-center gap-2 px-3 py-1 text-xs font-medium ring-1 ring-inset transition disabled:cursor-wait ${statusBadgeClass(status)} ${filters.status === status ? "" : "opacity-40 hover:opacity-70"
                 }`}
             >
               {statusLabel(status)} <span className="font-mono">{count}</span>

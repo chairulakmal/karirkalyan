@@ -2,6 +2,7 @@
 
 import { useState, useTransition } from "react";
 import { createApplication, prefillFromUrl } from "@/app/lib/actions";
+import { Field } from "@/app/components/field";
 
 export function NewApplicationForm() {
   const [error, setError] = useState<string | null>(null);
@@ -175,20 +176,6 @@ function FileField({ name, label }: { name: string; label: string }) {
         name={name}
         accept=".pdf,application/pdf"
         className="mt-1.5 block w-full border border-dune bg-linen px-3 py-2 text-sm text-midnight file:mr-3 file:border-0 file:bg-transparent file:text-sm file:font-medium file:text-cobalt"
-      />
-    </label>
-  );
-}
-
-function Field(props: React.InputHTMLAttributes<HTMLInputElement> & { label: string }) {
-  const { label, name, ...rest } = props;
-  return (
-    <label className="block text-sm">
-      <span className="kk-label">{label}</span>
-      <input
-        {...rest}
-        name={name}
-        className="mt-1.5 block w-full border border-dune bg-linen px-3 py-2 text-sm text-midnight placeholder:text-ink-soft focus:border-cobalt focus:outline-none focus:ring-1 focus:ring-cobalt"
       />
     </label>
   );

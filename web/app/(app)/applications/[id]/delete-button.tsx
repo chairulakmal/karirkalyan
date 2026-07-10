@@ -11,8 +11,10 @@ export function DeleteButton({ id }: { id: number }) {
     if (!window.confirm("Delete this application? This cannot be undone.")) return;
     setError(null);
     startTransition(async () => {
+      // On success deleteApplication redirects (throws) and never resolves;
+      // a resolved value is always a failure.
       const result = await deleteApplication(id);
-      if (result && !result.ok) setError(result.error);
+      if (!result.ok) setError(result.error);
     });
   }
 

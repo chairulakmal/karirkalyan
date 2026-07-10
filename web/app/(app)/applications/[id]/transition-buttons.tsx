@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useTransition } from "react";
+import { useRouter } from "next/navigation";
 import { transitionStatus } from "@/app/lib/actions";
 import { statusBadgeClass, statusLabel } from "@/app/lib/format";
 import type { Status } from "@/app/lib/types";
@@ -28,6 +29,7 @@ export function TransitionButtons({
   validNextStates: Status[];
   currentStatus: Status;
 }) {
+  const router = useRouter();
   const [error, setError] = useState<string | null>(null);
   const [confirming, setConfirming] = useState<Status | null>(null);
   const [reversalReason, setReversalReason] = useState("");
@@ -39,7 +41,15 @@ export function TransitionButtons({
     setReversalReason("");
     startTransition(async () => {
       const result = await transitionStatus(id, to, lockVersion, note);
-      if (!result.ok) setError(result.error);
+      if (result.ok) return;
+      if (result.status === 409) {
+        // Stale optimistic lock: refresh so a fresh lockVersion prop flows in
+        // and the retry can succeed without a manual reload.
+        setError("This application was changed elsewhere — refreshing to the latest version…");
+        router.refresh();
+      } else {
+        setError(result.error);
+      }
     });
   }
 
@@ -158,7 +168,7 @@ export function TransitionButtons({
               type="button"
               onClick={() => handleClick(status)}
               disabled={pending}
-              className={`inline-flex items-center px-3 py-1 text-xs font-medium ring-1 ring-inset transition hover:opacity-80 disabled:opacity-50 ${statusBadgeClass(status)}`}
+              className={`inline-flex min-h-10 items-center px-3 py-1 text-xs font-medium ring-1 ring-inset transition hover:opacity-80 disabled:opacity-50 ${statusBadgeClass(status)}`}
             >
               → {statusLabel(status)}
             </button>

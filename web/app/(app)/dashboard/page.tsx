@@ -1,13 +1,11 @@
 import Link from "next/link";
 import { apiFetch } from "@/app/lib/api";
-import type { Application, DashboardStats, Status, User } from "@/app/lib/types";
+import type { Application, DashboardStats, Paginated, Status, User } from "@/app/lib/types";
 import { ApplicationsList } from "./applications-list";
 
 export default async function Dashboard() {
   const [appsRes, statsRes, meRes] = await Promise.all([
-    apiFetch<{ data: Application[]; meta: { next_cursor: string | null; has_more: boolean } }>(
-      "/applications?limit=10",
-    ),
+    apiFetch<Paginated<Application>>("/applications?limit=10"),
     apiFetch<DashboardStats>("/dashboard"),
     apiFetch<User>("/me"),
   ]);
@@ -66,8 +64,19 @@ export default async function Dashboard() {
           Average days from apply → offer:{" "}
           <span className="text-midnight">{stats.avg_days_to_offer}</span>
           <span className="group relative ml-2 inline-block align-middle">
-            <span className="cursor-help select-none text-ink-soft/50 hover:text-ink-soft">ⓘ</span>
-            <span className="pointer-events-none absolute bottom-full left-1/2 z-10 mb-2 w-56 -translate-x-1/2 rounded bg-midnight px-3 py-2 font-sans leading-relaxed text-linen opacity-0 shadow-lg transition-opacity group-hover:opacity-100">
+            <button
+              type="button"
+              aria-label="What counts toward this average"
+              aria-describedby="avg-days-tooltip"
+              className="cursor-help select-none text-ink-soft/50 transition-colors hover:text-ink-soft focus-visible:text-ink-soft focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-cobalt"
+            >
+              ⓘ
+            </button>
+            <span
+              id="avg-days-tooltip"
+              role="tooltip"
+              className="pointer-events-none absolute bottom-full left-1/2 z-10 mb-2 w-56 -translate-x-1/2 rounded bg-midnight px-3 py-2 font-sans leading-relaxed text-linen opacity-0 shadow-lg transition-opacity group-hover:opacity-100 group-focus-within:opacity-100"
+            >
               Counts applications that reached offer, accepted, or declined. Measured from your
               applied date to when the offer status was recorded in the audit log.
             </span>

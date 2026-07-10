@@ -16,6 +16,14 @@ export type Status =
   | "withdrawn"
   | "archived";
 
+// Cursor-pagination envelope returned by the list endpoints.
+export type PageMeta = { next_cursor: string | null; has_more: boolean };
+
+export type Paginated<T> = {
+  data: T[];
+  meta: PageMeta;
+};
+
 export type User = {
   id: number;
   email: string;

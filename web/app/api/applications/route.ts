@@ -1,11 +1,6 @@
 import { type NextRequest } from "next/server";
 import { apiFetch } from "@/app/lib/api";
-import type { Application } from "@/app/lib/types";
-
-type PagedResponse = {
-  data: Application[];
-  meta: { next_cursor: string | null; has_more: boolean };
-};
+import type { Application, Paginated } from "@/app/lib/types";
 
 export async function GET(request: NextRequest) {
   const { searchParams } = request.nextUrl;
@@ -22,7 +17,7 @@ export async function GET(request: NextRequest) {
   if (company) qs.set("company", company);
   if (source) qs.set("source", source);
 
-  const result = await apiFetch<PagedResponse>(`/applications?${qs}`);
+  const result = await apiFetch<Paginated<Application>>(`/applications?${qs}`);
 
   if (!result.ok) {
     return Response.json({ error: result.error }, { status: result.status });

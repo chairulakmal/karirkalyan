@@ -2,6 +2,7 @@
 
 import { useRouter } from "next/navigation";
 import { useState, useTransition } from "react";
+import { Field } from "@/app/components/field";
 
 type Mode = "sign-in" | "sign-up";
 
@@ -131,19 +132,5 @@ export function AuthForm({ defaultMode = "sign-in" }: { defaultMode?: Mode }) {
         </button>
       </form>
     </div>
-  );
-}
-
-function Field(props: React.InputHTMLAttributes<HTMLInputElement> & { label: string }) {
-  const { label, name, ...rest } = props;
-  return (
-    <label className="block text-sm">
-      <span className="kk-label">{label}</span>
-      <input
-        {...rest}
-        name={name}
-        className="mt-1.5 block w-full border border-dune bg-linen px-3 py-2 text-sm text-midnight placeholder:text-ink-soft focus:border-cobalt focus:outline-none focus:ring-1 focus:ring-cobalt"
-      />
-    </label>
   );
 }

@@ -4,6 +4,7 @@ import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { updateApplication } from "@/app/lib/actions";
 import { formatDate } from "@/app/lib/format";
+import { Field } from "@/app/components/field";
 
 type Props = {
   id: number;
@@ -32,6 +33,11 @@ export function DetailsEditor(props: Props) {
       if (result.ok) {
         setEditing(false);
         router.refresh(); // pull fresh values + bumped lock_version
+      } else if (result.status === 409) {
+        // Stale optimistic lock: refresh so fresh props (new lock_version)
+        // flow in and the next save can succeed without a manual reload.
+        setError("This application was changed elsewhere — refreshing to the latest version…");
+        router.refresh();
       } else {
         setError(result.error);
       }
@@ -135,19 +141,5 @@ function Row({ label, value }: { label: string; value: React.ReactNode }) {
       <dt className="text-ink-soft">{label}</dt>
       <dd className="text-right text-midnight">{value}</dd>
     </div>
-  );
-}
-
-function Field(props: React.InputHTMLAttributes<HTMLInputElement> & { label: string }) {
-  const { label, name, ...rest } = props;
-  return (
-    <label className="block text-sm">
-      <span className="kk-label">{label}</span>
-      <input
-        {...rest}
-        name={name}
-        className="mt-1.5 block w-full border border-dune bg-linen px-3 py-2 text-sm text-midnight placeholder:text-ink-soft focus:border-cobalt focus:outline-none focus:ring-1 focus:ring-cobalt"
-      />
-    </label>
   );
 }
