@@ -44,7 +44,9 @@ module Api
     # Middleware like session, flash, cookies can be added back manually.
     # Skip views, helpers and assets when generating a new resource.
     config.api_only = true
-    # Sidekiq disabled — see CLAUDE.md "Re-enabling Sidekiq" to restore.
-    config.active_job.queue_adapter = :async
+    # Solid Queue (Postgres-backed) — workers run inside Puma via the
+    # solid_queue plugin (SOLID_QUEUE_IN_PUMA env var, see config/puma.rb).
+    # Overridden to :async in development and :test in test.
+    config.active_job.queue_adapter = :solid_queue
   end
 end

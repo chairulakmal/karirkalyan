@@ -26,6 +26,11 @@ Rails.application.configure do
   # Change to :null_store to avoid any caching.
   config.cache_store = :memory_store
 
+  # Run jobs inline-ish in dev (no Solid Queue worker needed alongside
+  # `rails server`). Set SOLID_QUEUE_IN_PUMA + remove this line to exercise
+  # the production path locally.
+  config.active_job.queue_adapter = :async
+
   # Print deprecation notices to the Rails logger.
   config.active_support.deprecation = :log
 

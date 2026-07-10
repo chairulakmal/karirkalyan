@@ -8,28 +8,29 @@ Full-stack job application tracker. Rails 8 API (`api/`) + Next.js 16 frontend (
 
 - **Backend:** Rails 8 API-only, Ruby 3.4.9 (mise), PostgreSQL 16, Devise + devise-jwt
 - **Frontend:** Next.js 16 App Router, Tailwind CSS, JWT in `httpOnly` cookie
-- **Infra:** Railway for deployment (Sidekiq + Redis disabled — see below)
+- **Jobs & cache:** Solid Queue + Solid Cache — Postgres-backed, single database, no
+  Redis/Sidekiq. Replaced Sidekiq/Redis to keep Railway to two services + one Postgres.
+- **Infra:** Railway for deployment
 
-## Re-enabling Sidekiq
+## Background jobs (Solid Queue)
 
-Sidekiq (and Redis) are disabled to reduce infra cost and complexity. To restore:
-
-1. **`api/Gemfile`** — uncomment `sidekiq`, `sidekiq-cron`, `redis`; run `bundle install`
-2. **`api/config/application.rb`** — change `queue_adapter` back to `:sidekiq`
-3. **`api/config/initializers/sidekiq.rb`** — uncomment the `configure_server` block
-4. **`api/config/routes.rb`** — restore the `Sidekiq::Web` mount (check git history)
-5. **`api/app/controllers/health_controller.rb`** — restore the `redis_ok?` check
-6. **`api/config/environments/production.rb`** — switch `cache_store` back to `:redis_cache_store`
-7. **`api/docker-compose.yml`** — uncomment the `redis` service and `redis_data` volume
-8. **Railway** — provision a Redis service and set `REDIS_URL` env var
-
-The `FollowUpReminderJob` cron (daily 23:15 UTC → 08:15 JST) and `FollowUpMailer` are
-preserved in code — they will resume working once the above steps are complete.
+- **Adapter:** `:solid_queue` in production (`config/application.rb`); `:async` in
+  development, `:test` in test.
+- **Workers run inside Puma** — `config/puma.rb` has `plugin :solid_queue if
+  ENV["SOLID_QUEUE_IN_PUMA"]`; that env var must be set on the Railway `api` service.
+  No separate worker service.
+- **Recurring jobs:** `config/recurring.yml` — `FollowUpReminderJob` daily at
+  08:15 JST (cron `15 8 * * * Asia/Tokyo`), plus hourly finished-job cleanup.
+- **Single-DB:** queue/cache tables live in the primary Postgres via a normal
+  migration; there are no `db/queue_schema.rb`/`db/cache_schema.rb` files and no
+  `connects_to`/`database:` config. Keep it that way unless the app outgrows it.
+- **Cache:** `:solid_cache_store` in production; Rack::Attack throttle counters go
+  through `Rails.cache`, so they're shared across Puma workers.
 
 ## Local Dev
 
 ```bash
-docker compose up -d        # postgres only (redis commented out while Sidekiq is disabled)
+docker compose up -d        # postgres only
 
 cd api && bundle install && bin/rails db:create db:migrate && bin/rails server  # :3001
 cd web && npm install && npm run dev                                            # :3000

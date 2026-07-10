@@ -1,0 +1,15 @@
+# Solid Queue recurring tasks (replaces the old sidekiq-cron schedule).
+# Loaded by the dispatcher; timezone is explicit in the cron expression.
+
+production:
+  # Daily follow-up reminders at 08:15 JST (was "15 23 * * *" UTC under
+  # sidekiq-cron — same wall-clock time for Tokyo users).
+  follow_up_reminders:
+    class: FollowUpReminderJob
+    schedule: "15 8 * * * Asia/Tokyo"
+
+  # Keep the jobs table from growing unbounded (single-DB setup — these rows
+  # live in the primary Postgres).
+  clear_solid_queue_finished_jobs:
+    command: "SolidQueue::Job.clear_finished_in_batches(sleep_between_batches: 0.3)"
+    schedule: every hour at minute 12
