@@ -1,4 +1,6 @@
 require "active_support/core_ext/integer/time"
+# Loaded explicitly: environment files run before autoloading is set up.
+require_relative "../../app/lib/allowed_hosts"
 
 Rails.application.configure do
   # Settings specified here will take precedence over those in config/application.rb.
@@ -74,14 +76,9 @@ Rails.application.configure do
 
   # DNS-rebinding protection. Production domain + Railway-issued preview/prod
   # subdomains + private-network hostnames for service-to-service calls.
-  # An additional host can be supplied at runtime via APP_HOST.
-  # Anchored (\A…\z) so the pattern must match the *entire* Host, not just a
-  # substring — an unanchored /.*\.railway\.app/ would also accept an attacker
-  # host like "foo.railway.app.evil.com".
-  config.hosts << "kk.chairulakmal.com"
-  config.hosts << /\A([a-z0-9-]+\.)+railway\.app\z/i
-  config.hosts << /\A([a-z0-9-]+\.)+railway\.internal\z/i
-  config.hosts << ENV["APP_HOST"] if ENV["APP_HOST"].present?
+  # An additional host can be supplied at runtime via APP_HOST. Patterns and the
+  # "don't anchor them" rationale live in AllowedHosts, which spec/lib covers.
+  config.hosts.concat(AllowedHosts.all)
 
   # Health check endpoint skips host authorization so the platform's prober
   # (which may use an internal hostname) keeps working.
