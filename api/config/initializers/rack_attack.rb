@@ -1,8 +1,9 @@
 # Rate-limit auth endpoints to defend against brute-force and account spam.
 #
-# Storage: Rails.cache — :redis_cache_store in prod (see config/environments/production.rb),
-# so throttle counters are shared across all Puma workers; :memory_store in dev,
-# :null_store in test (the throttling spec swaps in its own MemoryStore).
+# Storage: Rails.cache — :solid_cache_store in prod (Postgres-backed, see
+# config/environments/production.rb), so throttle counters are shared across all
+# Puma workers/processes; :memory_store in dev, :null_store in test (the
+# throttling spec swaps in its own MemoryStore).
 #
 # req.ip respects Rails' trusted-proxy handling, so behind Railway/Cloudflare the
 # real client IP is used (not the proxy's).

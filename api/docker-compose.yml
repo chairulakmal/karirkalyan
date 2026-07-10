@@ -12,15 +12,5 @@ services:
     volumes:
       - postgres_data:/var/lib/postgresql/data
 
-  # Redis is disabled — Sidekiq is not running. Uncomment to re-enable
-  # (see CLAUDE.md "Re-enabling Sidekiq").
-  # redis:
-  #   image: redis:8-alpine
-  #   ports:
-  #     - "6379:6379"
-  #   volumes:
-  #     - redis_data:/data
-
 volumes:
   postgres_data:
-  # redis_data:

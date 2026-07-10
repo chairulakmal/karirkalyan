@@ -18,8 +18,8 @@ where each fix landed.
 - [x] **Upload memory DoS** — `applications_controller.rb#application_params` calls
   `.read` before the 1 MB model validation; check `.size` first, and consider a global
   request-body cap (Thruster). *(fix/backend-hardening, PR #39)*
-- [ ] **Rate-limit counters are per-Puma-worker** — Rack::Attack uses `:memory_store` in
-  prod; move to a shared store (Solid Cache — see Stack below).
+- [x] **Rate-limit counters are per-Puma-worker** — Rack::Attack uses `:memory_store` in
+  prod; move to a shared store (Solid Cache — see Stack below). *(feat/solid-queue-cache)*
 - [ ] **No account-level brute-force backstop** — throttling is IP-only; add Devise
   `:lockable` or an email-keyed throttle.
 - [ ] **Login-CSRF residual on auth route handlers** — `web/app/api/auth/session|register`
@@ -48,10 +48,10 @@ where each fix landed.
 - [x] **Reminder timezone off-by-one** — `follow_up_reminder_job.rb` compares
   `DATE(follow_up_at)` in UTC; JST users get reminders a day early. Zone-aware day range +
   `config.time_zone`. *(fix/backend-hardening, PR #39)*
-- [ ] **Reminder feature is dead in prod** — no scheduler since Sidekiq was removed;
-  see Solid Queue under Stack.
-- [ ] **Reminder idempotency race** — `exists?`-then-`create!` isn't atomic; rescue
-  `ActiveRecord::RecordNotUnique` for true exactly-once.
+- [x] **Reminder feature is dead in prod** — no scheduler since Sidekiq was removed;
+  see Solid Queue under Stack. *(feat/solid-queue-cache)*
+- [x] **Reminder idempotency race** — `exists?`-then-`create!` isn't atomic; rescue
+  `ActiveRecord::RecordNotUnique` for true exactly-once. *(feat/solid-queue-cache)*
 
 ## UX
 
@@ -100,11 +100,12 @@ where each fix landed.
 
 ## Stack
 
-- [ ] **Adopt Solid Queue + Solid Cache instead of re-enabling Sidekiq/Redis** — runs on
+- [x] **Adopt Solid Queue + Solid Cache instead of re-enabling Sidekiq/Redis** — runs on
   the existing Postgres, zero new Railway services. One change fixes four findings:
   recurring `FollowUpReminderJob` (Solid Queue recurring tasks), shared Rack::Attack store
   (Solid Cache), durable `deliver_later`, and removes the dead-feature caveat.
   `puma.rb` already has `plugin :solid_queue if ENV["SOLID_QUEUE_IN_PUMA"]` waiting.
+  *(feat/solid-queue-cache — requires `SOLID_QUEUE_IN_PUMA=true` on the Railway api service)*
 
 ## Feature ideas
 
@@ -112,4 +113,4 @@ where each fix landed.
 - [ ] **Kanban board view** of the FSM states — demos the state machine far better than a list.
 - [ ] **Email verification** (Devise `:confirmable`).
 - [ ] **CSV export** of applications.
-- [ ] **Follow-up digest email** once Solid Queue lands (mailer already exists).
+- [ ] **Follow-up digest email** — Solid Queue now landed; the mailer already exists.

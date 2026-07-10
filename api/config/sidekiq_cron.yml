@@ -1,8 +1,0 @@
-# Sidekiq-cron schedule. Loaded by config/initializers/sidekiq.rb in the
-# Sidekiq server process only. Times are UTC (Railway runs in UTC).
-follow_up_reminder:
-  cron: "15 23 * * *"         # 23:15 UTC daily = 08:15 Asia/Tokyo, so the
-                              # reminder lands in the user's morning (JST).
-  class: "FollowUpReminderJob"
-  queue: default
-  description: "Enqueue daily follow-up reminders for applications due today"

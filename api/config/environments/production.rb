@@ -57,11 +57,10 @@ Rails.application.configure do
     enable_starttls_auto: true
   }
 
-  # Memory cache — Sidekiq/Redis is disabled so there is no shared Redis instance.
-  # Rack::Attack throttle counters are per-Puma-worker (not shared), which is
-  # acceptable at low traffic. Re-enable :redis_cache_store when Sidekiq is restored
-  # (see CLAUDE.md "Re-enabling Sidekiq").
-  config.cache_store = :memory_store
+  # Solid Cache — Postgres-backed shared cache (no Redis service needed).
+  # Rack::Attack throttle counters go through Rails.cache, so they are shared
+  # across all Puma workers/processes. Store options in config/cache.yml.
+  config.cache_store = :solid_cache_store
 
   # Enable locale fallbacks for I18n (makes lookups for any locale fall back to
   # the I18n.default_locale when a translation cannot be found).

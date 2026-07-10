@@ -22,10 +22,10 @@ A full-stack job application tracker — Rails 8 API + Next.js 16 frontend.
 | Audit trail | `TimelineEntry` written atomically with every status change |
 | Auth | Devise + devise-jwt with JTI revocation — stateless JWT with real logout |
 | Concurrency | Optimistic locking (`lock_version`) → `409 Conflict` |
-| Background jobs | Idempotency key pattern (at-least-once safe); Sidekiq disabled — jobs run via `:async` adapter in-process |
-| Email | ActionMailer over SMTP (Resend) — welcome email on sign-up + daily follow-up reminder job (currently inactive while Sidekiq is off) |
+| Background jobs | Solid Queue (Postgres-backed, runs inside Puma — no extra service); idempotency key pattern (at-least-once safe) |
+| Email | ActionMailer over SMTP (Resend) — welcome email on sign-up + daily follow-up reminder at 08:15 JST (Solid Queue recurring task) |
 | AI pre-fill | Paste a job URL → Claude Haiku 4.5 extracts company/role/notes for review before saving; server-side service, SSRF-guarded + rate-limited, reads Japanese postings natively |
-| Caching | `:memory_store` (Redis removed while Sidekiq is disabled; Rack::Attack throttle store is per-process) |
+| Caching | Solid Cache (Postgres-backed) — Rack::Attack throttle counters shared across all Puma workers, no Redis |
 | File storage | PostgreSQL `bytea`, 1 MB cap, PDF magic-byte validation |
 | Dashboard | Pure SQL aggregation — no N+1, no records loaded into Ruby |
 | API docs | rswag — request specs and OpenAPI spec share one source |
@@ -101,7 +101,7 @@ api/
   app/lib/application_fsm.rb              ← FSM: a TRANSITIONS array, no gem, read top to bottom
   app/services/applications/
     transition_service.rb                 ← Status change + audit row in one DB transaction
-  app/jobs/follow_up_reminder_job.rb      ← Idempotent Sidekiq job (idempotency_key pattern)
+  app/jobs/follow_up_reminder_job.rb      ← Idempotent recurring job (idempotency_key pattern)
   app/controllers/api/v1/
     applications_controller.rb            ← REST + transition + binary file download
     dashboard_controller.rb               ← Pure SQL aggregation — no N+1, no records loaded
@@ -138,7 +138,7 @@ Architecture rationale for every decision lives in [PLAN.md](PLAN.md).
 
 - **Backend:** Rails 8 API-only, Ruby 3.4.9, PostgreSQL 16, Devise + devise-jwt
 - **Frontend:** Next.js 16 App Router, Tailwind CSS
-- **Infra:** Docker Compose (local); Railway (production) — managed PostgreSQL; Redis/Sidekiq disabled
+- **Infra:** Docker Compose (local); Railway (production) — managed PostgreSQL; Solid Queue + Solid Cache on the same Postgres (no Redis)
 
 ---
 

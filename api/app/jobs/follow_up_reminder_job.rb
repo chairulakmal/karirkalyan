@@ -13,14 +13,22 @@ class FollowUpReminderJob < ApplicationJob
       key = "reminder-#{application.id}-#{Date.current}"
       next if TimelineEntry.exists?(idempotency_key: key)
 
-      TimelineEntry.create!(
-        application:     application,
-        actor:           application.user,
-        from_status:     application.status,
-        to_status:       application.status,
-        note:            "Follow-up reminder",
-        idempotency_key: key
-      )
+      begin
+        TimelineEntry.create!(
+          application:     application,
+          actor:           application.user,
+          from_status:     application.status,
+          to_status:       application.status,
+          note:            "Follow-up reminder",
+          idempotency_key: key
+        )
+      rescue ActiveRecord::RecordNotUnique
+        # exists?-then-create! isn't atomic: a concurrent run (e.g. an
+        # overlapping retry) can insert between the check and the create.
+        # The unique index on idempotency_key is the real guarantee — losing
+        # the race means the reminder is already handled, so skip the email.
+        next
+      end
 
       # The TimelineEntry above is the exactly-once anchor (unique idempotency
       # key). Email delivery is decoupled via deliver_later — a separate,
