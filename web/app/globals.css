@@ -12,6 +12,7 @@
   --color-ink-soft: #424b65;
   --color-saffron: #e8a04a;
   --color-saffron-2: #f0bc7a;
+  --color-danger: #96291d;
   --color-linen: #f7f3ea;
   --color-sand: #ece8df;
   --color-dune: #cfc8b8;
@@ -22,6 +23,13 @@
 
   --radius-card: 0;
   --radius-button: 0;
+
+  /* Motion, from tokens.css (--kk-ease / --kk-base). Overriding Tailwind's
+   * defaults means every bare `transition` utility already in the codebase
+   * picks up the brand curve — nobody has to remember `ease-brand`. */
+  --ease-brand: cubic-bezier(0.2, 0.6, 0.2, 1);
+  --default-transition-duration: 200ms;
+  --default-transition-timing-function: cubic-bezier(0.2, 0.6, 0.2, 1);
 }
 
 :root {
@@ -64,4 +72,47 @@ h1, h2, h3 {
   letter-spacing: 0.18em;
   text-transform: uppercase;
   color: var(--color-ink-soft);
+}
+
+/* Display heading — the hero, and nothing else.
+ *
+ * Fraunces is an optical-size variable font: `opsz` is not a size, it is how the
+ * letterforms are drawn *for* a size. The h1/h2/h3 rule above sets opsz 36,
+ * which is cut for headings — thin joins and open counters that look weak once
+ * the type is 60px+. At display sizes the 144 cut is the correct one, the same
+ * cut the wordmark uses, and the tracking has to come in to compensate. */
+.kk-display {
+  font-family: var(--font-serif);
+  font-variation-settings: "opsz" 144, "wght" 400;
+  letter-spacing: -0.035em;
+  line-height: 0.98;
+}
+
+/* Mono ordinal for numbered sections — the transition table's own vocabulary,
+ * borrowed for the page structure. */
+.kk-num {
+  font-family: var(--font-mono);
+  font-size: 12px;
+  letter-spacing: 0.1em;
+  color: var(--color-dune);
+  font-variant-numeric: tabular-nums;
+}
+
+/* One focus ring for the whole app, on the brand primary. Previously each
+ * interactive element re-declared its own, and anything that forgot fell back
+ * to the UA outline — invisible against sand. */
+:focus-visible {
+  outline: 2px solid var(--color-cobalt);
+  outline-offset: 2px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
 }

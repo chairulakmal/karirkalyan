@@ -1,9 +1,15 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
-import { redirect } from "next/navigation";
+import { getLocale, getTranslations } from "next-intl/server";
+import { getPathname, redirect } from "@/i18n/navigation";
 import { apiFetch } from "./api";
 import type { Application } from "./types";
+
+// next-intl's redirect/getPathname take the locale explicitly — a server action
+// has no component tree to infer it from. Both are unprefixed for `en` and
+// prefixed for `ja`, so a Japanese visitor lands back inside `/ja/*` instead of
+// being dumped on the English page.
 
 // A failed action; `status` is the upstream HTTP status when the failure came
 // from the API (absent for local validation failures). Callers key off it to
@@ -11,13 +17,43 @@ import type { Application } from "./types";
 export type ActionFailure = { ok: false; error: string; status?: number };
 export type ActionResult = { ok: true } | ActionFailure;
 
+// The API carries no machine-readable error code — only `{ error: "<English
+// sentence>" }` and an HTTP status. The status is the only part that can be
+// translated off, so an upstream failure is reported as the catalog entry for
+// its status; anything outside this set falls back to `errors.unknown`. Never
+// string-match the English sentence to recover a pseudo-code.
+const TRANSLATED_STATUSES = new Set([401, 403, 404, 409, 422, 429, 502, 503]);
+
+async function apiFailure(status: number): Promise<ActionFailure> {
+  const t = await getTranslations("errors");
+  const key = TRANSLATED_STATUSES.has(status) ? String(status) : "unknown";
+  return { ok: false, error: t(key), status };
+}
+
+// Local (pre-request) validation failure — no HTTP status to key on, so the
+// caller names the catalog entry directly.
+async function localFailure(key: string): Promise<ActionFailure> {
+  const t = await getTranslations("errors");
+  return { ok: false, error: t(key) };
+}
+
+// Revalidates the two pages a write can change. Only the caller's locale is
+// revalidated: every route is dynamically rendered (see the root layout), so
+// there is no shared Full Route Cache to purge — just the visitor's own router
+// cache, which only ever holds paths in the locale they are browsing.
+async function revalidateApplication(id: number) {
+  const locale = await getLocale();
+  revalidatePath(getPathname({ href: `/applications/${id}`, locale }));
+  revalidatePath(getPathname({ href: "/dashboard", locale }));
+}
+
 // Resolves only on failure — the success path ends in redirect(), which throws
 // and never returns. Typing it as ActionFailure keeps call sites honest.
 export async function createApplication(formData: FormData): Promise<ActionFailure> {
   const company = formData.get("company")?.toString().trim();
   const role = formData.get("role")?.toString().trim();
   if (!company || !role) {
-    return { ok: false, error: "Company and role are required" };
+    return localFailure("companyRoleRequired");
   }
 
   const body = new FormData();
@@ -58,10 +94,11 @@ export async function createApplication(formData: FormData): Promise<ActionFailu
     body,
   });
 
-  if (!res.ok) return { ok: false, error: res.error, status: res.status };
+  if (!res.ok) return apiFailure(res.status);
 
-  revalidatePath("/dashboard");
-  redirect(`/applications/${res.data.id}`);
+  const locale = await getLocale();
+  revalidatePath(getPathname({ href: "/dashboard", locale }));
+  redirect({ href: `/applications/${res.data.id}`, locale });
 }
 
 export type PrefillResult =
@@ -70,7 +107,7 @@ export type PrefillResult =
 
 export async function prefillFromUrl(url: string): Promise<PrefillResult> {
   const trimmed = url.trim();
-  if (!trimmed) return { ok: false, error: "Paste a job posting URL first." };
+  if (!trimmed) return localFailure("urlRequired");
 
   const res = await apiFetch<{
     company: string;
@@ -82,7 +119,7 @@ export async function prefillFromUrl(url: string): Promise<PrefillResult> {
     body: JSON.stringify({ url: trimmed }),
   });
 
-  if (!res.ok) return { ok: false, error: res.error };
+  if (!res.ok) return apiFailure(res.status);
   return { ok: true, ...res.data };
 }
 
@@ -98,10 +135,9 @@ export async function updateApplication(
     body: JSON.stringify({ application }),
   });
 
-  if (!res.ok) return { ok: false, error: res.error, status: res.status };
+  if (!res.ok) return apiFailure(res.status);
 
-  revalidatePath(`/applications/${id}`);
-  revalidatePath("/dashboard");
+  await revalidateApplication(id);
   return { ok: true };
 }
 
@@ -115,9 +151,8 @@ export async function transitionStatus(
     method: "PATCH",
     body: JSON.stringify({ status: to, lock_version: lockVersion, note: note ?? null }),
   });
-  if (!res.ok) return { ok: false, error: res.error, status: res.status };
-  revalidatePath(`/applications/${id}`);
-  revalidatePath("/dashboard");
+  if (!res.ok) return apiFailure(res.status);
+  await revalidateApplication(id);
   return { ok: true };
 }
 
@@ -128,7 +163,7 @@ export async function uploadFile(
 ): Promise<ActionResult> {
   const file = formData.get("file");
   if (!(file instanceof File) || file.size === 0) {
-    return { ok: false, error: "Choose a PDF file" };
+    return localFailure("chooseFile");
   }
 
   const upstream = new FormData();
@@ -139,17 +174,19 @@ export async function uploadFile(
     body: upstream,
   });
 
-  if (!res.ok) return { ok: false, error: res.error, status: res.status };
-  revalidatePath(`/applications/${id}`);
+  if (!res.ok) return apiFailure(res.status);
+  // Detail page only — an upload leaves the dashboard listing unchanged.
+  revalidatePath(getPathname({ href: `/applications/${id}`, locale: await getLocale() }));
   return { ok: true };
 }
 
 // Resolves only on failure — the success path ends in redirect(), which throws.
 export async function deleteApplication(id: number): Promise<ActionFailure> {
   const res = await apiFetch(`/applications/${id}`, { method: "DELETE" });
-  if (!res.ok) return { ok: false, error: res.error, status: res.status };
-  revalidatePath("/dashboard");
-  redirect("/dashboard");
+  if (!res.ok) return apiFailure(res.status);
+  const locale = await getLocale();
+  revalidatePath(getPathname({ href: "/dashboard", locale }));
+  redirect({ href: "/dashboard", locale });
 }
 
 type ApplicationInput = {

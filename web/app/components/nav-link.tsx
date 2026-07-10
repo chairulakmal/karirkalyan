@@ -1,9 +1,11 @@
 "use client";
 
-import Link from "next/link";
-import { usePathname } from "next/navigation";
+import { Link, usePathname } from "@/i18n/navigation";
 
 // Header nav link that marks the page you're on (aria-current + underline).
+// Both imports come from `@/i18n/navigation`, not `next/*`: the Link keeps the
+// visitor inside their locale, and this `usePathname` returns the path with the
+// locale prefix already stripped, so `href` comparison needs no special case.
 export function NavLink({ href, children }: { href: string; children: React.ReactNode }) {
   const pathname = usePathname();
   const active = pathname === href;

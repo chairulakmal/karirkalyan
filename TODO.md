@@ -4,9 +4,10 @@ Open work only. Shipped work lives in [`CHANGELOG.md`](CHANGELOG.md).
 
 **Current release: `v1.0.1`** — tagged 2026-07-10 at `2980300`. Security review + fixes.
 **Next release: `v1.1.0`** — Japanese UI (i18n) and a homepage + about/docs revamp.
+**Then `v1.1.1`** — mobile view improvements.
 **After that: `v1.2.0`** — the Kanban board view.
 
-Everything below is post-1.0.1. The v1.1.0 and v1.2.0 items are scoped; the backlog is not.
+Everything below is post-1.0.1. The v1.1.0, v1.1.1 and v1.2.0 items are scoped; the backlog is not.
 
 ---
 
@@ -36,66 +37,136 @@ user-visible, which is the point — the debt in the backlog is not.
 **Do i18n first.** It decides how copy is stored, and writing new marketing copy before the
 message catalogs exist means authoring it twice.
 
-### Japanese UI (i18n)
+### Japanese UI (i18n) — done, pending a PR
 
-No i18n dependency exists yet and `web/app/layout.tsx:74` hardcodes `lang="en"`. Six pages
-(`web/app/**/page.tsx`), so the copy surface is small; the work is in the plumbing, not the
-volume of strings.
+All items below are landed on `feat/i18n-japanese-ui` and verified against the dev server: `/`
+serves English, `/ja` serves Japanese, `/en/*` `307`s to the unprefixed canonical path. The
+plumbing is described in `SPEC.md`; the routing decisions are recorded there too.
 
-- [ ] **Pick and install a library.** `next-intl` is the usual fit for App Router. Confirm
-  the version supports Next.js 16 before committing — check `node_modules/next/dist/docs/`
-  for the current i18n guidance rather than assuming, per `web/AGENTS.md`.
-- [ ] **Decide routing strategy** — `/ja/*` path prefix vs. cookie-only locale. Path prefix
-  is better for SEO and links; it means updating the `config.matcher` in `web/proxy.ts` so
-  route guards and the crawler-metadata exclusions still fire on prefixed paths.
+What is left is not code: **open the PR**, and settle the `phone_screen` translation flagged
+below.
+
+- [x] **Pick and install a library.** `next-intl@4.13.2` — declares `next: ^16.0.0` in its peer
+  dependencies, so Next.js 16 support is stated, not inferred.
+- [x] **Decide routing strategy** — `localePrefix: "as-needed"`: English unprefixed, Japanese at
+  `/ja/*`. No existing URL moves. `/en/*` self-corrects — next-intl `307`s it to the unprefixed
+  path (verified in `middleware.js:131-133`), so each page keeps one canonical address.
+  `config.matcher` needs **no change**: it excludes by prefix segment and `/ja` collides with none
+  of them. The auth guard must run on the locale-stripped pathname so `PUBLIC_PATHS` stays three
+  entries rather than six. Recorded in `SPEC.md`.
   *Note: the CSP nonce work already forces dynamic rendering app-wide via `await connection()`
   in the root layout, so locale routing costs no static optimization — there is none left to lose.*
-- [ ] **Extract copy into message catalogs.** Start with the status labels and help text
-  (`web/app/lib/format.ts`, `web/app/components/status-help.tsx`) — they are the highest-value
-  strings and the ones a Japanese reviewer will look at first.
-- [ ] **Translate the 13 FSM state names** with care. `phone_screen`, `final_round`, `ghosted`
-  and `withdrawn` have no clean one-word Japanese equivalent; pick terms that match how
-  Japanese job boards actually label these stages, not literal translations.
-- [ ] **Set `lang` dynamically** from the active locale, and add a locale switcher.
-- [ ] **Server-side error messages** — Rails returns English validation/error strings that the
-  frontend renders verbatim. **Map them in the web layer**, keyed off the error code and HTTP
-  status; leave the API English-only. Translating in Rails would mean an i18n dependency,
-  locale negotiation on every request, and a second message catalog to keep in sync — for
-  strings only the frontend displays. Unlike the FSM table, nothing is duplicated by mapping
-  client-side: the API's error codes stay the single source of truth and `web/` only supplies
-  their presentation, which is what a message catalog is for.
+- [x] **Extract copy into message catalogs.** Every page, form, and component reads from
+  `messages/{en,ja}.json`; `format.ts` holds no copy at all now. The only hardcoded English
+  left in `.tsx` is `global-not-found.tsx` — an unmatched path carries no locale, so it cannot
+  be translated. `en.json` and `ja.json` are key-for-key identical.
+- [x] **Translate the 13 FSM state names.** In the `status` namespace as `label.*` and
+  `description.*`.
+  *`phone_screen` → `カジュアル面談` was questioned and **kept** (2026-07-10). It names a
+  pre-selection chat rather than a 選考 stage, which is a slight mismatch with where the state
+  sits, but it is the term a Japanese jobseeker actually recognises. Recognition beat precision.*
+- [x] **Set `lang` dynamically** from the active locale (`[locale]/layout.tsx`), and add a
+  locale switcher. The switcher is a two-locale toggle showing only the inactive language;
+  mounted in the app shell, the marketing header, and the auth layout. See `SPEC.md`.
+- [x] **Server-side error messages** — mapped in `web/` off the HTTP status, API left
+  English-only. Two mapping sites, because the auth form calls route handlers with `fetch`
+  rather than going through a server action: `apiFailure()`/`localFailure()` in
+  `app/lib/actions.ts`, and `errorMessage()` in `(auth)/sign-in/sign-in-form.tsx`. The English
+  sentence from the API is discarded, never parsed. A `422`'s per-field detail is therefore
+  **lost**, not left in English — it comes back when the error codes land in v1.2.0.
+  *Corrected 2026-07-10: this item used to say "keyed off the error code and HTTP status." There
+  is no error code. Rails returns `{ error: "<English sentence>" }` and a status — nothing else —
+  and `web/app/lib/api.ts:109` passes the sentence straight through. Adding a code is an `api/`
+  change, so it moved to v1.2.0 (below). Status-keyed mapping covers `401`, `409`, `422`, `429`,
+  `502`, `503`; per-field `422` text (`"Company can't be blank"`) stays English until the codes
+  land. Do **not** string-match the English sentences to recover a code — that is a prose parser
+  and it breaks on the first reword. See the decisions log in `SPEC.md`.*
 
 ### Homepage + about/docs revamp
 
 Depends on i18n landing first — every string below should be authored into the message
 catalogs bilingually, not written in English and retrofitted.
 
-Today `web/app/page.tsx` is a single-file landing page: hero, three feature cards
-(FSM-backed / resume per role / follow-up reminders), and a footer. There is no about or
-docs page at all, and the footer's "API docs" link points off-site to the raw rswag UI on
-the Railway domain (`API_DOCS_URL` in `web/app/lib/links.ts`).
+- [x] **Decided (2026-07-10): reframe the hero at the reviewer.** The homepage argues that this
+  is a job tracker *built on a finite state machine* — 13 states, an immutable audit trail, the
+  stack named outright. The primary call to action is "Read the architecture" (→ `/about`), with
+  the demo second. The jobseeker framing ("without the spreadsheet") is retired.
+  **Consequence to hold onto:** the demo login is no longer the obvious next action, so `/about`
+  now has to carry the visit. It cannot be a stack list — it is the page the whole site points
+  at. Build it before, or with, the hero; a hero whose main CTA 404s is worse than the old one.
+- [x] **Rewrote the hero** (2026-07-10) — `app/[locale]/page.tsx`, both catalogs. Header nav is
+  About / Sign in / locale switcher; the hero names the stack; the cards are the transition
+  table, the immutable history, and Postgres-backed jobs.
+- [x] **Built the `/about` page** (2026-07-10) — four decisions, each stated as the cheaper
+  alternative it rejected: why Rails for a TS developer, why a PORO FSM over a state-machine
+  gem, why Solid Queue instead of Sidekiq/Redis, why `bytea` over object storage.
+  It is an `OPEN_PATHS` entry in `proxy.ts` — it renders with *or* without a session, because
+  bouncing a signed-in reader to `/dashboard` would hide the page from the people most likely
+  to read it.
+- [x] **Built the in-app `/docs` page** (2026-07-10) — auth, per-user scoping, the one-string
+  error shape, cursor pagination, and the endpoint table, then a link out to the rswag UI.
+  Every "API docs" link in the app (homepage footer, `/about`, and the signed-in "For
+  reviewers" footer) now points here rather than off-site; `API_DOCS_URL` survives as the one
+  outbound link on this page. Also an `OPEN_PATHS` entry.
+  Endpoint methods and paths are code and stay untranslated — only the sentence beside each.
+- [x] **The homepage will need a real design pass, not a copy edit.** *(2026-07-10)* There is no
+  `frontend-design` skill installed — that line was aspirational — so the direction came from the
+  real brand book in `design/assets/tokens.css` instead. Three of its decisions had never reached
+  the app: the motion tokens (now Tailwind's `--default-transition-*`, so every existing bare
+  `transition` inherits the brand curve), the display type cut (Fraunces `opsz 144` via
+  `.kk-display` — the global `h1,h2,h3` rule's `opsz 36` is a heading cut that goes weak past 60px),
+  and saffron, reserved for "offers, celebratory" and unused on every marketing page.
+  The biggest gap was argument, not aesthetics: the hero claimed a finite state machine and showed
+  nothing. `pipeline-diagram.tsx` now draws one — and saffron finally appears, on the `offer` and
+  `accepted` chips. It is an **illustration**, not a copy of the 33-edge table; it names
+  `api/app/lib/application_fsm.rb` as the authority, and reuses `statusBadgeClass` plus the `status`
+  catalog so the vocabulary keeps one home. `/about` numbers its four decisions `01`–`04` because
+  the lede promises four; `/docs` colours the verb by risk, with `DELETE` in the same red
+  `format.ts` gives the terminal-negative statuses. Also: one global cobalt `:focus-visible` ring,
+  and a `prefers-reduced-motion` block.
+- [x] **Wire up the SEO surfaces** (2026-07-11) — `web/app/sitemap.ts` now derives entries for
+  all five public pages (`/`, `/about`, `/docs`, `/sign-up`, `/sign-in`) with per-locale
+  `alternates` (hreflang + `x-default`) via `getPathname`, so the prefix rule has one home.
+  The `jsonLd` blob stays local to `page.tsx` — no second page needs it yet.
+- [x] **Fix `web/public/llms.txt`** — Sidekiq/Redis 8 replaced with Solid Queue + Solid Cache
+  in both the feature list and the stack, and the Railway line no longer claims a managed Redis.
+  The FSM state list stays (an LLM reading this file benefits from it) but now says it is a
+  summary and names `api/app/lib/application_fsm.rb` as the authority, and no longer implies the
+  pipeline is linear. Add the bilingual UI here once i18n is merged and deployed — the file
+  describes production, not a branch.
 
-- [ ] **Decide what the homepage is arguing.** It currently sells the app to a jobseeker
-  ("without the spreadsheet"). The actual audience is a hiring reviewer in Tokyo. Those want
-  different pages — either commit to the product framing and let an about page carry the
-  engineering story, or reframe the hero. Don't try to do both in one hero.
-- [ ] **Build an `/about` page** — the engineering narrative that `SPEC.md` already tells
-  well: why Rails for a TS developer, why a PORO FSM over a state-machine gem, why Solid
-  Queue instead of Sidekiq/Redis, why `bytea` over object storage. This is the page that does
-  the portfolio work; the homepage only has to get people to it.
-- [ ] **Build an in-app `/docs` page** rather than deep-linking the raw rswag UI. Off-site
-  Swagger on a `*.up.railway.app` domain reads as unfinished, and it drops the visitor out of
-  the app's design system. Keep the rswag UI reachable, but link to it from a docs page that
-  frames the API instead of making it the destination.
-- [ ] **The homepage will need a real design pass, not a copy edit.** The current page is a
-  competent template. Treat aesthetic direction as part of the work — the frontend-design
-  skill is the right starting point.
-- [ ] **Wire up the SEO surfaces.** `web/app/sitemap.ts` hardcodes three URLs (`/`, `/sign-up`,
-  `/sign-in`); new pages must be added there, and locale-prefixed variants too once i18n lands.
-  The `jsonLd` blob in `page.tsx` should move somewhere reusable if a second page needs it.
-- [ ] **Fix `web/public/llms.txt`** — it still says reminders run on "idempotent **Sidekiq**
-  background jobs". Sidekiq was removed in v1.0.0 when Solid Queue landed. It also hardcodes
-  the FSM state list, which will drift; regenerate or annotate it.
+---
+
+## v1.1.1 — Mobile view improvements
+
+Like v1.1.0, this is **`web/`-only**. A patch release rather than a minor one because it changes
+no behaviour and adds no page — it makes the pages that exist usable on a phone.
+
+It comes *after* the homepage revamp deliberately. Responsive work on a page that is about to be
+redesigned is thrown away twice: once when the hero changes, once when `/about` and `/docs`
+arrive. Land the layouts, then fit them to small screens.
+
+Japanese matters here in a way it does not on desktop. Japanese sets no wider than English at the
+same font size but wraps on entirely different rules, and the FSM status labels are the longest
+strings in the app. A badge row that fits in English can overflow in Japanese, so **check both
+locales at every breakpoint** — that is the reason this release follows i18n rather than
+preceding it.
+
+- [ ] **Audit before writing any CSS.** Walk every page at 375px (iPhone SE) and 390px, in both
+  locales, and write down what actually breaks. The list below is a prior, not a finding — no
+  responsive audit has been run since the pages were built, and the app already uses `md:`
+  breakpoints in places, so some of this may already be fine. Do not fix what is not broken.
+- [ ] **The dashboard application list** is the primary suspect: it carries a status badge, a
+  company name, a job board label, and a relative timestamp on one row. Decide whether the row
+  stacks or the metadata collapses behind the card; do not shrink the type until it fits.
+- [ ] **The application detail page** — the transition buttons are a horizontal row of up to
+  several states, and the details editor is a label/value grid. Both assume width.
+- [ ] **Tap targets.** The locale switcher, the transition buttons, and the delete button are
+  all styled for a cursor. 44×44px is the floor.
+- [ ] **The nav in the app shell** puts dashboard, new, sign-out, and the locale switcher on one
+  line. Something gives at 375px.
+- [ ] **Verify no page scrolls horizontally.** A single overflowing element does this to the
+  whole document, and it is the most common way a desktop-first layout fails on a phone.
 
 ---
 
@@ -105,8 +176,16 @@ Columns are FSM states, cards are applications, and a drag between columns is a
 `PATCH /api/v1/applications/:id/transition` call. It demos the state machine far better than a
 list does.
 
-**This release opens with an `api/` change, which is why it is not v1.1.0.** Land that change
-in its own PR, on its own, before any board component is written. Do not fold it into a UI PR.
+**This release opens with `api/` changes, which is why they are not v1.1.0.** Land them in their
+own PR, on their own, before any board component is written. Do not fold them into a UI PR.
+
+- [ ] **Add machine-readable error codes to the API.** Deferred here from v1.1.0's i18n work, which
+  could not localize per-field validation errors without one. Every Rails error is currently
+  `{ error: "<English sentence>" }` + a status; add a stable `code` (`stale_record`,
+  `invalid_credentials`, `validation_failed` with a `field`) alongside the existing `error` string,
+  so `web/` can key its message catalog off the code instead of the status. Additive — keep `error`
+  so nothing breaks. Then narrow the status-keyed fallbacks added in v1.1.0. Same PR as the
+  transition table below: one `api/` diff, one rswag regeneration, one security re-read.
 
 - [ ] **Expose the transition table from the API.** The board must know which drops are legal,
   and `ApplicationFSM::TRANSITIONS` is the only source of truth. It is *not* a linear pipeline
@@ -154,9 +233,6 @@ Verified against the code on 2026-07-10 — all still hold.
 
 ### UI & accessibility
 
-- [ ] **Danger colors bypass the token system** — 25 improvised `red-*` Tailwind utilities across
-  `web/app`, and no `--color-danger` anywhere. Add the token to `design/assets/tokens.css` +
-  `globals.css` and migrate.
 - [ ] **No dark mode** — `web/app/globals.css:28` hardcodes `color-scheme: light` while dark icon
   assets exist in `design/`. Decide to ship it or delete the unused assets; leaving both is
   the worst option.
