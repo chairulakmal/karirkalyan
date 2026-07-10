@@ -42,12 +42,14 @@ No i18n dependency exists yet and `web/app/layout.tsx:74` hardcodes `lang="en"`.
 (`web/app/**/page.tsx`), so the copy surface is small; the work is in the plumbing, not the
 volume of strings.
 
-- [ ] **Pick and install a library.** `next-intl` is the usual fit for App Router. Confirm
-  the version supports Next.js 16 before committing — check `node_modules/next/dist/docs/`
-  for the current i18n guidance rather than assuming, per `web/AGENTS.md`.
-- [ ] **Decide routing strategy** — `/ja/*` path prefix vs. cookie-only locale. Path prefix
-  is better for SEO and links; it means updating the `config.matcher` in `web/proxy.ts` so
-  route guards and the crawler-metadata exclusions still fire on prefixed paths.
+- [x] **Pick and install a library.** `next-intl@4.13.2` — declares `next: ^16.0.0` in its peer
+  dependencies, so Next.js 16 support is stated, not inferred.
+- [x] **Decide routing strategy** — `localePrefix: "as-needed"`: English unprefixed, Japanese at
+  `/ja/*`. No existing URL moves. `/en/*` self-corrects — next-intl `307`s it to the unprefixed
+  path (verified in `middleware.js:131-133`), so each page keeps one canonical address.
+  `config.matcher` needs **no change**: it excludes by prefix segment and `/ja` collides with none
+  of them. The auth guard must run on the locale-stripped pathname so `PUBLIC_PATHS` stays three
+  entries rather than six. Recorded in `SPEC.md`.
   *Note: the CSP nonce work already forces dynamic rendering app-wide via `await connection()`
   in the root layout, so locale routing costs no static optimization — there is none left to lose.*
 - [ ] **Extract copy into message catalogs.** Start with the status labels and help text
@@ -58,12 +60,15 @@ volume of strings.
   Japanese job boards actually label these stages, not literal translations.
 - [ ] **Set `lang` dynamically** from the active locale, and add a locale switcher.
 - [ ] **Server-side error messages** — Rails returns English validation/error strings that the
-  frontend renders verbatim. **Map them in the web layer**, keyed off the error code and HTTP
-  status; leave the API English-only. Translating in Rails would mean an i18n dependency,
-  locale negotiation on every request, and a second message catalog to keep in sync — for
-  strings only the frontend displays. Unlike the FSM table, nothing is duplicated by mapping
-  client-side: the API's error codes stay the single source of truth and `web/` only supplies
-  their presentation, which is what a message catalog is for.
+  frontend renders verbatim. **Map them in the web layer keyed off the HTTP status**, and leave
+  the API English-only.
+  *Corrected 2026-07-10: this item used to say "keyed off the error code and HTTP status." There
+  is no error code. Rails returns `{ error: "<English sentence>" }` and a status — nothing else —
+  and `web/app/lib/api.ts:109` passes the sentence straight through. Adding a code is an `api/`
+  change, so it moved to v1.2.0 (below). Status-keyed mapping covers `401`, `409`, `422`, `429`,
+  `502`, `503`; per-field `422` text (`"Company can't be blank"`) stays English until the codes
+  land. Do **not** string-match the English sentences to recover a code — that is a prose parser
+  and it breaks on the first reword. See the decisions log in `SPEC.md`.*
 
 ### Homepage + about/docs revamp
 
@@ -105,8 +110,16 @@ Columns are FSM states, cards are applications, and a drag between columns is a
 `PATCH /api/v1/applications/:id/transition` call. It demos the state machine far better than a
 list does.
 
-**This release opens with an `api/` change, which is why it is not v1.1.0.** Land that change
-in its own PR, on its own, before any board component is written. Do not fold it into a UI PR.
+**This release opens with `api/` changes, which is why they are not v1.1.0.** Land them in their
+own PR, on their own, before any board component is written. Do not fold them into a UI PR.
+
+- [ ] **Add machine-readable error codes to the API.** Deferred here from v1.1.0's i18n work, which
+  could not localize per-field validation errors without one. Every Rails error is currently
+  `{ error: "<English sentence>" }` + a status; add a stable `code` (`stale_record`,
+  `invalid_credentials`, `validation_failed` with a `field`) alongside the existing `error` string,
+  so `web/` can key its message catalog off the code instead of the status. Additive — keep `error`
+  so nothing breaks. Then narrow the status-keyed fallbacks added in v1.1.0. Same PR as the
+  transition table below: one `api/` diff, one rswag regeneration, one security re-read.
 
 - [ ] **Expose the transition table from the API.** The board must know which drops are legal,
   and `ApplicationFSM::TRANSITIONS` is the only source of truth. It is *not* a linear pipeline

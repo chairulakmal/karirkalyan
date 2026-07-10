@@ -469,6 +469,7 @@ STARTTLS port `2587`. The `From:` domain must be verified in Resend first.
 | JWT in `httpOnly` cookie | `localStorage` | Token never touches client JS — XSS-proof |
 | Tailwind CSS v4 | — | Utility-first; no UI library, no form library, no state library |
 | Server components + server actions | Client-side data fetching | The token stays server-side by construction |
+| `next-intl` | `react-i18next`, hand-rolled | App Router–native (RSC message catalogs, no client bundle for server copy); declares `next: ^16` |
 
 #### Next.js 16 vs Vite
 
@@ -520,9 +521,12 @@ Next.js 16 renamed `middleware.ts` → `proxy.ts`; a `middleware.ts` file is **i
 function named `proxy`.
 
 It redirects `/` to `/dashboard` or `/sign-in` on cookie presence, protects app routes, and bounces
-authenticated users away from the auth pages. `config.matcher` **must** exclude `/robots.txt`,
-`/sitemap.xml`, and `/llms.txt`, or crawlers get a `307` to sign-in and the whole SEO surface
-becomes unreachable.
+authenticated users away from the auth pages. Authorization is presence of the `session` cookie —
+there are no roles. `config.matcher` **must** exclude `/robots.txt`, `/sitemap.xml`, and
+`/llms.txt`, or crawlers get a `307` to sign-in and the whole SEO surface becomes unreachable.
+
+It also resolves the locale and applies next-intl's rewrite/redirect before the auth check, so the
+guard always sees a locale-stripped pathname. See the i18n section below.
 
 `proxy.ts` also sets the CSP. The policy is per-request nonce-based
 (`script-src 'self' 'nonce-…' 'strict-dynamic'`), with no `'unsafe-inline'`; development keeps
@@ -531,17 +535,72 @@ root layout opts the whole app into dynamic rendering**, so every page's scripts
 There is consequently no static optimization left to lose — which is why locale-prefixed routing in
 v1.1.0 costs nothing.
 
-### i18n — planned for v1.1.0, not yet built
+### i18n — `next-intl`, English and Japanese
 
-There is no i18n dependency, and `app/layout.tsx` hardcodes `lang="en"`. When it lands:
+Locales are `en` (default) and `ja`. Copy lives in ICU message catalogs at `web/messages/{en,ja}.json`.
 
-- Locale routing must update `config.matcher` in `proxy.ts` so guards and crawler exclusions still
-  fire on prefixed paths.
-- **Rails stays English-only.** Error strings are mapped to localized copy in the web layer, keyed
-  off error code and status. The API's codes remain the source of truth; `web/` supplies
-  presentation. Translating in Rails would mean a second message catalog to keep in sync.
+#### URL shape — `ja` is prefixed, `en` is not
 
-See `TODO.md` for the full scope.
+`localePrefix: "as-needed"`. English keeps the bare paths (`/`, `/dashboard`, `/about`); Japanese is
+prefixed (`/ja`, `/ja/dashboard`, `/ja/about`). No existing URL moved when i18n landed, which is why
+this shape was chosen over prefixing both locales.
+
+`/en/*` is not a 404 and is not a second canonical URL for the same page: next-intl redirects it to
+the unprefixed path (`307`, query string preserved). So the English page has exactly one address,
+which is what the sitemap and `hreflang` advertise.
+
+Locale for an unprefixed path resolves from the `NEXT_LOCALE` cookie, then `Accept-Language`, then
+the default.
+
+#### Routing internals
+
+Pages live under `app/[locale]/`. Route handlers (`app/api/**`) and the crawler files
+(`robots.ts`, `sitemap.ts`, `manifest.webmanifest`) stay outside it — they are locale-independent,
+and a locale segment would break their fixed paths.
+
+`proxy.ts` composes two concerns in one pass, in this order:
+
+1. next-intl's middleware resolves the locale and produces the rewrite (`/dashboard` → `/en/dashboard`)
+   or redirect (`/en/dashboard` → `/dashboard`).
+2. The auth guard runs against the **locale-stripped** pathname, so `PUBLIC_PATHS` stays a list of
+   three entries rather than six, and `/ja/dashboard` is protected exactly as `/dashboard` is.
+3. The CSP with its per-request nonce is set on whatever response comes out of 1 and 2 — including
+   redirects, which must carry it too.
+
+`config.matcher` is unchanged: it excludes by *prefix segment* (`api`, `_next`, …) and a `/ja` prefix
+does not collide with any exclusion. The crawler exclusions (`robots.txt`, `sitemap.xml`,
+`llms.txt`) keep working because those paths are never locale-prefixed.
+
+#### Server-side error messages — keyed on HTTP status, not error code
+
+**Rails stays English-only, and `web/` localizes by HTTP status.**
+
+The API has no machine-readable error code. Every failure is `{ error: "<English sentence>" }` plus a
+status (`application_controller.rb:10,14`, `applications_controller.rb:62,64,66,81,91`), and
+`extractError` (`web/app/lib/api.ts:109`) hands that sentence to the UI verbatim. So `web/` maps
+**status → localized copy**: `401`, `409`, `422`, `429`, `502`, `503` each get a catalog entry.
+
+This is a deliberate trade, not an oversight — see the decisions log entry below. The consequence to
+know: a `422` carrying a per-field `errors.full_messages` string (`"Company can't be blank"`) cannot
+be localized this way, because the status alone does not say which field failed. Those remain
+English. In practice the common validation paths never reach Rails — `actions.ts` rejects empty
+company/role client-side first — so the English residue is the uncommon case.
+
+Localizing *in Rails* was rejected for the original reason: it would mean an i18n dependency, locale
+negotiation on every request, and a second message catalog to keep in sync, for strings only the
+frontend ever displays.
+
+#### Locale-sensitive formatting
+
+`Intl.RelativeTimeFormat` and `toLocaleDateString` in `app/lib/format.ts` take the active locale
+rather than the hardcoded `"en"`. `<html lang>` and OpenGraph `locale` follow the active locale too.
+
+#### What is not translated
+
+Job-board brand names (`BOARD_LABELS`), schema.org enum values in the `jsonLd` blob, and the
+`KarirKalyan` wordmark.
+
+See `TODO.md` for remaining scope.
 
 ---
 
@@ -694,6 +753,29 @@ because extraction is a small job — a larger model would spend money for no be
 the alternatives for native Japanese comprehension, which is what makes the feature useful for a
 Tokyo job search. Degrades gracefully: with no API key the endpoint returns `503` and the rest of
 the app is unaffected.
+
+### Error localization keyed on HTTP status, not on an error code
+
+The obvious design is for Rails to return a stable machine-readable code (`stale_record`,
+`invalid_credentials`) and for `web/` to look that code up in a message catalog. The API's codes stay
+the single source of truth, `web/` supplies presentation, and nothing is duplicated.
+
+**That design was specified before anyone checked the response shape, and the shape does not support
+it.** Rails returns a free-text English sentence and an HTTP status — there is no code, anywhere.
+Adding one is an `api/` change, and v1.1.0 is `web/`-only by design (see `TODO.md`).
+
+Rather than break the boundary for a frontend release, or invent a code by string-matching English
+sentences in `web/` — which is a parser for prose, and breaks the first time someone rewords a
+validation message — v1.1.0 localizes on the status. Coarse, but every string it produces is correct,
+and the two errors users actually see (`401` bad credentials, `409` stale `lock_version`) are exactly
+the ones a status distinguishes cleanly.
+
+The cost is per-field `422` text staying English. The fix is real error codes, and it belongs in
+**v1.2.0**, which already opens with an `api/` change for the FSM transition table. One `api/` PR,
+two reasons.
+
+The general lesson is the one this file exists to enforce: a spec that describes a mechanism nobody
+verified is a bug in the spec, not a requirement on the code.
 
 ### No Company / Platform / Tag models
 
