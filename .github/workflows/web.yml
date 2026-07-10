@@ -10,8 +10,57 @@ defaults:
     working-directory: web
 
 jobs:
-  check:
-    name: Lint, typecheck & build
+  # See api.yml for why this exists: a skipped required check blocks the push,
+  # so path filtering happens here rather than on the workflow trigger.
+  changes:
+    name: Detect changes
+    runs-on: ubuntu-latest
+    outputs:
+      code: ${{ steps.filter.outputs.code }}
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+
+      - name: Classify changed files
+        id: filter
+        working-directory: .
+        run: |
+          set -euo pipefail
+
+          if [ "${{ github.event_name }}" = "pull_request" ]; then
+            files=$(git diff --name-only \
+              "origin/${{ github.base_ref }}...${{ github.event.pull_request.head.sha }}")
+          else
+            before="${{ github.event.before }}"
+            # First push to a branch, or a force-push: no reliable base. Run everything.
+            if [ -z "$before" ] || [ "$before" = "0000000000000000000000000000000000000000" ] \
+               || ! git cat-file -e "$before^{commit}" 2>/dev/null; then
+              echo "code=true" >> "$GITHUB_OUTPUT"
+              exit 0
+            fi
+            files=$(git diff --name-only "$before" "${{ github.sha }}")
+          fi
+
+          echo "Changed files:"
+          printf '%s\n' "$files" | sed 's/^/  /'
+
+          # Anything not on this list is treated as code, so an unrecognised path
+          # errs toward running CI rather than skipping it.
+          non_docs=$(printf '%s\n' "$files" \
+            | grep -vE '(\.md$|^LICENSE$|^notes/|^web/public/llms\.txt$)' || true)
+
+          if [ -n "$non_docs" ]; then
+            echo "code=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "code=false" >> "$GITHUB_OUTPUT"
+          fi
+
+  verify:
+    name: Next lint, typecheck & build
+    needs: changes
+    if: needs.changes.outputs.code == 'true'
     runs-on: ubuntu-latest
     env:
       # Build-time placeholder; real value comes from Railway in production.
@@ -42,8 +91,8 @@ jobs:
 
   e2e:
     name: Playwright E2E
-    if: github.event_name == 'push'
-    needs: check
+    needs: [changes, verify]
+    if: github.event_name == 'push' && needs.changes.outputs.code == 'true'
     runs-on: ubuntu-latest
 
     services:
@@ -106,3 +155,30 @@ jobs:
 
       - name: Run E2E tests
         run: npm run test:e2e
+
+  # The branch ruleset requires this exact context name. It must always run and
+  # always report, so it is `if: always()` and never path-filtered.
+  gate:
+    name: Lint, typecheck & build
+    needs: [changes, verify]
+    if: always()
+    runs-on: ubuntu-latest
+    steps:
+      - name: Report result
+        working-directory: .
+        run: |
+          set -euo pipefail
+          changes="${{ needs.changes.result }}"
+          verify="${{ needs.verify.result }}"
+          echo "changes=$changes verify=$verify"
+
+          if [ "$changes" != "success" ]; then
+            echo "::error::Change detection failed; refusing to report green."
+            exit 1
+          fi
+
+          case "$verify" in
+            success) echo "Web checks passed." ;;
+            skipped) echo "Docs-only change; web checks not required." ;;
+            *)       echo "::error::Web checks did not pass (result: $verify)."; exit 1 ;;
+          esac

@@ -41,6 +41,12 @@ repository role has `bypass_mode: always`, so Akmal can push straight to `main` 
 what makes the docs row above possible. The bypass applies to *every* rule, so the table is
 still discipline rather than a wall: don't reach for it outside the docs row.
 
+CI is path-aware so a docs commit doesn't pay for a full Rails suite and Next build. Both
+workflows split into `changes` → `verify` → `gate`. **`gate` owns the required context name
+and must always run**: a required check that is skipped stays *expected* forever and blocks
+the merge, so path filtering lives in `changes`, never on the workflow trigger. If you
+rename a job, keep `gate`'s `name:` byte-identical to the ruleset's context string.
+
 ## Subagents
 
 Delegate to a subagent when the task genuinely warrants it — a wide search whose file
