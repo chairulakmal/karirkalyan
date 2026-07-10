@@ -554,6 +554,19 @@ RSpec.describe "Applications", type: :request do
 
         expect(response).to have_http_status(:unprocessable_entity)
       end
+
+      it "rejects an over-1 MB upload with 422 without reading it into memory" do
+        oversized = Rack::Test::UploadedFile.new(
+          StringIO.new("%PDF-1.4" + ("a" * (Application::MAX_FILE_SIZE + 100))),
+          "application/pdf", original_filename: "big.pdf"
+        )
+        post "/api/v1/applications",
+          params: { application: { company: "Mercari", role: "Backend Engineer", resume: oversized } },
+          headers: { "Authorization" => jwt_for(user) }
+
+        expect(response).to have_http_status(:unprocessable_entity)
+        expect(JSON.parse(response.body)["error"]).to match(/under 1 MB/)
+      end
     end
 
     describe "PATCH /api/v1/applications/:id (resume)" do

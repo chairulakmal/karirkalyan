@@ -29,16 +29,6 @@ jobs:
           --health-timeout 5s
           --health-retries 5
 
-      redis:
-        image: redis:8
-        ports:
-          - 6379:6379
-        options: >-
-          --health-cmd "redis-cli ping"
-          --health-interval 10s
-          --health-timeout 5s
-          --health-retries 5
-
     env:
       RAILS_ENV: test
       RUBOCOP_CACHE_ROOT: tmp/rubocop
@@ -46,7 +36,6 @@ jobs:
       DB_PORT: 5432
       DB_USERNAME: karirkalyan
       DB_PASSWORD: karirkalyan
-      REDIS_URL: redis://localhost:6379/0
       DEVISE_JWT_SECRET_KEY: ci-only-not-a-real-secret
 
     steps:

@@ -91,18 +91,24 @@ module Applications
     end
 
     def fetch(uri, redirects_left: MAX_REDIRECTS)
-      guard_against_internal_host!(uri)
+      # Resolve + validate once, then pin the connection to that exact IP.
+      # Letting Net::HTTP re-resolve the host would reopen a DNS-rebinding hole:
+      # a name that validated as public could rebind to a private IP between the
+      # check and the connect. Setting http.ipaddr keeps the Host header and TLS
+      # SNI on the original hostname while dialling the validated address.
+      validated_ip = guard_against_internal_host!(uri)
 
-      response = Net::HTTP.start(
-        uri.host, uri.port,
-        use_ssl:      uri.scheme == "https",
-        open_timeout: OPEN_TIMEOUT,
-        read_timeout: READ_TIMEOUT
-      ) do |http|
+      http              = Net::HTTP.new(uri.host, uri.port)
+      http.ipaddr       = validated_ip
+      http.use_ssl      = uri.scheme == "https"
+      http.open_timeout = OPEN_TIMEOUT
+      http.read_timeout = READ_TIMEOUT
+
+      response = http.start do |conn|
         request = Net::HTTP::Get.new(uri)
         request["User-Agent"] = USER_AGENT
         request["Accept"]     = "text/html,application/xhtml+xml"
-        http.request(request)
+        conn.request(request)
       end
 
       case response
@@ -124,8 +130,13 @@ module Applications
     # Refuse to fetch private/loopback/link-local/internal addresses (incl. the
     # cloud metadata endpoint 169.254.169.254, covered by link_local). Resolves
     # the host and checks every address, so a public name pointing at a private
-    # IP is still blocked. Re-run on each redirect hop by fetch.
+    # IP is still blocked. Returns a validated IP for the caller to connect to
+    # directly (defeats DNS rebinding). Re-run on each redirect hop by fetch.
     def guard_against_internal_host!(uri)
+      unless [ 80, 443 ].include?(uri.port)
+        raise InvalidUrlError, "That URL uses a port we don't allow (only 80 and 443)."
+      end
+
       addresses = Resolv.getaddresses(uri.host)
       raise InvalidUrlError, "Couldn't resolve that host." if addresses.empty?
 
@@ -135,6 +146,10 @@ module Applications
 
         raise InvalidUrlError, "That URL points to a private or internal address."
       end
+
+      # Every resolved address passed the check, so any is safe to dial. Pinning
+      # the first one guarantees we connect to an address we actually validated.
+      addresses.first
     rescue IPAddr::InvalidAddressError
       raise InvalidUrlError, "Couldn't resolve that host."
     end

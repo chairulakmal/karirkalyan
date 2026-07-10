@@ -89,24 +89,25 @@ RSpec.describe "Auth", type: :request do
     end
   end
 
-  # Welcome email on sign-up (multipart of behaviour, not part of the OpenAPI spec)
-  # deliver_now (not deliver_later) — no background queue while Sidekiq is disabled.
+  # Welcome email on sign-up (part of behaviour, not part of the OpenAPI spec).
+  # deliver_later: the mail is enqueued (not sent inline) so an SMTP failure can't
+  # 500 a request whose account already saved — assert on the enqueued job.
   describe "POST /api/v1/auth/sign_up — welcome email" do
-    it "sends a welcome email on successful registration" do
+    it "enqueues a welcome email on successful registration" do
       expect do
         post "/api/v1/auth/sign_up",
           params: { user: { email: "fresh@example.com", password: "password123" } },
           as: :json
-      end.to change { ActionMailer::Base.deliveries.count }.by(1)
+      end.to have_enqueued_mail(WelcomeMailer, :welcome)
     end
 
-    it "does not send a welcome email when registration fails" do
+    it "does not enqueue a welcome email when registration fails" do
       create(:user, email: "dupe@example.com")
       expect do
         post "/api/v1/auth/sign_up",
           params: { user: { email: "dupe@example.com", password: "password123" } },
           as: :json
-      end.not_to change { ActionMailer::Base.deliveries.count }
+      end.not_to have_enqueued_mail(WelcomeMailer, :welcome)
     end
   end
 end

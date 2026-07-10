@@ -54,6 +54,42 @@ RSpec.describe Applications::UrlPrefillService do
         expect { described_class.new("http://intranet.example.com/", client: client).call }
           .to raise_error(described_class::InvalidUrlError, /private or internal/)
       end
+
+      it "rejects a URL on a non-80/443 port before resolving DNS" do
+        expect(Resolv).not_to receive(:getaddresses)
+        expect { described_class.new("http://example.com:8080/jobs", client: client).call }
+          .to raise_error(described_class::InvalidUrlError, /port/)
+      end
+    end
+
+    # DNS-rebinding defence: the connection must be pinned to the IP we validated,
+    # not re-resolved by Net::HTTP (which an attacker's DNS could rebind between
+    # the check and the connect).
+    context "connection is pinned to the validated IP" do
+      subject(:service) { described_class.new("http://example.com/jobs/42", client: client) }
+
+      let(:http) { instance_double(Net::HTTP) }
+      let(:response) do
+        Net::HTTPOK.new("1.1", "200", "OK").tap do |r|
+          allow(r).to receive(:body).and_return("<html>Mercari — Backend Engineer</html>")
+        end
+      end
+
+      before do
+        allow(Resolv).to receive(:getaddresses).with("example.com").and_return([ "93.184.216.34" ])
+        allow(Net::HTTP).to receive(:new).with("example.com", 80).and_return(http)
+        allow(http).to receive(:ipaddr=)
+        allow(http).to receive(:use_ssl=)
+        allow(http).to receive(:open_timeout=)
+        allow(http).to receive(:read_timeout=)
+        allow(http).to receive(:start).and_yield(http).and_return(response)
+        allow(http).to receive(:request).and_return(response)
+      end
+
+      it "sets ipaddr= to the resolved address" do
+        service.call
+        expect(http).to have_received(:ipaddr=).with("93.184.216.34")
+      end
     end
 
     context "page has no readable text" do

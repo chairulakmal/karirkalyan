@@ -1,8 +1,17 @@
 module Api
   module V1
     class ApplicationsController < ApplicationController
+      # Raised when an upload exceeds ::Application::MAX_FILE_SIZE, before its body
+      # is read into memory. Mapped to 422 so the client gets the same status as
+      # the model-level size validation it pre-empts.
+      class FileTooLargeError < StandardError; end
+
       before_action :set_application, only: %i[show update destroy transition resume cover_letter]
       before_action :set_nosniff_header, only: %i[resume cover_letter]
+
+      rescue_from FileTooLargeError do |error|
+        render json: { error: error.message }, status: :unprocessable_entity
+      end
 
       def index
         limit = [ [ params.fetch(:limit, 10).to_i, 1 ].max, 100 ].min
@@ -133,9 +142,23 @@ module Api
         attrs = params.require(:application).permit(
           :company, :role, :url, :notes, :follow_up_at, :lock_version
         )
-        attrs[:resume]       = params[:application][:resume].read       if params.dig(:application, :resume).respond_to?(:read)
-        attrs[:cover_letter] = params[:application][:cover_letter].read if params.dig(:application, :cover_letter).respond_to?(:read)
+        attrs[:resume]       = read_upload(:resume)       if params.dig(:application, :resume).respond_to?(:read)
+        attrs[:cover_letter] = read_upload(:cover_letter) if params.dig(:application, :cover_letter).respond_to?(:read)
         attrs
+      end
+
+      # Reads an uploaded file into memory, but only after confirming its size is
+      # within the model's limit. Checking `.size` (cheap, from the multipart
+      # metadata) before `.read` stops an attacker from forcing us to buffer an
+      # arbitrarily large body just to have the model reject it afterwards.
+      def read_upload(field)
+        upload = params[:application][field]
+
+        if upload.respond_to?(:size) && upload.size > ::Application::MAX_FILE_SIZE
+          raise FileTooLargeError, "#{field.to_s.humanize} must be under 1 MB"
+        end
+
+        upload.read
       end
 
       # Creation sets the initial state (the FSM only governs later transitions).

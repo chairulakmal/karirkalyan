@@ -36,6 +36,35 @@ RSpec.describe FollowUpReminderJob, type: :job do
         .not_to change(TimelineEntry, :count)
     end
 
+    # The app runs in JST (config.time_zone = "Tokyo") while timestamps are stored
+    # in UTC. "Due today" must mean the JST day, so a late-evening JST reminder
+    # doesn't slip to the previous UTC day (fired a day early) and an early-morning
+    # JST one isn't missed. Anchor the clock to midday JST on 2026-07-10.
+    describe "JST day boundary" do
+      around { |example| travel_to(Time.zone.local(2026, 7, 10, 12, 0, 0)) { example.run } }
+
+      it "includes a reminder set for 23:30 JST today (15:30 UTC)" do
+        create(:application, :applied, user: user,
+          follow_up_at: Time.zone.local(2026, 7, 10, 23, 30, 0))
+        expect { described_class.new.perform }
+          .to change(TimelineEntry, :count).by(1)
+      end
+
+      it "includes a reminder set for 00:30 JST today (which is 15:30 UTC yesterday)" do
+        create(:application, :applied, user: user,
+          follow_up_at: Time.zone.local(2026, 7, 10, 0, 30, 0))
+        expect { described_class.new.perform }
+          .to change(TimelineEntry, :count).by(1)
+      end
+
+      it "excludes a reminder set for 00:30 JST tomorrow (which UTC-DATE would fire early)" do
+        create(:application, :applied, user: user,
+          follow_up_at: Time.zone.local(2026, 7, 11, 0, 30, 0))
+        expect { described_class.new.perform }
+          .not_to change(TimelineEntry, :count)
+      end
+    end
+
     describe "email delivery" do
       it "enqueues a reminder email for a due application" do
         application

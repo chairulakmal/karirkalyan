@@ -2,8 +2,11 @@ class FollowUpReminderJob < ApplicationJob
   queue_as :default
 
   def perform
+    # Zone-aware "due today": Time.zone.today.all_day is the JST day expressed as
+    # a UTC range, so a JST user's reminder fires on their day — not a day early,
+    # which DATE(follow_up_at) (compared in UTC) would cause.
     due = Application
-      .where("DATE(follow_up_at) = ?", Date.current)
+      .where(follow_up_at: Time.zone.today.all_day)
       .where.not(status: ApplicationFSM::TERMINAL_STATES)
 
     due.find_each do |application|
