@@ -30,26 +30,25 @@ Ordered by severity. File references are `path:line` at `9708df6`.
   Add Devise `:lockable`, or throttle on the email once the JSON body is parsed
   (a controller-level `before_action` throttle sees `params`, unlike the Rack layer —
   see the "throttle by IP only" note in the initializer). Confirmed.
-- [ ] **[med] Login-CSRF on the auth route handlers** — `web/app/api/auth/session/route.ts`
-  and `.../register/route.ts` parse a JSON body and forward it to Rails with no `Origin`
-  or `Sec-Fetch-Site` check. Next's built-in CSRF protection covers Server Actions, not
-  route handlers, so a cross-site form/fetch can drive a login (classic login-CSRF: log
-  the victim into an attacker-controlled account) or a sign-up. Add an allowlist `Origin`
-  check against `FRONTEND_URL` in both `POST` handlers (and the session `DELETE`). Confirmed.
-- [ ] **[med] Demo account is a shared, writable, un-reset account** — the "Try demo"
+- [x] **[med] Login-CSRF on the auth route handlers** — `web/app/api/auth/session/route.ts`
+  and `.../register/route.ts` parsed a JSON body and forwarded it to Rails with no `Origin`
+  check. Next's built-in CSRF protection covers Server Actions, not route handlers, so a
+  cross-site form/fetch could drive a login (classic login-CSRF) or sign-up. Added an
+  `Origin` allowlist check (`web/app/lib/csrf.ts`, same-origin by default, `ALLOWED_ORIGIN`
+  to pin) on both `POST` handlers and the session `DELETE`; cross-origin → 403.
+  *(chore/security-review-v1.0.1, 885e50b)*
+- [ ] **[med] Demo account is a shared, writable account** (partly fixed) — the "Try demo"
   button signs every visitor into one shared user with credentials hardcoded in the
   client bundle (`web/app/(auth)/sign-in/sign-in-form.tsx:62`). That much is inherent to
-  a public demo, but two things make it worse than intended:
-    1. `Demo::ResetService` (`api/app/services/demo/reset_service.rb`) is **never invoked** —
-       no route, no job, not in `config/recurring.yml`. The reset that's supposed to keep
-       the demo clean does not run, so the shared account accumulates every visitor's data
-       indefinitely.
-    2. The demo user has the **same capabilities as a real user**, including the paid AI
-       prefill endpoint (Claude call + outbound fetch), rate-limited by IP only. Distributed
-       use of the demo login is an uncapped cost/abuse vector.
-  Fix: wire `Demo::ResetService` into a recurring Solid Queue task (e.g. hourly), and either
-  gate AI prefill for the demo user or give the demo account a tighter per-account throttle.
-  Confirmed.
+  a public demo, but two things made it worse than intended:
+    1. ~~`Demo::ResetService` was **never invoked** — no route, no job — so the shared
+       account accumulated every visitor's data indefinitely.~~ **Fixed:** added
+       `DemoResetJob`, scheduled hourly in `config/recurring.yml`.
+       *(chore/security-review-v1.0.1, 885e50b)*
+    2. **Still open:** the demo user has the **same capabilities as a real user**, including
+       the paid AI prefill endpoint (Claude call + outbound fetch), rate-limited by IP only.
+       Distributed use of the demo login is an uncapped cost/abuse vector. Gate AI prefill
+       for the demo user or give the demo account a tighter per-account throttle.
 - [ ] **[low] Tighten CSP** — `web/next.config.ts:9` still ships `script-src 'unsafe-inline'`
   for the Next bootstrap. Move to a nonce-based policy (per-request nonce via `proxy.ts`,
   drop `'unsafe-inline'`). `object-src 'none'`, `frame-ancestors 'none'`, and `base-uri`
