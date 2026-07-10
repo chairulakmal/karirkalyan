@@ -26,6 +26,9 @@ Full-stack job application tracker. Rails 8 API (`api/`) + Next.js 16 frontend (
   `connects_to`/`database:` config. Keep it that way unless the app outgrows it.
 - **Cache:** `:solid_cache_store` in production; Rack::Attack throttle counters go
   through `Rails.cache`, so they're shared across Puma workers.
+- **DB pool:** `database.yml` sets `max_connections` to `RAILS_MAX_THREADS + 6` —
+  Solid Queue's ~5 threads share the pool with Puma's request threads and it
+  exits (stopping Puma with it) if the pool is smaller than its thread count.
 
 ## Local Dev
 
