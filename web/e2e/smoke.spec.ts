@@ -37,12 +37,16 @@ test("sign up, create an application, transition status", async ({ page }) => {
   await expect(page.getByRole("heading", { name: "Mercari" })).toBeVisible();
   await expect(page.getByText("Backend Engineer")).toBeVisible();
 
+  // The StatusHelp disclosure also renders a badge per reachable status, so
+  // scope status assertions to the page header's badge.
+  const statusBadge = page.locator("main header").getByText(/^(Draft|Applied)$/);
+
   // Status starts at "Draft" — transition to Applied
-  await expect(page.getByText("Draft", { exact: true })).toBeVisible();
+  await expect(statusBadge).toHaveText("Draft");
   await page.getByRole("button", { name: /applied/i }).first().click();
 
   // Status badge now reads "Applied"
-  await expect(page.getByText("Applied", { exact: true }).first()).toBeVisible();
+  await expect(statusBadge).toHaveText("Applied");
 
   // Timeline reflects the transition
   await expect(page.getByText(/draft.*applied/i)).toBeVisible();
