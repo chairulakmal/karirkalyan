@@ -1,4 +1,4 @@
-import Link from "next/link";
+import { Link } from "@/i18n/navigation";
 import { apiFetch } from "@/app/lib/api";
 import type { Application, DashboardStats, Paginated, Status, User } from "@/app/lib/types";
 import { ApplicationsList } from "./applications-list";

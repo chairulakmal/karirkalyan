@@ -1,10 +1,13 @@
-import Link from "next/link";
+import { getTranslations } from "next-intl/server";
+import { Link } from "@/i18n/navigation";
 import { NavLink } from "@/app/components/nav-link";
+import { LocaleSwitcher } from "@/app/components/locale-switcher";
 import { Mark, Wordmark } from "@/app/components/wordmark";
 import { SignOutButton } from "./sign-out-button";
 import { API_DOCS_URL, REPO_URL } from "@/app/lib/links";
 
-export default function AppLayout({ children }: { children: React.ReactNode }) {
+export default async function AppLayout({ children }: { children: React.ReactNode }) {
+  const t = await getTranslations("nav");
 
   return (
     <>
@@ -15,9 +18,10 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
             <Wordmark size="sm" />
           </Link>
           <nav className="flex items-center gap-5 text-sm">
-            <NavLink href="/dashboard">Dashboard</NavLink>
-            <NavLink href="/applications/new">New</NavLink>
+            <NavLink href="/dashboard">{t("dashboard")}</NavLink>
+            <NavLink href="/applications/new">{t("new")}</NavLink>
             <SignOutButton />
+            <LocaleSwitcher />
           </nav>
         </div>
       </header>
@@ -25,9 +29,9 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
       <footer className="border-t border-dune">
         <div className="mx-auto max-w-5xl px-6 py-5 text-xs text-ink-soft">
           <div className="flex flex-wrap items-center gap-x-5 gap-y-2">
-            <span className="kk-label">For reviewers</span>
-            <ReviewerLink href={API_DOCS_URL}>API docs (Swagger)</ReviewerLink>
-            <ReviewerLink href={REPO_URL}>Source</ReviewerLink>
+            <span className="kk-label">{t("forReviewers")}</span>
+            <ReviewerLink href={API_DOCS_URL}>{t("apiDocs")}</ReviewerLink>
+            <ReviewerLink href={REPO_URL}>{t("source")}</ReviewerLink>
           </div>
         </div>
       </footer>

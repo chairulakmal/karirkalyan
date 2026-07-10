@@ -1,4 +1,4 @@
-import Link from "next/link";
+import { Link } from "@/i18n/navigation";
 import { Mark, Wordmark } from "@/app/components/wordmark";
 import { REPO_URL, API_DOCS_URL } from "@/app/lib/links";
 

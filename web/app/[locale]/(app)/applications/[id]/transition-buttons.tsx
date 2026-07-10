@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useTransition } from "react";
-import { useRouter } from "next/navigation";
+import { useRouter } from "@/i18n/navigation";
 import { transitionStatus } from "@/app/lib/actions";
 import { statusBadgeClass, statusDescription, statusLabel } from "@/app/lib/format";
 import type { Status } from "@/app/lib/types";

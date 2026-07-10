@@ -1,4 +1,5 @@
-import Link from "next/link";
+// Locale-aware Link: a 404 inside /ja must send the visitor to /ja/dashboard.
+import { Link } from "@/i18n/navigation";
 
 export default function NotFound() {
   return (

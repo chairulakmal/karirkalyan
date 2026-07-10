@@ -29,9 +29,10 @@ proxy runs on those, crawlers get a `307` to `/sign-in` and the whole SEO surfac
 ### CSP nonce forces dynamic rendering
 
 `proxy.ts` also builds the Content-Security-Policy per request, so `script-src` can carry a fresh
-nonce instead of `'unsafe-inline'`. Nonces are only applied during SSR, so `app/layout.tsx` calls
-`await connection()` to opt every route into dynamic rendering. A statically prerendered page would
-be built with no nonce and its scripts blocked in production.
+nonce instead of `'unsafe-inline'`. Nonces are only applied during SSR, so the root layout
+(`app/[locale]/layout.tsx` — there is no `app/layout.tsx`) calls `await connection()` to opt every
+route into dynamic rendering. A statically prerendered page would be built with no nonce and its
+scripts blocked in production.
 
 Consequence worth knowing before optimizing: **there is no static optimization left to lose.**
 Don't add `export const dynamic = "force-static"` or reach for prerendering wins — they either

@@ -1,0 +1,61 @@
+{
+  "nav": {
+    "dashboard": "Dashboard",
+    "new": "New",
+    "signOut": "Sign out",
+    "signingOut": "Signing out…",
+    "forReviewers": "For reviewers",
+    "apiDocs": "API docs (Swagger)",
+    "source": "Source"
+  },
+  "status": {
+    "label": {
+      "wishlist": "Wishlist",
+      "draft": "Draft",
+      "applied": "Applied",
+      "phone_screen": "Phone screen",
+      "technical": "Technical",
+      "final_round": "Final round",
+      "offer": "Offer",
+      "accepted": "Accepted",
+      "rejected": "Rejected",
+      "ghosted": "Ghosted",
+      "declined": "Declined",
+      "withdrawn": "Withdrawn",
+      "archived": "Archived"
+    },
+    "description": {
+      "wishlist": "A job you've saved and might apply to — nothing sent yet.",
+      "draft": "You're preparing the application but haven't submitted it.",
+      "applied": "Application submitted — waiting to hear back.",
+      "phone_screen": "First call with a recruiter or hiring manager.",
+      "technical": "Technical interview or take-home assignment stage.",
+      "final_round": "Last interview stage before the company decides.",
+      "offer": "The company made an offer — the decision is yours now.",
+      "accepted": "You took their offer — the happy ending.",
+      "rejected": "The company decided not to move forward.",
+      "ghosted": "The company went silent and stopped responding.",
+      "declined": "You turned their offer down.",
+      "withdrawn": "You pulled out of the process yourself.",
+      "archived": "Closed and hidden from day-to-day tracking."
+    },
+    "meanings": "Status meanings",
+    "meaningsAria": "What do these statuses mean?",
+    "current": "current",
+    "permanent": "permanent"
+  },
+  "locale": {
+    "switchAria": "Change language",
+    "en": "English",
+    "ja": "日本語"
+  },
+  "errors": {
+    "401": "Your session is no longer valid. Sign in again to continue.",
+    "409": "This application was changed elsewhere. Reload and try again.",
+    "422": "Those details couldn't be saved. Check the form and try again.",
+    "429": "Too many requests. Wait a moment and try again.",
+    "502": "The server is unreachable right now. Try again shortly.",
+    "503": "This feature is temporarily unavailable.",
+    "unknown": "Something went wrong. Try again."
+  }
+}

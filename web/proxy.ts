@@ -1,5 +1,11 @@
-import { NextResponse, type NextRequest } from "next/server";
+import { NextRequest, NextResponse } from "next/server";
+import createMiddleware from "next-intl/middleware";
+import { routing } from "./i18n/routing";
 
+const handleI18n = createMiddleware(routing);
+
+// Locale-stripped paths. The guard never sees a `/ja` prefix, so this stays a
+// list of three rather than one entry per locale.
 const PUBLIC_PATHS = ["/", "/sign-in", "/sign-up"];
 
 const isDev = process.env.NODE_ENV === "development";
@@ -25,28 +31,50 @@ function buildCsp(nonce: string): string {
   ].join("; ");
 }
 
+/**
+ * Splits `/ja/dashboard` into the prefix to preserve on redirect (`/ja`) and
+ * the path the guard reasons about (`/dashboard`).
+ *
+ * `/en/*` is matched too, but yields an empty prefix: English is unprefixed, so
+ * redirecting an `/en/*` visitor lands them on the canonical path. next-intl
+ * would 307 them there anyway.
+ */
+function splitLocale(pathname: string): { prefix: string; path: string } {
+  const match = pathname.match(/^\/(en|ja)(?=\/|$)/);
+  if (!match) return { prefix: "", path: pathname };
+
+  const locale = match[1];
+  const rest = pathname.slice(match[0].length);
+  return {
+    prefix: locale === routing.defaultLocale ? "" : `/${locale}`,
+    path: rest === "" ? "/" : rest,
+  };
+}
+
 export function proxy(request: NextRequest) {
-  const { pathname } = request.nextUrl;
+  const { prefix, path } = splitLocale(request.nextUrl.pathname);
   const token = request.cookies.get("session")?.value;
 
   // Fresh, unpredictable nonce per request.
   const nonce = Buffer.from(crypto.randomUUID()).toString("base64");
   const csp = buildCsp(nonce);
 
-  const redirectTo = (path: string) => {
+  // Redirects stay inside the visitor's locale: a signed-in `/ja` visitor lands
+  // on `/ja/dashboard`, not `/dashboard`.
+  const redirectTo = (target: string) => {
     const url = request.nextUrl.clone();
-    url.pathname = path;
+    url.pathname = `${prefix}${target}`;
     const response = NextResponse.redirect(url);
     response.headers.set("Content-Security-Policy", csp);
     return response;
   };
 
-  if (pathname === "/" && token) {
+  if (path === "/" && token) {
     return redirectTo("/dashboard");
   }
 
   const isPublic = PUBLIC_PATHS.some(
-    (p) => pathname === p || (p !== "/" && pathname.startsWith(`${p}/`)),
+    (p) => path === p || (p !== "/" && path.startsWith(`${p}/`)),
   );
 
   if (!isPublic && !token) {
@@ -57,15 +85,25 @@ export function proxy(request: NextRequest) {
     return redirectTo("/dashboard");
   }
 
-  // Pass the nonce to Next on the request headers so SSR can read it and
-  // attach it to framework/page scripts, then echo the CSP on the response.
-  const requestHeaders = new Headers(request.headers);
-  requestHeaders.set("x-nonce", nonce);
-  requestHeaders.set("Content-Security-Policy", csp);
+  // The guard passed. Hand off to next-intl, which resolves the locale and
+  // returns either a rewrite (`/dashboard` → `/en/dashboard`) or a redirect
+  // (`/en/dashboard` → `/dashboard`).
+  //
+  // The nonce rides in on the *request* headers, mutated in place: next-intl
+  // does `new Headers(request.headers)` and hands the copy to the outgoing
+  // request, so SSR can read `x-nonce` and stamp it onto page scripts. Setting
+  // it on the response instead would never reach the renderer.
+  //
+  // Mutate rather than `new NextRequest(request, { headers })`: reconstructing
+  // the request re-reads its body, and every server action arrives here as a
+  // POST with one.
+  request.headers.set("x-nonce", nonce);
+  request.headers.set("Content-Security-Policy", csp);
 
-  const response = NextResponse.next({
-    request: { headers: requestHeaders },
-  });
+  const response = handleI18n(request);
+
+  // Applies to both branches above — a redirect needs the CSP just as much as a
+  // rendered page does.
   response.headers.set("Content-Security-Policy", csp);
   return response;
 }
@@ -74,6 +112,9 @@ export const config = {
   // Run on every route except Next internals, api routes, static assets, and
   // crawler metadata (robots/sitemap/llms.txt must stay reachable unauthenticated).
   // The api route handlers manage their own auth (they need to see /api/auth/* unauth).
+  //
+  // No locale entry is needed: this excludes by leading path segment, and `/ja`
+  // collides with none of them. The crawler files are never locale-prefixed.
   matcher: [
     "/((?!api|_next/static|_next/image|favicon.ico|manifest.webmanifest|robots.txt|sitemap.xml|llms.txt|brand/|.*\\.svg$|.*\\.png$).*)",
   ],

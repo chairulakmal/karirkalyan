@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useTransition } from "react";
-import { useRouter } from "next/navigation";
+import { useRouter } from "@/i18n/navigation";
 import { updateApplication } from "@/app/lib/actions";
 import { ACTIVE_STATUSES, formatDate, isOverdue } from "@/app/lib/format";
 import { Field } from "@/app/components/field";

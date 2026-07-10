@@ -1,9 +1,11 @@
 "use client";
 
-import { useRouter } from "next/navigation";
+import { useTranslations } from "next-intl";
+import { useRouter } from "@/i18n/navigation";
 import { useTransition } from "react";
 
 export function SignOutButton() {
+  const t = useTranslations("nav");
   const router = useRouter();
   const [pending, startTransition] = useTransition();
 
@@ -22,7 +24,7 @@ export function SignOutButton() {
       disabled={pending}
       className="font-medium text-ink-soft hover:text-cobalt disabled:opacity-50"
     >
-      {pending ? "Signing out…" : "Sign out"}
+      {pending ? t("signingOut") : t("signOut")}
     </button>
   );
 }

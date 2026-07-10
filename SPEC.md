@@ -554,22 +554,64 @@ the default.
 
 #### Routing internals
 
-Pages live under `app/[locale]/`. Route handlers (`app/api/**`) and the crawler files
-(`robots.ts`, `sitemap.ts`, `manifest.webmanifest`) stay outside it — they are locale-independent,
+Pages live under `app/[locale]/`, which is therefore the **root layout** — there is no
+`app/layout.tsx`. Route handlers (`app/api/**`), the crawler files (`robots.ts`, `sitemap.ts`,
+`manifest.webmanifest`), and `global-not-found.tsx` stay outside it — they are locale-independent,
 and a locale segment would break their fixed paths.
 
 `proxy.ts` composes two concerns in one pass, in this order:
 
-1. next-intl's middleware resolves the locale and produces the rewrite (`/dashboard` → `/en/dashboard`)
-   or redirect (`/en/dashboard` → `/dashboard`).
-2. The auth guard runs against the **locale-stripped** pathname, so `PUBLIC_PATHS` stays a list of
-   three entries rather than six, and `/ja/dashboard` is protected exactly as `/dashboard` is.
-3. The CSP with its per-request nonce is set on whatever response comes out of 1 and 2 — including
+1. `splitLocale()` splits the pathname into the prefix to preserve (`/ja`, or empty for English)
+   and the path the guard reasons about (`/dashboard`).
+2. The auth guard runs against that **locale-stripped** path, so `PUBLIC_PATHS` stays a list of
+   three entries rather than six, and `/ja/dashboard` is protected exactly as `/dashboard` is. Its
+   redirects re-apply the prefix, so a signed-out `/ja/dashboard` visitor lands on `/ja/sign-in`.
+3. If the guard passes, next-intl's middleware resolves the locale and produces the rewrite
+   (`/dashboard` → `/en/dashboard`) or redirect (`/en/dashboard` → `/dashboard`).
+4. The CSP with its per-request nonce is set on whatever response comes out of 2 and 3 — including
    redirects, which must carry it too.
+
+The guard runs *before* next-intl, not after, because it needs no locale to make its decision and
+next-intl's output is a rewrite the guard would then have to un-rewrite.
+
+The nonce reaches SSR by mutating `request.headers` in place before delegating: next-intl copies
+those headers (`new Headers(request.headers)`) onto the request it forwards. It must be a mutation,
+not `new NextRequest(request, { headers })` — reconstructing the request re-reads its body, and
+every server action arrives as a POST with one.
 
 `config.matcher` is unchanged: it excludes by *prefix segment* (`api`, `_next`, …) and a `/ja` prefix
 does not collide with any exclusion. The crawler exclusions (`robots.txt`, `sitemap.xml`,
 `llms.txt`) keep working because those paths are never locale-prefixed.
+
+#### Navigation must go through `i18n/navigation.ts`
+
+`Link`, `useRouter`, `usePathname`, `getPathname`, and `redirect` are re-exported from
+`i18n/navigation.ts` and used **instead of** the `next/link` and `next/navigation` originals. The
+originals drop the prefix, so a `/ja` visitor clicking through the app silently falls back to
+English. `notFound()` still comes from `next/navigation` — it carries no path.
+
+Two consequences worth knowing:
+
+- `usePathname` from this module returns the **locale-stripped** path, so `NavLink`'s `href`
+  comparison needs no special case.
+- In a server action there is no component tree to infer the locale from, so `redirect` and
+  `getPathname` take it explicitly: `actions.ts` calls `getLocale()` and passes it. `revalidatePath`
+  gets the same treatment, since the visitor's router cache is keyed on the prefixed URL.
+
+#### 404s
+
+`app/[locale]/not-found.tsx` handles a bad path *inside* a locale. Paths matching no route at all
+fall to `app/global-not-found.tsx`, enabled by `experimental.globalNotFound` in `next.config.ts`.
+It exists because a root layout under a dynamic segment leaves Next nothing to compose a 404 from;
+without it those paths get Next's built-in bare document — no `lang`, no stylesheet, no nonce.
+It bypasses normal rendering, so it returns a full HTML document, imports its own styles and fonts,
+and links out with a plain `<a>` (no client router is mounted to take a soft navigation).
+
+#### Sitemap
+
+`app/sitemap.ts` emits one `<url>` per route, `<loc>` being the default-locale (unprefixed) address,
+with `alternates.languages` producing `hreflang` links for `en`, `ja`, and `x-default`. Prefixes come
+from `getPathname()` rather than string concatenation, so the prefix rule has one source of truth.
 
 #### Server-side error messages — keyed on HTTP status, not error code
 

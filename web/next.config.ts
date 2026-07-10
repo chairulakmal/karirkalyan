@@ -1,4 +1,5 @@
 import type { NextConfig } from "next";
+import createNextIntlPlugin from "next-intl/plugin";
 
 // The Content-Security-Policy lives in proxy.ts, not here: it is generated per
 // request so script-src can carry a fresh nonce (dropping 'unsafe-inline' for
@@ -19,6 +20,15 @@ const nextConfig: NextConfig = {
   async headers() {
     return [{ source: "/:path*", headers: securityHeaders }];
   },
+  experimental: {
+    // Enables app/global-not-found.tsx. Needed because the root layout sits under
+    // a dynamic segment (app/[locale]/layout.tsx), leaving no layout for Next to
+    // build a 404 from for paths that match no route. See app/global-not-found.tsx.
+    globalNotFound: true,
+  },
 };
 
-export default nextConfig;
+// Points next-intl at `i18n/request.ts` (its default location).
+const withNextIntl = createNextIntlPlugin();
+
+export default withNextIntl(nextConfig);

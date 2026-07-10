@@ -1,4 +1,4 @@
-import Link from "next/link";
+import { Link } from "@/i18n/navigation";
 import { Mark, Wordmark } from "@/app/components/wordmark";
 
 export default function AuthLayout({ children }: { children: React.ReactNode }) {

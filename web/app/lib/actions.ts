@@ -1,15 +1,31 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
-import { redirect } from "next/navigation";
+import { getLocale } from "next-intl/server";
+import { getPathname, redirect } from "@/i18n/navigation";
 import { apiFetch } from "./api";
 import type { Application } from "./types";
+
+// next-intl's redirect/getPathname take the locale explicitly — a server action
+// has no component tree to infer it from. Both are unprefixed for `en` and
+// prefixed for `ja`, so a Japanese visitor lands back inside `/ja/*` instead of
+// being dumped on the English page.
 
 // A failed action; `status` is the upstream HTTP status when the failure came
 // from the API (absent for local validation failures). Callers key off it to
 // recover from a 409 optimistic-lock conflict.
 export type ActionFailure = { ok: false; error: string; status?: number };
 export type ActionResult = { ok: true } | ActionFailure;
+
+// Revalidates the two pages a write can change. Only the caller's locale is
+// revalidated: every route is dynamically rendered (see the root layout), so
+// there is no shared Full Route Cache to purge — just the visitor's own router
+// cache, which only ever holds paths in the locale they are browsing.
+async function revalidateApplication(id: number) {
+  const locale = await getLocale();
+  revalidatePath(getPathname({ href: `/applications/${id}`, locale }));
+  revalidatePath(getPathname({ href: "/dashboard", locale }));
+}
 
 // Resolves only on failure — the success path ends in redirect(), which throws
 // and never returns. Typing it as ActionFailure keeps call sites honest.
@@ -60,8 +76,9 @@ export async function createApplication(formData: FormData): Promise<ActionFailu
 
   if (!res.ok) return { ok: false, error: res.error, status: res.status };
 
-  revalidatePath("/dashboard");
-  redirect(`/applications/${res.data.id}`);
+  const locale = await getLocale();
+  revalidatePath(getPathname({ href: "/dashboard", locale }));
+  redirect({ href: `/applications/${res.data.id}`, locale });
 }
 
 export type PrefillResult =
@@ -100,8 +117,7 @@ export async function updateApplication(
 
   if (!res.ok) return { ok: false, error: res.error, status: res.status };
 
-  revalidatePath(`/applications/${id}`);
-  revalidatePath("/dashboard");
+  await revalidateApplication(id);
   return { ok: true };
 }
 
@@ -116,8 +132,7 @@ export async function transitionStatus(
     body: JSON.stringify({ status: to, lock_version: lockVersion, note: note ?? null }),
   });
   if (!res.ok) return { ok: false, error: res.error, status: res.status };
-  revalidatePath(`/applications/${id}`);
-  revalidatePath("/dashboard");
+  await revalidateApplication(id);
   return { ok: true };
 }
 
@@ -140,7 +155,8 @@ export async function uploadFile(
   });
 
   if (!res.ok) return { ok: false, error: res.error, status: res.status };
-  revalidatePath(`/applications/${id}`);
+  // Detail page only — an upload leaves the dashboard listing unchanged.
+  revalidatePath(getPathname({ href: `/applications/${id}`, locale: await getLocale() }));
   return { ok: true };
 }
 
@@ -148,8 +164,9 @@ export async function uploadFile(
 export async function deleteApplication(id: number): Promise<ActionFailure> {
   const res = await apiFetch(`/applications/${id}`, { method: "DELETE" });
   if (!res.ok) return { ok: false, error: res.error, status: res.status };
-  revalidatePath("/dashboard");
-  redirect("/dashboard");
+  const locale = await getLocale();
+  revalidatePath(getPathname({ href: "/dashboard", locale }));
+  redirect({ href: "/dashboard", locale });
 }
 
 type ApplicationInput = {

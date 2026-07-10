@@ -1,4 +1,4 @@
-import { AuthForm } from "@/app/(auth)/sign-in/sign-in-form";
+import { AuthForm } from "../sign-in/sign-in-form";
 
 export default function SignUpPage() {
   return (
