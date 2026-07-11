@@ -5,6 +5,27 @@ Open work lives in [`TODO.md`](TODO.md).
 
 ---
 
+## v1.1.1 — 2026-07-11
+
+Tagged at `885ec4d`. Mobile view improvements — the responsive audit found the two headers
+were what actually broke at 375px; the dashboard list, application detail page, and
+transition buttons already carried responsive classes and held up in both locales. Entirely
+`web/`, no behaviour change, as scoped. *(fix/mobile-header-cta, PR #50)*
+
+- **Headers declutter below `sm` (640px) rather than collapse into a menu** — a hamburger
+  would hide the locale switcher exactly where a Japanese visitor first meets the app. Each
+  header drops only what is redundant at that width: the homepage hides its "About" nav link
+  (the hero's primary CTA is the same destination immediately below); the signed-in app
+  shell hides the wordmark text and the "Dashboard" link (the mark beside them already links
+  to `/dashboard`). What remains fits 375px in Japanese, the wider locale, without wrapping.
+- **Homepage primary CTA renamed** "Read the architecture" → "How it's built" (Japanese
+  unchanged: 設計を読む); message key `readArchitecture` → `ctaAbout` in both catalogs.
+- **Chore:** `next dev` gets `--max-old-space-size=4096`; `build` and `start` untouched.
+- The `llms.txt` bilingual-UI mention deferred from v1.1.0 had already landed (it lists the
+  `/ja` pages), so no docs change was needed here.
+
+---
+
 ## v1.1.0 — 2026-07-11
 
 Tagged at `161b343`. Japanese UI (i18n) and the homepage + about/docs revamp. Entirely

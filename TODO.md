@@ -2,48 +2,11 @@
 
 Open work only. Shipped work lives in [`CHANGELOG.md`](CHANGELOG.md).
 
-**Current release: `v1.1.0`** — tagged 2026-07-11 at `161b343`. Japanese UI (i18n) + homepage,
-about and docs revamp.
-**Next release: `v1.1.1`** — mobile view improvements.
-**After that: `v1.2.0`** — the Kanban board view.
+**Current release: `v1.1.1`** — tagged 2026-07-11 at `885ec4d`. Mobile view improvements
+(header declutter below `sm`, CTA rename).
+**Next release: `v1.2.0`** — the Kanban board view.
 
-Everything below is post-1.1.0. The v1.1.1 and v1.2.0 items are scoped; the backlog is not.
-
----
-
-## v1.1.1 — Mobile view improvements
-
-Like v1.1.0, this is **`web/`-only**. A patch release rather than a minor one because it changes
-no behaviour and adds no page — it makes the pages that exist usable on a phone.
-
-It comes *after* the homepage revamp deliberately. Responsive work on a page that is about to be
-redesigned is thrown away twice: once when the hero changes, once when `/about` and `/docs`
-arrive. Land the layouts, then fit them to small screens.
-
-Japanese matters here in a way it does not on desktop. Japanese sets no wider than English at the
-same font size but wraps on entirely different rules, and the FSM status labels are the longest
-strings in the app. A badge row that fits in English can overflow in Japanese, so **check both
-locales at every breakpoint** — that is the reason this release follows i18n rather than
-preceding it.
-
-- [ ] **Audit before writing any CSS.** Walk every page at 375px (iPhone SE) and 390px, in both
-  locales, and write down what actually breaks. The list below is a prior, not a finding — no
-  responsive audit has been run since the pages were built, and the app already uses `md:`
-  breakpoints in places, so some of this may already be fine. Do not fix what is not broken.
-- [ ] **The dashboard application list** is the primary suspect: it carries a status badge, a
-  company name, a job board label, and a relative timestamp on one row. Decide whether the row
-  stacks or the metadata collapses behind the card; do not shrink the type until it fits.
-- [ ] **The application detail page** — the transition buttons are a horizontal row of up to
-  several states, and the details editor is a label/value grid. Both assume width.
-- [ ] **Tap targets.** The locale switcher, the transition buttons, and the delete button are
-  all styled for a cursor. 44×44px is the floor.
-- [ ] **The nav in the app shell** puts dashboard, new, sign-out, and the locale switcher on one
-  line. Something gives at 375px.
-- [ ] **Verify no page scrolls horizontally.** A single overflowing element does this to the
-  whole document, and it is the most common way a desktop-first layout fails on a phone.
-- [ ] **Mention the bilingual UI in `web/public/llms.txt`.** Deferred from v1.1.0 because the
-  file describes production, not a branch; once the v1.1.0 deploy is live this is a one-line
-  docs change.
+Everything below is post-1.1.1. The v1.2.0 items are scoped; the backlog is not.
 
 ---
 
