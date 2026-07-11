@@ -17,10 +17,18 @@ export default async function AppLayout({ children }: { children: React.ReactNod
         <div className="mx-auto flex max-w-5xl items-center justify-between px-6 py-4">
           <Link href="/dashboard" className="flex items-center gap-3">
             <Mark size={28} />
-            <Wordmark size="sm" />
+            {/* Wordmark text hidden below sm — the mark carries the identity
+                and frees the width the Japanese nav labels need at 375px. */}
+            <span className="hidden sm:block">
+              <Wordmark size="sm" />
+            </span>
           </Link>
-          <nav className="flex items-center gap-5 text-sm">
-            <NavLink href="/dashboard">{t("dashboard")}</NavLink>
+          <nav className="flex items-center gap-4 whitespace-nowrap text-sm sm:gap-5">
+            {/* Hidden below sm: the mark on the left already links to the
+                dashboard, so the label is redundant where width is scarce. */}
+            <span className="hidden sm:block">
+              <NavLink href="/dashboard">{t("dashboard")}</NavLink>
+            </span>
             <NavLink href="/applications/new">{t("new")}</NavLink>
             <SignOutButton />
             <LocaleSwitcher />
