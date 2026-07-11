@@ -64,6 +64,21 @@ citations inline where a claim came from research rather than the code.
 
 ### UI & accessibility
 
+- [ ] **Japanese phrase-based line breaking (文節単位の改行).** Japanese has no spaces, so the
+      browser breaks lines at almost any character boundary and compound words wrap mid-word
+      (`東京オリン` / `ピック`). Two-layer fix, both cheap: (1) `word-break: auto-phrase` in CSS —
+      [Chromium 119+ only](https://caniuse.com/mdn-css_properties_word-break_auto-phrase), needs
+      `lang="ja"` on an ancestor (the i18n layout already sets it), degrades to today's behaviour
+      elsewhere, so it is a one-line progressive enhancement; (2)
+      [BudouX](https://github.com/google/budoux) (`budoux` on npm, ~15 KB, zero deps — the same
+      model that powers `auto-phrase`) run **server-side in RSC** on headings, buttons, and card
+      titles, where a bad break is most visible — long body text mostly self-corrects. BudouX
+      inserts break opportunities and pairs with `word-break: keep-all`; prefer `<wbr>` output
+      over zero-width spaces, which survive copy-paste. `Intl.Segmenter` is not a substitute — it
+      segments dictionary words, not phrases, and breaks choppier. **Researched 2026-07-11.**
+      Ecosystem note: the segmentation problem is solved (BudouX + the CSS property absorbing
+      it); the only open niche is integration glue — a next-intl-aware wrapper or a
+      remark/rehype plugin — better spent as a blog post than an npm package.
 - [ ] **No dark mode** — `web/app/globals.css:28` hardcodes `color-scheme: light` while dark icon
       assets exist in `design/`. Decide to ship it or delete the unused assets; leaving both is
       the worst option. Similar to LinkedIn not having a dark mode, we will stick to light mode.
