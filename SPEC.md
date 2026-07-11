@@ -32,7 +32,7 @@ Two consequences worth stating plainly:
   [`CHANGELOG.md`](CHANGELOG.md), including the pre-1.0.0 build phases that used to sit at the
   top of this file.
 
-Last synced against the code: **2026-07-11**, at `v1.1.0`.
+Last synced against the code: **2026-07-11**, at `v1.1.1`.
 
 ---
 
@@ -546,8 +546,17 @@ every user — see CHANGELOG v1.0.1.
 
 The homepage argues one claim: this is a job tracker **built on a finite state machine** — thirteen
 states, an explicit transition table, an immutable audit trail, the stack named outright. Its primary
-call to action is "Read the architecture" (→ `/about`); the demo is second. It is aimed at a reviewer
-reading the code, not at a jobseeker shopping for a tracker.
+call to action is "How it's built" (→ `/about`; 設計を読む in Japanese); the demo is second. It is
+aimed at a reviewer reading the code, not at a jobseeker shopping for a tracker.
+
+On viewports below `sm` (640px) the headers **declutter rather than collapse into a menu**, because a
+hamburger would hide the locale switcher — and the marketing and auth headers are where a Japanese
+visitor meets the app before any session exists to remember a preference. Each header drops only what
+is redundant at that width: the homepage hides its "About" nav link (the hero's primary CTA is the
+same destination, immediately below), and the signed-in app shell hides its "Dashboard" link and the
+wordmark text (the mark beside it already links to `/dashboard`). Everything that remains — sign-in /
+new / sign-out and the locale switcher — stays visible and one tap away, and fits a 375px viewport in
+Japanese, the wider locale, without wrapping.
 
 Below the hero it draws the machine it claims to be built on:
 `web/app/components/pipeline-diagram.tsx` draws the happy path as a vertical rail of status chips —

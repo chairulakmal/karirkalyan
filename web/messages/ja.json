@@ -70,7 +70,7 @@
   "home": {
     "signIn": "ログイン",
     "tryDemo": "デモを試す",
-    "readArchitecture": "設計を読む",
+    "ctaAbout": "設計を読む",
     "about": "このプロジェクトについて",
     "eyebrow": "Chairul Akmal のポートフォリオプロジェクト",
     "headline": "<accent>有限ステートマシン</accent>で動く、応募管理ツール。",

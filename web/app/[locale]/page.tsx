@@ -40,8 +40,14 @@ export default async function Home() {
             <Mark size={32} />
             <Wordmark size="md" />
           </div>
-          <nav className="flex items-center gap-6 text-sm">
-            <Link href="/about" className="font-medium text-ink-soft transition hover:text-midnight">
+          <nav className="flex items-center gap-6 whitespace-nowrap text-sm">
+            {/* Hidden below sm: the hero's primary CTA just below is the same
+                destination, and dropping it keeps the header on one line at
+                375px in Japanese (このプロジェクトについて is the widest label). */}
+            <Link
+              href="/about"
+              className="hidden font-medium text-ink-soft transition hover:text-midnight sm:inline"
+            >
               {t("about")}
             </Link>
             <Link
@@ -77,7 +83,7 @@ export default async function Home() {
               href="/about"
               className="inline-flex items-center justify-center bg-cobalt px-6 py-3 text-sm font-medium text-linen transition hover:bg-cobalt-2"
             >
-              {t("readArchitecture")}
+              {t("ctaAbout")}
             </Link>
             <Link
               href="/sign-in"
