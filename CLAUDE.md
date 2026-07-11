@@ -41,6 +41,7 @@ Consequences:
 | Current release, what's next, open work | `TODO.md` (release status at the top) |
 | What shipped, and when | `CHANGELOG.md` (includes the pre-1.0.0 build phases) |
 | Local dev setup | `SPEC.md` § Local development |
+| What earns a major / minor / patch | `SPEC.md` § Versioning & releases |
 
 Do not restate release status, versions, or scope in this file — that is `TODO.md`'s job, and
 copies here go stale.
@@ -58,6 +59,8 @@ One line each; the full rules and their reasoning live in `SPEC.md` at the named
   strategy)*
 - `web/` navigation goes through `i18n/navigation.ts`, not `next/link` / `next/navigation`
   originals. *(§ i18n)*
+- The version number lives **only** in the git tag. `web/package.json` is pinned to a static
+  `0.0.0` on purpose — do not "fix" it to match the release. *(§ Versioning & releases)*
 
 ## Branching & PRs
 
@@ -100,6 +103,14 @@ lands, and before the release that ships it is tagged**, bring the other docs up
 `README.md` *and* `README.ja.md` (always together, never one without the other),
 `CHANGELOG.md`, the swagger/rswag output, `llms.txt`. Tagging a release whose docs still
 describe the previous release is the `PLAN.md` failure mode with a version number on it.
+
+**Which digit moves** is decided by one mechanical test, not by how big the release feels:
+*could the previous release's image boot and serve against the database this release leaves
+behind?* If **no**, it is a **major** — an irreversible migration, `/api/v1` → `/api/v2`, an
+`ApplicationFSM` state removed or renamed, a required env var dropped. If yes and the release
+adds a user-visible capability, it is a **minor**; if it adds none — fixes, security,
+dependency bumps, performance — it is a **patch**. The reasoning, and why SemVer's own
+definition of major cannot fire on this project, is in `SPEC.md` § Versioning & releases.
 The `docs-auditor` subagent exists for exactly this post-feature sweep.
 
 ## Subagents
