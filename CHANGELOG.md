@@ -5,6 +5,30 @@ Open work lives in [`TODO.md`](TODO.md).
 
 ---
 
+## Unreleased
+
+Landed on `main` after the v1.3.0 tag, so it ships with whatever comes next.
+*(chore/dependency-refresh, PR #57)*
+
+- **Gems and npm packages refreshed** within their existing constraints — `fugit`,
+  `rubocop-rails`; Playwright, Tailwind, `@types/react`, ESLint; and patch bumps to the four
+  exact pins (Next → 16.2.10, React → 19.2.7). Clears the `@babel/core` and `js-yaml`
+  advisories: four vulnerabilities down to two. The two that remain are one advisory —
+  postcss, bundled inside Next, whose affected range covers *every* released Next, so there
+  is no version to move to. npm's own remedy is a downgrade to `next@9.3.3`; we declined it.
+  ESLint 10, TypeScript 7, and `@types/node` 26 are majors and were left for their own diff.
+- **Node pinned to 24, declared once in `web/.nvmrc`.** CI ran Node 22 (npm 10) while local
+  dev runs Node 24 (npm 11), and the two majors disagree about the lockfile — npm 11 dedupes
+  away the nested `@swc/helpers` that next-intl's peer range needs and npm 10 demands. That
+  is the *same* `npm ci` failure v1.1.0 hit; v1.1.0 fixed the symptom by regenerating the
+  lock with npm 10 and left the version gap in place, so it fired again on the first push of
+  PR #57. The gap is now closed rather than papered over: `setup-node` reads the version via
+  `node-version-file`, and Railpack reads it to build production — which had declared no Node
+  version anywhere and was running Railpack's implicit default. Production moves to Node 24
+  on the next deploy.
+
+---
+
 ## v1.3.0 — 2026-07-11
 
 Tagged at `f455853`. Ghost prediction: the dashboard now says which applications have almost
