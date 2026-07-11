@@ -37,9 +37,12 @@ own PR, on their own, before any board component is written. Do not fold them in
 
 With those landed, the `web/` work:
 
-- [ ] **Narrow the status-keyed error fallbacks added in v1.1.0.** `web/` still maps HTTP
-  status → message; switch the catalog to key off the new `code` (and `details[].field` /
-  `details[].code` for validation errors), keeping the status map as the fallback.
+- [x] **Narrow the status-keyed error fallbacks added in v1.1.0.** `web/` now localizes off
+  the API's `code` — per-field `details[].field`/`details[].code` first (`errors.field.*`),
+  then the code (`errors.code.*`), with the v1.1.0 status map kept as the fallback and
+  `errors.unknown` last. Both resolution sites (`apiFailure()` in server actions, the auth
+  form) share the order; the auth route handlers pass the upstream envelope through. Full
+  description in SPEC.md § Server-side error messages.
 - [ ] **Consume `GET /api/v1/transitions` in `web/`** to decide which drops look legal on the
   board. **Do not mirror the table in TypeScript.** A copy is a second source of truth, and a
   state machine that drifts from its own server is worse than an extra request.
