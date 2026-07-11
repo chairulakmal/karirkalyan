@@ -30,7 +30,7 @@ pipeline. Built as a portfolio project by Chairul Akmal.
 
 ## Tech stack
 
-- Backend: Rails 8 API-only, Ruby 3.4.9, PostgreSQL 16, Devise + devise-jwt
+- Backend: Rails 8 API-only, Ruby 3.4.9, PostgreSQL 18, Devise + devise-jwt
 - Jobs & cache: Solid Queue + Solid Cache, both Postgres-backed — no Redis, no Sidekiq.
   Workers run inside Puma, so there is no separate worker service.
 - Frontend: Next.js 16 App Router, TypeScript, Tailwind CSS

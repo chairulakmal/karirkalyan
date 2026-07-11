@@ -152,7 +152,7 @@ web/   ← Next.js 16 frontend   → :3000
 **Prerequisites:** Docker, Ruby 3.4.9, Node 24
 
 ```bash
-# 1. Postgres (the only container — no Redis)
+# 1. Postgres 18 (the only container — no Redis)
 cd api && docker compose up -d
 
 # 2. API on :3001
@@ -185,6 +185,6 @@ More detail — env vars, tests, demo-data reset — is in [api/README.md](api/R
 
 ## Stack
 
-- **Backend:** Rails 8 API-only, Ruby 3.4.9, PostgreSQL 16, Devise + devise-jwt
+- **Backend:** Rails 8 API-only, Ruby 3.4.9, PostgreSQL 18, Devise + devise-jwt
 - **Frontend:** Next.js 16 App Router, Tailwind CSS
-- **Infra:** Docker Compose (local); Railway (production) — managed PostgreSQL; Solid Queue + Solid Cache on the same Postgres (no Redis)
+- **Infra:** Docker Compose (local); Railway (production) — managed PostgreSQL 18, same major as local; Solid Queue + Solid Cache on the same Postgres (no Redis)

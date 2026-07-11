@@ -2,7 +2,8 @@ name: karirkalyan
 
 services:
   postgres:
-    image: postgres:16
+    # Matches the Railway production image (postgres-ssl:18). Keep the majors in step.
+    image: postgres:18
     environment:
       POSTGRES_USER:     ${DB_USERNAME:-karirkalyan}
       POSTGRES_PASSWORD: ${DB_PASSWORD:-karirkalyan}
@@ -10,7 +11,10 @@ services:
     ports:
       - "${DB_PORT:-5432}:5432"
     volumes:
-      - postgres_data:/var/lib/postgresql/data
+      # postgres:18 sets PGDATA=/var/lib/postgresql/18/docker and declares its volume at
+      # /var/lib/postgresql. Mounting the old .../data path would put the live data dir
+      # outside the volume, and the database would not survive `docker compose down`.
+      - postgres_data:/var/lib/postgresql
 
 volumes:
   postgres_data:
