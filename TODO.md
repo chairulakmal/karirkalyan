@@ -5,8 +5,21 @@ Open work only. Shipped work lives in [`CHANGELOG.md`](CHANGELOG.md).
 **Current release: `v1.3.0`** — tagged 2026-07-11 at `f455853`. Ghost prediction, which also
 absorbed the two production items the performance release had parked (the `timeline_entries`
 index and the `/me` fold — both struck off below).
-**Next release: performance.** What is left of it is the dev-server memory leak, which is a
-real pain point (`next dev` crashes even at 4 GB) and is now the whole of it.
+
+**North star (decided 2026-07-11): be the best career app for its one loyal user.** Portfolio
+value follows from that, not the other way round — a reviewer can tell a tool with a real
+user from a feature showcase. The dark-mode entry below made this argument first; it now
+governs the whole backlog. Two consequences for sequencing: items are ordered by **when in
+the user's life they pay off** (search-time items while the search is active; the `positions`
+entity is triggered by accepting an offer, not by finishing a prior release), and the backlog
+gains an **Operations** section for the worst-day work — backups, export — that no feature
+admission test covers.
+
+**Next release: search-time usefulness** — the follow-up digest and the Operations backup
+item are the cheapest wins the user feels this week. The dev-server memory leak is
+**maintenance, not a release**: its stopgap already shipped (`cf7cd8d` — 8 GB heap +
+heap-snapshot flag live in `web/package.json`), and what remains is filing upstream when the
+next crash writes a snapshot.
 **Nothing in flight.**
 
 Everything below is post-1.3.0 and unscoped.
@@ -18,7 +31,8 @@ Everything below is post-1.3.0 and unscoped.
 Verified against the code on 2026-07-10 — all still hold. The dev-server memory item and the
 career-planning idea were added 2026-07-11. The market-dependent feature ideas (Japan market,
 global remote, ghost prediction) were verified against current web sources on 2026-07-11 —
-citations inline where a claim came from research rather than the code.
+citations inline where a claim came from research rather than the code. The Operations
+section and the north-star re-ranking were added 2026-07-11.
 
 ### Performance — production
 
@@ -32,7 +46,7 @@ citations inline where a claim came from research rather than the code.
       `application_id` index to `(application_id, created_at)` for the ghost-risk window
       function — a replacement, not an addition.)
 
-### Performance — dev (priority)
+### Performance — dev (maintenance — blocked on upstream, not a release)
 
 - [ ] **`next dev` crashes even with a 4 GB heap** (`--max-old-space-size=4096`, added in
       v1.1.1). **Diagnosed 2026-07-11** — it is a **V8 heap leak in the `next-server` process**,
@@ -53,14 +67,45 @@ citations inline where a claim came from research rather than the code.
     **not** reproduce — ten bogus URLs 404'd cleanly. The behaviour matches discussion
     **#93451** (unbounded growth after HMR edits, ~7 GB, open and unresolved as of
     2026-07).
-  - **Next actions:** add `--heapsnapshot-near-heap-limit=1` to the dev script's
-    `NODE_OPTIONS` (allowed there; `--trace-gc` is not) so the next real crash writes the
-    heap snapshot upstream wants, then file on #93451/new issue with it. Meanwhile bump the
-    dev heap to 8 GB and restart the server when it gets slow. One unexplained datum for
-    the upstream report: V8 heap also jumped ~1.6 GB across the 404 phase and a 45 s idle
-    window — growth without edits, so renders (every route is dynamic here — the CSP-nonce
-    `await connection()`) retain memory too, not just compiles; the ~15-font layout item
-    above may be a multiplier.
+  - **Next actions:** the stopgap is **done** (`cf7cd8d`) — the dev script already runs
+    with an 8 GB heap and `--heapsnapshot-near-heap-limit=1` (allowed there; `--trace-gc`
+    is not), so the next real crash writes the heap snapshot upstream wants. What remains:
+    file on #93451/new issue with that snapshot, and restart the server when it gets slow.
+    One unexplained datum for the upstream report: V8 heap also jumped ~1.6 GB across the
+    404 phase and a 45 s idle window — growth without edits, so renders (every route is
+    dynamic here — the CSP-nonce `await connection()`) retain memory too, not just
+    compiles; the three-family font setup compiling into every layout pass may be a
+    multiplier (the old font-payload item was struck as stale in `4284f61` — production
+    loads five variable slices, not ~15 static files).
+
+### Operations — the loyal user's worst day
+
+The career-growth admission test below governs *features*; it deliberately does not apply
+here. This section exists because nothing else in the repo defends the data: the real
+job-search history — applications, timeline, resumes stored as bytea — lives in one Railway
+Postgres, and **the Railway Hobby plan has no managed backups** (confirmed 2026-07-11). For a
+loyal user, losing that history is strictly worse than lacking any feature in this file.
+
+- [ ] **Scheduled `pg_dump` backups.** Decided 2026-07-11: a dump, **not** a mirror on some
+      free Postgres tier — a second live database is HA machinery for an app that needs an
+      undo button, and free tiers are themselves a liability (they expire, pause idle
+      databases, and add an account plus a version-compat surface to maintain). Cheapest
+      reliable shape: a scheduled GitHub Actions workflow running `pg_dump` against the
+      Railway connection URL (repo secret), uploading the dump as a workflow artifact on a
+      rolling retention window — no new services, and at personal-tracker scale the dump is
+      a few MB. Two constraints: **encrypt the dump (e.g. `age`, key in a secret) before
+      upload — this repo is public and public-repo artifacts are downloadable by anyone**
+      (or run the workflow from a tiny private repo instead); and match the `pg_dump` client
+      major version to the server's. GitHub disables cron workflows after 60 days of repo
+      inactivity — low risk here, but known. Document the restore drill in SPEC.md: an
+      untested backup is a hope, not a backup.
+- [ ] **Full-account export** — JSON plus resume files, downloadable from the app. The
+      loyal-user version of the CSV table-stakes item (CSV covers applications only; it
+      recovers neither resumes nor timeline). CSV stays as a convenience view; this is the
+      data-safety artefact, and the second, provider-independent leg of the backup story.
+- [x] **Error tracking — conscious asymmetry, decided 2026-07-11.** Honeybadger covers the
+      API (`api/Gemfile`, wired in production). `web/` has no client-side error tracking,
+      and that is accepted for a single-user app: the one user *is* the error reporter.
 
 ### UI & accessibility
 
@@ -79,9 +124,28 @@ citations inline where a claim came from research rather than the code.
       Ecosystem note: the segmentation problem is solved (BudouX + the CSS property absorbing
       it); the only open niche is integration glue — a next-intl-aware wrapper or a
       remark/rehype plugin — better spent as a blog post than an npm package.
-- [ ] **No dark mode** — `web/app/globals.css:28` hardcodes `color-scheme: light` while dark icon
-      assets exist in `design/`. Decide to ship it or delete the unused assets; leaving both is
-      the worst option. Similar to LinkedIn not having a dark mode, we will stick to light mode.
+- [x] **No dark mode — decided 2026-07-11: light only, and that is the ship state, not a gap.**
+      `web/app/globals.css:28` hardcodes `color-scheme: light`, and `web/` contains no dark
+      styling at all — no `prefers-color-scheme` block, no `dark:` utilities. It stays that way.
+
+      The reasoning is about who this is for. KarirKalyan is a **professional app, not a dev
+      tool.** Its user is a job seeker, and the app sits in a context that is uniformly light:
+      a recruiter's email, a company careers page, a PDF of their own resume. Dark mode is an
+      expectation engineers carry over from editors and terminals — building for it here would
+      be building for the developer looking at the portfolio rather than the person the product
+      claims to serve, which is exactly the tell that separates a product from a demo.
+
+      The cost side is not free either: a second theme doubles the surface every future screen
+      has to be designed, reviewed, and screenshotted against, and a half-maintained dark theme
+      (the usual outcome on a solo project) looks markedly worse than a confident single one.
+      One art-directed light theme is the stronger portfolio artefact.
+
+      **Assets:** the dark brand icons (`design/assets/icons/karirkalyan-dark.svg`,
+      `png/icon-dark-512.png`) are unreferenced — `web/app/components/wordmark.tsx:28` uses only
+      the monogram. Keep them. They are *brand* assets (a logotype for dark backgrounds — slide
+      decks, social cards, a dark README banner), which is a different thing from an app theme,
+      so their existence is not evidence of an unfinished dark mode and nothing in `web/` should
+      grow toward them.
 
 ### Code quality
 
@@ -96,18 +160,29 @@ citations inline where a claim came from research rather than the code.
 ### Feature ideas
 
 Unscoped. The pre-1.0.0 Phase 9 notes (now in `CHANGELOG.md`) also name an analytics dashboard
-and an AI cover-letter assist as the declared roadmap. Everything here is **post-v1.2.0** and most of it _does_ touch `api/` —
+and an AI cover-letter assist as the declared roadmap. Everything here is **post-v1.3.0** and most of it _does_ touch `api/` —
 that is fine, the `web/`-only constraint is a property of v1.1.0, not a permanent rule.
 
 The three table-stakes items first, then the ones that differentiate. A generic tracker is a
-CRUD demo; the ideas below are the ones a Tokyo hiring reviewer could not have seen in someone
-else's portfolio, because they encode knowledge of the market rather than knowledge of Rails.
+CRUD demo; the differentiators after the table-stakes list are the ones a Tokyo hiring
+reviewer could not have seen in someone else's portfolio, because they encode knowledge of
+the market rather than knowledge of Rails.
 
-**Table stakes**
+**Field admission test (added 2026-07-11), for any new per-application column** — channel,
+agency, comp structure, language level, hiring entity, timezone, all of them: it must be
+**captured at prefill time by `UrlPrefillService`, or cost near-zero manual entry**. The app
+has one user, and a field he stops filling in after the fifth application is dead schema
+plus form friction. The hiring-entity item already says this about itself; it is the rule
+for the whole section, not a footnote on one item.
 
-- [ ] **Email verification** (Devise `:confirmable`).
-- [ ] **CSV export** of applications.
-- [ ] **Follow-up digest email** — Solid Queue landed; the mailer already exists.
+**Table stakes** — re-ranked 2026-07-11 by the north star, not by what a checklist expects:
+
+- [ ] **Follow-up digest email** — first: Solid Queue landed, the mailer already exists, and
+      it is useful *this week* of an active search. Part of the next release.
+- [ ] **CSV export** of applications — a convenience view; the data-safety version is the
+      full-account export in Operations above.
+- [ ] **Email verification** (Devise `:confirmable`) — last, and labelled honestly: it guards
+      a signup problem a single-user app does not have. A portfolio checkbox, ranked as one.
 
 **Ghost prediction — shipped in `v1.3.0`.** See CHANGELOG § v1.3.0 and SPEC.md § Query
 layer. The market research that justified it, and the stage distribution the global defaults
@@ -119,6 +194,13 @@ These are the strongest differentiators and the most research-dependent. **Resea
 current web sources 2026-07-11** — findings and citations inline below. The immigration numbers
 should still be re-confirmed against the Immigration Services Agency / MOJ the day a migration
 is actually written; everything else is now grounded enough to scope from.
+
+**Maintenance rule (added 2026-07-11):** every item here embeds perishable external facts —
+fee schedules, processing times, survey medians. A career tool that confidently states last
+year's rules is worse than one that says nothing, so each item must state its **annual
+refresh cost** when it is scoped, and the sum of those lines is a real cap on how many of
+these a solo maintainer can ship. The career-intelligence item below already budgets this
+way ("one data-entry session a year"); that is the pattern.
 
 - [ ] **Visa / status-of-residence tracking.** For a foreign engineer in Japan this is the
       single most decision-relevant fact about a job posting, and no generic tracker models it. Per
@@ -151,7 +233,11 @@ is actually written; everything else is now grounded enough to scope from.
       time, dependents, and spouse fields
       removed](https://www.gtalent.jp/blog/japanwork-en/job-hunting-en/rirekisho-en). **Target
       the MHLW format** — it is the closest thing to official, and its fair-hiring rationale is
-      a good line in the README.
+      a good line in the README. **Carry cost (recorded 2026-07-11): the highest in this
+      file.** PDF generation in Rails is a known maintenance sink — toolchain choice, CJK
+      font embedding, layout drift — and the MHLW format itself can churn. Highest wow,
+      highest carry; scope it with both eyes open, the way the dark-mode entry weighed its
+      cost side.
 - [ ] **Model the recruiter channel.** Hiring in Japan is heavily agent-mediated. Add a channel
       to each application — direct / agent / referral — and record which agency submitted you where.
       Two agencies submitting the same candidate to the same company is a real and damaging
@@ -198,8 +284,8 @@ is actually written; everything else is now grounded enough to scope from.
 
 Direction decided 2026-07-11: KarirKalyan's long-term identity is a **career growth tracker**,
 not just an application tracker — the name already says so (karir = career; the product is
-currently narrower than its own name). Sequencing is unchanged by this: performance release
-first, ghost prediction after, this cluster then.
+currently narrower than its own name). Sequencing (updated 2026-07-11): this cluster follows
+the user's calendar, not a release order — see the `positions` scoping trigger below.
 
 - [ ] **`positions` (tenure) entity — the keystone; design it before building anything below.**
       Today `accepted` is a terminal status; a career tracker needs the job you then held as a
@@ -208,7 +294,9 @@ first, ghost prediction after, this cluster then.
       above), resume versioning, internal-promotion stages, and 職務経歴書 generation all hang
       off it — a 職務経歴書 is literally a positions table rendered as prose. Write it into
       SPEC.md's data model **first**; retrofitting it later means migrating what `accepted`
-      means.
+      means. **Scoping trigger (decided 2026-07-11): accepting an offer**, not finishing a
+      prior release — the moment the search succeeds is the moment this entity is needed, or
+      the app exits the user's life exactly when its retention story was supposed to begin.
 - [ ] **Make the app survive its own success.** Today the lifecycle ends at `accepted`: the
       search closes and there is no reason to open the app again until the next one. Extend it
       into the tenure _between_ searches, so landing a job is a state change, not an exit:

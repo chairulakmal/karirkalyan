@@ -8,7 +8,7 @@ Rails 8 API-only backend for KarirKalyan. Handles auth, application tracking, ba
 - Rails 8.1, API-only
 - PostgreSQL 16
 - Devise + devise-jwt (JTI revocation)
-- Sidekiq + sidekiq-cron
+- Solid Queue + Solid Cache — both Postgres-backed, no Redis
 - Anthropic SDK — Claude Haiku 4.5 for AI job-URL pre-fill
 - RSpec + FactoryBot + rswag
 
@@ -17,7 +17,8 @@ Rails 8 API-only backend for KarirKalyan. Handles auth, application tracking, ba
 **Prerequisites:** Docker, Ruby 3.4.9, Bundler
 
 ```bash
-# Start PostgreSQL and Redis (docker-compose.yml lives here, reads .env automatically)
+# Start PostgreSQL (docker-compose.yml lives here, reads .env automatically).
+# Postgres is the only container — Solid Queue and Solid Cache use it too.
 docker compose up -d
 
 # Install dependencies and set up the database
@@ -31,12 +32,14 @@ bin/rails server
 
 API docs available at `http://localhost:3001/api-docs` once running.
 
+Jobs run inline in development via the `:async` adapter (`config/environments/development.rb`), so there is **no worker process to start** alongside `rails server`. To exercise Solid Queue for real, set `SOLID_QUEUE_IN_PUMA=1` and drop that line.
+
 ## Deployment env vars
 
 | Variable | Source |
 |---|---|
 | `DATABASE_URL` | Railway managed Postgres (reference variable) |
-| `REDIS_URL` | Railway managed Redis (reference variable) |
+| `SOLID_QUEUE_IN_PUMA` | Set to `1`. **Required** — `config/puma.rb` only loads `plugin :solid_queue` when it is present, and without the plugin no job ever runs (no separate worker service exists to pick up the slack). |
 | `DEVISE_JWT_SECRET_KEY` | Generate: `ruby -e "require 'securerandom'; puts SecureRandom.hex(64)"` |
 | `FRONTEND_URL` | URL of the deployed `web` service (also used as the link host in reminder emails) |
 | `SECRET_KEY_BASE` | Generate: `bin/rails secret`. Preferred over `RAILS_MASTER_KEY` — this app stores no secrets in `credentials.yml.enc`, so sharing the master key with production is unnecessary. |
@@ -45,25 +48,33 @@ API docs available at `http://localhost:3001/api-docs` once running.
 | `SMTP_USER` | SMTP username. For Resend this is the literal string `resend`. |
 | `SMTP_PASS` | SMTP password / API key. For Resend, a `re_…` API key. |
 | `MAILER_FROM` | `From:` address for outbound mail, e.g. `KarirKalyan <reminders@kk.chairulakmal.com>`. Must be on a domain verified with the SMTP provider. |
-| `ANTHROPIC_API_KEY` | Anthropic API key (pay-as-you-go, from console.anthropic.com) for the AI job-URL pre-fill. **Only the `api` service needs it** — pre-fill is a synchronous request, not a Sidekiq job. If unset, `POST /applications/prefill` returns `503` and the rest of the app is unaffected. |
-| `SIDEKIQ_USERNAME` | HTTP basic-auth user for the `/sidekiq` dashboard. **Required in production** — the dashboard fails closed (401) if unset. |
-| `SIDEKIQ_PASSWORD` | HTTP basic-auth password for `/sidekiq`. |
+| `ANTHROPIC_API_KEY` | Anthropic API key (pay-as-you-go, from console.anthropic.com) for the AI job-URL pre-fill. Pre-fill is a synchronous request, not a background job. If unset, `POST /applications/prefill` returns `503` and the rest of the app is unaffected. |
+| `HONEYBADGER_API_KEY` | Error reporting (`config/honeybadger.yml`). |
 
-### Email & scheduled reminders
+### Background jobs & scheduled reminders
 
-`FollowUpReminderJob` runs daily via **sidekiq-cron** (`config/sidekiq_cron.yml`, loaded by `config/initializers/sidekiq.rb` in the Sidekiq server process only) at `15 23 * * *` UTC — 08:15 JST, the user's morning. For each application whose `follow_up_at` falls due, it writes a `TimelineEntry` (the exactly-once idempotency anchor) and enqueues a `FollowUpMailer.reminder` email via `deliver_later` on the `mailers` queue. Decoupling delivery means a transient SMTP failure retries the email without ever duplicating the timeline entry.
+Jobs run on **Solid Queue**, backed by the same PostgreSQL database — no Redis, and no separate worker service. In production the supervisor, dispatcher, and workers run **inside the Puma process** via `plugin :solid_queue` (`config/puma.rb`), which loads only when `SOLID_QUEUE_IN_PUMA` is set. Worker/dispatcher tuning lives in `config/queue.yml`.
 
-**Production topology:** background jobs run in a dedicated Railway **`sidekiq`** service (the same Docker image as `api`, with a `bundle exec sidekiq -C config/sidekiq.yml` Start Command override). The `api` service only *enqueues* — nothing processes the queue without the `sidekiq` service running. It mirrors `api`'s env via `${{api.*}}` variable references.
+Recurring work is declared in `config/recurring.yml`:
+
+| Task | Schedule | What it does |
+|---|---|---|
+| `follow_up_reminders` | `15 8 * * * Asia/Tokyo` — 08:15 JST, the user's morning | `FollowUpReminderJob` |
+| `reset_demo_account` | hourly, at :42 | `DemoResetJob` — see [Demo data](#demo-data) |
+| `clear_solid_queue_finished_jobs` | hourly, at :12 | Keeps the jobs table from growing unbounded |
+
+`FollowUpReminderJob`: for each application whose `follow_up_at` falls due, it writes a `TimelineEntry` (the exactly-once idempotency anchor) and enqueues a `FollowUpMailer.reminder` email via `deliver_later` on the `mailers` queue. Decoupling delivery means a transient SMTP failure retries the email without ever duplicating the timeline entry.
+
+There is **no job dashboard**. The `Sidekiq::Web` mount was removed with Sidekiq; inspect the queue in `psql` (`solid_queue_*` tables) or add Mission Control if it's ever worth a screen.
 
 Locally, mail is **not** sent by default — preview rendered email at `http://localhost:3001/rails/mailers`. Set the `SMTP_*` env vars in development to send real mail (e.g. to test Resend end-to-end).
 
-### Sidekiq dashboard
-
-Live job/queue/retry/cron view at `GET /sidekiq` (`Sidekiq::Web`). Protected by HTTP basic auth in production via `SIDEKIQ_USERNAME` / `SIDEKIQ_PASSWORD` (fails closed if unset); open on localhost in dev. API-only Rails omits the session middleware Sidekiq::Web's CSRF protection needs, so it's mounted with its own cookie session (`config/routes.rb`).
-
 ### Caching
 
-Production `Rails.cache` is `:redis_cache_store` (same Redis as Sidekiq), shared across Puma workers and also backing Rack::Attack's throttle counters. The dashboard's heavy aggregation query is cached with a key derived from the user's application count + latest `updated_at`, so it self-invalidates on any change. Short client timeouts + an `error_handler` mean an unreachable Redis degrades to a cache miss rather than erroring the request.
+Production `Rails.cache` is `:solid_cache_store` — Postgres-backed, so throttle counters and cached values are shared across all Puma workers with no extra service (`config/cache.yml`; development uses `:memory_store`). Two things ride on it:
+
+- **Rack::Attack throttle counters** (`Rack::Attack.cache.store = Rails.cache`), which have to be shared across processes to actually throttle anything.
+- **The dashboard's aggregation query**, cached for 12 hours under a key derived from the user's application count + latest `updated_at`, so it self-invalidates on any change (`app/controllers/api/v1/dashboard_controller.rb`).
 
 ### AI job-URL pre-fill
 
@@ -87,7 +98,9 @@ The service also does **not** consult `robots.txt`. This is a single, user-initi
 
 ## Demo data
 
-The "Try demo account" button signs every visitor into one shared user (`demo@karirkalyan.com`), so its data drifts as people explore. Seeds are idempotent (`find_or_create_by!`), but only *create* — they won't refresh rows that already exist.
+The "Try demo account" button signs every visitor into one shared user (`demo@karirkalyan.com`), so its data drifts as people explore. In production the `reset_demo_account` recurring task wipes it back to a clean seed **every hour at :42** (`DemoResetJob` → `Demo::ResetService`), scoped to the demo user — real accounts are never touched.
+
+Seeds are idempotent (`find_or_create_by!`), but only *create* — they won't refresh rows that already exist, which is why the reset destroys before reseeding rather than re-running seeds on top.
 
 ```bash
 bin/rails db:seed       # idempotent: adds any missing demo data, never duplicates
@@ -95,7 +108,7 @@ bin/rails demo:reset    # full refresh: destroys the demo user (cascades to its
                         # applications + timeline) and reseeds — real users untouched
 ```
 
-On Railway, run the reset against production via `railway ssh --service api bin/rails demo:reset`. Note that `db:reset`/`db:drop` do **not** work on Railway's managed Postgres (the role can't drop the connected database) — `demo:reset` sidesteps that by deleting only the demo user's records. Logic lives in `Demo::ResetService`.
+The hourly task makes a manual reset rarely necessary, but on Railway you can force one via `railway ssh --service api bin/rails demo:reset`. Note that `db:reset`/`db:drop` do **not** work on Railway's managed Postgres (the role can't drop the connected database) — `demo:reset` sidesteps that by deleting only the demo user's records. Logic lives in `Demo::ResetService`.
 
 ## Running tests
 
@@ -132,7 +145,8 @@ Outputs to `swagger/v1/swagger.yaml`.
 | `app/lib/application_fsm.rb` | FSM — `TRANSITIONS` array + `assert_transition!` |
 | `app/services/applications/transition_service.rb` | Status change + audit entry in one transaction |
 | `app/services/applications/url_prefill_service.rb` | AI URL pre-fill — fetch + strip + Claude extraction, SSRF-guarded |
-| `app/jobs/follow_up_reminder_job.rb` | Daily Sidekiq job with idempotency key |
+| `app/jobs/follow_up_reminder_job.rb` | Daily Solid Queue recurring job with idempotency key |
+| `config/recurring.yml` | Recurring-task schedule (reminders, demo reset, job cleanup) |
 | `spec/requests/api/v1/applications_spec.rb` | Request specs — also source for OpenAPI generation |
 
 ## API routes

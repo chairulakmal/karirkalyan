@@ -129,13 +129,45 @@ web/
   proxy.ts                                ← Auth route guard (Next.js 16 renamed middleware.ts)
   app/api/auth/session/route.ts           ← Receives JWT from Rails, sets httpOnly cookie
   app/lib/api.ts                          ← Server-side fetch helper — JWT never reaches the browser
-  app/(app)/dashboard/page.tsx            ← Applications list + stats
-  app/(app)/applications/[id]/page.tsx    ← Detail + timeline + FSM-driven transition buttons
-  app/(app)/board/board.tsx               ← Kanban board — drag = transition, legality read from the API
+  i18n/navigation.ts                      ← Locale-aware Link/router — import these, not next/link
+  app/[locale]/(app)/dashboard/page.tsx         ← Applications list + stats
+  app/[locale]/(app)/applications/[id]/page.tsx ← Detail + timeline + FSM-driven transition buttons
+  app/[locale]/(app)/board/board.tsx            ← Kanban board — drag = transition, legality read from the API
 ```
 
 Architecture rationale for every decision lives in [SPEC.md](SPEC.md), the technical source of
 truth for this project.
+
+---
+
+## Run it locally
+
+Two apps, one repo:
+
+```
+api/   ← Rails 8 API           → :3001
+web/   ← Next.js 16 frontend   → :3000
+```
+
+**Prerequisites:** Docker, Ruby 3.4.9, Node 24
+
+```bash
+# 1. Postgres (the only container — no Redis)
+cd api && docker compose up -d
+
+# 2. API on :3001
+bundle install
+bin/rails db:create db:migrate
+bin/rails db:seed          # optional — demo account + 12 sample applications
+bin/rails server
+
+# 3. Frontend on :3000, in a second terminal
+cd web && npm install && npm run dev
+```
+
+Open [localhost:3000](http://localhost:3000). Background jobs run inline in development (the `:async` adapter), so there is no worker process to start.
+
+More detail — env vars, tests, demo-data reset — is in [api/README.md](api/README.md) and [web/README.md](web/README.md).
 
 ---
 
@@ -156,14 +188,3 @@ truth for this project.
 - **Backend:** Rails 8 API-only, Ruby 3.4.9, PostgreSQL 16, Devise + devise-jwt
 - **Frontend:** Next.js 16 App Router, Tailwind CSS
 - **Infra:** Docker Compose (local); Railway (production) — managed PostgreSQL; Solid Queue + Solid Cache on the same Postgres (no Redis)
-
----
-
-## Repo layout
-
-```
-api/   ← Rails 8 API
-web/   ← Next.js 16 frontend
-```
-
-See [api/README.md](api/README.md) and [web/README.md](web/README.md) for setup instructions.

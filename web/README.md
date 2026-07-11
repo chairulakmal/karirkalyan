@@ -7,6 +7,7 @@ Next.js 16 App Router frontend. Consumes the Rails API over REST and handles JWT
 - Next.js 16 (App Router)
 - TypeScript
 - Tailwind CSS
+- next-intl — English + Japanese
 
 ## Auth design
 
@@ -14,18 +15,29 @@ The Rails API issues a JWT in the `Authorization` response header on sign-in. Ra
 
 This pattern requires a server component — it's one reason Next.js was chosen over a pure Vite/SPA setup.
 
+## i18n
+
+Every page lives under a `[locale]` segment — `en` and `ja` (`i18n/routing.ts`, messages in `messages/en.json` and `messages/ja.json`). Import `Link`, `redirect`, `useRouter` and friends from **`i18n/navigation.ts`**, never from `next/link` / `next/navigation` directly: the wrapped versions carry the active locale through, the originals silently drop it.
+
 ## Screens
+
+Routes below are locale-prefixed in practice (`/en/dashboard`, `/ja/dashboard`).
 
 | Route | Content |
 |---|---|
+| `/` | Landing page |
 | `/sign-in`, `/sign-up` | Auth forms — POST to Rails, exchange token through `/api/auth/session` |
 | `/dashboard` | Applications list with status badges and `follow_up_at` indicators, plus stats summary |
-| `/applications/new` | Create a new application |
+| `/board` | Kanban board — drag a card to run an FSM transition; legality read from `GET /api/v1/transitions`, optimistic with a `409` snap-back |
+| `/applications/new` | Create a new application — includes the AI job-URL pre-fill |
 | `/applications/[id]` | Detail view — FSM transition buttons (from `valid_next_states`), timeline entries, resume/cover letter upload |
+| `/about`, `/docs` | Project write-up and documentation |
 
 ## Local setup
 
-**Prerequisites:** Node 22+ (matches Railway production)
+**Prerequisites:** Node 24 (matches Railway production)
+
+Node is pinned in **one** place — `.nvmrc` — and everything else reads it: `actions/setup-node` via `node-version-file`, and Railpack when it builds the production image. `package.json` restates it as `engines.node` because Railpack consults that first. Keep the two in step; a CI runtime that differs from production's is how the `npm ci` lockfile divergence bit twice.
 
 ```bash
 npm install
@@ -39,7 +51,7 @@ Expects the Rails API on `:3001`. Copy `.env.example` to `.env.local` if you nee
 A single smoke test covers the critical path: sign up → land on dashboard → create application → transition status. Runs in ~2 seconds.
 
 ```bash
-# Prereq: Postgres + Redis running (cd ../api && docker compose up -d)
+# Prereq: Postgres running (cd ../api && docker compose up -d)
 
 npm run test:e2e            # headless run
 npm run test:e2e:ui         # interactive UI mode for debugging
