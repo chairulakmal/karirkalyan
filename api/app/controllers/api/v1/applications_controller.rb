@@ -2,15 +2,24 @@ module Api
   module V1
     class ApplicationsController < ApplicationController
       # Raised when an upload exceeds ::Application::MAX_FILE_SIZE, before its body
-      # is read into memory. Mapped to 422 so the client gets the same status as
-      # the model-level size validation it pre-empts.
-      class FileTooLargeError < StandardError; end
+      # is read into memory. Mapped to the same 422 validation_failed envelope
+      # (detail code `too_long`) as the model-level size validation it pre-empts,
+      # so clients handle both paths identically.
+      class FileTooLargeError < StandardError
+        attr_reader :field
+
+        def initialize(field)
+          @field = field
+          super("#{field.to_s.humanize} must be under 1 MB")
+        end
+      end
 
       before_action :set_application, only: %i[show update destroy transition resume cover_letter]
       before_action :set_nosniff_header, only: %i[resume cover_letter]
 
       rescue_from FileTooLargeError do |error|
-        render json: { error: error.message }, status: :unprocessable_entity
+        render_error(error.message, code: "validation_failed", status: :unprocessable_entity,
+                     details: [ { field: error.field, code: "too_long" } ])
       end
 
       def index
@@ -59,11 +68,11 @@ module Api
         fields = Applications::UrlPrefillService.new(params[:url]).call
         render json: fields
       rescue Applications::UrlPrefillService::ConfigError => e
-        render json: { error: e.message }, status: :service_unavailable
+        render_error(e.message, code: "prefill_unavailable", status: :service_unavailable)
       rescue Applications::UrlPrefillService::ExtractionError => e
-        render json: { error: e.message }, status: :bad_gateway
+        render_error(e.message, code: "prefill_failed", status: :bad_gateway)
       rescue Applications::UrlPrefillService::Error => e
-        render json: { error: e.message }, status: :unprocessable_entity
+        render_error(e.message, code: "invalid_url", status: :unprocessable_entity)
       end
 
       def show
@@ -78,7 +87,7 @@ module Api
         apply_initial_status(application)
 
         if application.errors.any? || !application.save
-          return render json: { error: application.errors.full_messages.join(". ") }, status: :unprocessable_entity
+          return render_validation_failed(application)
         end
 
         render json: application, status: :created
@@ -88,7 +97,7 @@ module Api
         if @application.update(application_params)
           render json: @application
         else
-          render json: { error: @application.errors.full_messages.join(". ") }, status: :unprocessable_entity
+          render_validation_failed(@application)
         end
       end
 
@@ -155,7 +164,7 @@ module Api
         upload = params[:application][field]
 
         if upload.respond_to?(:size) && upload.size > ::Application::MAX_FILE_SIZE
-          raise FileTooLargeError, "#{field.to_s.humanize} must be under 1 MB"
+          raise FileTooLargeError, field
         end
 
         upload.read
@@ -171,7 +180,8 @@ module Api
         requested = params.dig(:application, :status).presence || "draft"
 
         unless ApplicationFSM::ENTRY_STATES.include?(requested)
-          application.errors.add(:status, "must be one of: #{ApplicationFSM::ENTRY_STATES.join(', ')}")
+          application.errors.add(:status, :inclusion,
+            message: "must be one of: #{ApplicationFSM::ENTRY_STATES.join(', ')}")
           return
         end
 

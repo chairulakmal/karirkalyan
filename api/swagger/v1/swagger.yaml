@@ -368,3 +368,19 @@ paths:
           description: current user profile
         '401':
           description: not authenticated
+  "/api/v1/transitions":
+    get:
+      summary: Get the FSM's effective transition table
+      tags:
+      - Transitions
+      security:
+      - bearerAuth: []
+      description: The legal status transitions, derived server-side from the FSM.
+        `transitions` maps every state to its valid next states with the archived
+        rule folded in; terminal states map to an empty array. Clients consume this
+        at runtime instead of hardcoding the table.
+      responses:
+        '200':
+          description: the effective transition table
+        '401':
+          description: not authenticated

@@ -32,7 +32,8 @@ Two consequences worth stating plainly:
   [`CHANGELOG.md`](CHANGELOG.md), including the pre-1.0.0 build phases that used to sit at the
   top of this file.
 
-Last synced against the code: **2026-07-11**, at `v1.1.1`.
+Last synced against the code: **2026-07-11**, post-`v1.1.2` (v1.2.0 API groundwork: error
+codes + the transition-table endpoint).
 
 ---
 
@@ -220,8 +221,9 @@ ApplicationFSM::TERMINAL_STATES              # accepted, declined, archived
 ApplicationFSM::ENTRY_STATES                 # wishlist, draft, applied
 ```
 
-`valid_next_states` is serialised by `show` and `transition` only — **not by `index`**. A board
-view needs it there, or needs the table itself exposed. See `TODO.md`, v1.2.0.
+`valid_next_states` is serialised by `show` and `transition` only — **not by `index`**, which
+stays lean. A board view gets the whole effective table in one request from
+`GET /api/v1/transitions` instead — see § API contract.
 
 ### Service layer
 
@@ -303,8 +305,31 @@ selects applications added without a link. There is no `source` column and no pe
 
 ### API contract
 
-All routes are JSON. Every error response is `{ error: "message" }` — a single string, never an
-array. Validation failures join their messages into that one string.
+All routes are JSON. Every error response is:
+
+```json
+{ "error": "<English sentence>", "code": "<stable_code>" }
+```
+
+`error` is a single human-readable string — never an array; validation failures join their
+messages into it. `code` is the machine-readable half of the contract: a stable snake_case
+identifier that `web/` can key its message catalog on, so localization never has to parse
+English prose. The full code table is below. `validation_failed` responses additionally carry
+the failing fields:
+
+```json
+{
+  "error": "Company can't be blank. Role can't be blank",
+  "code": "validation_failed",
+  "details": [
+    { "field": "company", "code": "blank" },
+    { "field": "role", "code": "blank" }
+  ]
+}
+```
+
+`details[].code` is the ActiveModel error type (`blank`, `inclusion`, `too_long`, …), so a
+catalog can localize per field without string-matching the sentence.
 
 ```
 POST   /api/v1/auth/sign_up                       201, JWT in Authorization header
@@ -320,6 +345,7 @@ DELETE /api/v1/applications/:id
 PATCH  /api/v1/applications/:id/transition        FSM transition; + valid_next_states
 GET    /api/v1/applications/:id/resume            send_data, PDF, nosniff
 GET    /api/v1/applications/:id/cover_letter      send_data, PDF, nosniff
+GET    /api/v1/transitions                        the FSM's effective transition table
 GET    /api/v1/dashboard                          SQL aggregation + facets
 GET    /api/v1/me                                 authenticated user's profile
 
@@ -331,14 +357,54 @@ GET    /api-docs/v1/swagger.yaml                  generated from request specs
 Every record is reached through `current_user.applications`, so cross-user access returns `404`,
 not `403`.
 
-#### Status codes with meaning
+#### Error codes
 
-| Code | When |
-|---|---|
-| `409` | `ActiveRecord::StaleObjectError` — optimistic-locking conflict |
-| `422` | FSM `InvalidTransitionError`; validation failure; bad or private pre-fill URL |
-| `502` | AI extraction failed |
-| `503` | `ANTHROPIC_API_KEY` missing; `/up` when Postgres is down |
+Every `code` the API can return, with the status it rides on. The status is still meaningful on
+its own (a `409` is retryable, a `422` is not), but the code is what clients should branch on.
+
+| `code` | Status | When |
+|---|---|---|
+| `unauthenticated` | `401` | Missing, expired, or revoked JWT (Devise failure app) |
+| `invalid_credentials` | `401` | Sign-in with a wrong email or password |
+| `not_found` | `404` | No such record — including another user's record |
+| `stale_record` | `409` | `ActiveRecord::StaleObjectError` — optimistic-locking conflict |
+| `invalid_transition` | `422` | FSM `InvalidTransitionError` |
+| `validation_failed` | `422` | Model validation failure (create/update, sign-up, file upload); carries `details` |
+| `invalid_url` | `422` | Bad or private/internal pre-fill URL |
+| `rate_limited` | `429` | Rack::Attack throttle; `Retry-After` header set |
+| `prefill_failed` | `502` | AI extraction failed |
+| `prefill_unavailable` | `503` | `ANTHROPIC_API_KEY` missing — the rest of the app keeps working |
+
+Codes are append-only: renaming or removing one is a breaking change to `web/`'s message
+catalog, adding one is not (unknown codes fall back to status-keyed copy). `/up` also returns
+`503` when Postgres is down, but it is a health probe with its own body shape
+(`{ status, checks }`), not part of this error contract.
+
+#### The transition table — `GET /api/v1/transitions`
+
+A Kanban board must know which drops are legal *before* the drop, and
+`ApplicationFSM::TRANSITIONS` is the only source of truth — the shape cannot be guessed from
+the state list (revival paths like `ghosted → applied` are legal; most forward skips are not).
+So the API serves the table read-only:
+
+```json
+{
+  "states":          ["wishlist", "draft", "applied", "…all 13, pipeline order first"],
+  "entry_states":    ["wishlist", "draft", "applied"],
+  "terminal_states": ["accepted", "declined", "archived"],
+  "transitions":     { "wishlist": ["draft", "withdrawn", "archived"], "…": ["…"], "accepted": [] }
+}
+```
+
+`transitions` maps **every** state through `ApplicationFSM.valid_next_states`, so the archived
+rule (any non-terminal state → `archived`, an early return in `assert_transition!`, not a row
+in `TRANSITIONS`) is already folded in — this is the *effective* table, not the raw constant.
+Terminal states map to `[]`. The payload is static per deploy and authenticated like every
+other route.
+
+Consuming this at runtime is the sanctioned alternative to mirroring the table in TypeScript:
+a fetched copy cannot drift from the server, a re-typed copy can. The server still rejects
+illegal transitions regardless — the client's copy only decides what *looks* droppable.
 
 #### Cursor pagination
 
@@ -723,15 +789,16 @@ holding a second copy as a constant. A Japanese search result should say what th
 says. `/about` and `/docs` each override `title` and `description` from their own catalog namespace,
 which the layout's `title.template` renders as `… — KarirKalyan`.
 
-#### Server-side error messages — keyed on HTTP status, not error code
+#### Server-side error messages — keyed on HTTP status, not yet on the error code
 
-**Rails stays English-only, and `web/` localizes by HTTP status.**
+**Rails stays English-only, and `web/` currently localizes by HTTP status.**
 
-The API has no machine-readable error code. Every failure is `{ error: "<English sentence>" }` plus a
-status (`application_controller.rb:10,14`, `applications_controller.rb:62,64,66,81,91`). So `web/`
-throws the sentence away and maps **status → localized copy**: `401`, `403`, `404`, `409`, `422`,
-`429`, `502`, `503` each get an entry under the `errors` namespace, and anything else falls back to
-`errors.unknown`. Nothing ever string-matches the English sentence to recover a pseudo-code.
+The API returns a machine-readable `code` on every failure (see § API contract — added as
+v1.2.0 groundwork), but `web/` does not consume it yet: it still throws the body away and maps
+**status → localized copy**: `401`, `403`, `404`, `409`, `422`, `429`, `502`, `503` each get an
+entry under the `errors` namespace, and anything else falls back to `errors.unknown`. Nothing
+ever string-matches the English sentence to recover a pseudo-code. Narrowing this mapping to
+key on `code` (and per-field `details`) is open v1.2.0 work — see `TODO.md`.
 
 Two places do this mapping, because the failure reaches the UI by two paths:
 
@@ -946,6 +1013,10 @@ the ones a status distinguishes cleanly.
 The cost is per-field `422` text staying English. The fix is real error codes, and it belongs in
 **v1.2.0**, which already opens with an `api/` change for the FSM transition table. One `api/` PR,
 two reasons.
+
+*(Addendum, v1.2.0 groundwork: that `api/` PR landed — every error now carries a stable `code`,
+and `validation_failed` carries per-field `details`. The status-keyed mapping in `web/` remains
+until the board work narrows it; see § Server-side error messages and `TODO.md`.)*
 
 The general lesson is the one this file exists to enforce: a spec that describes a mechanism nobody
 verified is a bug in the spec, not a requirement on the code.

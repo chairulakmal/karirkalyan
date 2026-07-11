@@ -2,6 +2,8 @@ module Api
   module V1
     module Auth
       class RegistrationsController < Devise::RegistrationsController
+        include ErrorRendering
+
         respond_to :json
 
         def create
@@ -14,7 +16,10 @@ module Api
             WelcomeMailer.welcome(resource).deliver_later
             render json: { user: { id: resource.id, email: resource.email } }, status: :created
           else
-            render json: { errors: resource.errors.full_messages }, status: :unprocessable_entity
+            # The single-string { error:, code: } envelope, like every other
+            # failure — this used to return { errors: [...] }, an array the
+            # API contract never allowed.
+            render_validation_failed(resource)
           end
         end
       end
