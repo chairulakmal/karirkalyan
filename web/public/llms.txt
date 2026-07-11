@@ -16,6 +16,11 @@ pipeline. Built as a portfolio project by Chairul Akmal.
 - Sends follow-up reminders via idempotent Solid Queue background jobs
 - Stores resume and cover letter as PostgreSQL bytea per application
 - Exposes a stats dashboard via pure SQL aggregation (no N+1)
+- Offers a Kanban board at /board: one column per active status, and dragging a card between
+  columns performs a real FSM transition. The board fetches the legal moves from
+  GET /api/v1/transitions rather than keeping its own copy of the table, and the server
+  re-validates every move regardless. Each card also has a menu listing every legal next state,
+  which is the keyboard-accessible path.
 - Cursor-based pagination on the applications list
 
 ## Tech stack

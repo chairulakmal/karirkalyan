@@ -1,7 +1,7 @@
 {
   "nav": {
     "dashboard": "Dashboard",
-    "board": "Board",
+    "board": "Kanban",
     "new": "New",
     "signOut": "Sign out",
     "signingOut": "Signing out…",
@@ -110,6 +110,8 @@
     "auditBody": "Every transition appends a timeline entry — who moved it, from which state, to which, and when. Nothing in the app updates one in place.",
     "jobsTitle": "Background jobs on Postgres",
     "jobsBody": "Follow-up reminders run on Solid Queue inside the Puma process. No Redis, no worker service. Each reminder is idempotent by key, so a retry cannot send it twice.",
+    "boardTitle": "A board that reads the table",
+    "boardBody": "Drag a card across the Kanban board and it runs a real transition. The board fetches the transition table from the API instead of keeping a copy, so only the columns a card may legally reach light up — and the server checks again anyway.",
     "tagline": "A job application tracker built on a finite state machine: thirteen states, an explicit transition table, and an immutable audit trail. Rails 8 API, Next.js 16 frontend, one PostgreSQL database."
   },
   "footer": {
@@ -211,7 +213,7 @@
   },
   "board": {
     "eyebrow": "Pipeline",
-    "title": "Board",
+    "title": "Kanban",
     "tracked": "{count, plural, =0 {no applications on the board} one {# application on the board} other {# applications on the board}}",
     "failedToLoad": "Failed to load: {message}",
     "truncated": "Showing only the first {count} applications — the board is truncated. Use the dashboard filters to reach the rest.",

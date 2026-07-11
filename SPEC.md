@@ -633,8 +633,14 @@ illustration, not a second copy of the transition table.** The real table has th
 `api/app/lib/application_fsm.rb`; the diagram names that file in its caption, nothing in the app
 reads the diagram, and no behaviour depends on it — a stale arrow there is a wrong drawing, never a
 wrong transition. Mirroring the full table in TypeScript is precisely what deferred the Kanban board
-to v1.2.0, and this does not do it. Chip labels come from the `status` catalog and chip colours from
+to v1.2.0; the board answers that by *fetching* the table (§ Board view), and this diagram answers it
+by not needing one. Chip labels come from the `status` catalog and chip colours from
 `statusBadgeClass`, so the FSM's vocabulary still has one home.
+
+Below the diagram, four numbered cards state the four claims the code has to back: the explicit
+transition table, the append-only audit trail, Solid Queue on Postgres, and the Kanban board that
+reads its legal moves from the API instead of copying them. They sit in one hairline grid — two
+across at `md`, four at `lg`.
 
 `/about` therefore carries the visit. It states four decisions, each as the cheaper alternative it
 rejected: Rails for a TypeScript developer, a PORO FSM over a state-machine gem, Solid Queue over
@@ -688,6 +694,12 @@ so the route guard's "everything else" row already protects it — no `proxy.ts`
 gains a `nav.board` link beside Dashboard; unlike the Dashboard link it stays visible below `sm`,
 because there is no second way to reach the board.
 
+The **route is `/board`; the label is "Kanban"** (カンバン) — in the nav (`nav.board`) and as the
+page title (`board.title`). "Board" names the thing generically and could be any of the app's
+views; "Kanban" names the one pattern the page actually is, and it is the word both audiences
+already have. The path stays `/board` because a URL that moves is a URL that breaks, and the
+message namespace stays `board.*` for the same reason.
+
 #### Data — one bounded fetch-all, plus the transition table
 
 The server page makes two fetches in parallel:
@@ -704,8 +716,13 @@ The server page makes two fetches in parallel:
 
 #### Columns — seven active, one closed rail
 
-The seven columns are exactly `ACTIVE_STATUSES` (`format.ts`): wishlist, draft, applied,
-phone_screen, technical, final_round, offer, in a horizontally scrollable region. The six closed
+The seven columns are exactly `ACTIVE_STATUSES` (`format.ts`), laid out as a wrapping grid rather
+than a horizontal scroller — four columns per row on large screens, two per row on small screens,
+one on the narrowest — keeping every column on screen without sideways scrolling. Display order is
+board-local and grouped by engagement, not funnel order: the four-column row break puts the
+interview loop (applied, phone_screen, technical, final_round) on the first row and everything
+outside it (wishlist, draft, offer) on the second. Membership still derives from
+`ACTIVE_STATUSES`, so the order list can never hide a column. The six closed
 states — accepted, declined, rejected, ghosted, withdrawn, archived — do not get columns; thirteen
 columns is unreadable at any width. They collapse into a **closed rail** below the board, one
 toggleable group per status showing a count, expanding to the same cards.

@@ -24,6 +24,26 @@ import type { Application, Status, TransitionTable } from "@/app/lib/types";
 
 type Move = { id: number; to: Status };
 
+// Board-only display order. The grid wraps at four, so this groups row one as
+// the interview loop and row two as everything outside it (not yet applied,
+// or done interviewing) instead of funnel order. Membership still comes from
+// ACTIVE_STATUSES; a status missing here sorts after the ranked ones instead
+// of disappearing.
+const COLUMN_ORDER: readonly Status[] = [
+  "applied",
+  "phone_screen",
+  "technical",
+  "final_round",
+  "wishlist",
+  "draft",
+  "offer",
+];
+
+function columnRank(s: Status): number {
+  const i = COLUMN_ORDER.indexOf(s);
+  return i === -1 ? COLUMN_ORDER.length : i;
+}
+
 export function Board({
   applications,
   table,
@@ -74,7 +94,7 @@ export function Board({
     else byStatus.set(app.status, [app]);
   }
 
-  const columns = [...ACTIVE_STATUSES];
+  const columns = [...ACTIVE_STATUSES].sort((a, b) => columnRank(a) - columnRank(b));
   // Everything the API knows that isn't an active column — derived from the
   // fetched state list, so nothing here enumerates the FSM's vocabulary.
   const closed = table.states.filter((s) => !ACTIVE_STATUSES.has(s));
@@ -107,7 +127,7 @@ export function Board({
         </p>
       )}
 
-      <div className="flex gap-3 overflow-x-auto pb-4">
+      <div className="grid grid-cols-1 gap-3 pb-4 sm:grid-cols-2 lg:grid-cols-4">
         {columns.map((status) => {
           const cards = byStatus.get(status) ?? [];
           const legal = isLegalTarget(status);
@@ -125,7 +145,7 @@ export function Board({
                 setDragging(null);
                 if (app) move(app, status);
               }}
-              className={`flex w-60 shrink-0 flex-col border transition ${
+              className={`flex flex-col border transition ${
                 legal ? "border-cobalt bg-cobalt/5" : "border-dune bg-sand/30"
               } ${dragging && !legal ? "opacity-60" : ""}`}
             >
