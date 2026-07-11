@@ -2,9 +2,10 @@
 
 Open work only. Shipped work lives in [`CHANGELOG.md`](CHANGELOG.md).
 
-**Current release: `v1.3.0`** — tagged 2026-07-11 at `f455853`. Ghost prediction, which also
-absorbed the two production items the performance release had parked (the `timeline_entries`
-index and the `/me` fold — both struck off below).
+**Current release: `v1.3.0`** — tagged 2026-07-11 at `f455853`, published as a
+[GitHub Release](https://github.com/chairulakmal/karirkalyan/releases/tag/v1.3.0). Ghost
+prediction, which also absorbed the two production items the performance release had parked
+(the `timeline_entries` index and the `/me` fold — both struck off below).
 
 **North star (decided 2026-07-11): be the best career app for its one loyal user.** Portfolio
 value follows from that, not the other way round — a reviewer can tell a tool with a real
