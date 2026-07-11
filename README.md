@@ -10,7 +10,7 @@ A full-stack job application tracker — Rails 8 API + Next.js 16 frontend.
 
 **Live:** [kk.chairulakmal.com](https://kk.chairulakmal.com) · **API docs:** Swagger UI at [`/api-docs`](https://api-production-4899.up.railway.app/api-docs) on the API service
 
-**Demo account** — sign in as `demo@karirkalyan.com` / `oretachinomachida` to explore a prefilled Tokyo tech job search (12 mock applications across Marcari, Vine Corp, Rokuton, and more — all FSM states covered). Or click **Try demo account** on the sign-in page.
+**Demo account** — click **Try demo account** on the [sign-in page](https://kk.chairulakmal.com/sign-in) to explore a prefilled Tokyo tech job search (12 mock applications across Marcari, Vine Corp, Rokuton, and more — all FSM states covered). Prefer signing in manually? `demo@karirkalyan.com` / `oretachinomachida`.
 
 ---
 
