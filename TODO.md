@@ -2,67 +2,12 @@
 
 Open work only. Shipped work lives in [`CHANGELOG.md`](CHANGELOG.md).
 
-**Current release: `v1.1.2`** — tagged 2026-07-11 at `b66fceb`. Fixes the delete confirm
-prompt clipping at 375px.
-**Next release: `v1.2.0`** — the Kanban board view.
+**Current release: `v1.2.0`** — tagged 2026-07-11 at `36c9378`. The Kanban board view, plus
+the API error codes and transition-table endpoint it needed.
+**Next release: not yet scoped** — candidates live in the backlog below; the ghost-prediction
+item is marked "do it first".
 
-Everything below is post-1.1.2. The v1.2.0 items are scoped; the backlog is not.
-
----
-
-## v1.2.0 — Kanban board view
-
-Columns are FSM states, cards are applications, and a drag between columns is a
-`PATCH /api/v1/applications/:id/transition` call. It demos the state machine far better than a
-list does.
-
-**This release opens with `api/` changes, which is why they are not v1.1.0.** Land them in their
-own PR, on their own, before any board component is written. Do not fold them into a UI PR.
-
-- [x] **Add machine-readable error codes to the API.** Deferred here from v1.1.0's i18n work, which
-  could not localize per-field validation errors without one. Every Rails error was
-  `{ error: "<English sentence>" }` + a status; now a stable `code` (`stale_record`,
-  `invalid_credentials`, `validation_failed` with per-field `details`, …) rides alongside the
-  existing `error` string, so `web/` can key its message catalog off the code instead of the
-  status. Additive — `error` kept so nothing breaks. Full taxonomy in SPEC.md § Error codes.
-
-- [x] **Expose the transition table from the API.** The board must know which drops are legal,
-  and `ApplicationFSM::TRANSITIONS` is the only source of truth. It is *not* a linear pipeline
-  — `ghosted → applied`, `rejected → applied` and `withdrawn → applied` are all legal, while
-  most forward skips are not, so the shape cannot be guessed from the state list. `show` and
-  `transition` already return `valid_next_states` for *one* application, but `index` does not,
-  so a board has no way to know what any card can do. `GET /api/v1/transitions` now serves the
-  effective table, built from `ApplicationFSM.valid_next_states`. Note the server rejects
-  illegal transitions regardless; the client table only decides what *looks* droppable.
-
-With those landed, the `web/` work:
-
-- [x] **Narrow the status-keyed error fallbacks added in v1.1.0.** `web/` now localizes off
-  the API's `code` — per-field `details[].field`/`details[].code` first (`errors.field.*`),
-  then the code (`errors.code.*`), with the v1.1.0 status map kept as the fallback and
-  `errors.unknown` last. Both resolution sites (`apiFailure()` in server actions, the auth
-  form) share the order; the auth route handlers pass the upstream envelope through. Full
-  description in SPEC.md § Server-side error messages.
-- [x] **Consume `GET /api/v1/transitions` in `web/`** to decide which drops look legal on the
-  board. **Do not mirror the table in TypeScript.** A copy is a second source of truth, and a
-  state machine that drifts from its own server is worse than an extra request. The board page
-  now fetches the table alongside the applications and highlights legal drop targets from it.
-- [x] **Solve the 13-column problem.** `ApplicationFSM::VALID_STATES` has 13 states —
-  too many to sit side by side. Shipped as the active pipeline (`wishlist` → `draft` →
-  `applied` → `phone_screen` → `technical` → `final_round` → `offer`) as columns, with the
-  terminal and dead-end states (`accepted`, `declined`, `rejected`, `ghosted`, `withdrawn`,
-  `archived`) collapsed into a closed rail below the board — not a drop target.
-- [x] **Reconcile with cursor pagination.** Settled in SPEC.md § Board view before any
-  component was written: a bounded fetch-all against `index` as it stands (`limit=100`, capped
-  at 10 pages) with an on-screen truncation notice past the cap. Per-column cursors were
-  rejected in the decisions log — new query params for precision the board doesn't need.
-- [x] **Optimistic transitions.** Landed via `useOptimistic`: a move renders instantly, a
-  failed one snaps the card home with a board-level notice, and the `409`
-  stale-`lock_version` path additionally refreshes the route so fresh `lock_version`s flow in.
-- [x] **Keyboard-accessible alternative.** Every card carries a focusable menu button listing
-  *all* legal next states — including the closed ones drag refuses — sharing the detail page's
-  confirm/revival semantics via `app/lib/transitions.ts`. The menu is the accessible path and
-  the only complete one; drag is a pointer convenience.
+Everything below is post-1.2.0 and unscoped.
 
 ---
 

@@ -5,6 +5,63 @@ Open work lives in [`TODO.md`](TODO.md).
 
 ---
 
+## v1.2.0 — 2026-07-11
+
+Tagged at `36c9378`. The Kanban board view, plus the `api/` groundwork it needed. As scoped,
+the release opened with the API changes in their own PR before any board component was
+written. *(feat/api-error-codes-and-transitions PR #52, feat/web-error-codes PR #53,
+feat/kanban-board PR #54)*
+
+### API groundwork *(PR #52)*
+
+- **Machine-readable error codes** — deferred here from v1.1.0's i18n work, which could not
+  localize per-field validation errors without them. A stable `code` (`stale_record`,
+  `invalid_credentials`, `validation_failed` with per-field `details`, …) now rides alongside
+  the existing `error` string — additive, nothing breaks. Full taxonomy in SPEC.md § Error
+  codes.
+- **`GET /api/v1/transitions`** — serves the effective transition table, built from
+  `ApplicationFSM.valid_next_states`, so a client can learn which moves are legal without
+  mirroring the table. The server rejects illegal transitions regardless; the table only
+  decides what *looks* possible.
+
+### Errors localized by code, not status *(PR #53)*
+
+- **`web/` keys its message catalog off the API's `code`** — per-field `details[].field` /
+  `details[].code` first (`errors.field.*`), then the code (`errors.code.*`), with the v1.1.0
+  status map kept as fallback and `errors.unknown` last. Both resolution sites — `apiFailure()`
+  in server actions and the auth form — share the order, and the shared failure-detail guard
+  keeps the server and client parsers in agreement. Recovers the per-field `422` detail that
+  v1.1.0 had to drop.
+
+### The Kanban board *(PR #54)*
+
+- **`/board`, labeled "Kanban" (カンバン)** — columns are FSM states, cards are applications,
+  and a drag between columns is a `PATCH /api/v1/applications/:id/transition` call. It demos
+  the state machine far better than a list does. The route stays `/board`; only the label says
+  Kanban.
+- **The board fetches the transition table** from `GET /api/v1/transitions` and highlights
+  legal drop targets from it — no copy in TypeScript, per the repo's oldest invariant.
+- **Seven active columns, six closed states in a rail** — the active pipeline (`wishlist` →
+  … → `offer`) lays out as a wrapping grid (four columns per row at `lg`, two at `sm`, one
+  below) with the interview loop grouped on the first row; the terminal and dead-end states
+  collapse into a toggleable closed rail below the board, not a drop target. Thirteen columns
+  is unreadable at any width.
+- **One bounded fetch-all** against the existing `index` (`limit=100`, capped at 10 pages)
+  with an on-screen truncation notice past the cap — per-column cursors were rejected in the
+  decisions log as new query params for precision the board doesn't need.
+- **Optimistic transitions** via `useOptimistic` — a move renders instantly, a failed one
+  snaps the card home with a board-level notice, and the `409` stale-`lock_version` path
+  additionally refreshes the route so fresh `lock_version`s flow in.
+- **Keyboard-accessible card menu** — every card carries a focusable menu listing *all* legal
+  next states, including the closed ones drag refuses, sharing the detail page's
+  confirm/revival semantics via `app/lib/transitions.ts`. The menu is the accessible path and
+  the only complete one; drag is a pointer convenience.
+- **Homepage gains a fourth numbered card** stating the board's claim — it reads its legal
+  moves from the API instead of copying them — and the claims grid reflows two across at
+  `md`, four at `lg`. README, README.ja, and `llms.txt` describe the board.
+
+---
+
 ## v1.1.2 — 2026-07-11
 
 Tagged at `b66fceb`. One mobile-layout fix that v1.1.1's responsive audit missed: the audit

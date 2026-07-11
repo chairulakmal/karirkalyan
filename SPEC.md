@@ -32,7 +32,7 @@ Two consequences worth stating plainly:
   [`CHANGELOG.md`](CHANGELOG.md), including the pre-1.0.0 build phases that used to sit at the
   top of this file.
 
-Last synced against the code: **2026-07-11**, post-`v1.1.2` (v1.2.0: API error codes + the
+Last synced against the code: **2026-07-11**, post-`v1.2.0` (API error codes + the
 transition-table endpoint; `web/` error catalog keyed on those codes; the `/board` Kanban view).
 
 ---
