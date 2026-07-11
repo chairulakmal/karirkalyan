@@ -33,6 +33,7 @@ const ENDPOINTS = [
   { method: "PATCH", path: "/api/v1/applications/:id/transition", key: "transition" },
   { method: "GET", path: "/api/v1/applications/:id/resume", key: "resume" },
   { method: "GET", path: "/api/v1/applications/:id/cover_letter", key: "coverLetter" },
+  { method: "GET", path: "/api/v1/transitions", key: "transitionTable" },
   { method: "GET", path: "/api/v1/dashboard", key: "dashboard" },
   { method: "GET", path: "/api/v1/me", key: "me" },
   { method: "GET", path: "/up", key: "up" },
