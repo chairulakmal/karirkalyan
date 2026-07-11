@@ -43,7 +43,7 @@ index).
 ```
 karirkalyan/
   api/    ← Rails 8 API-only. Owns data, auth, the FSM, background jobs.
-    docker-compose.yml   ← postgres 16 for local dev (no Redis)
+    docker-compose.yml   ← postgres 18 for local dev (no Redis)
   web/    ← Next.js 16 App Router. Owns the UI and the browser session.
   design/ ← design tokens and icon assets
   notes/  ← working notes; not authoritative
@@ -69,7 +69,7 @@ Everything in the frontend auth design follows from that.
 |---|---|---|
 | Rails 8 API-only | Full-stack Rails | No HTML views needed; clean API contract |
 | Ruby 3.4.9 (via mise) | System Ruby | Reproducible across machines |
-| PostgreSQL 16 | SQLite | Foreign keys, `EXTRACT()` for date math, production-grade |
+| PostgreSQL 18 | SQLite | Foreign keys, `EXTRACT()` for date math, production-grade |
 | Devise + devise-jwt | Roll own JWT | Proven auth layer; JTI revocation solves logout |
 | Custom PORO FSM | `state_machines` gem | Visible logic — the transitions table is the documentation |
 | Service objects | Fat models / callbacks | Explicit call sites; easy to test in isolation |
@@ -1126,7 +1126,7 @@ Coverage: SimpleCov, branch coverage on, 80% floor.
 |---|---|---|
 | `api` | `api/` | Dockerfile `CMD` — `rails server` (Puma, with the Solid Queue plugin) |
 | `web` | `web/` | `npm run start` |
-| PostgreSQL | managed | — |
+| PostgreSQL 18 | managed (`ghcr.io/railwayapp-templates/postgres-ssl:18`) | — |
 
 Environment variables: `DATABASE_URL`, `DEVISE_JWT_SECRET_KEY`, `SECRET_KEY_BASE`, `FRONTEND_URL`,
 `SOLID_QUEUE_IN_PUMA` (**required** — without it no job ever runs), `HONEYBADGER_API_KEY`,
@@ -1170,8 +1170,21 @@ image. `web/package.json` restates it as `engines.node` because Railpack consult
 Keep them in step; a CI runtime that differs from production's is how the `npm ci` lockfile
 divergence bit twice — in v1.1.0, and again in the dependency refresh after v1.3.0.
 
+Local Postgres tracks production's major version — both are **18**. A dev database a major
+version behind production is a bug waiting to be found in production, and the two drifted
+apart for exactly that reason once already: Railway was moved to `postgres-ssl:18` while
+`docker-compose.yml`, CI, and this file all still said 16.
+
+The `postgres:18` image moved its data directory: `PGDATA` is now
+`/var/lib/postgresql/18/docker` and the declared volume is `/var/lib/postgresql`, not
+`/var/lib/postgresql/data`. `docker-compose.yml` mounts the new path — mounting the old one
+against an 18 image leaves Postgres writing outside the named volume, and the database
+silently empties on every `docker compose down`. Upgrading a machine that still has a 16
+volume needs `docker compose down -v` and a fresh `db:setup` (dev data is disposable; the
+volume cannot be read by an 18 server).
+
 ```bash
-cd api && docker compose up -d    # postgres 16 only — no Redis
+cd api && docker compose up -d    # postgres 18 only — no Redis
 
 cd api && bundle install && bin/rails db:create db:migrate && bin/rails server  # :3001
 cd web && npm install && npm run dev                                            # :3000

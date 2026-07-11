@@ -6,7 +6,7 @@ Rails 8 API-only backend for KarirKalyan. Handles auth, application tracking, ba
 
 - Ruby 3.4.9
 - Rails 8.1, API-only
-- PostgreSQL 16
+- PostgreSQL 18
 - Devise + devise-jwt (JTI revocation)
 - Solid Queue + Solid Cache — both Postgres-backed, no Redis
 - Anthropic SDK — Claude Haiku 4.5 for AI job-URL pre-fill

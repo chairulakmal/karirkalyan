@@ -95,7 +95,7 @@ loyal user, losing that history is strictly worse than lacking any feature in th
       backup — `solid_queue`/`solid_cache` churn never triggers it, and the fingerprint
       commit doubles as the keep-alive against GitHub's 60-day cron auto-disable. The dump
       itself is the full database: client major queried from the server at run time
-      (**production is Postgres 18**, not the local-dev 16), gzipped artifact on 60-day
+      (**production is Postgres 18** — as, since this release, is local dev), gzipped artifact on 60-day
       retention, `pipefail` plus completion-trailer and size checks so a failed dump is a
       red run, never a silent tiny artifact. Decision recorded: a dump, **not** a mirror on
       a free Postgres tier — a second live database is HA machinery for an app that needs
@@ -107,9 +107,14 @@ loyal user, losing that history is strictly worse than lacking any feature in th
         applications:19 | timeline_entries:32`, status spread intact). Drill steps are
         documented in the backups repo README.
     - [ ] Document the drill (or point to the backups repo) in SPEC.md § Deployment.
-  - [ ] **Local dev Postgres 16 → 18** (`api/docker-compose.yml`) — discovered during
-        backup setup: production has been two majors ahead of the dev container and the
-        SPEC's "postgres 16" line. Bump, and sync SPEC.md § Local development.
+  - [x] **Local dev Postgres 16 → 18 — done 2026-07-11** (`api/docker-compose.yml`, both
+        CI workflows, SPEC.md, both READMEs, `api/README.md`, `llms.txt`). Production was
+        confirmed already on 18.4 (`postgres-ssl:18`), so nothing changed on Railway; the
+        drift was entirely dev/CI/docs. The bump also moved the compose volume mount to
+        `/var/lib/postgresql` — `postgres:18` relocated `PGDATA` to
+        `/var/lib/postgresql/18/docker`, and the old `.../data` mount would have parked
+        the live data dir outside the named volume. Upgrading a machine with a 16 volume
+        needs `docker compose down -v` + `db:setup`.
 - [ ] **Full-account export** — JSON plus resume files, downloadable from the app. The
       loyal-user version of the CSV table-stakes item (CSV covers applications only; it
       recovers neither resumes nor timeline). CSV stays as a convenience view; this is the
