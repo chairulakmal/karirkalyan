@@ -13,7 +13,9 @@ import "./globals.css";
  *
  * Unlike `[locale]/not-found.tsx`, this bypasses normal rendering, so it must
  * return a full HTML document and import its own styles and fonts. Only the two
- * families this page actually uses are loaded — body text and the heading.
+ * families this page actually uses are loaded — body text and the heading — and
+ * in the same variable form as the root layout, so the emitted files are
+ * content-hash-shared with it rather than adding static duplicates to the build.
  *
  * Copy stays English: an unmatched path carries no locale to translate into.
  */
@@ -21,14 +23,13 @@ import "./globals.css";
 const manrope = Manrope({
   variable: "--font-manrope",
   subsets: ["latin"],
-  weight: ["400", "500"],
   display: "swap",
 });
 
 const fraunces = Fraunces({
   variable: "--font-fraunces",
   subsets: ["latin"],
-  weight: ["300", "400"],
+  axes: ["opsz"],
   display: "swap",
 });
 

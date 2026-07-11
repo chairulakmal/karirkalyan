@@ -19,8 +19,6 @@ career-planning idea were added 2026-07-11.
 
 ### Performance — production (priority)
 
-- [ ] **Font payload** — 3 families / ~15 files in `web/app/layout.tsx` (Fraunces 4 weights,
-  Manrope 5, IBM Plex Mono 2); switch Fraunces & Manrope to variable builds or trim unused weights.
 - [ ] **`timeline_entries` offer-lookup index** — the dashboard subquery filters `to_status = 'offer'`
   and the table has no index on `to_status` at all (only `actor_id`, `application_id`,
   `idempotency_key`). Add `(to_status, application_id, created_at)` if it grows.
