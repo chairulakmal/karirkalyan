@@ -32,7 +32,7 @@ bin/rails server
 
 API docs available at `http://localhost:3001/api-docs` once running.
 
-Jobs run inline in development via the `:async` adapter (`config/environments/development.rb`), so there is **no worker process to start** alongside `rails server`. To exercise Solid Queue for real, set `SOLID_QUEUE_IN_PUMA=1` and drop that line.
+Jobs run in-process in development via the `:async` adapter (`config/environments/development.rb`) — an in-memory thread pool, not Rails' separate `:inline` adapter — so there is **no worker process to start** alongside `rails server`. To exercise Solid Queue for real, set `SOLID_QUEUE_IN_PUMA=1` and drop that line.
 
 ## Deployment env vars
 
@@ -165,7 +165,12 @@ DELETE /api/v1/applications/:id
 PATCH  /api/v1/applications/:id/transition
 GET    /api/v1/applications/:id/resume
 GET    /api/v1/applications/:id/cover_letter
-GET    /api/v1/dashboard
 
+GET    /api/v1/transitions               # the FSM transition table — the board reads this
+                                         #   instead of mirroring it in TypeScript
+GET    /api/v1/dashboard
+GET    /api/v1/me
+
+GET    /up                               # deep health check — pings Postgres; no OpenAPI path
 GET    /api-docs
 ```

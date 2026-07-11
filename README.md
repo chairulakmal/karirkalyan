@@ -32,6 +32,8 @@ A full-stack job application tracker — Rails 8 API + Next.js 16 frontend.
 | Kanban board | Drag a card, run an FSM transition — optimistic, with a `409` snap-back. The board fetches the transition table from `GET /api/v1/transitions` rather than mirroring it in TypeScript; a card menu lists every legal next state as the accessible path |
 | API docs | rswag — request specs and OpenAPI spec share one source |
 | Testing | Unit specs (no DB) + request specs (real PostgreSQL) |
+| i18n | The product ships in English *and* Japanese — not just a translated README. next-intl with ICU message catalogs; `ja` is prefixed, `en` is bare, so every page keeps one canonical URL, with `hreflang` and the sitemap to match |
+| Pagination | Cursor-based (`?after=<base64_cursor>&limit=20`) |
 
 ---
 
@@ -180,6 +182,14 @@ More detail — env vars, tests, demo-data reset — is in [api/README.md](api/R
 | Shipped work, release by release | [CHANGELOG.md](CHANGELOG.md) |
 | Open work and the roadmap | [TODO.md](TODO.md) |
 | Local setup and running tests | [api/README.md](api/README.md), [web/README.md](web/README.md) |
+
+---
+
+## Why Rails API + Next.js
+
+Rails does what Rails is good at — data integrity, background jobs, serving an API. Putting Next.js in front of it buys one thing that a pure client-side bundler like Vite cannot: a server. The JWT is exchanged in a Next.js route handler and stored in an `httpOnly` cookie, so it never touches client-side JavaScript and an XSS bug cannot exfiltrate it. Without a server layer you would have to build one anyway just to set that cookie.
+
+Next.js is also the stack of the other portfolio project, [Awano](https://github.com/chairulakmal/awano) (a multi-tenant support desk). Read the two side by side and you'll see the same patterns — FSM, transactional audit trail, service layer, two-tier testing — expressed once in Rails and once in Next.js.
 
 ---
 

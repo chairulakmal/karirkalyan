@@ -21,7 +21,10 @@ Every page lives under a `[locale]` segment — `en` and `ja` (`i18n/routing.ts`
 
 ## Screens
 
-Routes below are locale-prefixed in practice (`/en/dashboard`, `/ja/dashboard`).
+`localePrefix` is `"as-needed"` (`i18n/routing.ts`): Japanese is prefixed (`/ja/dashboard`),
+English keeps the bare path (`/dashboard`). `/en/*` is **not** a live URL — next-intl `307`s it to
+the unprefixed form, so each page has exactly one canonical URL. Routes below are written in their
+English (bare) form.
 
 | Route | Content |
 |---|---|

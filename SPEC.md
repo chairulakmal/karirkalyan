@@ -233,7 +233,8 @@ for jobs added after the fact.
 ApplicationFSM.assert_transition!(from, to)  # raises InvalidTransitionError → 422
 ApplicationFSM.valid_next_states(from)       # [] for terminal states; appends "archived"
 ApplicationFSM::TRANSITIONS                  # frozen array of { from:, to: }
-ApplicationFSM::VALID_STATES                 # 13 states, derived from TRANSITIONS
+ApplicationFSM::VALID_STATES                 # 13 states — TRANSITIONS ∪ TERMINAL_STATES
+                                             #   (archived appears in no TRANSITIONS row)
 ApplicationFSM::TERMINAL_STATES              # accepted, declined, archived
 ApplicationFSM::ENTRY_STATES                 # wishlist, draft, applied
 ```
@@ -472,7 +473,9 @@ its own (a `409` is retryable, a `422` is not), but the code is what clients sho
 Codes are append-only: renaming or removing one is a breaking change to `web/`'s message
 catalog, adding one is not (unknown codes fall back to status-keyed copy). `/up` also returns
 `503` when Postgres is down, but it is a health probe with its own body shape
-(`{ status, checks }`), not part of this error contract.
+(`{ status, checks }`), not part of this error contract — and for the same reason it carries no
+OpenAPI path. It is infrastructure, not API; its absence from `swagger.yaml` is deliberate, not a
+missing rswag spec.
 
 #### The transition table — `GET /api/v1/transitions`
 
@@ -643,6 +646,10 @@ STARTTLS port `2587`. The `From:` domain must be verified in Resend first.
   - `sign_in`: per-IP, plus **email-keyed** throttles (`10/5min`, `50/hour`) capping guesses
     against a single account across all IPs. IP-only throttling is defeated by a botnet or a
     shared NAT egress.
+  - `sign_up`: 3/hour per IP. The *other* unauthenticated write, and the one that is easy to
+    forget: every sign-up writes a user and sends a welcome mail, so an uncapped one is a
+    spam-account and outbound-email vector — and the mail reputation it burns is not ours to
+    spend.
   - `prefill`: per-IP, plus **per-account** caps (10/min, 50/hour, 100/day) keyed on the JWT
     `sub`. The endpoint costs money (a Claude call plus an outbound fetch), so an uncapped
     per-account path is a cost and abuse vector — most sharply through the shared demo login.
@@ -781,8 +788,10 @@ Below the hero it draws the machine it claims to be built on:
 the register of a git log, which is the audit trail's own aesthetic, and a layout that never wraps
 on a phone — with the three closed states below it rejoining the rail at `applied` along a dashed
 cobalt return trace, so "it is not a line" is drawn rather than only stated. **It is an
-illustration, not a second copy of the transition table.** The real table has thirty-three edges and lives only in
-`api/app/lib/application_fsm.rb`; the diagram names that file in its caption, nothing in the app
+illustration, not a second copy of the transition table.** The real table lives only in
+`api/app/lib/application_fsm.rb` — deliberately not restated here, not even as an edge count, because
+a hand-copied number is the same failure as a hand-copied table and this paragraph once carried a
+wrong one; the diagram names that file in its caption, nothing in the app
 reads the diagram, and no behaviour depends on it — a stale arrow there is a wrong drawing, never a
 wrong transition. Mirroring the full table in TypeScript is precisely what deferred the Kanban board
 to v1.2.0; the board answers that by *fetching* the table (§ Board view), and this diagram answers it
@@ -964,7 +973,15 @@ does not collide with any exclusion. The crawler exclusions (`robots.txt`, `site
 `Link`, `useRouter`, `usePathname`, `getPathname`, and `redirect` are re-exported from
 `i18n/navigation.ts` and used **instead of** the `next/link` and `next/navigation` originals. The
 originals drop the prefix, so a `/ja` visitor clicking through the app silently falls back to
-English. `notFound()` still comes from `next/navigation` — it carries no path.
+English.
+
+Two deliberate exceptions, both importing from `next/navigation` on purpose:
+
+- `notFound()` — it carries no path, so there is no locale to preserve.
+- `redirect` in `app/lib/api.ts`, which sends an expired session to `/api/auth/expired` — a route
+  handler outside the `[locale]` tree. It must **not** be locale-prefixed: the wrapped `redirect`
+  would rewrite it to `/ja/api/auth/expired`, which does not exist. Someone applying the rule
+  mechanically will "fix" this import and silently break session expiry.
 
 Two consequences worth knowing:
 
