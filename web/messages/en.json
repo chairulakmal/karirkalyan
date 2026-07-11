@@ -1,6 +1,7 @@
 {
   "nav": {
     "dashboard": "Dashboard",
+    "board": "Kanban",
     "new": "New",
     "signOut": "Sign out",
     "signingOut": "Signing out…",
@@ -109,6 +110,8 @@
     "auditBody": "Every transition appends a timeline entry — who moved it, from which state, to which, and when. Nothing in the app updates one in place.",
     "jobsTitle": "Background jobs on Postgres",
     "jobsBody": "Follow-up reminders run on Solid Queue inside the Puma process. No Redis, no worker service. Each reminder is idempotent by key, so a retry cannot send it twice.",
+    "boardTitle": "A board that reads the table",
+    "boardBody": "Drag a card across the Kanban board and it runs a real transition. The board fetches the transition table from the API instead of keeping a copy, so only the columns a card may legally reach light up — and the server checks again anyway.",
     "tagline": "A job application tracker built on a finite state machine: thirteen states, an explicit transition table, and an immutable audit trail. Rails 8 API, Next.js 16 frontend, one PostgreSQL database."
   },
   "footer": {
@@ -144,8 +147,8 @@
     "authBody": "Sign-up and sign-in return a JWT in the <code>Authorization</code> header. In this frontend that token never reaches client-side JavaScript: a Next.js route handler receives it and writes an <code>httpOnly</code> cookie, and every later request is proxied server-side. Signing out rotates the token's <code>jti</code>, which revokes every device at once.",
     "scopeTitle": "Everything is scoped to you",
     "scopeBody": "Every record is reached through <code>current_user.applications</code>. Asking for someone else's application returns <em>404</em>, not <em>403</em> — a 403 would confirm the row exists.",
-    "errorsTitle": "Errors are one string",
-    "errorsBody": "Every failure responds with a single <code>error</code> key holding one string, never an array. Validation failures join their messages into it. The status code carries the meaning:",
+    "errorsTitle": "Errors carry a code",
+    "errorsBody": "Every failure responds with an <code>error</code> sentence and a stable machine-readable <code>code</code>; validation failures add a <code>details</code> array naming each field and its error type. This frontend localizes off the code, never the sentence. The status still groups them:",
     "errorTable": {
       "code": "Code",
       "when": "When",
@@ -170,6 +173,7 @@
       "transition": "Move the status through the state machine.",
       "resume": "Download the stored resume as a PDF.",
       "coverLetter": "Download the stored cover letter as a PDF.",
+      "transitionTable": "The state machine, read-only — every state and its legal next states.",
       "dashboard": "Aggregate counts and the filter facets.",
       "me": "The signed-in user's profile.",
       "up": "Health check — pings Postgres."
@@ -206,6 +210,18 @@
     "avgDaysAria": "What counts toward this average",
     "avgDaysTooltip": "Counts applications that reached offer, accepted, or declined. Measured from your applied date to when the offer status was recorded in the audit log.",
     "failedToLoad": "Failed to load: {message}"
+  },
+  "board": {
+    "eyebrow": "Pipeline",
+    "title": "Kanban",
+    "tracked": "{count, plural, =0 {no applications on the board} one {# application on the board} other {# applications on the board}}",
+    "failedToLoad": "Failed to load: {message}",
+    "truncated": "Showing only the first {count} applications — the board is truncated. Use the dashboard filters to reach the rest.",
+    "closedTitle": "Closed",
+    "empty": "Nothing on the board yet.",
+    "addFirst": "Add your first one →",
+    "moveMenu": "Move {company}",
+    "menuTitle": "Move to"
   },
   "list": {
     "company": "Company",

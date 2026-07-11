@@ -43,24 +43,26 @@ With those landed, the `web/` work:
   `errors.unknown` last. Both resolution sites (`apiFailure()` in server actions, the auth
   form) share the order; the auth route handlers pass the upstream envelope through. Full
   description in SPEC.md § Server-side error messages.
-- [ ] **Consume `GET /api/v1/transitions` in `web/`** to decide which drops look legal on the
+- [x] **Consume `GET /api/v1/transitions` in `web/`** to decide which drops look legal on the
   board. **Do not mirror the table in TypeScript.** A copy is a second source of truth, and a
-  state machine that drifts from its own server is worse than an extra request.
-- [ ] **Solve the 13-column problem.** `ApplicationFSM::VALID_STATES` has 13 states —
-  too many to sit side by side. Group them: an active pipeline (`wishlist` → `draft` →
+  state machine that drifts from its own server is worse than an extra request. The board page
+  now fetches the table alongside the applications and highlights legal drop targets from it.
+- [x] **Solve the 13-column problem.** `ApplicationFSM::VALID_STATES` has 13 states —
+  too many to sit side by side. Shipped as the active pipeline (`wishlist` → `draft` →
   `applied` → `phone_screen` → `technical` → `final_round` → `offer`) as columns, with the
   terminal and dead-end states (`accepted`, `declined`, `rejected`, `ghosted`, `withdrawn`,
-  `archived`) collapsed into a closed lane or a filter.
-- [ ] **Reconcile with cursor pagination.** `applications-list.tsx` cursor-paginates a single
-  ordered list; a board needs every column populated at once. Prefer a bounded fetch-all
-  against `index` as it stands; a per-column cursor would need new query params. Settle this
-  before writing components — it is a design decision, not an implementation detail.
-- [ ] **Optimistic transitions.** A drag that waits for a round trip feels broken. This is
-  where the backlog's `useOptimistic` item earns its keep — fold it in here rather than doing
-  it separately, and handle the `409` stale-`lock_version` path by reverting the card.
-- [ ] **Keyboard-accessible alternative.** Drag-and-drop alone fails a11y; the existing
-  transition buttons on the detail page can stay as the accessible path, but the board's cards
-  need focus + a menu, not just a drag handle.
+  `archived`) collapsed into a closed rail below the board — not a drop target.
+- [x] **Reconcile with cursor pagination.** Settled in SPEC.md § Board view before any
+  component was written: a bounded fetch-all against `index` as it stands (`limit=100`, capped
+  at 10 pages) with an on-screen truncation notice past the cap. Per-column cursors were
+  rejected in the decisions log — new query params for precision the board doesn't need.
+- [x] **Optimistic transitions.** Landed via `useOptimistic`: a move renders instantly, a
+  failed one snaps the card home with a board-level notice, and the `409`
+  stale-`lock_version` path additionally refreshes the route so fresh `lock_version`s flow in.
+- [x] **Keyboard-accessible alternative.** Every card carries a focusable menu button listing
+  *all* legal next states — including the closed ones drag refuses — sharing the detail page's
+  confirm/revival semantics via `app/lib/transitions.ts`. The menu is the accessible path and
+  the only complete one; drag is a pointer convenience.
 
 ---
 

@@ -28,6 +28,7 @@ A full-stack job application tracker — Rails 8 API + Next.js 16 frontend.
 | Caching | Solid Cache (Postgres-backed) — Rack::Attack throttle counters shared across all Puma workers, no Redis |
 | File storage | PostgreSQL `bytea`, 1 MB cap, PDF magic-byte validation |
 | Dashboard | Pure SQL aggregation — no N+1, no records loaded into Ruby |
+| Kanban board | Drag a card, run an FSM transition — optimistic, with a `409` snap-back. The board fetches the transition table from `GET /api/v1/transitions` rather than mirroring it in TypeScript; a card menu lists every legal next state as the accessible path |
 | API docs | rswag — request specs and OpenAPI spec share one source |
 | Testing | Unit specs (no DB) + request specs (real PostgreSQL) |
 
@@ -127,6 +128,7 @@ web/
   app/lib/api.ts                          ← Server-side fetch helper — JWT never reaches the browser
   app/(app)/dashboard/page.tsx            ← Applications list + stats
   app/(app)/applications/[id]/page.tsx    ← Detail + timeline + FSM-driven transition buttons
+  app/(app)/board/board.tsx               ← Kanban board — drag = transition, legality read from the API
 ```
 
 Architecture rationale for every decision lives in [SPEC.md](SPEC.md), the technical source of

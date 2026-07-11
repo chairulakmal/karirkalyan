@@ -5,13 +5,12 @@ import { useTranslations } from "next-intl";
 import { useRouter } from "@/i18n/navigation";
 import { transitionStatus } from "@/app/lib/actions";
 import { statusBadgeClass } from "@/app/lib/format";
+import {
+  CONFIRM_REQUIRED,
+  HARD_TERMINAL,
+  REVIVAL_STATES,
+} from "@/app/lib/transitions";
 import type { Status } from "@/app/lib/types";
-
-const CONFIRM_REQUIRED = new Set<Status>(["rejected", "accepted", "declined", "withdrawn", "archived"]);
-
-const REVIVAL_STATES = new Set<Status>(["ghosted", "rejected", "withdrawn"]);
-
-const HARD_TERMINAL = new Set<Status>(["accepted", "declined", "archived"]);
 
 export function TransitionButtons({
   id,

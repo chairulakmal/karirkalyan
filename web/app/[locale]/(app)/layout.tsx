@@ -29,6 +29,9 @@ export default async function AppLayout({ children }: { children: React.ReactNod
             <span className="hidden sm:block">
               <NavLink href="/dashboard">{t("dashboard")}</NavLink>
             </span>
+            {/* Stays visible below sm: unlike the dashboard (the mark links
+                there), there is no second way to reach the board. */}
+            <NavLink href="/board">{t("board")}</NavLink>
             <NavLink href="/applications/new">{t("new")}</NavLink>
             <SignOutButton />
             <LocaleSwitcher />

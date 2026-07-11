@@ -106,11 +106,12 @@ export default async function Home() {
 
           {/* Numbered, and divided by hairlines rather than whitespace: the page
               is arguing that structure is explicit, so it should look it. */}
-          <ul className="mt-24 grid gap-px border border-dune bg-dune md:grid-cols-3">
+          <ul className="mt-24 grid gap-px border border-dune bg-dune md:grid-cols-2 lg:grid-cols-4">
             {[
               { n: "01", title: t("fsmTitle"), body: t.rich("fsmBody", { em: (c) => <em>{c}</em> }) },
               { n: "02", title: t("auditTitle"), body: t("auditBody") },
               { n: "03", title: t("jobsTitle"), body: t("jobsBody") },
+              { n: "04", title: t("boardTitle"), body: t("boardBody") },
             ].map(({ n, title, body }) => (
               <li key={n} className="bg-sand p-6 md:p-7">
                 <p className="kk-num">{n}</p>

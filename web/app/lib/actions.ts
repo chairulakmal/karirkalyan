@@ -55,7 +55,7 @@ async function localFailure(key: string): Promise<ActionFailure> {
   return { ok: false, error: t(key) };
 }
 
-// Revalidates the two pages a write can change. Only the caller's locale is
+// Revalidates the pages a write can change. Only the caller's locale is
 // revalidated: every route is dynamically rendered (see the root layout), so
 // there is no shared Full Route Cache to purge — just the visitor's own router
 // cache, which only ever holds paths in the locale they are browsing.
@@ -63,6 +63,7 @@ async function revalidateApplication(id: number) {
   const locale = await getLocale();
   revalidatePath(getPathname({ href: `/applications/${id}`, locale }));
   revalidatePath(getPathname({ href: "/dashboard", locale }));
+  revalidatePath(getPathname({ href: "/board", locale }));
 }
 
 // Resolves only on failure — the success path ends in redirect(), which throws

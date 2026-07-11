@@ -65,6 +65,16 @@ export type ApplicationWithDetail = Application & {
   timeline_entries: TimelineEntry[];
 };
 
+// GET /transitions — the FSM read endpoint. `transitions` is the *effective*
+// table (each state mapped through valid_next_states, archived-rule folded
+// in), fetched so the board never mirrors ApplicationFSM::TRANSITIONS.
+export type TransitionTable = {
+  states: Status[];
+  entry_states: Status[];
+  terminal_states: Status[];
+  transitions: Record<Status, Status[]>;
+};
+
 export type DashboardStats = {
   by_status: Partial<Record<Status, number>>;
   // [company, board-host] for every application — drives the interdependent
