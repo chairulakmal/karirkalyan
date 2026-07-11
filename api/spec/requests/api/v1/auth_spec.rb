@@ -30,7 +30,12 @@ RSpec.describe "Auth", type: :request do
         let(:existing) { create(:user, email: "taken@example.com") }
         let(:body)     { { user: { email: "taken@example.com", password: "password123" } } }
         before { existing }
-        run_test!
+        run_test! do |response|
+          payload = JSON.parse(response.body)
+          expect(payload["error"]).to be_a(String)
+          expect(payload["code"]).to eq("validation_failed")
+          expect(payload["details"]).to include("field" => "email", "code" => "taken")
+        end
       end
     end
   end
@@ -66,7 +71,9 @@ RSpec.describe "Auth", type: :request do
 
       response "401", "invalid credentials" do
         let(:body) { { user: { email: "nobody@example.com", password: "wrong" } } }
-        run_test!
+        run_test! do |response|
+          expect(JSON.parse(response.body)).to include("error", "code" => "invalid_credentials")
+        end
       end
     end
   end
@@ -84,7 +91,9 @@ RSpec.describe "Auth", type: :request do
 
       response "401", "not authenticated" do
         let(:Authorization) { nil }
-        run_test!
+        run_test! do |response|
+          expect(JSON.parse(response.body)).to include("error", "code" => "unauthenticated")
+        end
       end
     end
   end

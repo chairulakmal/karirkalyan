@@ -97,14 +97,25 @@ RSpec.describe "Applications", type: :request do
         let(:Authorization) { jwt_for(user) }
         let(:body) { { application: { company: "DeNA", role: "PM", status: "offer" } } }
         run_test! do |response|
-          expect(JSON.parse(response.body)["error"]).to match(/must be one of/)
+          payload = JSON.parse(response.body)
+          expect(payload["error"]).to match(/must be one of/)
+          expect(payload["code"]).to eq("validation_failed")
+          expect(payload["details"]).to include("field" => "status", "code" => "inclusion")
         end
       end
 
       response "422", "validation failed (blank company or role)" do
         let(:Authorization) { jwt_for(user) }
         let(:body) { { application: { company: "", role: "" } } }
-        run_test!
+        run_test! do |response|
+          payload = JSON.parse(response.body)
+          expect(payload["error"]).to be_a(String)
+          expect(payload["code"]).to eq("validation_failed")
+          expect(payload["details"]).to include(
+            { "field" => "company", "code" => "blank" },
+            { "field" => "role",    "code" => "blank" }
+          )
+        end
       end
 
       response "401", "not authenticated" do
@@ -204,14 +215,16 @@ RSpec.describe "Applications", type: :request do
         end
 
         run_test! do |response|
-          expect(JSON.parse(response.body)).to include("error")
+          expect(JSON.parse(response.body)).to include("error", "code" => "invalid_url")
         end
       end
 
       response "401", "not authenticated" do
         let(:Authorization) { nil }
         let(:body)          { { url: "https://example.com/jobs/42" } }
-        run_test!
+        run_test! do |response|
+          expect(JSON.parse(response.body)["code"]).to eq("unauthenticated")
+        end
       end
     end
   end
@@ -234,7 +247,9 @@ RSpec.describe "Applications", type: :request do
       response "404", "not found or belongs to another user" do
         let(:Authorization) { jwt_for(user) }
         let(:id)            { 0 }
-        run_test!
+        run_test! do |response|
+          expect(JSON.parse(response.body)).to include("error", "code" => "not_found")
+        end
       end
 
       response "401", "not authenticated" do
@@ -282,7 +297,9 @@ RSpec.describe "Applications", type: :request do
         let(:record)           { create(:application, :applied, user: user) }
         let(:id)            { record.id }
         let(:body)          { { application: { notes: "Concurrent edit", lock_version: -1 } } }
-        run_test!
+        run_test! do |response|
+          expect(JSON.parse(response.body)["code"]).to eq("stale_record")
+        end
       end
 
       response "422", "validation failed" do
@@ -360,7 +377,9 @@ RSpec.describe "Applications", type: :request do
         let(:record)           { create(:application, :draft, user: user) }
         let(:id)            { record.id }
         let(:body)          { { status: "offer" } }
-        run_test!
+        run_test! do |response|
+          expect(JSON.parse(response.body)).to include("error", "code" => "invalid_transition")
+        end
       end
 
       response "409", "stale record" do
@@ -565,7 +584,10 @@ RSpec.describe "Applications", type: :request do
           headers: { "Authorization" => jwt_for(user) }
 
         expect(response).to have_http_status(:unprocessable_entity)
-        expect(JSON.parse(response.body)["error"]).to match(/under 1 MB/)
+        payload = JSON.parse(response.body)
+        expect(payload["error"]).to match(/under 1 MB/)
+        expect(payload["code"]).to eq("validation_failed")
+        expect(payload["details"]).to eq([ { "field" => "resume", "code" => "too_long" } ])
       end
     end
 

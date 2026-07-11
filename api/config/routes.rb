@@ -30,8 +30,9 @@ Rails.application.routes.draw do
         end
       end
 
-      get "dashboard", to: "dashboard#index"
-      get "me",        to: "me#show"
+      get "transitions", to: "transitions#index"
+      get "dashboard",   to: "dashboard#index"
+      get "me",          to: "me#show"
     end
   end
 end

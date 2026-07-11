@@ -21,7 +21,9 @@ RSpec.describe "Rack::Attack throttling", type: :request, skip_n_plus_one: true 
 
       expect(response).to have_http_status(:too_many_requests)
       expect(response.headers["Retry-After"]).to eq("60")
-      expect(JSON.parse(response.body)["error"]).to match(/Too many requests/)
+      payload = JSON.parse(response.body)
+      expect(payload["error"]).to match(/Too many requests/)
+      expect(payload["code"]).to eq("rate_limited")
     end
   end
 

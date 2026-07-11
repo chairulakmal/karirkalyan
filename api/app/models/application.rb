@@ -32,11 +32,13 @@ class Application < ApplicationRecord
     self.cover_letter_updated_at = Time.current
   end
 
+  # The :not_a_pdf symbol (not the prose message) is what API clients receive
+  # as the validation_failed detail code — see ErrorRendering.
   def resume_must_be_pdf
-    errors.add(:resume, "must be a PDF") unless resume.b.start_with?(PDF_MAGIC_BYTES)
+    errors.add(:resume, :not_a_pdf, message: "must be a PDF") unless resume.b.start_with?(PDF_MAGIC_BYTES)
   end
 
   def cover_letter_must_be_pdf
-    errors.add(:cover_letter, "must be a PDF") unless cover_letter.b.start_with?(PDF_MAGIC_BYTES)
+    errors.add(:cover_letter, :not_a_pdf, message: "must be a PDF") unless cover_letter.b.start_with?(PDF_MAGIC_BYTES)
   end
 end

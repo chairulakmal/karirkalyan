@@ -19,25 +19,30 @@ list does.
 **This release opens with `api/` changes, which is why they are not v1.1.0.** Land them in their
 own PR, on their own, before any board component is written. Do not fold them into a UI PR.
 
-- [ ] **Add machine-readable error codes to the API.** Deferred here from v1.1.0's i18n work, which
-  could not localize per-field validation errors without one. Every Rails error is currently
-  `{ error: "<English sentence>" }` + a status; add a stable `code` (`stale_record`,
-  `invalid_credentials`, `validation_failed` with a `field`) alongside the existing `error` string,
-  so `web/` can key its message catalog off the code instead of the status. Additive — keep `error`
-  so nothing breaks. Then narrow the status-keyed fallbacks added in v1.1.0. Same PR as the
-  transition table below: one `api/` diff, one rswag regeneration, one security re-read.
+- [x] **Add machine-readable error codes to the API.** Deferred here from v1.1.0's i18n work, which
+  could not localize per-field validation errors without one. Every Rails error was
+  `{ error: "<English sentence>" }` + a status; now a stable `code` (`stale_record`,
+  `invalid_credentials`, `validation_failed` with per-field `details`, …) rides alongside the
+  existing `error` string, so `web/` can key its message catalog off the code instead of the
+  status. Additive — `error` kept so nothing breaks. Full taxonomy in SPEC.md § Error codes.
 
-- [ ] **Expose the transition table from the API.** The board must know which drops are legal,
+- [x] **Expose the transition table from the API.** The board must know which drops are legal,
   and `ApplicationFSM::TRANSITIONS` is the only source of truth. It is *not* a linear pipeline
   — `ghosted → applied`, `rejected → applied` and `withdrawn → applied` are all legal, while
   most forward skips are not, so the shape cannot be guessed from the state list. `show` and
-  `transition` already return `valid_next_states` for *one* application
-  (`applications_controller.rb:71,109`), but `index` does not, so a board has no way to know
-  what any card can do. Add a read-only endpoint serving the table — `ApplicationFSM` already
-  has `valid_next_states` to build it from — and have `web/` consume it. **Do not mirror the
-  table in TypeScript.** A copy is a second source of truth, and a state machine that drifts
-  from its own server is worse than an extra request. Note the server rejects illegal
-  transitions regardless; the client table only decides what *looks* droppable.
+  `transition` already return `valid_next_states` for *one* application, but `index` does not,
+  so a board has no way to know what any card can do. `GET /api/v1/transitions` now serves the
+  effective table, built from `ApplicationFSM.valid_next_states`. Note the server rejects
+  illegal transitions regardless; the client table only decides what *looks* droppable.
+
+With those landed, the `web/` work:
+
+- [ ] **Narrow the status-keyed error fallbacks added in v1.1.0.** `web/` still maps HTTP
+  status → message; switch the catalog to key off the new `code` (and `details[].field` /
+  `details[].code` for validation errors), keeping the status map as the fallback.
+- [ ] **Consume `GET /api/v1/transitions` in `web/`** to decide which drops look legal on the
+  board. **Do not mirror the table in TypeScript.** A copy is a second source of truth, and a
+  state machine that drifts from its own server is worse than an extra request.
 - [ ] **Solve the 13-column problem.** `ApplicationFSM::VALID_STATES` has 13 states —
   too many to sit side by side. Group them: an active pipeline (`wishlist` → `draft` →
   `applied` → `phone_screen` → `technical` → `final_round` → `offer`) as columns, with the
