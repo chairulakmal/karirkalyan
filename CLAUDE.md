@@ -92,6 +92,16 @@ and must always run**: a required check that is skipped stays *expected* forever
 the merge, so path filtering lives in `changes`, never on the workflow trigger. If you
 rename a job, keep `gate`'s `name:` byte-identical to the ruleset's context string.
 
+## Releases — docs follow the feature, not the tag
+
+`SPEC.md` moves in the same PR as the behaviour change (rule above). The **rest** of the
+documentation surface is not allowed to wait for release day either: **after each feature
+lands, and before the release that ships it is tagged**, bring the other docs up to date —
+`README.md` *and* `README.ja.md` (always together, never one without the other),
+`CHANGELOG.md`, the swagger/rswag output, `llms.txt`. Tagging a release whose docs still
+describe the previous release is the `PLAN.md` failure mode with a version number on it.
+The `docs-auditor` subagent exists for exactly this post-feature sweep.
+
 ## Subagents
 
 Delegate to a subagent when the task genuinely warrants it — a wide search whose file
