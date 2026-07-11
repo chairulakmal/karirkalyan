@@ -32,10 +32,9 @@ Two consequences worth stating plainly:
   [`CHANGELOG.md`](CHANGELOG.md), including the pre-1.0.0 build phases that used to sit at the
   top of this file.
 
-Last synced against the code: **2026-07-11**, post-`v1.2.0` (API error codes + the
-transition-table endpoint; `web/` error catalog keyed on those codes; the `/board` Kanban view;
-variable font builds for Fraunces and Manrope; ghost prediction and the query layer it
-introduced).
+Last synced against the code: **2026-07-11**, post-`v1.3.0` (ghost prediction and the query
+layer it introduced; `/me` folded into the dashboard payload; the widened `timeline_entries`
+index).
 
 ---
 

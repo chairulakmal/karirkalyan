@@ -2,16 +2,14 @@
 
 Open work only. Shipped work lives in [`CHANGELOG.md`](CHANGELOG.md).
 
-**Current release: `v1.2.0`** — tagged 2026-07-11 at `36c9378`. The Kanban board view, plus
-the API error codes and transition-table endpoint it needed.
-**In flight: `v1.3.0` — ghost prediction** (`feat/ghost-prediction`, not yet tagged; see
-CHANGELOG § Unreleased). It was scoped after the performance release, but it turned out to
-touch both of that release's production items — the `timeline_entries` index and the `/me`
-fold — so those landed with it and are struck off below.
+**Current release: `v1.3.0`** — tagged 2026-07-11 at `f455853`. Ghost prediction, which also
+absorbed the two production items the performance release had parked (the `timeline_entries`
+index and the `/me` fold — both struck off below).
 **Next release: performance.** What is left of it is the dev-server memory leak, which is a
 real pain point (`next dev` crashes even at 4 GB) and is now the whole of it.
+**Nothing in flight.**
 
-Everything below is post-1.2.0 and unscoped.
+Everything below is post-1.3.0 and unscoped.
 
 ---
 
@@ -96,7 +94,7 @@ else's portfolio, because they encode knowledge of the market rather than knowle
 - [ ] **CSV export** of applications.
 - [ ] **Follow-up digest email** — Solid Queue landed; the mailer already exists.
 
-**Ghost prediction — shipped in `v1.3.0`.** See CHANGELOG § Unreleased and SPEC.md § Query
+**Ghost prediction — shipped in `v1.3.0`.** See CHANGELOG § v1.3.0 and SPEC.md § Query
 layer. The market research that justified it, and the stage distribution the global defaults
 were sanity-checked against, is recorded in SPEC.md § Query layer rather than repeated here.
 

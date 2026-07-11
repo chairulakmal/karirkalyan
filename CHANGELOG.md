@@ -5,10 +5,11 @@ Open work lives in [`TODO.md`](TODO.md).
 
 ---
 
-## Unreleased — ships as v1.3.0
+## v1.3.0 — 2026-07-11
 
-Ghost prediction: the dashboard now says which applications have almost certainly gone dead.
-Not yet tagged — the "Tagged at" line goes in when it is. *(feat/ghost-prediction)*
+Tagged at `f455853`. Ghost prediction: the dashboard now says which applications have almost
+certainly gone dead. It also absorbed the two production items parked in the performance
+release, because it touched both. *(feat/ghost-prediction, PR #56)*
 
 ### Ghost prediction
 
@@ -47,6 +48,13 @@ Not yet tagged — the "Tagged at" line goes in when it is. *(feat/ghost-predict
   alone would keep serving a stale, unflagged payload for up to 12 hours.
 - **`GET /api/v1/dashboard` has a response schema in the OpenAPI output**, the first endpoint
   to get one: it is the only response that cannot be guessed from a model.
+
+### Chore
+
+- **`web/package.json` version bumped to `1.3.0`.** It had read `1.0.0` through three releases
+  — the one file in the repo still claiming a version the code left behind.
+
+---
 
 ## v1.2.0 — 2026-07-11
 
