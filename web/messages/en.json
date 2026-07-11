@@ -174,7 +174,7 @@
       "resume": "Download the stored resume as a PDF.",
       "coverLetter": "Download the stored cover letter as a PDF.",
       "transitionTable": "The state machine, read-only — every state and its legal next states.",
-      "dashboard": "Aggregate counts and the filter facets.",
+      "dashboard": "Aggregate counts, the filter facets, ghost risk, and the current user.",
       "me": "The signed-in user's profile.",
       "up": "Health check — pings Postgres."
     },
@@ -209,7 +209,22 @@
     "avgDays": "Average days from apply → offer:",
     "avgDaysAria": "What counts toward this average",
     "avgDaysTooltip": "Counts applications that reached offer, accepted, or declined. Measured from your applied date to when the offer status was recorded in the audit log.",
-    "failedToLoad": "Failed to load: {message}"
+    "failedToLoad": "Failed to load: {message}",
+    "ghostRisk": {
+      "eyebrow": "Probably ghosted",
+      "summary": "{count, plural, one {# application has} other {# applications have}} been quiet longer than a company usually takes to get back to you.",
+      "silence": "{days, plural, one {# day} other {# days}} of silence in {stage} — past your {threshold}-day mark",
+      "markGhosted": "Mark as ghosted",
+      "marking": "Marking…",
+      "marker": "Quiet",
+      "markerTitle": "Silent longer than a reply usually takes at this stage",
+      "explainAria": "How this is worked out",
+      "explain": "Compares each waiting application against how long companies have actually taken to reply to you at that stage — the 90th percentile of your own response times. Until you have five replies at a stage, a general default is used instead.",
+      "basis": {
+        "personal": "{stage}: {days} days — your 90th percentile, from {count} replies",
+        "default": "{stage}: {days} days — default, only {count} of the 5 replies needed"
+      }
+    }
   },
   "board": {
     "eyebrow": "Pipeline",

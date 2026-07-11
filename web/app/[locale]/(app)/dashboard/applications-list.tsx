@@ -48,6 +48,9 @@ interface Props {
   statusBuckets: [Status, number][];
   facets: [string, string][]; // [company, board-host] per application
   total: number;
+  // Every at-risk id, not just the ones on the first page — the ghost-risk query
+  // is not paginated, so rows appended by "load more" get the marker too.
+  atRiskIds: number[];
 }
 
 export function ApplicationsList({
@@ -56,10 +59,13 @@ export function ApplicationsList({
   statusBuckets,
   facets,
   total,
+  atRiskIds,
 }: Props) {
   const t = useTranslations("list");
   const ts = useTranslations("status");
+  const tg = useTranslations("dashboard.ghostRisk");
   const locale = useLocale();
+  const atRisk = new Set(atRiskIds);
   const [items, setItems] = useState(() => sortByImportance(initialItems));
   const [meta, setMeta] = useState(initialMeta);
   const [filters, setFilters] = useState<Filters>(NO_FILTERS);
@@ -231,6 +237,14 @@ export function ApplicationsList({
                     >
                       {ts(`label.${app.status}`)}
                     </span>
+                    {atRisk.has(app.id) && (
+                      <span
+                        title={tg("markerTitle")}
+                        className="inline-flex items-center px-2 py-0.5 text-xs font-medium text-danger ring-1 ring-inset ring-danger/30"
+                      >
+                        {tg("marker")}
+                      </span>
+                    )}
                   </div>
                   <p className="mt-1 truncate text-sm text-ink-soft">{app.role}</p>
                 </div>

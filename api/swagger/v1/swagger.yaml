@@ -353,7 +353,123 @@ paths:
       - bearerAuth: []
       responses:
         '200':
-          description: empty stats when user has no applications
+          description: stats aggregation — by_status is empty and total is 0 for a
+            user with no applications
+          content:
+            application/json:
+              schema:
+                type: object
+                required:
+                - by_status
+                - facets
+                - total
+                - avg_days_to_offer
+                - ghost_risk
+                - user
+                properties:
+                  by_status:
+                    type: object
+                    additionalProperties:
+                      type: integer
+                    description: Application count per status
+                  facets:
+                    type: array
+                    description: "[company, job-board host] per application"
+                    items:
+                      type: array
+                      items:
+                        type: string
+                      minItems: 2
+                      maxItems: 2
+                  total:
+                    type: integer
+                  avg_days_to_offer:
+                    type: number
+                    nullable: true
+                    description: Applied date → offer timeline entry; null until one
+                      reaches offer
+                  ghost_risk:
+                    type: object
+                    required:
+                    - thresholds
+                    - basis
+                    - sample_sizes
+                    - at_risk
+                    description: Applications silent past the user's p90 response
+                      time for their stage
+                    properties:
+                      thresholds:
+                        type: object
+                        additionalProperties:
+                          type: number
+                        description: Days of silence tolerated per stage, keyed on
+                          applied/phone_screen
+                      basis:
+                        type: object
+                        additionalProperties:
+                          type: string
+                          enum:
+                          - personal
+                          - default
+                        description: Whether each threshold came from the user's own
+                          history or the global default
+                      sample_sizes:
+                        type: object
+                        additionalProperties:
+                          type: integer
+                        description: Completed responses behind each threshold
+                      at_risk:
+                        type: array
+                        description: Longest silence first
+                        items:
+                          type: object
+                          required:
+                          - id
+                          - company
+                          - role
+                          - status
+                          - lock_version
+                          - days_in_stage
+                          - threshold
+                          properties:
+                            id:
+                              type: integer
+                            company:
+                              type: string
+                            role:
+                              type: string
+                            status:
+                              type: string
+                              enum:
+                              - applied
+                              - phone_screen
+                            lock_version:
+                              type: integer
+                              description: So the UI can transition inline
+                            days_in_stage:
+                              type: number
+                            threshold:
+                              type: number
+                  user:
+                    type: object
+                    description: The GET /me payload, folded in — the dashboard was
+                      fetching both
+                    required:
+                    - id
+                    - email
+                    - created_at
+                    - updated_at
+                    properties:
+                      id:
+                        type: integer
+                      email:
+                        type: string
+                      created_at:
+                        type: string
+                        format: date-time
+                      updated_at:
+                        type: string
+                        format: date-time
         '401':
           description: not authenticated
   "/api/v1/me":

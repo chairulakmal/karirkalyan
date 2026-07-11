@@ -28,6 +28,7 @@ A full-stack job application tracker — Rails 8 API + Next.js 16 frontend.
 | Caching | Solid Cache (Postgres-backed) — Rack::Attack throttle counters shared across all Puma workers, no Redis |
 | File storage | PostgreSQL `bytea`, 1 MB cap, PDF magic-byte validation |
 | Dashboard | Pure SQL aggregation — no N+1, no records loaded into Ruby |
+| Ghost prediction | Flags applications that have gone quiet for longer than *your own* p90 reply time, reconstructed from the audit trail with a window function — no new column, no new table. Falls back to a global default until you have five replies at a stage, and says which it used |
 | Kanban board | Drag a card, run an FSM transition — optimistic, with a `409` snap-back. The board fetches the transition table from `GET /api/v1/transitions` rather than mirroring it in TypeScript; a card menu lists every legal next state as the accessible path |
 | API docs | rswag — request specs and OpenAPI spec share one source |
 | Testing | Unit specs (no DB) + request specs (real PostgreSQL) |
@@ -111,6 +112,8 @@ api/
   app/lib/application_fsm.rb              ← FSM: a TRANSITIONS array, no gem, read top to bottom
   app/services/applications/
     transition_service.rb                 ← Status change + audit row in one DB transaction
+  app/queries/applications/
+    ghost_risk_query.rb                   ← Reads stage dwell times out of the audit trail (window function)
   app/jobs/follow_up_reminder_job.rb      ← Idempotent recurring job (idempotency_key pattern)
   app/controllers/api/v1/
     applications_controller.rb            ← REST + transition + binary file download

@@ -1,16 +1,18 @@
 import { getLocale, getTranslations } from "next-intl/server";
 import { Link } from "@/i18n/navigation";
 import { apiFetch } from "@/app/lib/api";
-import type { Application, DashboardStats, Paginated, Status, User } from "@/app/lib/types";
+import type { Application, DashboardStats, Paginated, Status } from "@/app/lib/types";
 import { InfoPopover } from "@/app/components/info-popover";
 import { ApplicationsList } from "./applications-list";
+import { GhostRiskCard } from "./ghost-risk-card";
 
 export default async function Dashboard() {
   const [t, locale] = await Promise.all([getTranslations("dashboard"), getLocale()]);
-  const [appsRes, statsRes, meRes] = await Promise.all([
+  // /dashboard carries the user, so there is no second /me request: the profile
+  // block below reads `stats.user`.
+  const [appsRes, statsRes] = await Promise.all([
     apiFetch<Paginated<Application>>("/applications?limit=10"),
     apiFetch<DashboardStats>("/dashboard"),
-    apiFetch<User>("/me"),
   ]);
 
   if (!appsRes.ok) {
@@ -23,7 +25,7 @@ export default async function Dashboard() {
 
   const { data: applications, meta } = appsRes.data;
   const stats = statsRes.ok ? statsRes.data : null;
-  const me = meRes.ok ? meRes.data : null;
+  const me = stats?.user ?? null;
   const statusBuckets = stats ? (Object.entries(stats.by_status) as [Status, number][]) : [];
   const facets = stats?.facets ?? [];
   const total = stats?.total ?? applications.length;
@@ -43,6 +45,11 @@ export default async function Dashboard() {
           {t("newApplication")}
         </Link>
       </header>
+
+      {/* Above the fold, above the profile: it is the only block on this page
+          that asks the user to do something, and it renders nothing when there
+          is nothing to act on. */}
+      {stats && <GhostRiskCard risk={stats.ghost_risk} />}
 
       {me && (
         <section className="border border-dune bg-linen p-5">
@@ -89,6 +96,7 @@ export default async function Dashboard() {
         statusBuckets={statusBuckets}
         facets={facets}
         total={total}
+        atRiskIds={stats?.ghost_risk.at_risk.map((a) => a.id) ?? []}
       />
     </div>
   );
