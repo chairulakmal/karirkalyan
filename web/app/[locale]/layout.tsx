@@ -7,18 +7,21 @@ import { getTranslations } from "next-intl/server";
 import { routing } from "@/i18n/routing";
 import "../globals.css";
 
+// Fraunces and Manrope load as variable builds — one file per style instead of
+// one per weight, and the only form in which the `font-variation-settings`
+// rules in globals.css (`opsz`/`wght` cuts for headings, wordmark, display)
+// actually bind. IBM Plex Mono has no variable build, so it stays static.
 const manrope = Manrope({
   variable: "--font-manrope",
   subsets: ["latin"],
-  weight: ["300", "400", "500", "600", "700"],
   display: "swap",
 });
 
 const fraunces = Fraunces({
   variable: "--font-fraunces",
   subsets: ["latin"],
-  weight: ["300", "400", "500", "600"],
   style: ["normal", "italic"],
+  axes: ["opsz"],
   display: "swap",
 });
 

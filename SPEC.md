@@ -33,7 +33,8 @@ Two consequences worth stating plainly:
   top of this file.
 
 Last synced against the code: **2026-07-11**, post-`v1.2.0` (API error codes + the
-transition-table endpoint; `web/` error catalog keyed on those codes; the `/board` Kanban view).
+transition-table endpoint; `web/` error catalog keyed on those codes; the `/board` Kanban view;
+variable font builds for Fraunces and Manrope).
 
 ---
 
@@ -559,6 +560,16 @@ a warm madder (`#96291D`) for destructive actions, error text, and terminal-nega
 applied through opacity modifiers (`text-danger`, `bg-danger/10`, `ring-danger/30`) and never stock
 Tailwind `red-*` — three typefaces (Fraunces display, Manrope body, IBM Plex Mono labels), and
 **radius `0`** — the sharp corners are the editorial voice, not an oversight.
+
+The typefaces load through `next/font/google` in `web/app/[locale]/layout.tsx` (and
+`global-not-found.tsx`, whose two families use the same variable form so its files are
+content-hash-shared with the layout's). Fraunces and Manrope are **variable builds** — Fraunces
+with `axes: ["opsz"]` in normal + italic, Manrope with
+the default `wght` axis — while IBM Plex Mono has no variable build and stays static at 400/500.
+That is five base `woff2` files instead of the fifteen static instances loaded before, and it is
+also what makes the `font-variation-settings` rules below actually bind: `opsz`/`wght` variation
+settings are no-ops on a static instance, so the heading and wordmark cuts *require* the variable
+builds — don't "optimize" back to enumerated weights.
 
 Three things there are easy to get wrong:
 
