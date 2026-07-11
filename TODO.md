@@ -2,10 +2,14 @@
 
 Open work only. Shipped work lives in [`CHANGELOG.md`](CHANGELOG.md).
 
-**Current release: `v1.3.0`** — tagged 2026-07-11 at `f455853`, published as a
-[GitHub Release](https://github.com/chairulakmal/karirkalyan/releases/tag/v1.3.0). Ghost
-prediction, which also absorbed the two production items the performance release had parked
-(the `timeline_entries` index and the `/me` fold — both struck off below).
+**Current release: `v1.3.1`** — tagged 2026-07-12, published as a
+[GitHub Release](https://github.com/chairulakmal/karirkalyan/releases/tag/v1.3.1). A patch: the
+dependency refresh, the Sidekiq/Redis purge, Postgres 18 in dev and CI, the docs audit, and the
+versioning policy itself. No new capability, and no migration — see `CHANGELOG.md`.
+
+`v1.3.0` (2026-07-11, `f455853`) was ghost prediction, which also absorbed the two production
+items the performance release had parked (the `timeline_entries` index and the `/me` fold —
+both struck off below).
 
 **North star (decided 2026-07-11): be the best career app for its one loyal user.** Portfolio
 value follows from that, not the other way round — a reviewer can tell a tool with a real
@@ -34,7 +38,7 @@ behind — which is the whole of the major test.
 
 | Release | Level | Contents |
 | --- | --- | --- |
-| `v1.3.1` | patch | Everything already on `main` since the v1.3.0 tag. Zero work — tag it. |
+| ~~`v1.3.1`~~ | patch | **Shipped 2026-07-12.** Everything that had accumulated on `main` since the v1.3.0 tag. |
 | `v1.4.0` | minor | Follow-up digest, calendar-aware dead zones, CSV export, full-account export |
 | `v1.4.1` | patch | `Applications::ListQuery` extraction, `API_BASE` naming |
 | `v1.5.0` | minor | The Japan market layer: recruiter channel + `agencies`, 年収 comp structure, Japanese-level filter |
@@ -46,11 +50,11 @@ nullable or defaulted.** A `NOT NULL` column with no default means the previous 
 `INSERT`s fail against the new database — and by the mechanical test that quietly turns a minor
 into a **major**. It is the only way this plan accidentally violates its own versioning.
 
-### `v1.3.1` — patch. Zero work; it is sitting untagged for no reason
+### ~~`v1.3.1` — patch~~ — shipped 2026-07-12
 
-The `CHANGELOG.md` **Unreleased** block is already a patch by definition — dependency refresh,
-Postgres 18 in dev/CI, the Sidekiq/Redis purge, the docs audit, the versioning policy. No new
-capability among them.
+The work had been sitting on `main` untagged: dependency refresh, Postgres 18 in dev/CI, the
+Sidekiq/Redis purge, the docs audit, the versioning policy, and this scoping. No new capability
+among them, and no migration — a patch by definition, and the first release the policy cut.
 
 ### `v1.4.0` — minor. "The search, this week"
 

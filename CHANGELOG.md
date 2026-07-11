@@ -5,11 +5,14 @@ Open work lives in [`TODO.md`](TODO.md).
 
 ---
 
-## Unreleased
+## v1.3.1 — 2026-07-12
 
-Landed on `main` after the v1.3.0 tag, so it ships with whatever comes next.
+**A patch, and the first release cut by the policy it contains.** Nothing here is a new
+capability — a dependency refresh, dead configuration deleted, dev/CI brought level with
+production, and documentation corrected — which is the whole of the definition. The previous
+image would boot unchanged against this database; there is no migration in the release at all.
 *(chore/dependency-refresh, PR #57; chore/postgres-18, PR #58; chore/purge-sidekiq-debris,
-PR #59; chore/versioning-policy, PR #60)*
+PR #59; chore/versioning-policy, PR #60; the backlog scoping went straight to `main` as docs)*
 
 - **A versioning policy, written down** (`SPEC.md` § Versioning & releases). SemVer, but with
   **major redefined against a surface this project actually has**: the textbook rule (*major
@@ -54,6 +57,12 @@ PR #59; chore/versioning-policy, PR #60)*
   `node-version-file`, and Railpack reads it to build production — which had declared no Node
   version anywhere and was running Railpack's implicit default. Production moves to Node 24
   on the next deploy.
+- **The backlog is scoped into releases** (`TODO.md` § Release plan) — `v1.3.1` through
+  `v1.6.0`, plus the one item that cannot fit under 1.x. Applying the new policy's mechanical
+  test to the whole file, only the `positions` entity fails it (a new table *and* a changed
+  meaning for `accepted` in the FSM), so it is the sole major and everything else is a minor
+  or a patch. Items are grouped by which files they would otherwise force us to open twice,
+  not by theme.
 
 ---
 
