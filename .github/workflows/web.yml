@@ -73,7 +73,7 @@ jobs:
       - name: Set up Node
         uses: actions/setup-node@v4
         with:
-          node-version: 22
+          node-version-file: web/.nvmrc
           cache: npm
           cache-dependency-path: web/package-lock.json
 
@@ -137,7 +137,7 @@ jobs:
       - name: Set up Node
         uses: actions/setup-node@v4
         with:
-          node-version: 22
+          node-version-file: web/.nvmrc
           cache: npm
           cache-dependency-path: web/package-lock.json
 
