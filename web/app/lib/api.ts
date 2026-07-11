@@ -4,9 +4,9 @@ import { redirect } from "next/navigation";
 const API_URL = process.env.API_URL ?? "http://localhost:3001";
 const SESSION_COOKIE = "session";
 
-// One entry of a `validation_failed` response: which field failed and the
-// ActiveModel error type (`blank`, `taken`, `too_long`, `not_a_pdf`, …).
-export type ApiErrorDetail = { field: string; code: string };
+import { type ApiErrorDetail, isApiErrorDetail } from "./api-error";
+
+export type { ApiErrorDetail };
 
 export type ApiFailure = {
   ok: false;
@@ -78,7 +78,7 @@ export async function apiFetch<T = unknown>(
   if (response.ok) {
     return { ok: true, status: response.status, data: body as T, authHeader };
   }
-  return { status: response.status, ...extractFailure(body) };
+  return extractFailure(body, response.status);
 }
 
 /**
@@ -119,19 +119,13 @@ export const API_BASE = API_URL;
 
 // Pulls the API's failure envelope — `{ error, code, details? }` — out of an
 // error body, tolerating shapes that predate or fall outside the contract.
-function extractFailure(body: unknown): Omit<ApiFailure, "status"> {
+function extractFailure(body: unknown, status: number): ApiFailure {
   const obj =
     body && typeof body === "object" ? (body as Record<string, unknown>) : {};
-  const error = typeof obj.error === "string" ? obj.error : "HTTP error";
+  const error = typeof obj.error === "string" ? obj.error : `HTTP ${status}`;
   const code = typeof obj.code === "string" ? obj.code : undefined;
   const details = Array.isArray(obj.details)
-    ? obj.details.filter(
-        (d): d is ApiErrorDetail =>
-          !!d &&
-          typeof d === "object" &&
-          typeof (d as ApiErrorDetail).field === "string" &&
-          typeof (d as ApiErrorDetail).code === "string",
-      )
+    ? obj.details.filter(isApiErrorDetail)
     : undefined;
-  return { ok: false, error, code, details };
+  return { ok: false, status, error, code, details };
 }

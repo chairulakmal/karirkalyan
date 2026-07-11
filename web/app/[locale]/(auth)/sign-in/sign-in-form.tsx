@@ -4,6 +4,7 @@ import { useRouter } from "@/i18n/navigation";
 import { useState, useTransition } from "react";
 import { useTranslations } from "next-intl";
 import { Field } from "@/app/components/field";
+import { isApiErrorDetail } from "@/app/lib/api-error";
 
 type Mode = "sign-in" | "sign-up";
 
@@ -14,10 +15,7 @@ type Mode = "sign-in" | "sign-up";
 // error messages. Never string-match the `error` sentence.
 const KEYED_STATUSES = new Set([403, 404, 409, 422, 429, 502, 503]);
 
-type FailureBody = {
-  code?: string;
-  details?: { field?: unknown; code?: unknown }[];
-} | null;
+type FailureBody = { code?: string; details?: unknown } | null;
 
 export function AuthForm({ defaultMode = "sign-in" }: { defaultMode?: Mode }) {
   const t = useTranslations("auth");
@@ -40,6 +38,7 @@ export function AuthForm({ defaultMode = "sign-in" }: { defaultMode?: Mode }) {
   ): string {
     if (body?.code === "validation_failed" && Array.isArray(body.details)) {
       const messages = body.details
+        .filter(isApiErrorDetail)
         .map((d) => `field.${d.field}_${d.code}`)
         .filter((key) => tErrors.has(key))
         .map((key) => tErrors(key));
