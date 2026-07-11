@@ -20,9 +20,4 @@ RSpec.describe "GET /up", type: :request do
     expect(body["status"]).to eq("degraded")
     expect(body["checks"]).to eq("database" => false)
   end
-
-  # Redis health check removed — Sidekiq is disabled. Restore this case when
-  # re-enabling Sidekiq (see CLAUDE.md). Previous impl checked:
-  #   allow(Sidekiq).to receive(:redis).and_raise(StandardError, "down")
-  #   expect(body["checks"]).to eq("database" => true, "redis" => false)
 end

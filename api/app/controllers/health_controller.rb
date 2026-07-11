@@ -18,7 +18,4 @@ class HealthController < ActionController::API
     Rails.logger.error("Health check: postgres failed — #{e.class}: #{e.message}")
     false
   end
-
-  # Redis health check removed — Sidekiq is disabled. Restore when re-enabling
-  # Sidekiq (see CLAUDE.md). Previous impl: Sidekiq.redis { |c| c.call("PING") }
 end

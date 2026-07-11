@@ -4,8 +4,8 @@ import { defineConfig, devices } from "@playwright/test";
  * E2E configuration.
  *
  * Starts the Rails API on :3001 and Next.js on :3000 if they aren't already
- * running. Requires Postgres + Redis up locally (run `docker compose up -d`
- * from `api/` first).
+ * running. Requires Postgres up locally (run `docker compose up -d` from `api/`
+ * first) — it is the only container.
  *
  * Tests register a unique email per run, so no DB cleanup is needed.
  */

@@ -1,6 +1,5 @@
-# For local multi-process dev (e.g. `foreman start`). NOT used in production:
-# Railway builds from the Dockerfile and ignores this Procfile. In production the
-# `api` service runs the Dockerfile CMD (Puma) and the `sidekiq` service runs the
-# worker command below via a dashboard Start Command override.
-web:    bundle exec rails server -b 0.0.0.0 -p ${PORT:-3001}
-# worker: bundle exec sidekiq -C config/sidekiq.yml  # disabled — see CLAUDE.md
+# For local dev via `foreman start`. NOT used in production: Railway builds from
+# the Dockerfile and ignores this Procfile. There is no worker line because there
+# is no worker process — Solid Queue runs inside Puma in production, and on the
+# `:async` adapter in development.
+web: bundle exec rails server -b 0.0.0.0 -p ${PORT:-3001}
