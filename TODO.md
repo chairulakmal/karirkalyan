@@ -87,19 +87,29 @@ job-search history — applications, timeline, resumes stored as bytea — lives
 Postgres, and **the Railway Hobby plan has no managed backups** (confirmed 2026-07-11). For a
 loyal user, losing that history is strictly worse than lacking any feature in this file.
 
-- [ ] **Scheduled `pg_dump` backups.** Decided 2026-07-11: a dump, **not** a mirror on some
-      free Postgres tier — a second live database is HA machinery for an app that needs an
-      undo button, and free tiers are themselves a liability (they expire, pause idle
-      databases, and add an account plus a version-compat surface to maintain). Cheapest
-      reliable shape: a scheduled GitHub Actions workflow running `pg_dump` against the
-      Railway connection URL (repo secret), uploading the dump as a workflow artifact on a
-      rolling retention window — no new services, and at personal-tracker scale the dump is
-      a few MB. Two constraints: **encrypt the dump (e.g. `age`, key in a secret) before
-      upload — this repo is public and public-repo artifacts are downloadable by anyone**
-      (or run the workflow from a tiny private repo instead); and match the `pg_dump` client
-      major version to the server's. GitHub disables cron workflows after 60 days of repo
-      inactivity — low risk here, but known. Document the restore drill in SPEC.md: an
-      untested backup is a hope, not a backup.
+- [x] **Scheduled `pg_dump` backups — shipped 2026-07-11** in the private
+      [`karirkalyan-backups`](https://github.com/chairulakmal/karirkalyan-backups) repo
+      (private-repo variant, so the dump needs no encryption). Daily cron at 05:15 JST
+      fingerprints `users` / `applications` / `timeline_entries` (`count @ max(updated_at)`)
+      and only dumps when the fingerprint changed since the state committed by the previous
+      backup — `solid_queue`/`solid_cache` churn never triggers it, and the fingerprint
+      commit doubles as the keep-alive against GitHub's 60-day cron auto-disable. The dump
+      itself is the full database: client major queried from the server at run time
+      (**production is Postgres 18**, not the local-dev 16), gzipped artifact on 60-day
+      retention, `pipefail` plus completion-trailer and size checks so a failed dump is a
+      red run, never a silent tiny artifact. Decision recorded: a dump, **not** a mirror on
+      a free Postgres tier — a second live database is HA machinery for an app that needs
+      an undo button, and free tiers expire, pause idle databases, and add a version-compat
+      surface to maintain.
+  - [x] **Restore drill — passed 2026-07-11**: `db-dump-7` restored into a scratch
+        Postgres 18.4 (the `docker-compose.yml` in the backups repo, tmpfs, port 5418)
+        with zero errors; all 17 tables and every row came back (`users:3 |
+        applications:19 | timeline_entries:32`, status spread intact). Drill steps are
+        documented in the backups repo README.
+    - [ ] Document the drill (or point to the backups repo) in SPEC.md § Deployment.
+  - [ ] **Local dev Postgres 16 → 18** (`api/docker-compose.yml`) — discovered during
+        backup setup: production has been two majors ahead of the dev container and the
+        SPEC's "postgres 16" line. Bump, and sync SPEC.md § Local development.
 - [ ] **Full-account export** — JSON plus resume files, downloadable from the app. The
       loyal-user version of the CSV table-stakes item (CSV covers applications only; it
       recovers neither resumes nor timeline). CSV stays as a convenience view; this is the
