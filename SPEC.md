@@ -1162,7 +1162,13 @@ master key with production is unnecessary. Without one of these, the app aborts 
 
 ## Local development
 
-**Prerequisites:** Docker, Ruby 3.4.9 (via mise), Node 20+
+**Prerequisites:** Docker, Ruby 3.4.9 (via mise), Node 24
+
+Node is pinned to 24 in **one** place — `web/.nvmrc` — and everything else reads it:
+`actions/setup-node` via `node-version-file`, and Railpack when it builds the production
+image. `web/package.json` restates it as `engines.node` because Railpack consults that first.
+Keep them in step; a CI runtime that differs from production's is how the `npm ci` lockfile
+divergence in v1.1.0 (and again in v1.3.1) got in.
 
 ```bash
 cd api && docker compose up -d    # postgres 16 only — no Redis
