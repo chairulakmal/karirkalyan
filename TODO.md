@@ -31,25 +31,32 @@ career-planning idea were added 2026-07-11.
 ### Performance — dev (secondary)
 
 - [ ] **`next dev` crashes even with a 4 GB heap** (`--max-old-space-size=4096`, added in
-  v1.1.1). **Diagnose before adding knobs** — the flag only bounds the V8 heap, and on
-  Next 16 `next dev` runs Turbopack, whose compiler state lives in native (Rust) memory the
-  flag does not touch. So first establish *which* memory runs out: a V8
-  `heap out of memory` abort, a native/RSS blow-up, or the OS OOM-killer (`dmesg`). Next's
-  own guide (`node_modules/next/dist/docs/01-app/02-guides/memory-usage.md`) prescribes
-  `NODE_OPTIONS=--inspect` + heap snapshots for the V8 side; most of its other remedies
-  (`webpackMemoryOptimizations`, webpack cache tweaks) are webpack-only and do not apply.
-  - The wish is **evicting stale compiler state while keeping hot reload**. webpack had
-    `onDemandEntries` (dispose pages idle for N ms) for exactly this; Turbopack has no
-    documented equivalent, but `experimental.turbopackFileSystemCacheForDev` (default `true`
-    on our version — verify it is actually on) persists compilation to disk, which is the
-    same idea one level down. If nothing in-process works, the honest fallback is a
-    scheduled dev-server restart, which the fs cache should make cheap — a workaround, not
-    a fix, so also check github.com/vercel/next.js issues for the leak and file upstream
-    with the heap snapshot if it reproduces.
-  - Two local aggravators worth ruling out: every route renders dynamically (the CSP-nonce
-    `await connection()` in the root layout), so nothing visited is ever served static in
-    dev; and the ~15 font files compile into every layout pass — the production font-payload
-    item above may pay off here too.
+  v1.1.1). **Diagnosed 2026-07-11** — it is a **V8 heap leak in the `next-server` process**,
+  not native/Rust memory and not the OS: 30 days of journal show zero OOM-killer or
+  systemd-oomd kills, and an instrumented run (`--report-on-signal` diagnostic reports +
+  RSS sampling) showed V8 `usedMemory` tracking RSS growth ~1:1 while the native baseline
+  stayed a flat ~0.8–1.5 GB. Retention is monotonic and unbounded: ~239 MB V8 heap at boot,
+  ~541 MB after warming the ten public routes, then **~40–60 MB retained per HMR rebuild**
+  (3.1 GB used / 5.8 GB RSS after 30 scripted edits, `detachedContextCount` 0 throughout).
+  So raising `--max-old-space-size` only postpones the `JavaScript heap out of memory`
+  abort — 4 GB dies in a normal editing session; 8 GB (the machine has 29 GB) buys a longer
+  one, nothing more.
+  - **Answered sub-questions:** `experimental.turbopackFileSystemCacheForDev` *is* on
+    (default `true` in 16.2.6, `config-shared.js:263`; `.next/dev/cache/turbopack` is 310 MB)
+    — the leak happens with it. It does make restarts cheap: warm boot-to-ready measured at
+    ~5 s, so a periodic dev-server restart is a viable stopgap. Upstream issue #85290
+    (404 → infinite compile loop; relevant because of our `globalNotFound` setup) does
+    **not** reproduce — ten bogus URLs 404'd cleanly. The behaviour matches discussion
+    **#93451** (unbounded growth after HMR edits, ~7 GB, open and unresolved as of
+    2026-07).
+  - **Next actions:** add `--heapsnapshot-near-heap-limit=1` to the dev script's
+    `NODE_OPTIONS` (allowed there; `--trace-gc` is not) so the next real crash writes the
+    heap snapshot upstream wants, then file on #93451/new issue with it. Meanwhile bump the
+    dev heap to 8 GB and restart the server when it gets slow. One unexplained datum for
+    the upstream report: V8 heap also jumped ~1.6 GB across the 404 phase and a 45 s idle
+    window — growth without edits, so renders (every route is dynamic here — the CSP-nonce
+    `await connection()`) retain memory too, not just compiles; the ~15-font layout item
+    above may be a multiplier.
 
 ### UI & accessibility
 
