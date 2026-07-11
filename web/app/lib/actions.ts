@@ -4,6 +4,7 @@ import { revalidatePath } from "next/cache";
 import { getLocale, getTranslations } from "next-intl/server";
 import { getPathname, redirect } from "@/i18n/navigation";
 import { apiFetch } from "./api";
+import type { ApiFailure } from "./api";
 import type { Application } from "./types";
 
 // next-intl's redirect/getPathname take the locale explicitly — a server action
@@ -11,23 +12,40 @@ import type { Application } from "./types";
 // prefixed for `ja`, so a Japanese visitor lands back inside `/ja/*` instead of
 // being dumped on the English page.
 
-// A failed action; `status` is the upstream HTTP status when the failure came
-// from the API (absent for local validation failures). Callers key off it to
-// recover from a 409 optimistic-lock conflict.
-export type ActionFailure = { ok: false; error: string; status?: number };
+// A failed action; `status`/`code` are the upstream HTTP status and error code
+// when the failure came from the API (absent for local validation failures).
+// Callers key off them to recover from a 409/`stale_record` optimistic-lock
+// conflict.
+export type ActionFailure = { ok: false; error: string; status?: number; code?: string };
 export type ActionResult = { ok: true } | ActionFailure;
 
-// The API carries no machine-readable error code — only `{ error: "<English
-// sentence>" }` and an HTTP status. The status is the only part that can be
-// translated off, so an upstream failure is reported as the catalog entry for
-// its status; anything outside this set falls back to `errors.unknown`. Never
-// string-match the English sentence to recover a pseudo-code.
+// Statuses with a fallback catalog entry of their own (the v1.1.0 map);
+// anything else falls back to `errors.unknown`.
 const TRANSLATED_STATUSES = new Set([401, 403, 404, 409, 422, 429, 502, 503]);
 
-async function apiFailure(status: number): Promise<ActionFailure> {
+// Localizes an upstream failure off the API's machine-readable `code`
+// (per-field `details` first, then the code, then the status map, then
+// `errors.unknown`). Never string-match the English `error` sentence — the
+// codes exist so no one has to parse prose. Resolution order in SPEC.md
+// § Server-side error messages.
+async function apiFailure(res: ApiFailure): Promise<ActionFailure> {
   const t = await getTranslations("errors");
-  const key = TRANSLATED_STATUSES.has(status) ? String(status) : "unknown";
-  return { ok: false, error: t(key), status };
+  const failure = { ok: false as const, status: res.status, code: res.code };
+
+  if (res.code === "validation_failed" && res.details) {
+    const messages = res.details
+      .map((d) => `field.${d.field}_${d.code}`)
+      .filter((key) => t.has(key))
+      .map((key) => t(key));
+    if (messages.length > 0) return { ...failure, error: messages.join(" ") };
+  }
+
+  if (res.code && t.has(`code.${res.code}`)) {
+    return { ...failure, error: t(`code.${res.code}`) };
+  }
+
+  const key = TRANSLATED_STATUSES.has(res.status) ? String(res.status) : "unknown";
+  return { ...failure, error: t(key) };
 }
 
 // Local (pre-request) validation failure — no HTTP status to key on, so the
@@ -94,7 +112,7 @@ export async function createApplication(formData: FormData): Promise<ActionFailu
     body,
   });
 
-  if (!res.ok) return apiFailure(res.status);
+  if (!res.ok) return apiFailure(res);
 
   const locale = await getLocale();
   revalidatePath(getPathname({ href: "/dashboard", locale }));
@@ -119,7 +137,7 @@ export async function prefillFromUrl(url: string): Promise<PrefillResult> {
     body: JSON.stringify({ url: trimmed }),
   });
 
-  if (!res.ok) return apiFailure(res.status);
+  if (!res.ok) return apiFailure(res);
   return { ok: true, ...res.data };
 }
 
@@ -135,7 +153,7 @@ export async function updateApplication(
     body: JSON.stringify({ application }),
   });
 
-  if (!res.ok) return apiFailure(res.status);
+  if (!res.ok) return apiFailure(res);
 
   await revalidateApplication(id);
   return { ok: true };
@@ -151,7 +169,7 @@ export async function transitionStatus(
     method: "PATCH",
     body: JSON.stringify({ status: to, lock_version: lockVersion, note: note ?? null }),
   });
-  if (!res.ok) return apiFailure(res.status);
+  if (!res.ok) return apiFailure(res);
   await revalidateApplication(id);
   return { ok: true };
 }
@@ -174,7 +192,7 @@ export async function uploadFile(
     body: upstream,
   });
 
-  if (!res.ok) return apiFailure(res.status);
+  if (!res.ok) return apiFailure(res);
   // Detail page only — an upload leaves the dashboard listing unchanged.
   revalidatePath(getPathname({ href: `/applications/${id}`, locale: await getLocale() }));
   return { ok: true };
@@ -183,7 +201,7 @@ export async function uploadFile(
 // Resolves only on failure — the success path ends in redirect(), which throws.
 export async function deleteApplication(id: number): Promise<ActionFailure> {
   const res = await apiFetch(`/applications/${id}`, { method: "DELETE" });
-  if (!res.ok) return apiFailure(res.status);
+  if (!res.ok) return apiFailure(res);
   const locale = await getLocale();
   revalidatePath(getPathname({ href: "/dashboard", locale }));
   redirect({ href: "/dashboard", locale });

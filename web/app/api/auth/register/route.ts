@@ -25,7 +25,10 @@ export async function POST(request: Request) {
   if (upstream.status === 429) {
     const retryAfter = upstream.headers.get("Retry-After") ?? "3600";
     return Response.json(
-      { error: `Too many sign-up attempts. Try again in ${retryAfter}s.` },
+      {
+        error: `Too many sign-up attempts. Try again in ${retryAfter}s.`,
+        code: "rate_limited",
+      },
       { status: 429 },
     );
   }
@@ -33,12 +36,17 @@ export async function POST(request: Request) {
   const payload = await upstream.json().catch(() => ({}));
 
   if (!upstream.ok) {
-    const errors = (payload as { errors?: string[] }).errors;
-    const message =
-      (errors && errors.length > 0 && errors.join(", ")) ||
-      (payload as { error?: string }).error ||
-      "Unable to create account";
-    return Response.json({ error: message }, { status: upstream.status });
+    // Rails answers `{ error, code, details? }` — forward the envelope intact
+    // so the form can localize off `code` / `details[].field`.
+    const { error, code, details } = payload as {
+      error?: string;
+      code?: string;
+      details?: unknown;
+    };
+    return Response.json(
+      { error: error ?? "Unable to create account", code, details },
+      { status: upstream.status },
+    );
   }
 
   return Response.json(payload, { status: 201 });

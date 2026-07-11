@@ -4,15 +4,18 @@ import { useRouter } from "@/i18n/navigation";
 import { useState, useTransition } from "react";
 import { useTranslations } from "next-intl";
 import { Field } from "@/app/components/field";
+import { isApiErrorDetail } from "@/app/lib/api-error";
 
 type Mode = "sign-in" | "sign-up";
 
-// `/api/auth/*` answers with `{ error: "<English sentence>" }` and a status,
-// exactly like the Rails API behind it — the status is the only part that can
-// be translated off. Statuses listed here have a catalog entry of their own;
-// anything else falls back to `errors.unknown`. Never string-match the
-// sentence to recover a pseudo-code.
+// `/api/auth/*` answers with `{ error, code, details? }`, mirroring the Rails
+// API behind it. Localization keys off the machine-readable `code` (per-field
+// `details` first), with the status map as the fallback — same resolution
+// order as `apiFailure()` in app/lib/actions.ts; see SPEC.md § Server-side
+// error messages. Never string-match the `error` sentence.
 const KEYED_STATUSES = new Set([403, 404, 409, 422, 429, 502, 503]);
+
+type FailureBody = { code?: string; details?: unknown } | null;
 
 export function AuthForm({ defaultMode = "sign-in" }: { defaultMode?: Mode }) {
   const t = useTranslations("auth");
@@ -27,10 +30,30 @@ export function AuthForm({ defaultMode = "sign-in" }: { defaultMode?: Mode }) {
 
   // `overrides` names a catalog entry that reads better than the generic one
   // for that status — a 401 here means bad credentials, not a dead session.
-  function errorMessage(status: number, overrides: Record<number, string> = {}): string {
+  // It only applies when the body carries no code the catalog knows.
+  function errorMessage(
+    status: number,
+    body: FailureBody,
+    overrides: Record<number, string> = {},
+  ): string {
+    if (body?.code === "validation_failed" && Array.isArray(body.details)) {
+      const messages = body.details
+        .filter(isApiErrorDetail)
+        .map((d) => `field.${d.field}_${d.code}`)
+        .filter((key) => tErrors.has(key))
+        .map((key) => tErrors(key));
+      if (messages.length > 0) return messages.join(" ");
+    }
+    if (body?.code && tErrors.has(`code.${body.code}`)) {
+      return tErrors(`code.${body.code}`);
+    }
     return tErrors(
       overrides[status] ?? (KEYED_STATUSES.has(status) ? String(status) : "unknown"),
     );
+  }
+
+  async function failureBody(res: Response): Promise<FailureBody> {
+    return (await res.json().catch(() => null)) as FailureBody;
   }
 
   async function doSignIn(email: string, password: string): Promise<boolean> {
@@ -41,7 +64,7 @@ export function AuthForm({ defaultMode = "sign-in" }: { defaultMode?: Mode }) {
       body: JSON.stringify({ email, password }),
     });
     if (!res.ok) {
-      setError(errorMessage(res.status, { 401: "invalidCredentials" }));
+      setError(errorMessage(res.status, await failureBody(res), { 401: "invalidCredentials" }));
       return false;
     }
     startTransition(() => {
@@ -67,7 +90,12 @@ export function AuthForm({ defaultMode = "sign-in" }: { defaultMode?: Mode }) {
       body: JSON.stringify({ email, password }),
     });
     if (!register.ok) {
-      setError(errorMessage(register.status, { 409: "signUpFailed", 422: "signUpFailed" }));
+      setError(
+        errorMessage(register.status, await failureBody(register), {
+          409: "signUpFailed",
+          422: "signUpFailed",
+        }),
+      );
       return;
     }
     await doSignIn(email, password);

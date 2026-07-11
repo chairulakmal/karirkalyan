@@ -26,7 +26,10 @@ export async function POST(request: Request) {
   if (upstream.status === 429) {
     const retryAfter = upstream.headers.get("Retry-After") ?? "60";
     return Response.json(
-      { error: `Too many sign-in attempts. Try again in ${retryAfter}s.` },
+      {
+        error: `Too many sign-in attempts. Try again in ${retryAfter}s.`,
+        code: "rate_limited",
+      },
       { status: 429 },
     );
   }
@@ -34,8 +37,19 @@ export async function POST(request: Request) {
   // Only a genuine 401 means bad credentials. Collapsing every non-OK status
   // into 401 once disguised a total API outage (host authorization was 403ing
   // every internal call) as "wrong password" for every user, demo included.
+  // The copy is ours but the machine-readable `code` is passed through from
+  // Rails so the form localizes off it.
   if (upstream.status === 401) {
-    return Response.json({ error: "Invalid email or password" }, { status: 401 });
+    const payload = (await upstream.json().catch(() => null)) as {
+      code?: string;
+    } | null;
+    return Response.json(
+      {
+        error: "Invalid email or password",
+        code: payload?.code ?? "invalid_credentials",
+      },
+      { status: 401 },
+    );
   }
 
   if (!upstream.ok) {

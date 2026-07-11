@@ -4,9 +4,21 @@ import { redirect } from "next/navigation";
 const API_URL = process.env.API_URL ?? "http://localhost:3001";
 const SESSION_COOKIE = "session";
 
+import { type ApiErrorDetail, isApiErrorDetail } from "./api-error";
+
+export type { ApiErrorDetail };
+
+export type ApiFailure = {
+  ok: false;
+  status: number;
+  error: string;
+  code?: string;
+  details?: ApiErrorDetail[];
+};
+
 export type ApiResult<T> =
   | { ok: true; status: number; data: T; authHeader: string | null }
-  | { ok: false; status: number; error: string };
+  | ApiFailure;
 
 /**
  * Server-side fetch wrapper that attaches the JWT from the httpOnly session
@@ -66,8 +78,7 @@ export async function apiFetch<T = unknown>(
   if (response.ok) {
     return { ok: true, status: response.status, data: body as T, authHeader };
   }
-  const message = extractError(body) ?? `HTTP ${response.status}`;
-  return { ok: false, status: response.status, error: message };
+  return extractFailure(body, response.status);
 }
 
 /**
@@ -106,9 +117,15 @@ export async function apiProxy(path: string): Promise<Response> {
 export const SESSION_COOKIE_NAME = SESSION_COOKIE;
 export const API_BASE = API_URL;
 
-function extractError(body: unknown): string | null {
-  if (!body || typeof body !== "object") return null;
-  const obj = body as Record<string, unknown>;
-  if (typeof obj.error === "string") return obj.error;
-  return null;
+// Pulls the API's failure envelope — `{ error, code, details? }` — out of an
+// error body, tolerating shapes that predate or fall outside the contract.
+function extractFailure(body: unknown, status: number): ApiFailure {
+  const obj =
+    body && typeof body === "object" ? (body as Record<string, unknown>) : {};
+  const error = typeof obj.error === "string" ? obj.error : `HTTP ${status}`;
+  const code = typeof obj.code === "string" ? obj.code : undefined;
+  const details = Array.isArray(obj.details)
+    ? obj.details.filter(isApiErrorDetail)
+    : undefined;
+  return { ok: false, status, error, code, details };
 }

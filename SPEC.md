@@ -32,8 +32,8 @@ Two consequences worth stating plainly:
   [`CHANGELOG.md`](CHANGELOG.md), including the pre-1.0.0 build phases that used to sit at the
   top of this file.
 
-Last synced against the code: **2026-07-11**, post-`v1.1.2` (v1.2.0 API groundwork: error
-codes + the transition-table endpoint).
+Last synced against the code: **2026-07-11**, post-`v1.1.2` (v1.2.0 groundwork: API error
+codes + the transition-table endpoint; `web/` error catalog keyed on those codes).
 
 ---
 
@@ -789,36 +789,55 @@ holding a second copy as a constant. A Japanese search result should say what th
 says. `/about` and `/docs` each override `title` and `description` from their own catalog namespace,
 which the layout's `title.template` renders as `… — KarirKalyan`.
 
-#### Server-side error messages — keyed on HTTP status, not yet on the error code
+#### Server-side error messages — keyed on the error code, HTTP status as fallback
 
-**Rails stays English-only, and `web/` currently localizes by HTTP status.**
+**Rails stays English-only, and `web/` localizes by the machine-readable `code`** the API
+returns on every failure (see § API contract), falling back to the HTTP status when the code
+has no catalog entry.
 
-The API returns a machine-readable `code` on every failure (see § API contract — added as
-v1.2.0 groundwork), but `web/` does not consume it yet: it still throws the body away and maps
-**status → localized copy**: `401`, `403`, `404`, `409`, `422`, `429`, `502`, `503` each get an
-entry under the `errors` namespace, and anything else falls back to `errors.unknown`. Nothing
-ever string-matches the English sentence to recover a pseudo-code. Narrowing this mapping to
-key on `code` (and per-field `details`) is open v1.2.0 work — see `TODO.md`.
+An upstream failure resolves to localized copy in this order — first hit wins:
 
-Two places do this mapping, because the failure reaches the UI by two paths:
+1. **Per-field validation details.** When the failure is `validation_failed`, each
+   `details[]` entry is looked up as `errors.field.<field>_<code>`
+   (`errors.field.email_taken`, `errors.field.resume_too_long`); every entry with catalog
+   copy is rendered, joined into one message. Fields or inner codes without an entry are
+   skipped rather than guessed at.
+2. **The code.** `errors.code.<code>` — `invalid_credentials`, `stale_record`,
+   `invalid_transition`, `invalid_url`, `prefill_failed`, and the rest of the § Error codes
+   taxonomy each have an entry.
+3. **The status.** The v1.1.0 map survives as the fallback: `401`, `403`, `404`, `409`,
+   `422`, `429`, `502`, `503` under the `errors` namespace. It catches non-JSON failures,
+   codes added to the API before the catalog learns them, and route-handler-synthesized
+   errors that carry no code.
+4. `errors.unknown`.
 
-- `apiFailure()` in `app/lib/actions.ts` — every server action localizes before it returns, so the
-  client components that render `result.error` need no translation logic of their own. Failures the
-  action catches *before* the request (empty company/role, no file chosen, no URL to pre-fill) name
-  a catalog key directly through `localFailure()`, since they have no status to key on.
-- `errorMessage()` in `(auth)/sign-in/sign-in-form.tsx` — the auth form talks to the `/api/auth/*`
-  route handlers over `fetch`, not through a server action. It takes per-call overrides, because a
-  `401` there means bad credentials (`errors.invalidCredentials`), not an expired session.
+Nothing ever string-matches the English `error` sentence — the codes exist precisely so no
+one has to parse prose. Codes are append-only on the API side, and step 3 means an unknown
+code degrades to the v1.1.0 behaviour rather than breaking.
 
-This is a deliberate trade, not an oversight — see the decisions log entry below. The consequence to
-know: a `422` carrying a per-field `errors.full_messages` string (`"Company can't be blank"`) loses
-that detail, because the status alone does not say which field failed; the user sees the generic
-"check the form" copy. In practice the common validation paths never reach Rails — `actions.ts`
-rejects empty company/role first — so the lossy case is the uncommon one.
+Two places do this resolution, because a failure reaches the UI by two paths:
 
-Localizing *in Rails* was rejected for the original reason: it would mean an i18n dependency, locale
-negotiation on every request, and a second message catalog to keep in sync, for strings only the
-frontend ever displays.
+- `apiFailure()` in `app/lib/actions.ts` — takes the whole failed `ApiResult` (which
+  `apiFetch` now decorates with `code` and `details` alongside `error` and `status`); every
+  server action localizes before it returns, so the client components that render
+  `result.error` need no translation logic of their own. Failures the action catches *before*
+  the request (empty company/role, no file chosen, no URL to pre-fill) name a catalog key
+  directly through `localFailure()`, since they have neither code nor status to key on.
+- `errorMessage()` in `(auth)/sign-in/sign-in-form.tsx` — the auth form talks to the
+  `/api/auth/*` route handlers over `fetch`, not through a server action, so it parses the
+  response body itself and runs the same resolution. The route handlers pass the upstream
+  `code`/`details` through (the register handler forwards the Rails envelope unchanged; the
+  session handler substitutes its own copy for security-sensitive statuses but keeps the
+  code). Per-call status overrides remain as the fallback layer — a `401` there means bad
+  credentials, not a dead session.
+
+Catalog presence is tested with next-intl's `t.has()`, so steps 1–2 need no hardcoded list of
+known codes in TypeScript — the catalogs themselves are the list, and `en`/`ja` key parity is
+already enforced.
+
+Localizing *in Rails* was rejected for the original reason: it would mean an i18n dependency,
+locale negotiation on every request, and a second message catalog to keep in sync, for strings
+only the frontend ever displays.
 
 #### Locale-sensitive formatting
 
@@ -1014,9 +1033,10 @@ The cost is per-field `422` text staying English. The fix is real error codes, a
 **v1.2.0**, which already opens with an `api/` change for the FSM transition table. One `api/` PR,
 two reasons.
 
-*(Addendum, v1.2.0 groundwork: that `api/` PR landed — every error now carries a stable `code`,
-and `validation_failed` carries per-field `details`. The status-keyed mapping in `web/` remains
-until the board work narrows it; see § Server-side error messages and `TODO.md`.)*
+*(Addendum, v1.2.0: both halves landed — every API error carries a stable `code`
+(`validation_failed` with per-field `details`), and `web/` now keys its catalog on the code,
+with the status map demoted to the fallback layer. See § Server-side error messages for the
+resolution order.)*
 
 The general lesson is the one this file exists to enforce: a spec that describes a mechanism nobody
 verified is a bug in the spec, not a requirement on the code.

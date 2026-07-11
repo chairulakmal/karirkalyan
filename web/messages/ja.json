@@ -65,7 +65,30 @@
     "chooseFile": "PDFファイルを選択してください。",
     "urlRequired": "先に求人ページのURLを貼り付けてください。",
     "invalidCredentials": "メールアドレスまたはパスワードが正しくありません。",
-    "signUpFailed": "アカウントを作成できませんでした。このメールアドレスはすでに登録されている可能性があります。"
+    "signUpFailed": "アカウントを作成できませんでした。このメールアドレスはすでに登録されている可能性があります。",
+    "code": {
+      "unauthenticated": "セッションの有効期限が切れました。もう一度ログインしてください。",
+      "invalid_credentials": "メールアドレスまたはパスワードが正しくありません。",
+      "not_found": "この応募は見つかりませんでした。",
+      "stale_record": "この応募は別の画面で更新されました。再読み込みしてからやり直してください。",
+      "invalid_transition": "現在のステータスからその変更はできません。",
+      "validation_failed": "内容を保存できませんでした。入力内容を確認してからやり直してください。",
+      "invalid_url": "求人ページのURLとして読み取れませんでした。",
+      "rate_limited": "リクエストが多すぎます。しばらく待ってからやり直してください。",
+      "prefill_failed": "求人ページを読み取れませんでした。内容を手動で入力してください。",
+      "prefill_unavailable": "URLからの自動入力は一時的に利用できません。"
+    },
+    "field": {
+      "company_blank": "企業は必須です。",
+      "role_blank": "職種は必須です。",
+      "status_inclusion": "新規の応募は「検討中」「下書き」「応募済み」のいずれかでのみ作成できます。",
+      "email_taken": "このメールアドレスはすでに登録されています。",
+      "password_too_short": "パスワードは8文字以上で入力してください。",
+      "resume_too_long": "履歴書は1MB以下にしてください。",
+      "resume_not_a_pdf": "履歴書はPDFファイルにしてください。",
+      "cover_letter_too_long": "カバーレターは1MB以下にしてください。",
+      "cover_letter_not_a_pdf": "カバーレターはPDFファイルにしてください。"
+    }
   },
   "home": {
     "signIn": "ログイン",

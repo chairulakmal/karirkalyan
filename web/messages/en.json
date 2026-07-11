@@ -65,7 +65,30 @@
     "chooseFile": "Choose a PDF file.",
     "urlRequired": "Paste a job posting URL first.",
     "invalidCredentials": "That email and password don't match an account.",
-    "signUpFailed": "Couldn't create the account. That email may already be registered."
+    "signUpFailed": "Couldn't create the account. That email may already be registered.",
+    "code": {
+      "unauthenticated": "Your session is no longer valid. Sign in again to continue.",
+      "invalid_credentials": "That email and password don't match an account.",
+      "not_found": "That application no longer exists.",
+      "stale_record": "This application was changed elsewhere. Reload and try again.",
+      "invalid_transition": "That status change isn't allowed from the current status.",
+      "validation_failed": "Those details couldn't be saved. Check the form and try again.",
+      "invalid_url": "That couldn't be read as a job posting URL.",
+      "rate_limited": "Too many requests. Wait a moment and try again.",
+      "prefill_failed": "The job posting couldn't be read. Fill in the details manually.",
+      "prefill_unavailable": "URL pre-fill is temporarily unavailable."
+    },
+    "field": {
+      "company_blank": "Company is required.",
+      "role_blank": "Role is required.",
+      "status_inclusion": "New applications can only start as wishlist, draft, or applied.",
+      "email_taken": "That email is already registered.",
+      "password_too_short": "Password must be at least 8 characters.",
+      "resume_too_long": "The resume must be under 1 MB.",
+      "resume_not_a_pdf": "The resume must be a PDF.",
+      "cover_letter_too_long": "The cover letter must be under 1 MB.",
+      "cover_letter_not_a_pdf": "The cover letter must be a PDF."
+    }
   },
   "home": {
     "signIn": "Sign in",
