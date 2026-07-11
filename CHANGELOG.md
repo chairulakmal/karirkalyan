@@ -8,8 +8,36 @@ Open work lives in [`TODO.md`](TODO.md).
 ## Unreleased
 
 Landed on `main` after the v1.3.0 tag, so it ships with whatever comes next.
-*(chore/dependency-refresh, PR #57)*
+*(chore/dependency-refresh, PR #57; chore/postgres-18, PR #58; chore/purge-sidekiq-debris,
+PR #59; chore/versioning-policy, PR #60)*
 
+- **A versioning policy, written down** (`SPEC.md` § Versioning & releases). SemVer, but with
+  **major redefined against a surface this project actually has**: the textbook rule (*major
+  means you broke the API your consumers depend on*) can never fire here — `web/` is the only
+  client of `/api/v1` and ships in the same commit — so major now means **the previous image
+  cannot be redeployed against the new database**: an irreversible migration, `/api/v2`, an
+  `ApplicationFSM` state removed or renamed, a required env var dropped. Minor stays "additive
+  capability, rollback is still a redeploy"; patch stays "no new capability". The version now
+  lives **only** in the git tag: `web/package.json` is pinned to a static `0.0.0` (the package
+  is `private: true`, so npm never reads the field) rather than mirroring the tag by hand, which
+  is the `PLAN.md` failure mode in miniature.
+- **The Sidekiq/Redis debris from v1.0.0 is gone** — the `Dockerfile` described a second
+  `sidekiq` Railway service that does not exist and claimed background jobs "only run because
+  of" it; `.env.example` in both apps advertised `SIDEKIQ_*` credentials nothing reads; the
+  health check carried its old Redis `PING` in a comment. Deleted `config/sidekiq.yml` and
+  `spec/requests/sidekiq_web_spec.rb` (the gem is not in the `Gemfile`, so `Sidekiq::Web`
+  cannot be mounted — the spec was testing Rails' router). The *historical* mentions stay:
+  they explain why the system is what it is.
+- **Local dev and CI moved to PostgreSQL 18**, matching production, which was already there.
+  `postgres:18` relocates `PGDATA` to `/var/lib/postgresql/18/docker` and declares its volume
+  at `/var/lib/postgresql`, so a bare tag bump would have left the live data directory outside
+  the named volume and silently emptied the database on `docker compose down`.
+- **Documentation audited against the implementation.** `SPEC.md` claimed the FSM has
+  thirty-three edges (it has twenty-six — the rule against restating the transition table
+  applies to its edge count too); `web/README.md` claimed both locales are URL-prefixed
+  (`localePrefix` is `"as-needed"`: `ja` is prefixed, `en` is bare, `/en/*` `307`s); the
+  `sign_up` throttle and the deliberate absence of an OpenAPI path for `/up` were undocumented.
+  Both READMEs gained an i18n row — neither mentioned the product itself is bilingual.
 - **Gems and npm packages refreshed** within their existing constraints — `fugit`,
   `rubocop-rails`; Playwright, Tailwind, `@types/react`, ESLint; and patch bumps to the four
   exact pins (Next → 16.2.10, React → 19.2.7). Clears the `@babel/core` and `js-yaml`
