@@ -5,6 +5,49 @@ Open work lives in [`TODO.md`](TODO.md).
 
 ---
 
+## Unreleased — ships as v1.3.0
+
+Ghost prediction: the dashboard now says which applications have almost certainly gone dead.
+Not yet tagged — the "Tagged at" line goes in when it is. *(feat/ghost-prediction)*
+
+### Ghost prediction
+
+- **`Applications::GhostRiskQuery`** (`api/app/queries/` — a new directory) flags any
+  application sitting in `applied` or `phone_screen` that has been silent longer than the
+  user's **own p90 reply time** for that stage. No migration, no new column: the dwell times
+  are reconstructed from the `timeline_entries` audit trail with a window function, which is
+  the whole point — the FSM's audit log stops being bookkeeping and becomes a feature.
+- **Each timeline row is read as an *exit*, not an entry.** Creation writes no timeline entry,
+  so an application added straight as `applied` — the common case — has no `to_status =
+  'applied'` row to date the stage from. The stage's start comes from
+  `COALESCE(LAG(created_at) OVER (…), applied_at, created_at)`, which also makes backdated
+  `applied_at` and `ghosted → applied` revivals fall out with no special cases.
+- **Cold start is handled, and admitted to.** Below five recorded replies at a stage the
+  threshold is a global default (21 days for `applied`, 14 for `phone_screen`), and the
+  payload carries `basis: "default" | "personal"` so the UI can say so rather than passing a
+  default off as the user's own statistic. Personal thresholds are clamped to 7…90 days.
+  Exits to `ghosted` / `withdrawn` / `archived` never enter the sample — folding `ghosted` in
+  would let every ghosting the user records raise their own threshold, and the predictor would
+  talk itself out of ever predicting again.
+- **The dashboard card offers the `ghosted` transition inline** (`at_risk` rows carry
+  `lock_version`, so no re-fetch), sorted longest-silence-first, with a "Quiet" marker on the
+  matching rows of the applications list. The card renders nothing when there is nothing to
+  act on. Japanese throughout: 音信不通の可能性.
+
+### Folded in along the way — the two parked performance items
+
+- **`/me` is folded into the dashboard payload.** The dashboard was fetching both in one
+  `Promise.all`; that is one wasted request, and TODO said to fix it the next time the payload
+  was touched for another reason. This was that reason. `GET /api/v1/me` stays for API clients.
+- **`timeline_entries` index widened to `(application_id, created_at)`.** It *replaces* the
+  bare `application_id` index rather than adding to it (a prefix covers it), and serves the new
+  window function's `PARTITION BY … ORDER BY` as well as the detail page's timeline.
+- **The dashboard cache key now carries `Date.current`.** Ghost risk is a function of elapsed
+  time, and an application crossing its threshold changes no row — so a key derived from rows
+  alone would keep serving a stale, unflagged payload for up to 12 hours.
+- **`GET /api/v1/dashboard` has a response schema in the OpenAPI output**, the first endpoint
+  to get one: it is the only response that cannot be guessed from a model.
+
 ## v1.2.0 — 2026-07-11
 
 Tagged at `36c9378`. The Kanban board view, plus the `api/` groundwork it needed. As scoped,

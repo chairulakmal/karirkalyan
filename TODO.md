@@ -4,9 +4,12 @@ Open work only. Shipped work lives in [`CHANGELOG.md`](CHANGELOG.md).
 
 **Current release: `v1.2.0`** — tagged 2026-07-11 at `36c9378`. The Kanban board view, plus
 the API error codes and transition-table endpoint it needed.
-**Next release: performance.** Production performance is the priority; dev-server performance
-is secondary but has a real pain point (`next dev` crashes even at 4 GB). The ghost-prediction
-feature idea stays the strongest candidate for the release after.
+**In flight: `v1.3.0` — ghost prediction** (`feat/ghost-prediction`, not yet tagged; see
+CHANGELOG § Unreleased). It was scoped after the performance release, but it turned out to
+touch both of that release's production items — the `timeline_entries` index and the `/me`
+fold — so those landed with it and are struck off below.
+**Next release: performance.** What is left of it is the dev-server memory leak, which is a
+real pain point (`next dev` crashes even at 4 GB) and is now the whole of it.
 
 Everything below is post-1.2.0 and unscoped.
 
@@ -19,16 +22,19 @@ career-planning idea were added 2026-07-11. The market-dependent feature ideas (
 global remote, ghost prediction) were verified against current web sources on 2026-07-11 —
 citations inline where a claim came from research rather than the code.
 
-### Performance — production (priority)
+### Performance — production
 
-- [ ] **`timeline_entries` offer-lookup index** — the dashboard subquery filters `to_status = 'offer'`
-      and the table has no index on `to_status` at all (only `actor_id`, `application_id`,
-      `idempotency_key`). Add `(to_status, application_id, created_at)` if it grows.
-- [ ] **Fold `/me` into the dashboard payload** — `dashboard/page.tsx` already fetches it in
-      parallel via `Promise.all`, so this costs a wasted request, not a round trip. Low priority;
-      fix it when the dashboard payload is touched for another reason.
+- [x] **Fold `/me` into the dashboard payload** — done in `feat/ghost-prediction`, which is what
+      "fix it when the dashboard payload is touched for another reason" was waiting for.
+- [ ] **`timeline_entries` offer-lookup index** — still open, and still conditional. The
+      `avg_days_to_offer` subquery filters `to_status = 'offer'`, and there is deliberately no
+      index on `to_status`: at personal-tracker scale a user's timeline is a few hundred rows,
+      already reachable through `(application_id, created_at)`. Add `(to_status, application_id,
+      created_at)` **if the table grows**, not before. (`feat/ghost-prediction` widened the bare
+      `application_id` index to `(application_id, created_at)` for the ghost-risk window
+      function — a replacement, not an addition.)
 
-### Performance — dev (secondary)
+### Performance — dev (priority)
 
 - [ ] **`next dev` crashes even with a 4 GB heap** (`--max-old-space-size=4096`, added in
       v1.1.1). **Diagnosed 2026-07-11** — it is a **V8 heap leak in the `next-server` process**,
@@ -67,7 +73,9 @@ citations inline where a claim came from research rather than the code.
 ### Code quality
 
 - [ ] **Extract `Applications::ListQuery`** — `ApplicationsController#index` mixes filtering,
-      cursor decoding, and serialization inline. There is no `api/app/queries/` directory yet.
+      cursor decoding, and serialization inline. `api/app/queries/` now exists
+      (`Applications::GhostRiskQuery`), so the destination and its conventions are settled;
+      this is now a straight extraction with a pattern to follow.
 - [ ] **`API_BASE` vs `API_BASE_URL`** — two near-identical names for different things
       (`web/app/lib/api.ts:107` is the internal fetch base; `web/app/lib/links.ts:2` is the public
       Railway URL used for doc links). Rename or comment.
@@ -88,26 +96,9 @@ else's portfolio, because they encode knowledge of the market rather than knowle
 - [ ] **CSV export** of applications.
 - [ ] **Follow-up digest email** — Solid Queue landed; the mailer already exists.
 
-**Ghost prediction — the highest value-to-cost item here**
-
-- [ ] **Predict ghosting from the timeline you already record.** `timeline_entries` stores
-      `from_status`, `to_status`, and `created_at` for every transition, so median days-to-response
-      per stage is derivable from existing data with **no migration** — the one differentiating
-      feature that costs a query and a card, not a schema change. Flag an application as _likely
-      ghosted_ once it sits in `applied` or `phone_screen` past the user's own p90 for that stage,
-      and offer the `ghosted` transition inline. This turns the FSM's audit trail into a product
-      feature and gives the `ghosted` state a reason to exist beyond bookkeeping. Do it first.
-      _(Cold-start caveat: p90 over a handful of applications is noise. Needs a minimum-sample
-      threshold and a sensible global default before it can say anything.)_
-      **Market data (2026-07-11)** says this targets a worsening, mainstream problem, not an
-      edge case: [53% of job seekers were ghosted by an employer in the past
-      year](https://www.ihire.com/resourcecenter/employer/pages/53-percent-of-job-seekers-have-been-ghosted-by-a-potential-employer)
-      (up from 38% in 2024), and [61% report being ghosted _after_ an
-      interview](https://blog.theinterviewguys.com/the-2025-ghosting-index/) — so the flag must
-      cover `phone_screen`/`interview`, not just `applied`. The same research breaks ghosting
-      down by stage (28% after application, 16% after phone screen, 12% after multiple
-      interviews), which doubles as a sanity-check distribution for the global default until
-      the user has enough of their own data.
+**Ghost prediction — shipped in `v1.3.0`.** See CHANGELOG § Unreleased and SPEC.md § Query
+layer. The market research that justified it, and the stage distribution the global defaults
+were sanity-checked against, is recorded in SPEC.md § Query layer rather than repeated here.
 
 **Japan market**
 

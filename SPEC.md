@@ -34,7 +34,8 @@ Two consequences worth stating plainly:
 
 Last synced against the code: **2026-07-11**, post-`v1.2.0` (API error codes + the
 transition-table endpoint; `web/` error catalog keyed on those codes; the `/board` Kanban view;
-variable font builds for Fraunces and Manrope).
+variable font builds for Fraunces and Manrope; ghost prediction and the query layer it
+introduced).
 
 ---
 
@@ -143,10 +144,26 @@ timeline_entries
   note              text                ← optional, supplied on transition
   idempotency_key   string, unique      ← prevents duplicate reminder entries on job retry
   created_at, updated_at
+
+  index (application_id, created_at)   ← composite; serves the ghost-risk window function
+  index (actor_id)
+  index (idempotency_key) unique
 ```
 
-There is deliberately **no index on `to_status`**, though the dashboard's offer-lookup subquery
-filters on it. Add `(to_status, application_id, created_at)` if the table grows; see `TODO.md`.
+The `(application_id, created_at)` composite **replaces** a bare `application_id` index, which it
+covers as a prefix — so it is a widening, not an extra index. It exists because every read of this
+table is per-application in time order: the detail page's timeline, and the `LAG(created_at) OVER
+(PARTITION BY application_id ORDER BY created_at)` in the ghost-risk query, which is now the
+heaviest thing the dashboard does.
+
+There is still deliberately **no index on `to_status`**, though the dashboard's offer-lookup
+subquery filters on it. Add `(to_status, application_id, created_at)` if the table grows; see
+`TODO.md`.
+
+**Creation writes no timeline entry.** A row lands here only on a *transition*; an application
+created directly in an entry state (`wishlist`, `draft`, `applied`) has no `to_status` row naming
+that state. Anything deriving stage history from this table has to account for it — see the
+ghost-risk query, which does.
 
 ### State machine — `app/lib/application_fsm.rb`
 
@@ -304,6 +321,83 @@ This is documented because it already happened once and took production down (CH
 `JobBoard.from_url` strips a URL to a host key (`linkedin.com`). The `JobBoard::NONE` sentinel
 selects applications added without a link. There is no `source` column and no per-board parser.
 
+### Query layer — `app/queries/`
+
+Services exist for *writes*: an explicit user action changes state (§ Service layer). Query objects
+are the read-side counterpart — a non-trivial read model that belongs to no single controller and
+mutates nothing. `app/queries/` holds them. Today there is one.
+
+#### `Applications::GhostRiskQuery`
+
+Signature: `new(user:).call`. Answers one question: **which applications has the user probably been
+ghosted on?**
+
+The `ghosted` state has always existed in the FSM, but nothing ever *suggested* it — the user had to
+notice the silence themselves, which is precisely the thing a person in the middle of a job search
+is bad at. This query turns the audit trail the app already keeps into the suggestion. It needs no
+new column and no new table: `timeline_entries` already records `from_status`, `to_status`, and
+`created_at` for every move, which is enough to reconstruct how long every application sat in every
+stage.
+
+**Deriving time-in-stage.** The obvious reading — "an application entered stage `S` at the
+`created_at` of its `to_status = S` row" — is wrong here, and wrong in a way that silently discards
+most of the data. Creation writes no timeline entry (§ `timeline_entries`), so an application added
+directly as `applied` — the common case, since people add jobs they have already applied to — has no
+`to_status = 'applied'` row to anchor on.
+
+So read each row as an **exit**, not an entry. Every timeline entry is an exit from its
+`from_status`; the moment that stage was *entered* is the previous entry's `created_at`, or, when
+there is no previous entry, the application's own start:
+
+```sql
+COALESCE(
+  LAG(created_at) OVER (PARTITION BY application_id ORDER BY created_at),
+  applications.applied_at,
+  applications.created_at
+)
+```
+
+That single expression covers every case. A backdated `applied_at` (the create form accepts one)
+correctly dates the first stage from the real application date rather than the day the row was
+typed in. A revival (`ghosted → applied`) has a preceding entry, so `LAG` wins and the reset
+`applied_at` — the known sharp edge in § `Applications::TransitionService` — never gets a chance to
+corrupt the interval. And a `wishlist` application whose `applied_at` is null falls through to
+`created_at`.
+
+**What counts as a response.** The sample must measure *how long the company took to reply when it
+replied at all* — so exits to `ghosted`, `withdrawn`, and `archived` are excluded. Including
+`ghosted` in particular would be self-defeating: every application the user marks ghosted after a
+long silence would push their own threshold up, and the predictor would grow steadily more reluctant
+to predict. Everything else is a response — an advance up the pipeline, or a rejection.
+
+**The threshold.** Per stage in `RISK_STAGES = %w[applied phone_screen]` — the two stages where the
+next move is the company's and silence therefore means something — take
+`percentile_cont(0.9)` over the user's own completed response times. An application currently
+sitting in that stage past its threshold is *likely ghosted*. p90, not the median: the claim is "you
+are outside the range where replies normally arrive", and being wrong here is expensive in both
+directions — a false flag invites the user to close a live application.
+
+Cold start is the real design problem, and it is handled in three parts:
+
+| Guard | Value | Why |
+|---|---|---|
+| `MIN_SAMPLE` | `5` responses in that stage | Below this a p90 is one lucky outlier. Falls back to the default. |
+| `DEFAULT_P90` | `applied: 21`, `phone_screen: 14` days | Ordinary hiring-timeline heuristics, used until the user has their own history. |
+| clamp | `7 … 90` days | A user whose few replies all landed same-day would otherwise get a 2-day threshold and see every application flagged. The floor is a guard against confident nonsense; the ceiling stops one 200-day outlier from disabling the feature. |
+
+The payload names which of the two applied (`basis: "personal" | "default"`) and the sample size
+behind it, and the UI says so. A number this consequential should not arrive unexplained.
+
+**Why two stages, and why the defaults are what they are.** Ghosting is the mainstream case, not
+an edge case: [53% of job seekers were ghosted by an employer in the past
+year](https://www.ihire.com/resourcecenter/employer/pages/53-percent-of-job-seekers-have-been-ghosted-by-a-potential-employer)
+(up from 38% in 2024), and [61% report being ghosted *after* an
+interview](https://blog.theinterviewguys.com/the-2025-ghosting-index/) — which is why the flag
+covers `phone_screen` and not just `applied`. The same research breaks it down by stage — 28%
+after application, 16% after a phone screen, 12% after multiple interviews — a distribution the
+`DEFAULT_P90` pair is sanity-checked against: silence after an application is both commoner and
+tolerated longer than silence after someone has spoken to you.
+
 ### API contract
 
 All routes are JSON. Every error response is:
@@ -347,7 +441,7 @@ PATCH  /api/v1/applications/:id/transition        FSM transition; + valid_next_s
 GET    /api/v1/applications/:id/resume            send_data, PDF, nosniff
 GET    /api/v1/applications/:id/cover_letter      send_data, PDF, nosniff
 GET    /api/v1/transitions                        the FSM's effective transition table
-GET    /api/v1/dashboard                          SQL aggregation + facets
+GET    /api/v1/dashboard                          SQL aggregation + facets + ghost risk + user
 GET    /api/v1/me                                 authenticated user's profile
 
 GET    /up                                        deep health check — pings Postgres
@@ -417,6 +511,54 @@ than gem reach.
 
 Filters compose with pagination server-side: `status` (exact), `company` (exact), `source` (host
 substring, `ILIKE`).
+
+#### The dashboard payload — `GET /api/v1/dashboard`
+
+```json
+{
+  "by_status":         { "applied": 6, "phone_screen": 2, "rejected": 3 },
+  "facets":            [["Mercari", "linkedin.com"], ["Cookpad", "(none)"]],
+  "total":             11,
+  "avg_days_to_offer": 24.5,
+  "ghost_risk": {
+    "thresholds":   { "applied": 21.0, "phone_screen": 14.0 },
+    "basis":        { "applied": "personal", "phone_screen": "default" },
+    "sample_sizes": { "applied": 9, "phone_screen": 2 },
+    "at_risk": [
+      { "id": 7, "company": "Mercari", "role": "Backend Engineer", "status": "applied",
+        "lock_version": 1, "days_in_stage": 34.2, "threshold": 21.0 }
+    ]
+  },
+  "user": { "id": 1, "email": "a@b.com", "created_at": "…", "updated_at": "…" }
+}
+```
+
+`at_risk` is sorted longest-silence first and carries `lock_version`, so the UI can offer the
+`ghosted` transition inline without a second fetch — the whole point of the feature is that seeing
+the problem and resolving it are one click apart.
+
+**`user` is the former `GET /api/v1/me` payload, folded in.** The dashboard is the only page that
+wanted it, and it was fetching both endpoints in parallel anyway — one wasted request per load.
+`/me` still exists (it is a documented endpoint and costs nothing), but `web/` no longer calls it.
+
+**Caching.** The aggregation is the heaviest work in the app and runs on every dashboard load, so it
+is memoized in Solid Cache under a self-expiring key: the user id, their application count, and
+`MAX(updated_at)`. Every status change goes through `TransitionService`, which bumps
+`updated_at` — so the key changes exactly when the numbers could have changed, and no manual
+invalidation is needed. `expires_in: 12.hours` is a safety net, not the mechanism.
+
+Two things the key has to carry beyond the data:
+
+- **`STATS_CACHE_VERSION`** — bump it whenever the payload *shape* changes. A data-derived key
+  cannot see a deploy: unchanged rows would keep serving the old shape to new code.
+- **`Date.current`** — ghost risk is a function of *elapsed time*, and elapsed time is invisible to
+  a key built from rows. Without the date, an application could cross its threshold and stay
+  unflagged for up to twelve hours, because nothing about it changed — that is exactly the point.
+  Including the date recomputes the payload once a day per user, which is the right granularity for
+  a threshold measured in days.
+
+`user` is merged in *outside* the cached block. It is a cheap read, and keying application stats on
+a user record would be a category error.
 
 #### Dashboard filters — derived from the URL, no new column
 

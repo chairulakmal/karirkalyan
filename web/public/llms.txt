@@ -16,6 +16,11 @@ pipeline. Built as a portfolio project by Chairul Akmal.
 - Sends follow-up reminders via idempotent Solid Queue background jobs
 - Stores resume and cover letter as PostgreSQL bytea per application
 - Exposes a stats dashboard via pure SQL aggregation (no N+1)
+- Predicts which applications have been ghosted: the dashboard flags any application sitting in
+  applied or phone_screen that has been silent longer than the 90th percentile of that user's own
+  historical reply times for the stage, derived from the timeline audit trail with a window
+  function. Below five recorded replies at a stage it falls back to a global default (21 days for
+  applied, 14 for phone_screen) and labels the threshold as a default rather than a personal one.
 - Offers a Kanban board at /board: one column per active status, and dragging a card between
   columns performs a real FSM transition. The board fetches the legal moves from
   GET /api/v1/transitions rather than keeping its own copy of the table, and the server
