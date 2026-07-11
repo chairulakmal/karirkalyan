@@ -32,8 +32,8 @@ Two consequences worth stating plainly:
   [`CHANGELOG.md`](CHANGELOG.md), including the pre-1.0.0 build phases that used to sit at the
   top of this file.
 
-Last synced against the code: **2026-07-11**, post-`v1.1.2` (v1.2.0 groundwork: API error
-codes + the transition-table endpoint; `web/` error catalog keyed on those codes).
+Last synced against the code: **2026-07-11**, post-`v1.1.2` (v1.2.0: API error codes + the
+transition-table endpoint; `web/` error catalog keyed on those codes; the `/board` Kanban view).
 
 ---
 
@@ -641,8 +641,8 @@ rejected: Rails for a TypeScript developer, a PORO FSM over a state-machine gem,
 Sidekiq and Redis, `bytea` over object storage. Those arguments are the ones in the decisions log
 below, written for someone who has not read this file.
 
-`/docs` frames the API — auth, per-user scoping, the one-string error shape, cursor pagination, and
-the endpoint table — and then links out to the rswag Swagger UI. Deep-linking raw Swagger on a
+`/docs` frames the API — auth, per-user scoping, the `{ error, code, details? }` failure envelope,
+cursor pagination, and the endpoint table — and then links out to the rswag Swagger UI. Deep-linking raw Swagger on a
 `*.up.railway.app` domain drops the visitor out of the design system; the reference stays reachable,
 one click further in. The endpoint table's methods and paths are code and are not translated; only
 the sentence beside each one is.
@@ -679,6 +679,67 @@ guard always sees a locale-stripped pathname. See the i18n section below.
 root layout opts the whole app into dynamic rendering**, so every page's scripts get the nonce.
 There is consequently no static optimization left to lose — which is why locale-prefixed routing in
 v1.1.0 costs nothing.
+
+### Board view — `/board`
+
+A Kanban view of the same applications the dashboard lists: one column per active status, cards
+moved by drag or by menu, each move a real FSM transition. It lives under the `(app)` route group,
+so the route guard's "everything else" row already protects it — no `proxy.ts` change. The header
+gains a `nav.board` link beside Dashboard; unlike the Dashboard link it stays visible below `sm`,
+because there is no second way to reach the board.
+
+#### Data — one bounded fetch-all, plus the transition table
+
+The server page makes two fetches in parallel:
+
+- **Applications** — the cursor-paginated `GET /applications` followed to exhaustion at
+  `limit=100`, capped at 10 pages. A board is a view of *everything*, so pagination is the wrong
+  UI; but "fetch all" against a cursor API must be bounded or one pathological account hangs the
+  page. Past ~1,000 applications the board renders what it fetched plus a `board.truncated`
+  notice. Per-column cursors ("load more" inside each column) were rejected — see the decisions
+  log.
+- **The transition table** — `GET /api/v1/transitions`. The board *fetches* the table; it never
+  mirrors it. `ApplicationFSM::TRANSITIONS` stays the only copy (§ State machine), which is the
+  invariant that deferred this feature to v1.2.0 in the first place.
+
+#### Columns — seven active, one closed rail
+
+The seven columns are exactly `ACTIVE_STATUSES` (`format.ts`): wishlist, draft, applied,
+phone_screen, technical, final_round, offer, in a horizontally scrollable region. The six closed
+states — accepted, declined, rejected, ghosted, withdrawn, archived — do not get columns; thirteen
+columns is unreadable at any width. They collapse into a **closed rail** below the board, one
+toggleable group per status showing a count, expanding to the same cards.
+
+Cards keep the server's order within a column. There is no intra-column reordering: position is
+not API data, and inventing a client-side order would be a second source of truth.
+
+#### Moving cards — native drag-and-drop, card menu as the accessible path
+
+Drag-and-drop is native HTML5 (`draggable`, `dragover`, `drop`) — no dependency; what it can't do
+(touch, animation polish) is not worth a library at this scale (see decisions log). Drag is
+card → column only. While a card is dragged, columns that are legal targets *per the fetched
+table* highlight; dropping anywhere else is a silent no-op. The closed rail is **not** a drop
+target: moves into closed states carry intent — an offer accepted, a process abandoned — that a
+flick of the wrist shouldn't express.
+
+Every card carries a focusable menu button listing **all** legal next states, including the
+closed ones drag refuses. The menu is the accessible path and the only complete one; drag is a
+convenience layered on top. The confirm/revival semantics (`CONFIRM_REQUIRED`, `REVIVAL_STATES`,
+`HARD_TERMINAL`) move out of `transition-buttons.tsx` into a shared module so the detail page and
+the board cannot drift.
+
+The table only decides what *looks* droppable. The server re-validates every transition through
+`Applications::TransitionService` regardless — a stale table degrades the highlighting, never the
+data.
+
+#### Optimistic moves, 409 reverts
+
+A move applies optimistically via `useOptimistic` and calls the existing `transitionStatus`
+server action. On failure the card snaps back to its source column and a board-level localized
+notice shows the resolved error (§ Server-side error messages). A `409` / `stale_record`
+additionally triggers `router.refresh()`, since the board's copy of that application is stale by
+definition. `revalidateApplication()` in `actions.ts` revalidates `/board` alongside
+`/applications/[id]` and `/dashboard`, so moves made elsewhere reach the board on next render.
 
 ### i18n — `next-intl`, English and Japanese
 
@@ -1040,6 +1101,25 @@ resolution order.)*
 
 The general lesson is the one this file exists to enforce: a spec that describes a mechanism nobody
 verified is a bug in the spec, not a requirement on the code.
+
+### Board data — bounded fetch-all over per-column cursors
+
+The board follows the existing cursor-paginated index to exhaustion (`limit=100`, capped at 10
+pages) rather than giving each column its own cursor with a "load more". Per-column pagination
+looks more scalable but is fake precision here: it needs a new `status` filter parameter on the
+API, seven initial requests instead of a handful, and it breaks the board's one job — showing the
+whole pipeline at a glance. The cap keeps the pathological case (thousands of rows) from hanging
+the page; a personal tracker that hits it has outgrown a personal tracker. The truncation is
+stated on screen, not silent.
+
+### Board drag-and-drop — native HTML5, no library
+
+`dnd-kit` and friends buy touch support, keyboard dragging, and animation polish. The board
+doesn't need them: the card menu is already the keyboard path and the only complete one (drag
+can't reach the closed rail), which demotes drag to a pointer convenience — and a pointer
+convenience doesn't justify a dependency. Native `draggable`/`drop` events are ~30 lines. If
+touch dragging ever matters, the menu already works on touch today, and a library can replace the
+listeners without touching the data flow.
 
 ### No Company / Platform / Tag models
 
