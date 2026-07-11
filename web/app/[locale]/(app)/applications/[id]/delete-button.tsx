@@ -27,7 +27,10 @@ export function DeleteButton({ id }: { id: number }) {
 
   if (confirming) {
     return (
-      <div className="text-right">
+      // basis-full below sm: the parent header row can't fit the back link
+      // and this block side by side at 375px, and the prompt must never be
+      // clipped — an unreadable confirmation defeats the confirm step.
+      <div className="basis-full text-right sm:basis-auto">
         <p className="text-xs text-danger">{t("confirmPrompt")}</p>
         <div className="mt-1.5 flex justify-end gap-2">
           <button

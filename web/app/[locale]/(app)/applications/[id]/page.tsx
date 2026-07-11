@@ -61,7 +61,10 @@ export default async function ApplicationDetailPage({
             </a>
           ) : null}
         </div>
-        <div className="flex shrink-0 items-center gap-2">
+        {/* flex-wrap + justify-end: the delete confirm block goes basis-full
+            below sm, wrapping onto its own right-aligned row — side by side
+            with the back link it overflows a 375px viewport in Japanese. */}
+        <div className="flex shrink-0 flex-wrap items-center justify-end gap-2">
           <Link
             href="/dashboard"
             className="border border-dune bg-linen px-3 py-1.5 text-sm text-ink-soft hover:bg-sand"
