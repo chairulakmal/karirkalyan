@@ -16,30 +16,116 @@ entity is triggered by accepting an offer, not by finishing a prior release), an
 gains an **Operations** section for the worst-day work — backups, export — that no feature
 admission test covers.
 
-**Next release: search-time usefulness** — the follow-up digest and the Operations backup
-item are the cheapest wins the user feels this week. The dev-server memory leak is
-**maintenance, not a release**: its stopgap already shipped (`cf7cd8d` — 8 GB heap +
+**Nothing in flight.** The backlog below is now scoped into releases — see the release plan
+directly beneath. The dev-server memory leak carries no release tag on purpose: it is
+**maintenance, not a release**. Its stopgap already shipped (`cf7cd8d` — 8 GB heap +
 heap-snapshot flag live in `web/package.json`), and what remains is filing upstream when the
 next crash writes a snapshot.
-**Nothing in flight.**
-
-Everything below is post-1.3.0 and unscoped.
 
 ---
 
-## Backlog (unscoped)
+## Release plan — `v1.3.1` → `v1.6.0` (scoped 2026-07-12)
+
+**The whole backlog fits under 1.x.** Only one item forces a major, and `SPEC.md` § Versioning
+& releases already names it: the **`positions` entity**, because it adds a table *and* changes
+what `accepted` means in `ApplicationFSM`. Everything else here is an additive migration or has
+no schema at all, so the previous image would still boot against the database the release leaves
+behind — which is the whole of the major test.
+
+| Release | Level | Contents |
+| --- | --- | --- |
+| `v1.3.1` | patch | Everything already on `main` since the v1.3.0 tag. Zero work — tag it. |
+| `v1.4.0` | minor | Follow-up digest, calendar-aware dead zones, CSV export, full-account export |
+| `v1.4.1` | patch | `Applications::ListQuery` extraction, `API_BASE` naming |
+| `v1.5.0` | minor | The Japan market layer: recruiter channel + `agencies`, 年収 comp structure, Japanese-level filter |
+| `v1.5.1` | patch | Japanese phrase-based line breaking |
+| `v1.6.0` | minor | Hiring entity, timezone overlap + `.ics`, visa / status of residence, email verification |
+
+**The trap that would break this plan: every new column in `v1.5.0` and `v1.6.0` must be
+nullable or defaulted.** A `NOT NULL` column with no default means the previous image's
+`INSERT`s fail against the new database — and by the mechanical test that quietly turns a minor
+into a **major**. It is the only way this plan accidentally violates its own versioning.
+
+### `v1.3.1` — patch. Zero work; it is sitting untagged for no reason
+
+The `CHANGELOG.md` **Unreleased** block is already a patch by definition — dependency refresh,
+Postgres 18 in dev/CI, the Sidekiq/Redis purge, the docs audit, the versioning policy. No new
+capability among them.
+
+### `v1.4.0` — minor. "The search, this week"
+
+The follow-up digest, the calendar dead zones, CSV export, and the full-account export from
+Operations. Grouped, not bundled arbitrarily: the digest and the holiday-awareness are the
+**same edit to `FollowUpReminderJob`**, and CSV and the JSON+resumes export are the **same
+controller, serializer, and download surface** — splitting either pair means opening the same
+files twice. All four reuse machinery that already exists (Solid Queue, the mailer, bytea
+storage), and all four pay off *during* an active search, which is what the north star asks for.
+
+### `v1.4.1` — patch. Sequenced before `v1.5.0`, not filler
+
+Extract `Applications::ListQuery`; settle `API_BASE` vs `API_BASE_URL`. This lands **first**
+because `v1.5.0` adds three new filters to `ApplicationsController#index` — the exact method
+that already mixes filtering, cursor decoding, and serialization inline. Extract before, and the
+filters land in a query object with `Applications::GhostRiskQuery` as the pattern; extract after,
+and the controller thickens and then gets refactored under load.
+
+### `v1.5.0` — minor. The Japan market layer
+
+Recruiter channel + `agencies` + the ownership-window warning; 年収 as a comp *structure*, not a
+number; the Japanese-level requirement filter. One release because all three pass the **field
+admission test the same way** — each is captured by `UrlPrefillService` at prefill time from the
+posting text. That is one extraction pass, one migration, one form pass; three releases would be
+three trips through the same three files. This is also the release a Tokyo reviewer could not
+have seen in someone else's portfolio.
+
+### `v1.5.1` — patch. Japanese phrase-based line breaking
+
+No new capability, so it cannot be a minor — but it is worth the most **right after `v1.5.0`**,
+which is the release that fills the UI with the Japanese compound nouns (agency names, comp
+structures, JLPT levels) that wrap mid-word today.
+
+### `v1.6.0` — minor. "Can you actually take this job?"
+
+Hiring-entity enum, timezone overlap with the `.ics` export falling out of it, and visa /
+status-of-residence tracking with CoE lead time surfaced next to an offer deadline. The theme is
+**constraints that decide whether an offer is even takeable** — the visa item and the
+hiring-entity item are the same question asked from opposite directions. Email verification
+rides along as the portfolio checkbox it is, ranked last and labelled honestly.
+
+### Deliberately outside the plan
+
+- **`positions`, and everything hanging off it** — resume versioning, periodic check-ins,
+  low-noise market watch, the skills/certs gap list, the comp-percentile half of career
+  intelligence. Two reasons, both already decided above: `positions` is the `2.0.0`, and its
+  scoping trigger is **accepting an offer**, not finishing `v1.6.0`. Giving it a release number
+  would contradict that.
+- **履歴書 / 職務経歴書 generation.** 履歴書 alone is a legal minor — additive, no schema break —
+  but its twin *is* a `positions` table rendered as prose, and the entry below calls PDF
+  generation the highest carry cost in this file. Shipping half the pair, then maintaining that
+  toolchain for a year before the other half is even buildable, is the worst version of the
+  trade. Ship both after `2.0.0`.
+- **The `timeline_entries` index** stays conditional — nothing in `v1.4`–`v1.6` grows that table.
+- **The `next dev` heap leak** stays maintenance, per the header.
+- **Documenting the restore drill in SPEC.md § Deployment** is docs: straight to `main`, no
+  release.
+
+---
+
+## Backlog
 
 Verified against the code on 2026-07-10 — all still hold. The dev-server memory item and the
 career-planning idea were added 2026-07-11. The market-dependent feature ideas (Japan market,
 global remote, ghost prediction) were verified against current web sources on 2026-07-11 —
 citations inline where a claim came from research rather than the code. The Operations
-section and the north-star re-ranking were added 2026-07-11.
+section and the north-star re-ranking were added 2026-07-11. Items were scoped into releases on
+2026-07-12 — each open item below carries its release tag, and the plan above is the summary of
+those tags, not a second source of truth.
 
 ### Performance — production
 
 - [x] **Fold `/me` into the dashboard payload** — done in `feat/ghost-prediction`, which is what
       "fix it when the dashboard payload is touched for another reason" was waiting for.
-- [ ] **`timeline_entries` offer-lookup index** — still open, and still conditional. The
+- [ ] **`timeline_entries` offer-lookup index** *(no release — conditional)* — still open, and still conditional. The
       `avg_days_to_offer` subquery filters `to_status = 'offer'`, and there is deliberately no
       index on `to_status`: at personal-tracker scale a user's timeline is a few hundred rows,
       already reachable through `(application_id, created_at)`. Add `(to_status, application_id,
@@ -106,7 +192,8 @@ loyal user, losing that history is strictly worse than lacking any feature in th
         with zero errors; all 17 tables and every row came back (`users:3 |
         applications:19 | timeline_entries:32`, status spread intact). Drill steps are
         documented in the backups repo README.
-    - [ ] Document the drill (or point to the backups repo) in SPEC.md § Deployment.
+    - [ ] Document the drill (or point to the backups repo) in SPEC.md § Deployment. *(docs —
+          straight to `main`, no release)*
   - [x] **Local dev Postgres 16 → 18 — done 2026-07-11** (`api/docker-compose.yml`, both
         CI workflows, SPEC.md, both READMEs, `api/README.md`, `llms.txt`). Production was
         confirmed already on 18.4 (`postgres-ssl:18`), so nothing changed on Railway; the
@@ -115,7 +202,7 @@ loyal user, losing that history is strictly worse than lacking any feature in th
         `/var/lib/postgresql/18/docker`, and the old `.../data` mount would have parked
         the live data dir outside the named volume. Upgrading a machine with a 16 volume
         needs `docker compose down -v` + `db:setup`.
-- [ ] **Full-account export** — JSON plus resume files, downloadable from the app. The
+- [ ] **Full-account export** *(`v1.4.0`)* — JSON plus resume files, downloadable from the app. The
       loyal-user version of the CSV table-stakes item (CSV covers applications only; it
       recovers neither resumes nor timeline). CSV stays as a convenience view; this is the
       data-safety artefact, and the second, provider-independent leg of the backup story.
@@ -125,7 +212,9 @@ loyal user, losing that history is strictly worse than lacking any feature in th
 
 ### UI & accessibility
 
-- [ ] **Japanese phrase-based line breaking (文節単位の改行).** Japanese has no spaces, so the
+- [ ] **Japanese phrase-based line breaking (文節単位の改行)** *(`v1.5.1` — patch: no new
+      capability, and it pays off most once `v1.5.0` fills the UI with Japanese compound nouns)*.
+      Japanese has no spaces, so the
       browser breaks lines at almost any character boundary and compound words wrap mid-word
       (`東京オリン` / `ピック`). Two-layer fix, both cheap: (1) `word-break: auto-phrase` in CSS —
       [Chromium 119+ only](https://caniuse.com/mdn-css_properties_word-break_auto-phrase), needs
@@ -165,17 +254,22 @@ loyal user, losing that history is strictly worse than lacking any feature in th
 
 ### Code quality
 
-- [ ] **Extract `Applications::ListQuery`** — `ApplicationsController#index` mixes filtering,
+- [ ] **Extract `Applications::ListQuery`** *(`v1.4.1` — and it must land before `v1.5.0`)* —
+      `ApplicationsController#index` mixes filtering,
       cursor decoding, and serialization inline. `api/app/queries/` now exists
       (`Applications::GhostRiskQuery`), so the destination and its conventions are settled;
-      this is now a straight extraction with a pattern to follow.
-- [ ] **`API_BASE` vs `API_BASE_URL`** — two near-identical names for different things
+      this is now a straight extraction with a pattern to follow. The sequencing is the point:
+      `v1.5.0` adds three filters (channel, comp, Japanese level) to exactly this method, so
+      extracting first means they land in a query object rather than thickening a controller
+      that then has to be refactored under load.
+- [ ] **`API_BASE` vs `API_BASE_URL`** *(`v1.4.1`)* — two near-identical names for different things
       (`web/app/lib/api.ts:107` is the internal fetch base; `web/app/lib/links.ts:2` is the public
       Railway URL used for doc links). Rename or comment.
 
 ### Feature ideas
 
-Unscoped. The pre-1.0.0 Phase 9 notes (now in `CHANGELOG.md`) also name an analytics dashboard
+Scoped into `v1.4.0`–`v1.6.0` on 2026-07-12; tags inline below. The pre-1.0.0 Phase 9 notes (now
+in `CHANGELOG.md`) also name an analytics dashboard
 and an AI cover-letter assist as the declared roadmap. Everything here is **post-v1.3.0** and most of it _does_ touch `api/` —
 that is fine, the `web/`-only constraint is a property of v1.1.0, not a permanent rule.
 
@@ -193,12 +287,16 @@ for the whole section, not a footnote on one item.
 
 **Table stakes** — re-ranked 2026-07-11 by the north star, not by what a checklist expects:
 
-- [ ] **Follow-up digest email** — first: Solid Queue landed, the mailer already exists, and
-      it is useful *this week* of an active search. Part of the next release.
-- [ ] **CSV export** of applications — a convenience view; the data-safety version is the
-      full-account export in Operations above.
-- [ ] **Email verification** (Devise `:confirmable`) — last, and labelled honestly: it guards
-      a signup problem a single-user app does not have. A portfolio checkbox, ranked as one.
+- [ ] **Follow-up digest email** *(`v1.4.0`)* — first: Solid Queue landed, the mailer already
+      exists, and it is useful *this week* of an active search. Ships together with the
+      calendar-aware dead zones below — they are the same edit to `FollowUpReminderJob`.
+- [ ] **CSV export** of applications *(`v1.4.0`)* — a convenience view; the data-safety version is
+      the full-account export in Operations above. Ships *with* that export, not before it: same
+      controller, same serializer, same download surface, so building CSV alone means opening
+      those files twice.
+- [ ] **Email verification** (Devise `:confirmable`) *(`v1.6.0`, riding along)* — last, and
+      labelled honestly: it guards a signup problem a single-user app does not have. A portfolio
+      checkbox, ranked as one.
 
 **Ghost prediction — shipped in `v1.3.0`.** See CHANGELOG § v1.3.0 and SPEC.md § Query
 layer. The market research that justified it, and the stage distribution the global defaults
@@ -218,7 +316,7 @@ refresh cost** when it is scoped, and the sum of those lines is a real cap on ho
 these a solo maintainer can ship. The career-intelligence item below already budgets this
 way ("one data-entry session a year"); that is the pattern.
 
-- [ ] **Visa / status-of-residence tracking.** For a foreign engineer in Japan this is the
+- [ ] **Visa / status-of-residence tracking** *(`v1.6.0`)*. For a foreign engineer in Japan this is the
       single most decision-relevant fact about a job posting, and no generic tracker models it. Per
       application: does the employer sponsor, and which status of residence
       (技術・人文知識・国際業務 is the usual one for software roles)? Globally: days remaining on
@@ -238,7 +336,8 @@ way ("one data-entry session a year"); that is the pattern.
       技術・人文知識・国際業務 at ~55–65 days](https://japan-visa.com/coe/time) within the
       official 1–3-month band, and when changing employers the safe path is a fresh CoE — which
       is exactly the lead-time arithmetic this feature should surface next to an offer deadline.
-- [ ] **Rirekisho + shokumu-keirekisho generation.** Japanese applications conventionally want
+- [ ] **Rirekisho + shokumu-keirekisho generation** *(no release — deliberately parked past
+      `2.0.0`; see "Deliberately outside the plan" above)*. Japanese applications conventionally want
       two documents: 履歴書 (personal history, a standardised form) and 職務経歴書 (career history,
       free-form). Generating both as PDFs from stored profile data would be the clearest possible
       signal that the author understands the market. **Format question answered (2026-07-11):**
@@ -254,7 +353,7 @@ way ("one data-entry session a year"); that is the pattern.
       font embedding, layout drift — and the MHLW format itself can churn. Highest wow,
       highest carry; scope it with both eyes open, the way the dark-mode entry weighed its
       cost side.
-- [ ] **Model the recruiter channel.** Hiring in Japan is heavily agent-mediated. Add a channel
+- [ ] **Model the recruiter channel** *(`v1.5.0`)*. Hiring in Japan is heavily agent-mediated. Add a channel
       to each application — direct / agent / referral — and record which agency submitted you where.
       Two agencies submitting the same candidate to the same company is a real and damaging
       situation; an app that warns about a duplicate submission is solving a problem the incumbents
@@ -266,7 +365,7 @@ way ("one data-entry session a year"); that is the pattern.
       candidates don't know the rule exists. So the data model is not just a channel enum: it
       needs `(company, agency, submitted_at)` with an ownership-window expiry, and the warning
       fires on any second submission to a company whose window is still open.
-- [ ] **Compensation as 年収, not salary.** Japanese offers are quoted as an annual figure that
+- [ ] **Compensation as 年収, not salary** *(`v1.5.0`)*. Japanese offers are quoted as an annual figure that
       folds in bonus (賞与), often expressed as N months of base. Comparing "600万, 12 months + 2×
       bonus" against a flat 14-month structure is real arithmetic that candidates get wrong. Store
       the structure, not just the number, and normalise for comparison.
@@ -281,10 +380,11 @@ way ("one data-entry session a year"); that is the pattern.
       (989 respondents) puts the median international developer at **¥9.5M** — but ¥13.5M at
       international companies with no Japan entity vs ¥8.5M at Japanese-HQ firms, so any
       comparison UI should surface employer type, not just the number.
-- [ ] **Calendar-aware follow-ups.** `FollowUpReminderJob` already runs at 08:15 JST. Teach it
+- [ ] **Calendar-aware follow-ups** *(`v1.4.0`, with the digest — one edit to the same job)*.
+      `FollowUpReminderJob` already runs at 08:15 JST. Teach it
       the dead zones — the New Year holidays, Golden Week, Obon — when nudging a company achieves
       nothing. A reminder that knows not to fire on 1 January is a small touch that reads as care.
-- [ ] **Japanese-level filter.** Record the Japanese proficiency a posting demands (JLPT N1/N2,
+- [ ] **Japanese-level filter** *(`v1.5.0`)*. Record the Japanese proficiency a posting demands (JLPT N1/N2,
       "business level", conversational, none) against what the user holds, and filter on it.
       **Researched 2026-07-11:** this taxonomy matches how the market actually filters — both
       [TokyoDev](https://www.tokyodev.com/jobs/no-japanese-required) and
@@ -303,7 +403,12 @@ not just an application tracker — the name already says so (karir = career; th
 currently narrower than its own name). Sequencing (updated 2026-07-11): this cluster follows
 the user's calendar, not a release order — see the `positions` scoping trigger below.
 
+This whole cluster sits **outside the `v1.4`–`v1.6` plan** — not because it is unimportant, but
+because `positions` is the `2.0.0` (it adds a table *and* changes what `accepted` means in the
+FSM), and its trigger is a date in the user's life, not a release number.
+
 - [ ] **`positions` (tenure) entity — the keystone; design it before building anything below.**
+      *(`2.0.0` — the only major in this file)*
       Today `accepted` is a terminal status; a career tracker needs the job you then held as a
       first-class thing: company, title, start/end, and the comp structure from the 年収 item
       above. Comp history across positions (benchmarkable against the TokyoDev medians cited
@@ -313,7 +418,8 @@ the user's calendar, not a release order — see the `positions` scoping trigger
       means. **Scoping trigger (decided 2026-07-11): accepting an offer**, not finishing a
       prior release — the moment the search succeeds is the moment this entity is needed, or
       the app exits the user's life exactly when its retention story was supposed to begin.
-- [ ] **Make the app survive its own success.** Today the lifecycle ends at `accepted`: the
+- [ ] **Make the app survive its own success** *(post-`2.0.0` — every sub-item below hangs off
+      `positions`)*. Today the lifecycle ends at `accepted`: the
       search closes and there is no reason to open the app again until the next one. Extend it
       into the tenure _between_ searches, so landing a job is a state change, not an exit:
   - **Resume as a living document** — the resume is already stored per application; add a
@@ -349,7 +455,10 @@ the user's calendar, not a release order — see the `positions` scoping trigger
   (a ranked "learn next", never course progress or streaks); check-ins stay a recurring
   nudge, never a journaling habit loop.
 
-- [ ] **Career intelligence — benchmark reports from published surveys.** An in-app,
+- [ ] **Career intelligence — benchmark reports from published surveys** *(post-`2.0.0`: its
+      headline view — comp percentile for the current position — needs `positions`. The
+      offer-comp-vs-median slice becomes buildable once `v1.5.0` lands the 年収 structure, and
+      may ride a later `v1.6.x` if it earns its refresh cost on its own.)* An in-app,
       yearly-refreshed summary of reliable market sources: the [TokyoDev annual
       survey](https://www.tokyodev.com/articles/the-2025-tokyodev-developer-survey-results-are-live)
       first (2025: 989 respondents; median ¥9.5M, split by employer type, experience band, and
@@ -365,7 +474,7 @@ the user's calendar, not a release order — see the `positions` scoping trigger
 
 **Global remote**
 
-- [ ] **Can they actually hire you?** The filter that silently kills most global-remote
+- [ ] **Can they actually hire you?** *(`v1.6.0`)* The filter that silently kills most global-remote
       applications from Japan: many companies cannot employ someone resident here, and offer only a
       contractor arrangement or an employer-of-record. Track the hiring entity and whether Japan is
       a supported location — ideally captured at prefill time, since job postings usually say.
@@ -379,9 +488,9 @@ the user's calendar, not a release order — see the `positions` scoping trigger
       different employment reality (an EOR contract is with the EOR, not the company you
       interviewed with). Some EORs now also sponsor visas, which ties this to the visa item
       above.
-- [ ] **Timezone overlap.** Store the company's home timezone and any required overlap window,
+- [ ] **Timezone overlap** *(`v1.6.0`)*. Store the company's home timezone and any required overlap window,
       then show which roles are survivable from JST. A US-West role demanding four hours of overlap
       means a 1am start. Warn at interview-scheduling time too — an invite that lands at 03:00 JST
       should be visibly flagged, not quietly accepted.
-- [ ] **Interview scheduling with `.ics` export**, timezone-correct. Falls out of the above and
+- [ ] **Interview scheduling with `.ics` export** *(`v1.6.0`)*, timezone-correct. Falls out of the above and
       is small once the timezone data exists.
