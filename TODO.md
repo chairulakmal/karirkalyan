@@ -241,6 +241,20 @@ first, ghost prediction after, this cluster then.
   (a ranked "learn next", never course progress or streaks); check-ins stay a recurring
   nudge, never a journaling habit loop.
 
+- [ ] **Career intelligence — benchmark reports from published surveys.** An in-app,
+      yearly-refreshed summary of reliable market sources: the [TokyoDev annual
+      survey](https://www.tokyodev.com/articles/the-2025-tokyodev-developer-survey-results-are-live)
+      first (2025: 989 respondents; median ¥9.5M, split by employer type, experience band, and
+      language use), with MHLW's official wage statistics (賃金構造基本統計調査) as the
+      government counterpart. The point is not the report — a static summary page would fail
+      this section's admission test — but the user's own data shown against it: comp
+      percentile for the current position (needs the `positions` entity), offer comp vs the
+      market median for their experience band at decision time, their Japanese level against
+      the language-requirement distribution of the roles they track. Implementation is a
+      versioned reference dataset — a seed file refreshed once per survey cycle, no scraping,
+      no pipeline — so the recurring cost is one data-entry session a year. Check each
+      source's licensing/attribution terms before shipping its numbers.
+
 **Global remote**
 
 - [ ] **Can they actually hire you?** The filter that silently kills most global-remote
