@@ -6,9 +6,6 @@ Rails.application.routes.draw do
   mount Rswag::Ui::Engine => "/api-docs"
   mount Rswag::Api::Engine => "/api-docs"
 
-  # Sidekiq::Web dashboard is disabled (Sidekiq is disabled — see CLAUDE.md).
-  # To re-enable, restore the mount block from git history.
-
   devise_for :users,
     path: "/api/v1/auth",
     path_names: { sign_in: "sign_in", sign_out: "sign_out", registration: "sign_up" },

@@ -1,13 +1,11 @@
 # syntax=docker/dockerfile:1
 # check=error=true
 
-# Production image for Railway. One image, two services:
-#   - `api` service runs this image's default CMD (Puma).
-#   - `sidekiq` service runs the SAME image with a Start Command override
-#     (`bundle exec sidekiq -C config/sidekiq.yml`) set in the Railway dashboard.
-# NOTE: with a Dockerfile present, Railway runs this CMD and IGNORES the Procfile,
-# so background jobs only run because of the dedicated `sidekiq` service.
-# For local dev, use docker-compose.yml at the repo root (Postgres + Redis only).
+# Production image for Railway. One image, one service: `api` runs the default
+# CMD (Puma), and Solid Queue's supervisor, dispatcher and workers run inside that
+# same Puma process via `plugin :solid_queue` — there is no worker service.
+# NOTE: with a Dockerfile present, Railway runs this CMD and IGNORES the Procfile.
+# For local dev, use api/docker-compose.yml (Postgres only).
 
 ARG RUBY_VERSION=3.4.9
 FROM docker.io/library/ruby:$RUBY_VERSION-slim AS base
@@ -55,7 +53,6 @@ COPY --chown=rails:rails --from=build /rails /rails
 
 ENTRYPOINT ["/rails/bin/docker-entrypoint"]
 
-# Default command = the `api` (Puma) service. The `sidekiq` service overrides
-# this with a Start Command in the Railway dashboard.
+# Puma also hosts Solid Queue, so this is the only command any service runs.
 EXPOSE 8080
 CMD ["bundle", "exec", "rails", "server", "-b", "0.0.0.0", "-p", "8080"]
