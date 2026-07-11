@@ -1211,6 +1211,42 @@ Jobs run inline via the `:async` adapter in development — there is no worker p
 
 ---
 
+## Versioning & releases
+
+Semantic versioning, with **major redefined against the compatibility surfaces this project
+actually has**. The textbook rule — *major means you broke the API your consumers depend on* —
+does not fit: `web/` is the only client of `/api/v1` and it ships in the same commit, so there is
+no consumer to break and the major digit could never legitimately fire. A version scheme whose
+top digit is unreachable is not a scheme.
+
+The surface that does exist, and that a solo operator feels at 2 a.m., is **rollback**. So:
+
+| Level | Rule | Examples |
+| --- | --- | --- |
+| **major** | The previous image **cannot** be redeployed against the new database. Rolling back needs a plan. | An irreversible or destructive migration; `/api/v1` → `/api/v2`; removing or renaming a state in `ApplicationFSM` (stored `status` values stop validating); dropping a required env var. |
+| **minor** | New user-visible capability, and rollback is still a redeploy. | A feature (ghost prediction, the Kanban board); a new endpoint; a new optional field or additive migration. |
+| **patch** | No new capability. | Bug fix, security fix, dependency refresh, performance work. |
+
+The test for major is mechanical: **could I deploy the previous release's image against the
+database this release leaves behind, and would it boot and serve?** If no, it is a major. The
+`positions` entity in `TODO.md` is the first plausible `2.0.0` — it adds a table *and* changes the
+state machine.
+
+### The version number lives in exactly one place: the git tag
+
+`git tag v1.3.0` and its GitHub Release are the source of truth. `web/package.json` carries a
+static `"version": "0.0.0"`, which is deliberate: the package is `private: true`, so npm never
+reads or publishes the field, and a number kept there would be a hand-copied duplicate of the
+tag — the same failure that killed `PLAN.md` and that the FSM's single `TRANSITIONS` table exists
+to prevent. `api/` has no version constant. There is nothing to keep in sync, so nothing can
+drift.
+
+Releasing is therefore: land the work (with `SPEC.md` already updated, per the rule at the top of
+this document), move the `CHANGELOG.md` **Unreleased** block under a version heading, tag, and
+`gh release create`.
+
+---
+
 ## Decisions log
 
 Reversed decisions keep both entries. A spec that hides its own history teaches nothing.
