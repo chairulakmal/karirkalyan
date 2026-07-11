@@ -4,8 +4,9 @@ Open work only. Shipped work lives in [`CHANGELOG.md`](CHANGELOG.md).
 
 **Current release: `v1.2.0`** — tagged 2026-07-11 at `36c9378`. The Kanban board view, plus
 the API error codes and transition-table endpoint it needed.
-**Next release: not yet scoped** — candidates live in the backlog below; the ghost-prediction
-item is marked "do it first".
+**Next release: performance.** Production performance is the priority; dev-server performance
+is secondary but has a real pain point (`next dev` crashes even at 4 GB). The ghost-prediction
+feature idea stays the strongest candidate for the release after.
 
 Everything below is post-1.2.0 and unscoped.
 
@@ -13,9 +14,10 @@ Everything below is post-1.2.0 and unscoped.
 
 ## Backlog (unscoped)
 
-Verified against the code on 2026-07-10 — all still hold.
+Verified against the code on 2026-07-10 — all still hold. The dev-server memory item and the
+career-planning idea were added 2026-07-11.
 
-### Performance
+### Performance — production (priority)
 
 - [ ] **Font payload** — 3 families / ~15 files in `web/app/layout.tsx` (Fraunces 4 weights,
   Manrope 5, IBM Plex Mono 2); switch Fraunces & Manrope to variable builds or trim unused weights.
@@ -25,6 +27,29 @@ Verified against the code on 2026-07-10 — all still hold.
 - [ ] **Fold `/me` into the dashboard payload** — `dashboard/page.tsx` already fetches it in
   parallel via `Promise.all`, so this costs a wasted request, not a round trip. Low priority;
   fix it when the dashboard payload is touched for another reason.
+
+### Performance — dev (secondary)
+
+- [ ] **`next dev` crashes even with a 4 GB heap** (`--max-old-space-size=4096`, added in
+  v1.1.1). **Diagnose before adding knobs** — the flag only bounds the V8 heap, and on
+  Next 16 `next dev` runs Turbopack, whose compiler state lives in native (Rust) memory the
+  flag does not touch. So first establish *which* memory runs out: a V8
+  `heap out of memory` abort, a native/RSS blow-up, or the OS OOM-killer (`dmesg`). Next's
+  own guide (`node_modules/next/dist/docs/01-app/02-guides/memory-usage.md`) prescribes
+  `NODE_OPTIONS=--inspect` + heap snapshots for the V8 side; most of its other remedies
+  (`webpackMemoryOptimizations`, webpack cache tweaks) are webpack-only and do not apply.
+  - The wish is **evicting stale compiler state while keeping hot reload**. webpack had
+    `onDemandEntries` (dispose pages idle for N ms) for exactly this; Turbopack has no
+    documented equivalent, but `experimental.turbopackFileSystemCacheForDev` (default `true`
+    on our version — verify it is actually on) persists compilation to disk, which is the
+    same idea one level down. If nothing in-process works, the honest fallback is a
+    scheduled dev-server restart, which the fs cache should make cheap — a workaround, not
+    a fix, so also check github.com/vercel/next.js issues for the leak and file upstream
+    with the heap snapshot if it reproduces.
+  - Two local aggravators worth ruling out: every route renders dynamically (the CSP-nonce
+    `await connection()` in the root layout), so nothing visited is ever served static in
+    dev; and the ~15 font files compile into every layout pass — the production font-payload
+    item above may pay off here too.
 
 ### UI & accessibility
 
@@ -103,6 +128,33 @@ from my summary alone. Verify each against a current primary source before writi
   nothing. A reminder that knows not to fire on 1 January is a small touch that reads as care.
 - [ ] **Japanese-level filter.** Record the Japanese proficiency a posting demands (JLPT N1/N2,
   "business level", conversational, none) against what the user holds, and filter on it.
+
+**Career planning — life after `accepted`**
+
+- [ ] **Make the app survive its own success.** Today the lifecycle ends at `accepted`: the
+  search closes and there is no reason to open the app again until the next one. Extend it
+  into the tenure *between* searches, so landing a job is a state change, not an exit:
+  - **Resume as a living document** — the resume is already stored per application; add a
+    current, versioned profile that keeps improving while employed, so the next application
+    starts from the best version rather than a year-old PDF. Feeds the
+    rirekisho/shokumu-keirekisho generation idea above.
+  - **Low-noise market watch** — `wishlist` already models "interesting, not applied"; let it
+    be the employed-mode default. Tracking relevant roles while happily employed is how you
+    know your market value and when to move.
+  - **Skills & certs against the market, not a wishlist** — `UrlPrefillService` already reads
+    postings with Claude; extract the skills/certifications each tracked role asks for at
+    prefill time, and the gap between what target roles want and what the profile holds
+    becomes a ranked "learn next" list (JLPT level, cloud certs, a framework) with zero extra
+    data entry. Goals can target the current employer too — an internal promotion has stages
+    like an application does.
+  - **Periodic check-ins** — Solid Queue and the mailer exist; a quarterly "update your
+    resume, review your goals" nudge is one recurring job. Same dead-zone awareness as the
+    calendar-aware follow-ups item.
+
+  This repositions the tracker from a search tool you abandon on success into a career
+  companion with a retention story — also the better portfolio argument, since every
+  sub-item reuses machinery that already exists (bytea storage, `wishlist`, prefill
+  extraction, recurring jobs) rather than demanding new infrastructure.
 
 **Global remote**
 
