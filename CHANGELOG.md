@@ -5,6 +5,24 @@ Open work lives in [`TODO.md`](TODO.md).
 
 ---
 
+## v1.1.2 — 2026-07-11
+
+Tagged at `b66fceb`. One mobile-layout fix that v1.1.1's responsive audit missed: the audit
+checked the detail page's resting state, not the delete button's confirming state. Entirely
+`web/`, no behaviour change. *(fix/delete-confirm-overflow, PR #51)*
+
+- **Delete confirm prompt no longer clips at 375px.** The detail-page header's actions group
+  is `shrink-0`, so the confirm prompt's single-line width became the group's width and
+  overflowed the viewport on iPhone SE — a confirmation you cannot read defeats the confirm
+  step. In Japanese the back link and the confirm block genuinely do not fit side by side at
+  375px, so the actions group now wraps (`flex-wrap justify-end`) and the confirm block takes
+  `basis-full` below `sm`, landing on its own right-aligned row where the prompt and both
+  buttons fit on one line. `sm` and up keeps the side-by-side layout, and the confirm buttons
+  still render away from the original Delete button's position, so the double-tap protection
+  is unchanged.
+
+---
+
 ## v1.1.1 — 2026-07-11
 
 Tagged at `885ec4d`. Mobile view improvements — the responsive audit found the two headers

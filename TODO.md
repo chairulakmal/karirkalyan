@@ -2,11 +2,11 @@
 
 Open work only. Shipped work lives in [`CHANGELOG.md`](CHANGELOG.md).
 
-**Current release: `v1.1.1`** — tagged 2026-07-11 at `885ec4d`. Mobile view improvements
-(header declutter below `sm`, CTA rename).
+**Current release: `v1.1.2`** — tagged 2026-07-11 at `b66fceb`. Fixes the delete confirm
+prompt clipping at 375px.
 **Next release: `v1.2.0`** — the Kanban board view.
 
-Everything below is post-1.1.1. The v1.2.0 items are scoped; the backlog is not.
+Everything below is post-1.1.2. The v1.2.0 items are scoped; the backlog is not.
 
 ---
 
