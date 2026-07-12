@@ -1,43 +1,42 @@
 # TODO
 
-Open work only. Shipped work lives in [`CHANGELOG.md`](CHANGELOG.md).
+Open work only. Shipped work lives in [`CHANGELOG.md`](CHANGELOG.md), and so do the settled
+decisions-not-to-build (dark mode, document version history, client-side error tracking — see
+its § Decisions). This file was last cut back to open work on 2026-07-13.
 
-**Current release: `v1.4.1`** — "Close the door": public sign-up closed, `/privacy` and `/terms` in
-both locales, and `DELETE /api/v1/auth/account` given a spec, a contract entry and a request spec.
-A **patch**, because it *removes* a capability rather than adding one and touches no schema — the
-`v1.4.0` image boots against the database it leaves behind. See `CHANGELOG.md`.
-
-`v1.4.0` (2026-07-12) was "the search, this week": the follow-up digest, `JapanCalendar`'s dead
-zones, the CSV export, and the full-account export. `v1.3.1` (2026-07-12) was the patch that
-carried the dependency refresh, the Sidekiq/Redis purge, Postgres 18 in dev and CI, the docs
-audit, and the versioning policy itself. `v1.3.0` (2026-07-11, `f455853`) was ghost prediction,
-which also absorbed the two production items the performance release had parked (the
-`timeline_entries` index and the `/me` fold — both struck off below).
+**Current release: `v1.4.1`** (2026-07-12, "Close the door"). What it and every release before it
+shipped is `CHANGELOG.md`'s job to say, not this file's.
 
 **North star (decided 2026-07-11): be the best career app for its one loyal user.** Portfolio
 value follows from that, not the other way round — a reviewer can tell a tool with a real
-user from a feature showcase. The dark-mode entry below made this argument first; it now
-governs the whole backlog. Two consequences for sequencing: items are ordered by **when in
+user from a feature showcase. Two consequences for sequencing: items are ordered by **when in
 the user's life they pay off** (search-time items while the search is active; the `positions`
 entity is triggered by accepting an offer, not by finishing a prior release), and the backlog
-gains an **Operations** section for the worst-day work — backups, export — that no feature
+has an **Operations** section for the worst-day work — backups, export — that no feature
 admission test covers.
 
-**Nothing in flight.** `v1.4.1` shipped; the next release in the plan is `v1.4.2` — the code-quality
-patch that "Close the door" displaced: extract `Applications::ListQuery`, settle `API_BASE` vs
-`API_BASE_URL`, give downloaded files names that say which application they belong to, and throttle
-the upload path. It stays ahead of `v1.5.0`, so the `Applications::ListQuery` constraint below still
-holds. The dev-server memory leak carries no release tag on purpose: it is **maintenance, not a
-release**. Its stopgap already shipped (`cf7cd8d` — 8 GB heap + heap-snapshot flag live in
-`web/package.json`), and what remains is filing upstream when the next crash writes a snapshot.
+**Nothing in flight, but `v1.4.2` has already started accruing.** The post-`v1.4.1` docs audit
+(`deeedd0`, PR #63) landed on `main` untagged: Honeybadger Insights turned **off**, and three false
+claims corrected on `/privacy` in both locales. It sits in `CHANGELOG.md` § Unreleased and ships
+under the `v1.4.2` tag — it does not earn a tag of its own, and it does not change what `v1.4.2`
+*is*. That is still the code-quality patch "Close the door" displaced: extract
+`Applications::ListQuery`, settle `API_BASE` vs `API_BASE_URL`, give downloaded files names that say
+which application they belong to, and throttle the upload path. It stays ahead of `v1.5.0`, so the
+`Applications::ListQuery` constraint below still holds.
 
-**One operational precondition before the tag ships:** `/privacy` and `/terms` name
-`karirkalyan@cypherpunkzero.com` as the address an erasure request goes to. That mailbox has to
-actually receive mail — a published contact that bounces is worse than none.
+The dev-server memory leak carries no release tag on purpose: it is **maintenance, not a release**.
+Its stopgap already shipped (`cf7cd8d` — 8 GB heap + heap-snapshot flag live in `web/package.json`),
+and what remains is filing upstream when the next crash writes a snapshot.
+
+**One standing promise outranks everything here on the day it breaks:** `/privacy` and `/terms`
+name `karirkalyan@cypherpunkzero.com` (`web/app/lib/links.ts:7`) as the address an erasure request
+goes to; the mailbox is set up and was verified to receive mail (2026-07-12). It is a **published
+promise**, not a gate — if that routing ever breaks, the legal pages are lying, so fixing it
+outranks anything else in this file on the day it happens.
 
 ---
 
-## Release plan — `v1.3.1` → `v1.6.0` (scoped 2026-07-12)
+## Release plan — `v1.4.2` → `v1.7.0` (scoped 2026-07-12, amended 2026-07-13)
 
 **The whole backlog fits under 1.x.** Only one item forces a major, and `SPEC.md` § Versioning
 & releases already names it: the **`positions` entity**, because it adds a table *and* changes
@@ -45,119 +44,132 @@ what `accepted` means in `ApplicationFSM`. Everything else here is an additive m
 no schema at all, so the previous image would still boot against the database the release leaves
 behind — which is the whole of the major test.
 
+**Amended 2026-07-13 — the mobile access layer.** The original plan was deep on the data model
+and silent on where its one user physically is: during an active search, postings are met on the
+phone, and the access story was a desktop one — browser, URL, a password form the 1-day JWT
+resurfaces every morning. `v1.5.0` is now **"the pocket app"**, inserted *ahead of* the Japan
+market layer because both pay off while the search is active, and the share-sheet capture flow
+multiplies exactly the prefill pipeline the Japan layer bets on. Everything downstream slides one
+minor. The dark-mode decision's argument (`CHANGELOG.md` § Decisions) continues here: a job
+seeker's professional context isn't just light-themed, it's mobile.
+
+`v1.3.1` through `v1.4.1` shipped 2026-07-12 — see `CHANGELOG.md` for what each contained.
+
 | Release | Level | Contents |
 | --- | --- | --- |
-| ~~`v1.3.1`~~ | patch | **Shipped 2026-07-12.** Everything that had accumulated on `main` since the v1.3.0 tag. |
-| ~~`v1.4.0`~~ | minor | **Shipped 2026-07-12.** Follow-up digest, calendar-aware dead zones, CSV export, full-account export. |
-| ~~`v1.4.1`~~ | patch | **Shipped 2026-07-12.** Public sign-up closed, `/privacy` + `/terms` (EN + JA), account-deletion endpoint documented. |
-| `v1.4.2` | patch | `Applications::ListQuery` extraction, `API_BASE` naming, download filenames, upload throttle |
-| `v1.5.0` | minor | The Japan market layer: recruiter channel + `agencies`, 年収 comp structure, Japanese-level filter |
-| `v1.5.1` | patch | Japanese phrase-based line breaking |
-| `v1.6.0` | minor | Hiring entity, timezone overlap + `.ics`, visa / status of residence, email verification |
+| `v1.4.2` | patch | `Applications::ListQuery` extraction, `API_BASE` naming, download filenames, upload throttle, the profile-card fold — **plus the privacy/doc-drift fix already on `main`** |
+| `v1.5.0` | minor | The pocket app: share-sheet capture, passkey sign-in, push digest, installed-app shell |
+| `v1.6.0` | minor | The Japan market layer: recruiter channel + `agencies`, 年収 comp structure, Japanese-level filter |
+| `v1.6.1` | patch | Japanese phrase-based line breaking |
+| `v1.7.0` | minor | Hiring entity, timezone overlap + `.ics`, visa / status of residence |
 
-**The trap that would break this plan: every new column in `v1.5.0` and `v1.6.0` must be
+**The trap that would break this plan: every new column in `v1.5.0`–`v1.7.0` must be
 nullable or defaulted.** A `NOT NULL` column with no default means the previous image's
 `INSERT`s fail against the new database — and by the mechanical test that quietly turns a minor
-into a **major**. It is the only way this plan accidentally violates its own versioning.
-
-### ~~`v1.3.1` — patch~~ — shipped 2026-07-12
-
-The work had been sitting on `main` untagged: dependency refresh, Postgres 18 in dev/CI, the
-Sidekiq/Redis purge, the docs audit, the versioning policy, and this scoping. No new capability
-among them, and no migration — a patch by definition, and the first release the policy cut.
-
-### ~~`v1.4.0` — minor. "The search, this week"~~ — shipped 2026-07-12
-
-The follow-up digest, the calendar dead zones, CSV export, and the full-account export from
-Operations. Grouped, not bundled arbitrarily: the digest and the holiday-awareness were the
-**same edit to `FollowUpReminderJob`**, and CSV and the JSON+resumes export were the **same
-controller and download surface** — splitting either pair would have meant opening the same
-files twice. The grouping held: it landed as one PR (#61).
-
-The one thing the plan did not predict, and the piece worth remembering: **holding the digest
-through a dead zone only works because the idempotency key derives from `follow_up_at` rather
-than from the day the job runs.** Key it on the run date and a held reminder is silently lost.
-That single choice is what makes the calendar a *deferral* and not a *deletion*.
-
-### ~~`v1.4.1` — patch. "Close the door"~~ — shipped 2026-07-12
-
-All three pieces landed; see `CHANGELOG.md`. Public sign-up is closed (no endpoint, no page),
-`/privacy` and `/terms` ship in both locales, and `DELETE /api/v1/auth/account` now has a spec, a
-contract entry and a request spec. The Devise coupling trap was real: `skip: [:registrations]`
-would have taken the deletion endpoint with the sign-up one, so the destroy half is re-declared by
-hand in a `devise_scope`. A self-service delete **button** remains deliberately out of scope —
-revisit only if sign-up ever reopens.
+into a **major**. It is the only way this plan accidentally violates its own versioning. The
+pocket app's two new tables (`credentials`, `push_subscriptions`) are purely additive and pass
+for free — the rule bites on columns added to tables the previous image writes to.
 
 ### `v1.4.2` — patch. Sequenced before `v1.5.0`, not filler
 
-Extract `Applications::ListQuery`; settle `API_BASE` vs `API_BASE_URL`; give downloaded resumes
-and cover letters filenames that say which application they belong to; throttle the upload path.
-The first lands **first** because `v1.5.0` adds three new filters to
+**Already on `main`, untagged** (`deeedd0`, PR #63 — the post-`v1.4.1` docs audit): Honeybadger
+Insights off, three false claims corrected on `/privacy`, and the doc drift the audit turned up
+(`web/README.md`'s dead `/sign-up` route, swagger's Production server pointing at the Next.js app,
+`db:seed` called "optional" in three guides, Postgres 16 on the landing page). It rides this tag
+rather than earning one: no capability, no migration.
+
+**Still to do** — extract `Applications::ListQuery`; settle `API_BASE` vs `API_BASE_URL`; give
+downloaded resumes and cover letters filenames that say which application they belong to; throttle
+the upload path; fold "Your data" into the profile card and lift that card into a component. The
+first lands **first** because `v1.6.0` adds three new filters to
 `ApplicationsController#index` — the exact method that already mixes filtering, cursor decoding,
 and serialization inline. Extract before, and the filters land in a query object with
 `Applications::GhostRiskQuery` as the pattern; extract after, and the controller thickens and then
-gets refactored under load.
+gets refactored under load. (The insertion of the pocket app between them changes nothing here:
+`v1.5.0` does not touch `#index`.)
 
 The filenames are the v1.4.0 fallout: shipping the account archive is what made it visible that
 neither download surface names a file usefully. It is still a patch — no new capability, no
 migration, and the previous image boots against an unchanged database.
 
-### `v1.5.0` — minor. The Japan market layer
+### `v1.5.0` — minor. "The pocket app" (inserted 2026-07-13)
+
+The mobile access layer: make opening KarirKalyan on the phone feel like opening a good Android
+app, not a desktop site. **Android-first and web-only** — the deliverable is the WebAPK Chrome
+mints, not an APK; no iOS work ships in v1. Four pieces: the **capture flow** (a
+`/applications/new?url=…` deep link that runs `UrlPrefillService` on arrival, plus
+`share_target` in the manifest — share a posting from any app, land in a prefilled form);
+**passkey sign-in** (WebAuthn, additive nullable `credentials` table, password sign-in stays
+forever as the fallback); **push delivery** for the existing follow-up digest (additive
+`push_subscriptions` table, VAPID, a delivery branch in the job that already runs); and the
+**installed-app shell** (bottom tab bar with safe-area insets, `start_url` → dashboard, manifest
+shortcuts, a monochrome icon for Android themed icons).
+
+If the release runs heavy, the cut order is: passkeys collapse to a 30-day JWT (the access win
+ships, the mechanism follows), then push (the email digest already exists as the channel). The
+capture flow and the shell are the release — they are what changes the user story. Device
+facts, research citations, and the three traps (the Chrome-install requirement, the push-only
+service worker, the WebAuthn provider constraints) live in the backlog's **Mobile access**
+section below.
+
+### `v1.6.0` — minor. The Japan market layer
 
 Recruiter channel + `agencies` + the ownership-window warning; 年収 as a comp *structure*, not a
 number; the Japanese-level requirement filter. One release because all three pass the **field
 admission test the same way** — each is captured by `UrlPrefillService` at prefill time from the
 posting text. That is one extraction pass, one migration, one form pass; three releases would be
 three trips through the same three files. This is also the release a Tokyo reviewer could not
-have seen in someone else's portfolio.
+have seen in someone else's portfolio — and after `v1.5.0`, its three fields land into a capture
+flow that starts on the phone's share sheet, where the postings actually are.
 
-### `v1.5.1` — patch. Japanese phrase-based line breaking
+### `v1.6.1` — patch. Japanese phrase-based line breaking
 
-No new capability, so it cannot be a minor — but it is worth the most **right after `v1.5.0`**,
+No new capability, so it cannot be a minor — but it is worth the most **right after `v1.6.0`**,
 which is the release that fills the UI with the Japanese compound nouns (agency names, comp
 structures, JLPT levels) that wrap mid-word today.
 
-### `v1.6.0` — minor. "Can you actually take this job?"
+### `v1.7.0` — minor. "Can you actually take this job?"
 
 Hiring-entity enum, timezone overlap with the `.ics` export falling out of it, and visa /
 status-of-residence tracking with CoE lead time surfaced next to an offer deadline. The theme is
 **constraints that decide whether an offer is even takeable** — the visa item and the
-hiring-entity item are the same question asked from opposite directions. Email verification
-rides along as the portfolio checkbox it is, ranked last and labelled honestly.
+hiring-entity item are the same question asked from opposite directions. Email verification no
+longer rides along: `v1.4.1` closed sign-up and the backlog entry dropped the item, but an
+earlier version of this section still listed it — that was drift, fixed 2026-07-13.
 
 ### Deliberately outside the plan
 
 - **`positions`, and everything hanging off it** — resume versioning, periodic check-ins,
   low-noise market watch, the skills/certs gap list, the comp-percentile half of career
   intelligence. Two reasons, both already decided above: `positions` is the `2.0.0`, and its
-  scoping trigger is **accepting an offer**, not finishing `v1.6.0`. Giving it a release number
+  scoping trigger is **accepting an offer**, not finishing `v1.7.0`. Giving it a release number
   would contradict that.
 - **履歴書 / 職務経歴書 generation.** 履歴書 alone is a legal minor — additive, no schema break —
   but its twin *is* a `positions` table rendered as prose, and the entry below calls PDF
   generation the highest carry cost in this file. Shipping half the pair, then maintaining that
   toolchain for a year before the other half is even buildable, is the worst version of the
   trade. Ship both after `2.0.0`.
-- **The `timeline_entries` index** stays conditional — nothing in `v1.4`–`v1.6` grows that table.
+- **The `timeline_entries` index** stays conditional — nothing in `v1.4`–`v1.7` grows that table.
+- **Offline support, TWA / Play Store packaging, and all iOS work** — excluded from v1 by the
+  pocket-app scoping. Offline is architectural, not deferred politeness: every route renders
+  dynamically for the CSP nonce, so a service worker that caches HTML serves pages whose nonces
+  no longer match the header. See the Mobile access section.
 - **The `next dev` heap leak** stays maintenance, per the header.
-- **Documenting the restore drill in SPEC.md § Deployment** is docs: straight to `main`, no
-  release.
 
 ---
 
 ## Backlog
 
-Verified against the code on 2026-07-10 — all still hold. The dev-server memory item and the
-career-planning idea were added 2026-07-11. The market-dependent feature ideas (Japan market,
-global remote, ghost prediction) were verified against current web sources on 2026-07-11 —
-citations inline where a claim came from research rather than the code. The Operations
-section and the north-star re-ranking were added 2026-07-11. Items were scoped into releases on
-2026-07-12 — each open item below carries its release tag, and the plan above is the summary of
-those tags, not a second source of truth.
+Verified against the code on 2026-07-10 — all still hold. The market-dependent feature ideas
+(Japan market, global remote) were verified against current web sources on 2026-07-11 —
+citations inline where a claim came from research rather than the code. Items were scoped into
+releases on 2026-07-12 — each open item below carries its release tag, and the plan above is the
+summary of those tags, not a second source of truth. The plan was amended and renumbered on
+2026-07-13 — the **Mobile access** section under Feature ideas is what was inserted, and every
+tag from the old `v1.5.0` onward slid one minor.
 
 ### Performance — production
 
-- [x] **Fold `/me` into the dashboard payload** — done in `feat/ghost-prediction`, which is what
-      "fix it when the dashboard payload is touched for another reason" was waiting for.
 - [ ] **`timeline_entries` offer-lookup index** *(no release — conditional)* — still open, and still conditional. The
       `avg_days_to_offer` subquery filters `to_status = 'offer'`, and there is deliberately no
       index on `to_status`: at personal-tracker scale a user's timeline is a few hundred rows,
@@ -203,57 +215,11 @@ those tags, not a second source of truth.
 The career-growth admission test below governs *features*; it deliberately does not apply
 here. This section exists because nothing else in the repo defends the data: the real
 job-search history — applications, timeline, resumes stored as bytea — lives in one Railway
-Postgres, and **the Railway Hobby plan has no managed backups** (confirmed 2026-07-11). For a
-loyal user, losing that history is strictly worse than lacking any feature in this file.
+Postgres, and **the Railway Hobby plan has no managed backups** (confirmed 2026-07-11). The
+defence that already exists — the nightly `pg_dump` in the private `karirkalyan-backups` repo
+(restore drill passed) and the full-account export — is recorded in `CHANGELOG.md` (§ Backups,
+§ v1.4.0); what remains open is the abuse surface below.
 
-- [x] **Scheduled `pg_dump` backups — shipped 2026-07-11** in the private
-      [`karirkalyan-backups`](https://github.com/chairulakmal/karirkalyan-backups) repo
-      (private-repo variant, so the dump needs no encryption). Daily cron at 05:15 JST
-      fingerprints `users` / `applications` / `timeline_entries` (`count @ max(updated_at)`)
-      and only dumps when the fingerprint changed since the state committed by the previous
-      backup — `solid_queue`/`solid_cache` churn never triggers it, and the fingerprint
-      commit doubles as the keep-alive against GitHub's 60-day cron auto-disable. The dump
-      itself is the full database: client major queried from the server at run time
-      (**production is Postgres 18** — as, since this release, is local dev), gzipped artifact on 60-day
-      retention, `pipefail` plus completion-trailer and size checks so a failed dump is a
-      red run, never a silent tiny artifact. Decision recorded: a dump, **not** a mirror on
-      a free Postgres tier — a second live database is HA machinery for an app that needs
-      an undo button, and free tiers expire, pause idle databases, and add a version-compat
-      surface to maintain.
-  - [x] **Restore drill — passed 2026-07-11**: `db-dump-7` restored into a scratch
-        Postgres 18.4 (the `docker-compose.yml` in the backups repo, tmpfs, port 5418)
-        with zero errors; all 17 tables and every row came back (`users:3 |
-        applications:19 | timeline_entries:32`, status spread intact). Drill steps are
-        documented in the backups repo README.
-    - [x] **Documented in SPEC.md § Deployment → Backups** — done in the v1.4.1 docs audit.
-          The 60-day retention is now written down on this side of the fence, because
-          `/privacy` states it four times (including in the erasure promise) and it was
-          checkable only from a private repo nobody auditing this one can open.
-  - [x] **Local dev Postgres 16 → 18 — done 2026-07-11** (`api/docker-compose.yml`, both
-        CI workflows, SPEC.md, both READMEs, `api/README.md`, `llms.txt`). Production was
-        confirmed already on 18.4 (`postgres-ssl:18`), so nothing changed on Railway; the
-        drift was entirely dev/CI/docs. The bump also moved the compose volume mount to
-        `/var/lib/postgresql` — `postgres:18` relocated `PGDATA` to
-        `/var/lib/postgresql/18/docker`, and the old `.../data` mount would have parked
-        the live data dir outside the named volume. Upgrading a machine with a 16 volume
-        needs `docker compose down -v` + `db:setup`.
-- [x] **Full-account export** — shipped in `v1.4.0`. `GET /api/v1/exports/account`: a zip of
-      `account.json` (behind a `schema_version`) plus every resume and cover letter, downloadable
-      from the dashboard. The second, provider-independent leg of the backup story.
-- [x] **Error tracking — conscious asymmetry, decided 2026-07-11.** Honeybadger covers the
-      API (`api/Gemfile`, wired in production). `web/` has no client-side error tracking,
-      and that is accepted for a single-user app: the one user *is* the error reporter.
-- [x] **No document version history — decided 2026-07-12.** One resume and one cover letter per
-      application, the latest upload overwriting the last; `applications.resume` stays a single
-      `bytea`. Keeping the last N versions was considered and rejected. It would multiply blob
-      count against the primary Postgres — the same database whose entire backup story is a
-      nightly `pg_dump` — to retain documents nobody reads, and the honest form of the feature is
-      a `documents` table plus object storage, which is a migration, not an afternoon. The
-      question a job seeker actually asks is *"which resume did I send to this company?"*, and one
-      document pinned to one application already answers it exactly. Version history at the layer
-      that costs nothing: the account export zip is a point-in-time snapshot, and the `MMDD` stamp
-      in the download filename keeps a re-uploaded resume from clobbering the saved copy of the old
-      one. **Do not re-lift this without a storage change to justify it.**
 - [ ] **Throttle uploads, and cap applications per account** *(`v1.4.2` — patch: no capability,
       no migration)*. `rack_attack.rb` throttles sign-in, the AI prefill and the account
       export (there is no sign-up throttle because `v1.4.1` removed the endpoint), but
@@ -265,14 +231,14 @@ loyal user, losing that history is strictly worse than lacking any feature in th
       2 MB per application. **The unbounded axis is `POST /applications`**, which nothing caps: every
       new application is another 2 MB of storage allowance, on a database whose whole backup story
       is a nightly `pg_dump`. Two throttles, both per-account (the cost is a function of whose data
-      it is, not where the request came from — same reasoning as the export throttle above): a
-      write/upload cap, and a ceiling on applications per account. The per-account pattern and the
-      `429` responder already exist; this is a config change, not a design.
+      it is, not where the request came from — same reasoning as the export throttle, `CHANGELOG.md`
+      § v1.4.0): a write/upload cap, and a ceiling on applications per account. The per-account
+      pattern and the `429` responder already exist; this is a config change, not a design.
 
 ### UI & accessibility
 
-- [ ] **Japanese phrase-based line breaking (文節単位の改行)** *(`v1.5.1` — patch: no new
-      capability, and it pays off most once `v1.5.0` fills the UI with Japanese compound nouns)*.
+- [ ] **Japanese phrase-based line breaking (文節単位の改行)** *(`v1.6.1` — patch: no new
+      capability, and it pays off most once `v1.6.0` fills the UI with Japanese compound nouns)*.
       Japanese has no spaces, so the
       browser breaks lines at almost any character boundary and compound words wrap mid-word
       (`東京オリン` / `ピック`). Two-layer fix, both cheap: (1) `word-break: auto-phrase` in CSS —
@@ -288,37 +254,15 @@ loyal user, losing that history is strictly worse than lacking any feature in th
       Ecosystem note: the segmentation problem is solved (BudouX + the CSS property absorbing
       it); the only open niche is integration glue — a next-intl-aware wrapper or a
       remark/rehype plugin — better spent as a blog post than an npm package.
-- [x] **No dark mode — decided 2026-07-11: light only, and that is the ship state, not a gap.**
-      `web/app/globals.css:28` hardcodes `color-scheme: light`, and `web/` contains no dark
-      styling at all — no `prefers-color-scheme` block, no `dark:` utilities. It stays that way.
-
-      The reasoning is about who this is for. KarirKalyan is a **professional app, not a dev
-      tool.** Its user is a job seeker, and the app sits in a context that is uniformly light:
-      a recruiter's email, a company careers page, a PDF of their own resume. Dark mode is an
-      expectation engineers carry over from editors and terminals — building for it here would
-      be building for the developer looking at the portfolio rather than the person the product
-      claims to serve, which is exactly the tell that separates a product from a demo.
-
-      The cost side is not free either: a second theme doubles the surface every future screen
-      has to be designed, reviewed, and screenshotted against, and a half-maintained dark theme
-      (the usual outcome on a solo project) looks markedly worse than a confident single one.
-      One art-directed light theme is the stronger portfolio artefact.
-
-      **Assets:** the dark brand icons (`design/assets/icons/karirkalyan-dark.svg`,
-      `png/icon-dark-512.png`) are unreferenced — `web/app/components/wordmark.tsx:28` uses only
-      the monogram. Keep them. They are *brand* assets (a logotype for dark backgrounds — slide
-      decks, social cards, a dark README banner), which is a different thing from an app theme,
-      so their existence is not evidence of an unfinished dark mode and nothing in `web/` should
-      grow toward them.
 
 ### Code quality
 
-- [ ] **Extract `Applications::ListQuery`** *(`v1.4.2` — and it must land before `v1.5.0`)* —
+- [ ] **Extract `Applications::ListQuery`** *(`v1.4.2` — and it must land before `v1.6.0`)* —
       `ApplicationsController#index` mixes filtering,
       cursor decoding, and serialization inline. `api/app/queries/` now exists
       (`Applications::GhostRiskQuery`), so the destination and its conventions are settled;
       this is now a straight extraction with a pattern to follow. The sequencing is the point:
-      `v1.5.0` adds three filters (channel, comp, Japanese level) to exactly this method, so
+      `v1.6.0` adds three filters (channel, comp, Japanese level) to exactly this method, so
       extracting first means they land in a query object rather than thickening a controller
       that then has to be refactored under load.
 - [ ] **`API_BASE` vs `API_BASE_URL`** *(`v1.4.2`)* — two near-identical names for different things
@@ -355,18 +299,53 @@ loyal user, losing that history is strictly worse than lacking any feature in th
       Rails owns the fix on both surfaces — the Next proxy passes `Content-Disposition` straight
       through, and SPEC.md § Exports already commits to the server being the one place that names
       a file.
+- [ ] **Fold "Your data" into the profile card, and make the card a component** *(`v1.4.2` — patch:
+      no capability, no migration, `web/`-only)*. The dashboard renders the same
+      `<section className="border border-dune bg-linen p-5">` twice: the **profile** block
+      (`web/app/[locale]/(app)/dashboard/page.tsx:54–76` — email, member since) and the **exports**
+      block (`:97–116` — eyebrow "Your data", the CSV and account-archive links), with the
+      `avg_days_to_offer` line (`:78–91`) wedged between them. They are one thought — *who you are,
+      and what you can take with you* — split across two cards by nothing but render order. Merge
+      the exports block into the profile card, and lift the result into
+      `web/app/components/profile-card.tsx` so `/settings` or an account page can import it later
+      rather than copy it.
+
+      **Two traps, both cheap to walk into:**
+
+      **The export links must not inherit the profile block's `{me && …}` gate.** The profile block
+      is conditional on `stats.user` and the exports block is not — if the merged card is gated as a
+      whole, a failed `/dashboard` fetch silently removes the *only* surface that honours
+      `/privacy`'s "getting your data out" promise, and it fails invisibly, in exactly the moment
+      the user most wants their data. Render the card's export half unconditionally, or keep the
+      export actions outside the gate.
+
+      **The component takes the user as a prop; it does not fetch one.** `page.tsx:11` reads
+      `stats.user` from the dashboard payload precisely so there is no second `/me` request — that
+      fold is what `v1.3.0` shipped. A component that fetches its own user re-introduces the request
+      the fold removed, on every page that imports it.
+
+      **One decision, not a mechanical move: the heading.** `dashboard.exports.eyebrow` is "Your
+      data" in EN but 「データの書き出し」 (*exporting data*) in JA — not a translation of each
+      other, and only the EN one reads as a card title. Merging under a single heading is a copy
+      decision in both locales, and whichever eyebrow loses becomes a dead catalog key to delete
+      (the key-parity check is 337/337 and should stay that way).
+
+      Carry the two comments at `:93–96` and the `eslint-disable no-html-link-for-pages` lines with
+      the move — the export anchors are plain `<a>`s to `/api/exports/*` because those are API
+      routes, not localized pages, and that is a fact about the destination, not a style lapse.
 
 ### Feature ideas
 
-Scoped into `v1.4.0`–`v1.6.0` on 2026-07-12; tags inline below. The pre-1.0.0 Phase 9 notes (now
-in `CHANGELOG.md`) also name an analytics dashboard
-and an AI cover-letter assist as the declared roadmap. Everything here is **post-v1.3.0** and most of it _does_ touch `api/` —
-that is fine, the `web/`-only constraint is a property of v1.1.0, not a permanent rule.
+Scoped into releases on 2026-07-12, renumbered 2026-07-13 when Mobile access became `v1.5.0`;
+tags inline below. The pre-1.0.0 Phase 9 notes (now in `CHANGELOG.md`) also name an analytics
+dashboard and an AI cover-letter assist as the declared roadmap. Everything here is
+**post-v1.3.0** and most of it _does_ touch `api/` — that is fine, the `web/`-only constraint
+is a property of v1.1.0, not a permanent rule.
 
-The three table-stakes items first, then the ones that differentiate. A generic tracker is a
-CRUD demo; the differentiators after the table-stakes list are the ones a Tokyo hiring
+A generic tracker is a CRUD demo; the differentiators below are the ones a Tokyo hiring
 reviewer could not have seen in someone else's portfolio, because they encode knowledge of
-the market rather than knowledge of Rails.
+the market rather than knowledge of Rails. The table stakes are already in: the follow-up
+digest and CSV export shipped in `v1.4.0`, ghost prediction in `v1.3.0` — see `CHANGELOG.md`.
 
 **Field admission test (added 2026-07-11), for any new per-application column** — channel,
 agency, comp structure, language level, hiring entity, timezone, all of them: it must be
@@ -375,22 +354,79 @@ has one user, and a field he stops filling in after the fifth application is dea
 plus form friction. The hiring-entity item already says this about itself; it is the rule
 for the whole section, not a footnote on one item.
 
-**Table stakes** — re-ranked 2026-07-11 by the north star, not by what a checklist expects:
+**Table stakes — one conditional item remains:**
 
-- [x] **Follow-up digest email** — shipped in `v1.4.0`. `FollowUpMailer#reminder` became
-      `#digest`: one email per user per day, grouped by user from the applications the job
-      claimed, instead of one email per application.
-- [x] **CSV export** of applications — shipped in `v1.4.0`, alongside the full-account export as
-      planned. `GET /api/v1/exports/applications`, formula-injection escaped.
 - [ ] **Email verification** (Devise `:confirmable`) — **only if registration ever reopens.**
-      Dropped from `v1.6.0` by `v1.4.1`: `:confirmable` confirms that whoever typed an address
+      Dropped from the plan by `v1.4.1`: `:confirmable` confirms that whoever typed an address
       into a sign-up form can read that mailbox, and there is no sign-up form. The operator types
       the address into `users:create` himself, so there is nothing left to verify. It was already
       labelled a portfolio checkbox; it is now a checkbox for a box that does not exist.
 
-**Ghost prediction — shipped in `v1.3.0`.** See CHANGELOG § v1.3.0 and SPEC.md § Query
-layer. The market research that justified it, and the stage distribution the global defaults
-were sanity-checked against, is recorded in SPEC.md § Query layer rather than repeated here.
+**Mobile access — the pocket app** *(added 2026-07-13; all four items are `v1.5.0`)*
+
+The plan was deep on the data model and silent on where its one user physically is. During an
+active search, postings are met on the phone — LinkedIn's app, TokyoDev in a mobile tab, a
+recruiter's email on the train — while the access story was a desktop one: browser → URL → a
+password form the 1-day JWT (`api/config/initializers/devise.rb:32`) resurfaces every morning →
+a top-header nav. Half the substrate already exists unused: `web/public/manifest.webmanifest`
+already declares `display: standalone` with brand icons and theme color. The app is already
+*installable*; it just isn't an *app* once installed.
+
+**Device facts this section is built on (recorded 2026-07-13):** the user carries a **Nothing
+Phone 3a** (Android 15) and runs **Brave with Proton Pass** on both the phone and the Ubuntu
+desktop. He will install the PWA via Chrome, but **passkeys must stay accessible through Proton
+Pass**, not Google Password Manager. Hence the scope boundary: **Android-first, web-only** — the
+deliverable is the WebAPK Chrome mints, no TWA/Bubblewrap/Play packaging, and no iOS work in v1
+(`public/apple-icon.png` stays — it is a favicon-tier asset, not an iOS commitment, the same
+logic as the dark brand icons in the dark-mode decision, `CHANGELOG.md` § Decisions).
+
+- [ ] **Capture via the share sheet** *(`v1.5.0` — the feature; the rest of the release serves
+      it)*. A `/applications/new?url=…` deep link that triggers `UrlPrefillService` on arrival,
+      plus [`share_target`](https://developer.mozilla.org/en-US/docs/Web/Progressive_web_apps/Manifest/Reference/share_target)
+      in the manifest: share a posting from any app → land in a prefilled form. **Researched
+      2026-07-12 — the install trap:** `share_target` needs a real WebAPK, and
+      [Brave has no minting server](https://support.brave.app/hc/en-us/articles/39077114659597-How-do-I-install-and-use-Web-Apps-in-Brave)
+      — an install from Brave is a home-screen shortcut that
+      [silently lacks installation-gated capabilities](https://web.dev/learn/pwa/installation),
+      so it would look like the feature doesn't exist. The app is installed **once, via Chrome**;
+      browsing stays in Brave, and sharing *from* Brave still reaches the WebAPK — the share
+      source doesn't matter. That one-sentence install step goes in the docs. Sequencing
+      rationale: `v1.6.0`'s three fields are all captured at prefill time, so mobile capture
+      multiplies the exact pipeline that release bets on — which is why this lands first.
+- [ ] **Passkey sign-in** *(`v1.5.0`)*. WebAuthn via `webauthn-ruby` hand-wired into Devise (the
+      `devise-passkeys` gem is not mature enough to lean on), with an additive nullable
+      `credentials` table — still a minor by the mechanical test. The provider chain is Chrome →
+      Android Credential Manager → **Proton Pass**, so the implementation must keep provider
+      choice open: **discoverable credentials** (`residentKey: "required"`), **no
+      `authenticatorAttachment` restriction** (a `platform` restriction on desktop would demand
+      the machine's own authenticator and bypass the Proton Pass extension), **`attestation:
+      "none"`** (attestation policy is how sites accidentally block third-party providers).
+      Enrollment ships **desktop-first**: a passkey created on Ubuntu (Brave + Proton Pass
+      extension intercepts the ceremony) syncs through Proton Pass to the phone — no separate
+      phone enrollment flow. **Password sign-in stays forever as the fallback**: the chain has
+      more moving parts than a first-party one, and Brave has shipped real third-party-passkey
+      regressions ([brave-browser#38345](https://github.com/brave/brave-browser/issues/38345),
+      [#37984](https://github.com/brave/brave-browser/issues/37984)). If the release runs heavy,
+      the cut is a 30-day JWT (the revocation list is already wired via `revocation_requests`,
+      and the JWT-never-reaches-JS invariant is untouched) with passkeys as the follow-up minor.
+- [ ] **Push delivery for the follow-up digest** *(`v1.5.0`)*. A second channel for the digest
+      job that already exists: an additive `push_subscriptions` table, VAPID keys, and a delivery
+      branch next to the mailer. **The trap that must be written before the code: the service
+      worker is push-only — no `fetch` handler, ever.** Every route renders dynamically for the
+      CSP nonce (`web/proxy.ts` builds the policy per request), so a service worker that caches
+      HTML serves pages whose nonces no longer match the header and scripts get silently blocked.
+      Corollary, recorded under "Deliberately outside the plan": **offline is out** — it is the
+      one native trait this architecture cannot have cheaply. The launcher badge needs no work on
+      Android: the notification itself produces the dot/count.
+- [ ] **The installed-app shell** *(`v1.5.0`)*. Bottom tab bar (Dashboard / Applications / Board)
+      with `env(safe-area-inset-bottom)` — which also dissolves the 375px Japanese-nav-label
+      squeeze the header comment fights (`web/app/[locale]/(app)/layout.tsx:21`); `start_url` →
+      `/dashboard` so launching the installed app opens *into* the app instead of riding the
+      proxy redirect off the marketing page; manifest `shortcuts` (long-press the icon → New
+      application / Board); a `monochrome` icon for Android themed icons — on a Nothing Phone
+      specifically this is a disproportionate delight detail, its launcher aesthetic *is*
+      monochrome themed icons; and verify the 512px maskable icon actually has safe-zone padding
+      rather than just carrying the `maskable` label.
 
 **Japan market**
 
@@ -406,7 +442,7 @@ refresh cost** when it is scoped, and the sum of those lines is a real cap on ho
 these a solo maintainer can ship. The career-intelligence item below already budgets this
 way ("one data-entry session a year"); that is the pattern.
 
-- [ ] **Visa / status-of-residence tracking** *(`v1.6.0`)*. For a foreign engineer in Japan this is the
+- [ ] **Visa / status-of-residence tracking** *(`v1.7.0`)*. For a foreign engineer in Japan this is the
       single most decision-relevant fact about a job posting, and no generic tracker models it. Per
       application: does the employer sponsor, and which status of residence
       (技術・人文知識・国際業務 is the usual one for software roles)? Globally: days remaining on
@@ -441,9 +477,9 @@ way ("one data-entry session a year"); that is the pattern.
       a good line in the README. **Carry cost (recorded 2026-07-11): the highest in this
       file.** PDF generation in Rails is a known maintenance sink — toolchain choice, CJK
       font embedding, layout drift — and the MHLW format itself can churn. Highest wow,
-      highest carry; scope it with both eyes open, the way the dark-mode entry weighed its
-      cost side.
-- [ ] **Model the recruiter channel** *(`v1.5.0`)*. Hiring in Japan is heavily agent-mediated. Add a channel
+      highest carry; scope it with both eyes open, the way the dark-mode decision
+      (`CHANGELOG.md` § Decisions) weighed its cost side.
+- [ ] **Model the recruiter channel** *(`v1.6.0`)*. Hiring in Japan is heavily agent-mediated. Add a channel
       to each application — direct / agent / referral — and record which agency submitted you where.
       Two agencies submitting the same candidate to the same company is a real and damaging
       situation; an app that warns about a duplicate submission is solving a problem the incumbents
@@ -455,7 +491,7 @@ way ("one data-entry session a year"); that is the pattern.
       candidates don't know the rule exists. So the data model is not just a channel enum: it
       needs `(company, agency, submitted_at)` with an ownership-window expiry, and the warning
       fires on any second submission to a company whose window is still open.
-- [ ] **Compensation as 年収, not salary** *(`v1.5.0`)*. Japanese offers are quoted as an annual figure that
+- [ ] **Compensation as 年収, not salary** *(`v1.6.0`)*. Japanese offers are quoted as an annual figure that
       folds in bonus (賞与), often expressed as N months of base. Comparing "600万, 12 months + 2×
       bonus" against a flat 14-month structure is real arithmetic that candidates get wrong. Store
       the structure, not just the number, and normalise for comparison.
@@ -470,11 +506,7 @@ way ("one data-entry session a year"); that is the pattern.
       (989 respondents) puts the median international developer at **¥9.5M** — but ¥13.5M at
       international companies with no Japan entity vs ¥8.5M at Japanese-HQ firms, so any
       comparison UI should surface employer type, not just the number.
-- [x] **Calendar-aware follow-ups** — shipped in `v1.4.0`, with the digest, as one edit to the same
-      job. `JapanCalendar` holds the digest on weekends, national holidays, New Year, Golden Week
-      and Obon; the held reminders go out on the next business day, exactly once, because the
-      idempotency key derives from `follow_up_at` rather than from the day the job runs.
-- [ ] **Japanese-level filter** *(`v1.5.0`)*. Record the Japanese proficiency a posting demands (JLPT N1/N2,
+- [ ] **Japanese-level filter** *(`v1.6.0`)*. Record the Japanese proficiency a posting demands (JLPT N1/N2,
       "business level", conversational, none) against what the user holds, and filter on it.
       **Researched 2026-07-11:** this taxonomy matches how the market actually filters — both
       [TokyoDev](https://www.tokyodev.com/jobs/no-japanese-required) and
@@ -493,7 +525,7 @@ not just an application tracker — the name already says so (karir = career; th
 currently narrower than its own name). Sequencing (updated 2026-07-11): this cluster follows
 the user's calendar, not a release order — see the `positions` scoping trigger below.
 
-This whole cluster sits **outside the `v1.4`–`v1.6` plan** — not because it is unimportant, but
+This whole cluster sits **outside the `v1.4`–`v1.7` plan** — not because it is unimportant, but
 because `positions` is the `2.0.0` (it adds a table *and* changes what `accepted` means in the
 FSM), and its trigger is a date in the user's life, not a release number.
 
@@ -527,7 +559,7 @@ FSM), and its trigger is a date in the user's life, not a release number.
     like an application does.
   - **Periodic check-ins** — Solid Queue and the mailer exist; a quarterly "update your
     resume, review your goals" nudge is one recurring job. Same dead-zone awareness as the
-    calendar-aware follow-ups item.
+    calendar-aware follow-ups that shipped in `v1.4.0`.
 
   This repositions the tracker from a search tool you abandon on success into a career
   companion with a retention story — also the better portfolio argument, since every
@@ -547,8 +579,8 @@ FSM), and its trigger is a date in the user's life, not a release number.
 
 - [ ] **Career intelligence — benchmark reports from published surveys** *(post-`2.0.0`: its
       headline view — comp percentile for the current position — needs `positions`. The
-      offer-comp-vs-median slice becomes buildable once `v1.5.0` lands the 年収 structure, and
-      may ride a later `v1.6.x` if it earns its refresh cost on its own.)* An in-app,
+      offer-comp-vs-median slice becomes buildable once `v1.6.0` lands the 年収 structure, and
+      may ride a later `v1.7.x` if it earns its refresh cost on its own.)* An in-app,
       yearly-refreshed summary of reliable market sources: the [TokyoDev annual
       survey](https://www.tokyodev.com/articles/the-2025-tokyodev-developer-survey-results-are-live)
       first (2025: 989 respondents; median ¥9.5M, split by employer type, experience band, and
@@ -564,7 +596,7 @@ FSM), and its trigger is a date in the user's life, not a release number.
 
 **Global remote**
 
-- [ ] **Can they actually hire you?** *(`v1.6.0`)* The filter that silently kills most global-remote
+- [ ] **Can they actually hire you?** *(`v1.7.0`)* The filter that silently kills most global-remote
       applications from Japan: many companies cannot employ someone resident here, and offer only a
       contractor arrangement or an employer-of-record. Track the hiring entity and whether Japan is
       a supported location — ideally captured at prefill time, since job postings usually say.
@@ -578,9 +610,9 @@ FSM), and its trigger is a date in the user's life, not a release number.
       different employment reality (an EOR contract is with the EOR, not the company you
       interviewed with). Some EORs now also sponsor visas, which ties this to the visa item
       above.
-- [ ] **Timezone overlap** *(`v1.6.0`)*. Store the company's home timezone and any required overlap window,
+- [ ] **Timezone overlap** *(`v1.7.0`)*. Store the company's home timezone and any required overlap window,
       then show which roles are survivable from JST. A US-West role demanding four hours of overlap
       means a 1am start. Warn at interview-scheduling time too — an invite that lands at 03:00 JST
       should be visibly flagged, not quietly accepted.
-- [ ] **Interview scheduling with `.ics` export** *(`v1.6.0`)*, timezone-correct. Falls out of the above and
+- [ ] **Interview scheduling with `.ics` export** *(`v1.7.0`)*, timezone-correct. Falls out of the above and
       is small once the timezone data exists.

@@ -1,7 +1,8 @@
 # Changelog
 
 Shipped work, newest first. Branch/PR names note where each change landed.
-Open work lives in [`TODO.md`](TODO.md).
+Open work lives in [`TODO.md`](TODO.md). Settled decisions-not-to-build are recorded here too
+(§ Decisions below), so that `TODO.md` can stay open work only without the reasoning getting lost.
 
 ---
 
@@ -14,12 +15,53 @@ Rides along with the next patch. *(fix/privacy-truth-and-doc-drift)*
   traffic, not just from failures — while `/privacy` told users, in two languages, that Honeybadger
   "receives error reports". The cheaper fix was to widen the sentence; the right one was to stop
   sending the data, so that the sentence is true as written. Found by the post-v1.4.1 docs audit.
+  **The constraint this leaves behind:** turning Insights back on is a change to what a third
+  party sees, not a monitoring tweak — the legal pages (both locales) and SPEC.md § Legal pages
+  move in the *same* PR, or the policy becomes false. That rule is written into
+  `api/config/honeybadger.yml` above the flag; do not flip it from a dashboard.
 - **Three false claims corrected on `/privacy`, both locales.** The page said the request log
   records your IP (lograge emits `time`, `request_id` and `params` — no IP), and that Anthropic
   receives the job-posting *URL* (the server fetches the page itself and sends Claude the stripped
   text; the URL never leaves the box — SPEC had this exactly backwards). It now also says the
   pre-fill is fetched server-side, which is a fact in the user's favour: the job board never learns
   who was reading.
+
+---
+
+## Decisions — settled, not shipped
+
+Questions closed on the dates given, moved here when `TODO.md` was cut back to open work only
+(2026-07-13). Nothing below changed the code; each entry exists so the question does not get
+reopened by accident, and each names the condition under which it may be.
+
+- **Light theme only — no dark mode.** *(2026-07-11)* `web/app/globals.css:28` hardcodes
+  `color-scheme: light`, and that is the ship state, not a gap. KarirKalyan is a professional
+  app, not a dev tool: its user is a job seeker, and the app sits in a context that is uniformly
+  light — a recruiter's email, a company careers page, a PDF of their own resume. Dark mode is
+  an expectation engineers carry over from editors and terminals; building it here would be
+  building for the developer looking at the portfolio rather than the person the product claims
+  to serve, which is exactly the tell that separates a product from a demo. The cost side is not
+  free either: a second theme doubles the surface every future screen has to be designed,
+  reviewed, and screenshotted against, and a half-maintained dark theme (the usual outcome on a
+  solo project) looks markedly worse than a confident single one. The dark brand icons
+  (`design/assets/icons/karirkalyan-dark.svg`, `png/icon-dark-512.png`) stay, unreferenced —
+  they are *brand* assets (a logotype for dark backgrounds: slide decks, social cards, a dark
+  README banner), which is a different thing from an app theme, so their existence is not
+  evidence of an unfinished dark mode and nothing in `web/` should grow toward them.
+- **No document version history.** *(2026-07-12)* One resume and one cover letter per
+  application, the latest upload overwriting the last; `applications.resume` stays a single
+  `bytea`. Keeping the last N versions was considered and rejected: it would multiply blob count
+  against the primary Postgres — the same database whose entire backup story is a nightly
+  `pg_dump` — to retain documents nobody reads, and the honest form of the feature is a
+  `documents` table plus object storage, which is a migration, not an afternoon. The question a
+  job seeker actually asks is *"which resume did I send to this company?"*, and one document
+  pinned to one application already answers it exactly. Version history exists at the layer that
+  costs nothing: the account export zip is a point-in-time snapshot, and the `MMDD` stamp planned
+  for download filenames (`v1.4.2`) keeps a re-uploaded resume from clobbering the saved copy of
+  the old one. **Do not re-lift this without a storage change to justify it.**
+- **No client-side error tracking in `web/` — a conscious asymmetry.** *(2026-07-11)*
+  Honeybadger covers the API (`api/Gemfile`, wired in production); the frontend reports nothing,
+  and that is accepted for a single-user app: the one user *is* the error reporter.
 
 ---
 
@@ -163,6 +205,36 @@ PR #59; chore/versioning-policy, PR #60; the backlog scoping went straight to `m
   meaning for `accepted` in the FSM), so it is the sole major and everything else is a minor
   or a patch. Items are grouped by which files they would otherwise force us to open twice,
   not by theme.
+
+---
+
+## Backups — 2026-07-11, no tag
+
+The backup story ships from the private
+[`karirkalyan-backups`](https://github.com/chairulakmal/karirkalyan-backups) repo, so it carries
+no tag here — recorded because it answers this project's worst day: the real job-search history
+lives in one Railway Postgres, and the Railway Hobby plan has no managed backups (confirmed
+2026-07-11).
+
+- **Scheduled `pg_dump`, daily cron at 05:15 JST.** Each run fingerprints `users` /
+  `applications` / `timeline_entries` (`count @ max(updated_at)`) and only dumps when the
+  fingerprint changed since the state committed by the previous backup — `solid_queue` /
+  `solid_cache` churn never triggers it, and the fingerprint commit doubles as the keep-alive
+  against GitHub's 60-day cron auto-disable. The dump itself is the full database: client major
+  queried from the server at run time, gzipped artifact on 60-day retention, `pipefail` plus
+  completion-trailer and size checks so a failed dump is a red run, never a silent tiny artifact.
+  Private-repo variant, so the dump needs no encryption.
+- **Restore drill passed 2026-07-11.** `db-dump-7` restored into a scratch Postgres 18.4 (the
+  `docker-compose.yml` in the backups repo, tmpfs, port 5418) with zero errors; all 17 tables and
+  every row came back (`users:3 | applications:19 | timeline_entries:32`, status spread intact).
+  Drill steps are documented in the backups repo README, and the setup is documented on this side
+  of the fence in SPEC.md § Deployment → Backups (added in the v1.4.1 docs audit, because
+  `/privacy` states the 60-day retention four times and it was otherwise checkable only from a
+  private repo nobody auditing this one can open).
+- **Decision recorded: a dump, not a mirror** on a free Postgres tier — a second live database is
+  HA machinery for an app that needs an undo button, and free tiers expire, pause idle databases,
+  and add a version-compat surface to maintain. The second, provider-independent leg of the
+  backup story is the full-account export, shipped in v1.4.0.
 
 ---
 
