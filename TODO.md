@@ -23,9 +23,13 @@ entity is triggered by accepting an offer, not by finishing a prior release), an
 gains an **Operations** section for the worst-day work — backups, export — that no feature
 admission test covers.
 
-**Nothing in flight.** `v1.4.0` shipped; the next release in the plan is `v1.4.1` (the
-`Applications::ListQuery` extraction and the `API_BASE` naming), which is sequenced *before*
-`v1.5.0` on purpose — see the release plan directly beneath. The dev-server memory leak carries
+**Nothing in flight.** `v1.4.0` shipped; the next release in the plan is `v1.4.1` — **"Close the
+door"**: public sign-up off, privacy policy and terms in both locales. It jumped the queue ahead of
+the refactors on 2026-07-12, and the reason is the only one that should ever move a release
+forward: it is not about what the app can *do*, it is about what it is *holding*. Open sign-up
+means strangers' resumes; closing it makes almost the entire data-protection question disappear
+rather than answering it. The code-quality release it displaced is now `v1.4.2`, still ahead of
+`v1.5.0`, so the `Applications::ListQuery` constraint below still holds. The dev-server memory leak carries
 no release tag on purpose: it is **maintenance, not a release**. Its stopgap already shipped (`cf7cd8d` — 8 GB heap +
 heap-snapshot flag live in `web/package.json`), and what remains is filing upstream when the
 next crash writes a snapshot.
@@ -44,7 +48,8 @@ behind — which is the whole of the major test.
 | --- | --- | --- |
 | ~~`v1.3.1`~~ | patch | **Shipped 2026-07-12.** Everything that had accumulated on `main` since the v1.3.0 tag. |
 | ~~`v1.4.0`~~ | minor | **Shipped 2026-07-12.** Follow-up digest, calendar-aware dead zones, CSV export, full-account export. |
-| `v1.4.1` | patch | `Applications::ListQuery` extraction, `API_BASE` naming, download filenames |
+| `v1.4.1` | patch | **Close the door**: public sign-up off, privacy policy + terms (EN + JA) |
+| `v1.4.2` | patch | `Applications::ListQuery` extraction, `API_BASE` naming, download filenames, upload throttle |
 | `v1.5.0` | minor | The Japan market layer: recruiter channel + `agencies`, 年収 comp structure, Japanese-level filter |
 | `v1.5.1` | patch | Japanese phrase-based line breaking |
 | `v1.6.0` | minor | Hiring entity, timezone overlap + `.ics`, visa / status of residence, email verification |
@@ -73,14 +78,55 @@ through a dead zone only works because the idempotency key derives from `follow_
 than from the day the job runs.** Key it on the run date and a held reminder is silently lost.
 That single choice is what makes the calendar a *deferral* and not a *deletion*.
 
-### `v1.4.1` — patch. Sequenced before `v1.5.0`, not filler
+### `v1.4.1` — patch. "Close the door"
+
+**Ships before everything below, including the refactors.** Decided 2026-07-12.
+
+Public sign-up is open today (`/sign-up` is in `PUBLIC_PATHS` in `web/proxy.ts`), which means any
+stranger can create an account and upload a PDF — and a resume is the most PII-dense document a
+person owns: full name, address, phone number, employment history. That, not the app's existence,
+is what makes this a data-protection question at all. Japan's APPI dropped its 5,000-record
+small-handler exemption in 2017, so "it is tiny" was never a defence, and having no legal entity
+is not one either: a natural person can be the data controller, and the absence of a company
+means the liability lands on Akmal personally rather than on nobody.
+
+**The decision: close public sign-up.** The demo account (already advertised in `llms.txt` and on
+the marketing page) stays the way a reviewer tries the app, so nothing about the portfolio story
+is lost — and third-party PII simply stops arriving. This is the cheapest possible resolution of
+the whole question, and it is available precisely *because* the north star is one loyal user.
+
+Three pieces:
+
+- [ ] **Close public sign-up.** Remove the route and the page; drop `/sign-up` from `PUBLIC_PATHS`
+      and re-point the homepage CTA. **Watch the Devise coupling**: `devise_for` with
+      `:registerable` is what generates `POST /api/v1/auth/sign_up`, and it is also what generates
+      the `DELETE` (account destroy) on the same path — `skip: [:registrations]` takes both away.
+      Keep the destroy route.
+- [ ] **Privacy policy + terms, EN and JA** — new `/privacy` and `/terms` pages under the existing
+      i18n routing (never one locale without the other; the README rule applies here with more
+      force, not less). Content follows the code, so keep it honest and short: what is stored
+      (email, application records, one resume and one cover letter per application, as `bytea` in
+      Railway Postgres), that a nightly `pg_dump` goes to a **private** GitHub repo on 60-day
+      retention, who the sub-processors are (Railway, Anthropic for the URL prefill, the mail
+      provider, Honeybadger), that there is no analytics and no tracking, and how to reach a
+      human. **Do not promise a self-service delete button that does not exist** (below).
+- [ ] **Document the account-deletion endpoint.** `DELETE /api/v1/auth/sign_up` is already routed
+      and already cascades correctly (`dependent: :destroy` on `User#applications` and
+      `#timeline_entries`), but it has **no spec, no UI and no mention in SPEC.md — it works by
+      accident**. Give it a request spec and an API-contract entry. A *button* is deliberately
+      **not** in scope: with sign-up closed there is no third party who needs self-service
+      erasure, and the v1.4.0 account export already covers the portability half. Revisit only if
+      sign-up ever reopens.
+
+### `v1.4.2` — patch. Sequenced before `v1.5.0`, not filler
 
 Extract `Applications::ListQuery`; settle `API_BASE` vs `API_BASE_URL`; give downloaded resumes
-and cover letters filenames that say which application they belong to. The first lands **first**
-because `v1.5.0` adds three new filters to `ApplicationsController#index` — the exact method
-that already mixes filtering, cursor decoding, and serialization inline. Extract before, and the
-filters land in a query object with `Applications::GhostRiskQuery` as the pattern; extract after,
-and the controller thickens and then gets refactored under load.
+and cover letters filenames that say which application they belong to; throttle the upload path.
+The first lands **first** because `v1.5.0` adds three new filters to
+`ApplicationsController#index` — the exact method that already mixes filtering, cursor decoding,
+and serialization inline. Extract before, and the filters land in a query object with
+`Applications::GhostRiskQuery` as the pattern; extract after, and the controller thickens and then
+gets refactored under load.
 
 The filenames are the v1.4.0 fallout: shipping the account archive is what made it visible that
 neither download surface names a file usefully. It is still a patch — no new capability, no
@@ -225,7 +271,18 @@ loyal user, losing that history is strictly worse than lacking any feature in th
 - [x] **Error tracking — conscious asymmetry, decided 2026-07-11.** Honeybadger covers the
       API (`api/Gemfile`, wired in production). `web/` has no client-side error tracking,
       and that is accepted for a single-user app: the one user *is* the error reporter.
-- [ ] **Throttle uploads, and cap applications per account** *(`v1.4.1` — patch: no capability,
+- [x] **No document version history — decided 2026-07-12.** One resume and one cover letter per
+      application, the latest upload overwriting the last; `applications.resume` stays a single
+      `bytea`. Keeping the last N versions was considered and rejected. It would multiply blob
+      count against the primary Postgres — the same database whose entire backup story is a
+      nightly `pg_dump` — to retain documents nobody reads, and the honest form of the feature is
+      a `documents` table plus object storage, which is a migration, not an afternoon. The
+      question a job seeker actually asks is *"which resume did I send to this company?"*, and one
+      document pinned to one application already answers it exactly. Version history at the layer
+      that costs nothing: the account export zip is a point-in-time snapshot, and the `MMDD` stamp
+      in the download filename keeps a re-uploaded resume from clobbering the saved copy of the old
+      one. **Do not re-lift this without a storage change to justify it.**
+- [ ] **Throttle uploads, and cap applications per account** *(`v1.4.2` — patch: no capability,
       no migration)*. `rack_attack.rb` throttles sign-in, sign-up, the AI prefill and the account
       export, but **nothing throttles the upload path** (`PATCH /applications/:id` with a resume or
       cover letter). The exposure is smaller than it looks and it is worth being precise about why:
@@ -283,7 +340,7 @@ loyal user, losing that history is strictly worse than lacking any feature in th
 
 ### Code quality
 
-- [ ] **Extract `Applications::ListQuery`** *(`v1.4.1` — and it must land before `v1.5.0`)* —
+- [ ] **Extract `Applications::ListQuery`** *(`v1.4.2` — and it must land before `v1.5.0`)* —
       `ApplicationsController#index` mixes filtering,
       cursor decoding, and serialization inline. `api/app/queries/` now exists
       (`Applications::GhostRiskQuery`), so the destination and its conventions are settled;
@@ -291,11 +348,11 @@ loyal user, losing that history is strictly worse than lacking any feature in th
       `v1.5.0` adds three filters (channel, comp, Japanese level) to exactly this method, so
       extracting first means they land in a query object rather than thickening a controller
       that then has to be refactored under load.
-- [ ] **`API_BASE` vs `API_BASE_URL`** *(`v1.4.1`)* — two near-identical names for different things
+- [ ] **`API_BASE` vs `API_BASE_URL`** *(`v1.4.2`)* — two near-identical names for different things
       (`web/app/lib/api.ts:107` is the internal fetch base; `web/app/lib/links.ts:2` is the public
       Railway URL used for doc links). Rename or comment.
 - [ ] **Name downloaded resumes and cover letters after the application, not after nothing**
-      *(`v1.4.1`)* — the same disease on two surfaces. In the archive,
+      *(`v1.4.2`)* — the same disease on two surfaces. In the archive,
       `Exports::AccountArchive#blob_path` (`api/app/services/exports/account_archive.rb:85`)
       builds `resumes/{id}-{company.parameterize}.pdf`, and a **Japanese company name
       parameterizes to an empty string** — so the fallback fires and the entry is a bare
