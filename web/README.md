@@ -29,12 +29,13 @@ English (bare) form.
 | Route | Content |
 |---|---|
 | `/` | Landing page |
-| `/sign-in`, `/sign-up` | Auth forms — POST to Rails, exchange token through `/api/auth/session` |
+| `/sign-in` | The only auth form — POSTs to Rails, exchanges the token through `/api/auth/session`. There is **no** `/sign-up`: registration is closed (SPEC.md § Registration is closed) |
 | `/dashboard` | Applications list with status badges and `follow_up_at` indicators, plus stats summary |
 | `/board` | Kanban board — drag a card to run an FSM transition; legality read from `GET /api/v1/transitions`, optimistic with a `409` snap-back |
 | `/applications/new` | Create a new application — includes the AI job-URL pre-fill |
 | `/applications/[id]` | Detail view — FSM transition buttons (from `valid_next_states`), timeline entries, resume/cover letter upload |
 | `/about`, `/docs` | Project write-up and documentation |
+| `/privacy`, `/terms` | Legal pages, both locales — readable signed in or out |
 
 ## Local setup
 
@@ -51,15 +52,23 @@ Expects the Rails API on `:3001`. Copy `.env.example` to `.env.local` if you nee
 
 ## End-to-end tests (Playwright)
 
-A single smoke test covers the critical path: sign up → land on dashboard → create application → transition status. Runs in ~2 seconds.
+Smoke tests cover the critical paths: create an application and transition its status, and create one with a resume attached.
 
 ```bash
-# Prereq: Postgres running (cd ../api && docker compose up -d)
+# Prereqs: Postgres running (cd ../api && docker compose up -d)
+#          and seeded    (cd ../api && bin/rails db:seed)
 
 npm run test:e2e            # headless run
 npm run test:e2e:ui         # interactive UI mode for debugging
 ```
 
-Playwright auto-starts the Rails API (`:3001`) and Next.js (`:3000`) via its `webServer` config; if they're already running, it reuses them. Each test run registers a unique email (`e2e-<timestamp>@example.com`) so the DB stays usable across runs without cleanup.
+Playwright auto-starts the Rails API (`:3001`) and Next.js (`:3000`) via its `webServer` config; if they're already running, it reuses them.
+
+**The suite signs in once, not once per test.** The `setup` project (`e2e/auth.setup.ts`) signs in as the seeded `e2e` account and hands its session to every other project through Playwright's `storageState`, so the specs open already authenticated. Tests used to register a throwaway account each — that is the affordance v1.4.1 removed, and it is not the only reason: Rack::Attack is live outside the test environment and the suite drives the *development* server, where sign-in is throttled at 5/min per IP. A suite that signed in per test would walk into that ceiling as it grew.
+
+Two consequences worth knowing before adding a test:
+
+- **The account is seeded, not created** — `bin/rails db:seed` is a prerequisite, not a nicety. `api/db/seeds.rb` creates it (guarded `unless Rails.env.production?`), and `e2e/credentials.ts` reads the same `E2E_EMAIL` / `E2E_PASSWORD` env vars with the same defaults. Change one side and you must change the other.
+- **Nothing is cleaned up between runs**, and the account survives them, so no test may assume an empty dashboard. Each names its company uniquely (`Mercari ${Date.now()}`) and asserts on the row it just created.
 
 Test files live in `e2e/`. Browser binaries are installed into `~/.cache/ms-playwright/` (not the repo).

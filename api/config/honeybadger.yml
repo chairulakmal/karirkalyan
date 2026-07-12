@@ -25,6 +25,15 @@ development_environments:
 # Enable verbose debug logging (useful for troubleshooting).
 debug: false
 
-# Enable Honeybadger Insights
+# Honeybadger Insights — OFF, deliberately.
+#
+# With Insights on, honeybadger's Rails plugin subscribes to ActiveSupport notifications and
+# ships an event per request, per SQL query and per mailer send: a continuous stream of
+# telemetry from healthy traffic, not just from failures. `/privacy` names Honeybadger as one
+# of five sub-processors and says it "receives error reports". That sentence is only true with
+# this off.
+#
+# Turning it on is a change to what a third party sees, not a monitoring tweak: the legal pages
+# (both locales) and SPEC.md § Legal pages move in the same PR, or the policy becomes false.
 insights:
-  enabled: true
+  enabled: false

@@ -24,7 +24,9 @@ docker compose up -d
 # Install dependencies and set up the database
 bundle install
 bin/rails db:create db:migrate
-bin/rails db:seed             # optional: loads demo account + 12 sample applications
+bin/rails db:seed             # required: creates the demo account (+ 12 sample applications)
+                              # and, outside production, the `e2e` account Playwright signs in as.
+                              # Registration is closed — seeding is how you get a login.
 
 # Start the server on :3001
 bin/rails server

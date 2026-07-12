@@ -11,9 +11,11 @@ RSpec.configure do |config|
         version: "v1",
         description: "Job application tracker API — Rails 8, Devise + JWT"
       },
+      # The production server is the *API* service, not kk.chairulakmal.com — that is the
+      # Next.js app, which has no /api/v1 routes, so "Try it out" against it 404s.
       servers: [
         { url: "http://localhost:3001", description: "Local development" },
-        { url: "https://kk.chairulakmal.com", description: "Production" }
+        { url: "https://api-production-4899.up.railway.app", description: "Production" }
       ],
       components: {
         securitySchemes: {
