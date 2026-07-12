@@ -18,10 +18,12 @@ Next.js 16 renamed `middleware.ts` → `proxy.ts`. Do **not** create `middleware
 The guard lives in `web/proxy.ts` (repo root of `web/` — there is no `src/` directory). It is
 role-free: authorization is a single check for the presence of the `session` cookie.
 
-- `OPEN_PATHS` = `/about`, `/docs` — checked first, renders either way, no redirect in either
-  direction. They describe the project rather than sell it, so a signed-in reader should reach
-  them instead of bouncing to `/dashboard`.
-- `PUBLIC_PATHS` = `/`, `/sign-in`, `/sign-up` — reachable without a cookie.
+- `OPEN_PATHS` = `/about`, `/docs`, `/privacy`, `/terms` — checked first, renders either way, no
+  redirect in either direction. They describe the project rather than sell it, so a signed-in
+  reader should reach them instead of bouncing to `/dashboard` — and a privacy policy a user
+  cannot reach while logged in is not a privacy policy.
+- `PUBLIC_PATHS` = `/`, `/sign-in` — reachable without a cookie. There is no `/sign-up`; see
+  SPEC.md § Registration is closed.
 - Any other path without a cookie → redirect to `/sign-in`.
 - A public path *with* a cookie → redirect to `/dashboard`, so signed-in users never see the
   marketing or auth pages.

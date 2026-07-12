@@ -27,23 +27,9 @@ RSpec.describe "Rack::Attack throttling", type: :request, skip_n_plus_one: true 
     end
   end
 
-  describe "POST /api/v1/auth/sign_up" do
-    it "returns 429 after 3 attempts from the same IP within 1 hour" do
-      3.times do |i|
-        post "/api/v1/auth/sign_up",
-          params: { user: { email: "user#{i}@example.com", password: "password123" } },
-          as: :json
-        expect(response).to have_http_status(:created)
-      end
-
-      post "/api/v1/auth/sign_up",
-        params: { user: { email: "fourth@example.com", password: "password123" } },
-        as: :json
-
-      expect(response).to have_http_status(:too_many_requests)
-      expect(response.headers["Retry-After"]).to eq("3600")
-    end
-  end
+  # The auth/sign_up throttle was deleted along with the endpoint it protected
+  # (SPEC.md § Registration is closed). Nothing to test here; sign_in is the only
+  # unauthenticated write left.
 
   describe "POST /api/v1/auth/sign_in — per-account brute-force backstop" do
     let(:body) { { user: { email: "victim@example.com", password: "wrongpass" } } }

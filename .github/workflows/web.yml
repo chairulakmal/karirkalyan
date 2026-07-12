@@ -131,7 +131,10 @@ jobs:
           working-directory: api
 
       - name: Prepare database
-        run: bin/rails db:create db:migrate
+        # db:seed is not optional here: the E2E suite signs in as the `e2e`
+        # account rather than registering one (SPEC.md § Registration is closed),
+        # and seeds.rb is where that account comes from. Seeding is idempotent.
+        run: bin/rails db:create db:migrate db:seed
         working-directory: api
 
       - name: Set up Node

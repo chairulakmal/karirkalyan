@@ -6,16 +6,23 @@ Rails.application.routes.draw do
   mount Rswag::Ui::Engine => "/api-docs"
   mount Rswag::Api::Engine => "/api-docs"
 
+  # Registration is closed — there is no sign-up route (SPEC.md § Registration is closed).
+  # Devise's :registerable generates the sign-up POST *and* the account-destroy DELETE from
+  # the same controller, so skipping :registrations would silently take the deletion endpoint
+  # with it. It is skipped, and the destroy half re-declared below on a path that says what
+  # it does — as a plain route, because the controller is no longer a Devise one.
   devise_for :users,
     path: "/api/v1/auth",
-    path_names: { sign_in: "sign_in", sign_out: "sign_out", registration: "sign_up" },
-    controllers: {
-      sessions:      "api/v1/auth/sessions",
-      registrations: "api/v1/auth/registrations"
-    }
+    path_names: { sign_in: "sign_in", sign_out: "sign_out" },
+    skip: [ :registrations ],
+    controllers: { sessions: "api/v1/auth/sessions" }
 
   namespace :api do
     namespace :v1 do
+      namespace :auth do
+        delete "account", to: "registrations#destroy"
+      end
+
       resources :applications do
         collection do
           post :prefill

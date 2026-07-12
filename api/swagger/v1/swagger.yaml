@@ -272,37 +272,6 @@ paths:
           description: no cover letter uploaded
         '401':
           description: not authenticated
-  "/api/v1/auth/sign_up":
-    post:
-      summary: Register a new account
-      tags:
-      - Auth
-      parameters: []
-      responses:
-        '201':
-          description: account created
-        '422':
-          description: validation failed (duplicate email or blank password)
-      requestBody:
-        content:
-          application/json:
-            schema:
-              type: object
-              properties:
-                user:
-                  type: object
-                  properties:
-                    email:
-                      type: string
-                      example: user@example.com
-                    password:
-                      type: string
-                      example: password123
-                  required:
-                  - email
-                  - password
-              required:
-              - user
   "/api/v1/auth/sign_in":
     post:
       summary: Sign in
@@ -344,6 +313,28 @@ paths:
           description: signed out
         '401':
           description: not authenticated
+  "/api/v1/auth/account":
+    delete:
+      summary: Erase the account and everything under it
+      tags:
+      - Auth
+      security:
+      - bearerAuth: []
+      description: |
+        Destroys the caller's user record. Applications, timeline entries and the uploaded
+        resumes and cover letters inside them cascade with it, and the JWT stops validating
+        because there is no longer a user to look its `sub` up against.
+
+        There is no self-service button for this in the UI, and no sign-up endpoint to undo it
+        with — see SPEC.md § Registration is closed. The shared demo account is exempt: its
+        credentials are public, so anyone could otherwise erase it.
+      responses:
+        '204':
+          description: account erased
+        '401':
+          description: not authenticated
+        '403':
+          description: the demo account cannot be erased
   "/api/v1/dashboard":
     get:
       summary: Application stats for the current user

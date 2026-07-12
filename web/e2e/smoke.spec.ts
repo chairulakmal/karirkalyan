@@ -3,69 +3,51 @@ import { test, expect } from "@playwright/test";
 /**
  * Smoke tests covering critical happy paths.
  *
- * Each run uses a fresh email so tests never collide with previous runs.
- * The AuthForm merges sign-in/sign-up into one component with a tab toggle,
- * so both tabs render a "Create account" button. Use `last()` to target the
- * submit button, which appears after the tab toggle in the DOM.
+ * These arrive already signed in: the `setup` project (`e2e/auth.setup.ts`) signs in
+ * once as the seeded `e2e` account and hands the session to every test here. They used
+ * to open by registering a throwaway account, which is exactly the affordance v1.4.1
+ * removed (SPEC.md § Registration is closed).
+ *
+ * The account outlives a run, so nothing here may assume an empty dashboard. Each test
+ * names its company uniquely and asserts on that.
  */
-test("sign up, create an application, transition status", async ({ page }) => {
-  const email = `e2e-${Date.now()}@example.com`;
-  const password = "password123";
+test("create an application and transition its status", async ({ page }) => {
+  const company = `Mercari ${Date.now()}`;
 
-  // — Sign up —
-  await page.goto("/sign-up");
-  await page.getByLabel("Email").fill(email);
-  await page.getByLabel("Password").fill(password);
-  // Two "Create account" buttons exist: the tab toggle and the submit button.
-  await page.getByRole("button", { name: /create account/i }).last().click();
-
-  // Lands on dashboard
-  await page.waitForURL("/dashboard");
-  await expect(page.getByRole("heading", { name: "Dashboard" })).toBeVisible();
-  await expect(page.getByText("No applications yet.")).toBeVisible();
-
-  // — Create application —
-  await page.getByRole("link", { name: /add your first one/i }).click();
+  await page.goto("/dashboard");
+  await page.getByRole("link", { name: /new application/i }).first().click();
   await page.waitForURL("/applications/new");
 
-  await page.getByLabel("Company").fill("Mercari");
+  await page.getByLabel("Company").fill(company);
   await page.getByLabel("Role").fill("Backend Engineer");
   await page.getByRole("button", { name: /create application/i }).click();
 
-  // Lands on detail page with the application visible
+  // Lands on the detail page with the application visible
   await page.waitForURL(/\/applications\/\d+$/);
-  await expect(page.getByRole("heading", { name: "Mercari" })).toBeVisible();
+  await expect(page.getByRole("heading", { name: company })).toBeVisible();
   await expect(page.getByText("Backend Engineer")).toBeVisible();
 
-  // The StatusHelp disclosure also renders a badge per reachable status, so
-  // scope status assertions to the page header's badge.
+  // The transition section renders a badge per reachable status too, so scope
+  // the status assertion to the badge beside the heading. The page's <header>
+  // is the only one inside <main> — the nav's lives in the layout, outside it.
   const statusBadge = page.locator("main header").getByText(/^(Draft|Applied)$/);
-
-  // Status starts at "Draft" — transition to Applied
   await expect(statusBadge).toHaveText("Draft");
-  await page.getByRole("button", { name: /applied/i }).first().click();
 
-  // Status badge now reads "Applied"
+  // Transition buttons are labelled "→ Applied" (transitions.goTo)
+  await page.getByRole("button", { name: /→ Applied/i }).click();
   await expect(statusBadge).toHaveText("Applied");
 
-  // Timeline reflects the transition
-  await expect(page.getByText(/draft.*applied/i)).toBeVisible();
+  // Timeline records the transition as "Draft → Applied"
+  const timeline = page.locator("main ol");
+  await expect(timeline).toContainText("Draft");
+  await expect(timeline).toContainText("Applied");
 });
 
-test("create application with resume attached at creation", async ({ page }) => {
-  const email = `e2e-upload-${Date.now()}@example.com`;
-  const password = "password123";
+test("create an application with a resume attached at creation", async ({ page }) => {
+  const company = `Sansan ${Date.now()}`;
 
-  // — Sign up —
-  await page.goto("/sign-up");
-  await page.getByLabel("Email").fill(email);
-  await page.getByLabel("Password").fill(password);
-  await page.getByRole("button", { name: /create account/i }).last().click();
-  await page.waitForURL("/dashboard");
-
-  // — New application with resume —
   await page.goto("/applications/new");
-  await page.getByLabel("Company").fill("Sansan");
+  await page.getByLabel("Company").fill(company);
   await page.getByLabel("Role").fill("Ruby Engineer");
 
   // Attach a minimal valid PDF (magic bytes + padding to satisfy the validator)
@@ -79,7 +61,7 @@ test("create application with resume attached at creation", async ({ page }) => 
   await page.getByRole("button", { name: /create application/i }).click();
   await page.waitForURL(/\/applications\/\d+$/);
 
-  // The "View" link appears when resume_updated_at is set — it should be
-  // present immediately since the file was stored at creation time.
-  await expect(page.getByRole("link", { name: /view/i }).first()).toBeVisible();
+  // The "View · uploaded …" link only renders once resume_updated_at is set, so
+  // its presence is the proof the file was stored during creation.
+  await expect(page.getByRole("link", { name: /^view ·/i })).toBeVisible();
 });

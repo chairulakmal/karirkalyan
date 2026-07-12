@@ -32,8 +32,8 @@ Two consequences worth stating plainly:
   [`CHANGELOG.md`](CHANGELOG.md), including the pre-1.0.0 build phases that used to sit at the
   top of this file.
 
-Last synced against the code: **2026-07-12**, `v1.4.0` (the follow-up digest and `JapanCalendar`'s
-dead zones; the two exports, their per-account throttle, and the dashboard download surface).
+Last synced against the code: **2026-07-12**, `v1.4.1` (registration closed, the `/privacy` and
+`/terms` pages, and `DELETE /api/v1/auth/account` given a spec and a contract entry).
 
 ---
 
@@ -57,6 +57,68 @@ interactive UI).
 
 There is one hard rule at the boundary: **the JWT never reaches client-side JavaScript.**
 Everything in the frontend auth design follows from that.
+
+### Registration is closed
+
+**There is no way for a stranger to create an account.** No `POST /api/v1/auth/sign_up`, no
+`/sign-up` page, no invite flow. Visitors sign in to the shared read-write demo account, whose
+credentials are printed on the homepage. New accounts are created by the operator, on the server,
+with `bin/rails users:create EMAIL=… PASSWORD=…` — the one surviving caller of `WelcomeMailer`.
+
+This is deliberate, and it is the single most surprising thing about the system, so the reasoning
+is here rather than in a commit message:
+
+- **Open registration means strangers' resumes.** A resume is close to the most PII-dense document
+  a person owns — legal name, address, phone, employment history, sometimes a photo and a date of
+  birth. This app stores it as `bytea` in a single Railway Postgres, whose only backup is a nightly
+  `pg_dump`. That is an honest arrangement for *my* resume. Accepting yours would make it a
+  custodial promise I have not built the machinery to keep.
+- **No legal entity is not an exemption.** Under Japan's APPI a natural person handling personal
+  information can be a 個人情報取扱事業者 in their own right; the small-handler carve-out for under
+  5,000 records was repealed in 2017. "It's just a portfolio project" is not a defence, and neither
+  is "I'm not a company."
+- **Nothing is lost.** The portfolio story is told by the demo account, which is *better* than an
+  empty new account: it opens with 12 pre-loaded Tokyo tech applications, a populated board, real
+  timeline history and a working ghost-risk prediction. A recruiter who signs up gets an empty
+  dashboard and no reason to stay.
+- **It deletes a whole surface.** Closing the door removes the sign-up endpoint, its Rack::Attack
+  throttle, its spam-account and outbound-mail vectors, its CSRF-able route handler, and the
+  self-service account-deletion button an open service would owe its users — because there are no
+  such users. What it does *not* remove is the deletion capability itself: `DELETE
+  /api/v1/auth/account` stays, and cascades (§ API contract). The operator can honour an erasure
+  request; nobody can trip over the button.
+
+The trap to know before touching `config/routes.rb`: Devise's `:registerable` module generates the
+sign-up `POST` **and** the account-destroy `DELETE` from the same `registrations` controller, so
+reaching for `skip: [:registrations]` alone would silently take the deletion endpoint with it.
+`devise_for` therefore skips `:registrations`, and the destroy half is re-declared as an ordinary
+route — no `devise_scope` — on a path that says what it does:
+
+```ruby
+devise_for :users, path: "/api/v1/auth", skip: [ :registrations ], …
+
+namespace :api do
+  namespace :v1 do
+    namespace :auth do
+      delete "account", to: "registrations#destroy"
+    end
+```
+
+`Api::V1::Auth::RegistrationsController` is deliberately **not** a `Devise::RegistrationsController`
+subclass: inheriting it would drag `new`, `create`, `edit`, `update` and `cancel` in as live
+methods — unroutable, but a loaded gun in a drawer, in the one release whose point is that the gun
+is gone. It subclasses `ApplicationController` instead, which is where `authenticate_user!`,
+`current_user` and `render_error` come from anyway; nothing was lost. `bin/rails routes` shows
+exactly four auth routes: sign-in (new + create), sign-out, and account-destroy.
+
+The demo account is exempt from destruction (`403 forbidden`). Its credentials are published, this
+endpoint is in Swagger, and `DemoResetJob` only rebuilds on the hour — without the guard, any
+visitor could make "Try demo account" 401 for the next fifty-nine minutes.
+
+Reopening registration is a product decision, not a config change: it would owe users a privacy
+policy that promises more than "the operator's own data" (§ Legal pages), a self-service delete
+button, an upload throttle, a per-account application cap, and a backup story that is not one
+`pg_dump`.
 
 ---
 
@@ -446,9 +508,11 @@ the failing fields:
 catalog can localize per field without string-matching the sentence.
 
 ```
-POST   /api/v1/auth/sign_up                       201, JWT in Authorization header
 POST   /api/v1/auth/sign_in                       200, JWT in Authorization header
 DELETE /api/v1/auth/sign_out                      rotates jti — revokes all devices
+DELETE /api/v1/auth/account                       204, erases the account and everything under it
+
+(there is no sign-up endpoint — see § Registration is closed)
 
 GET    /api/v1/applications                       cursor-paginated
 POST   /api/v1/applications                       status must be in ENTRY_STATES
@@ -486,7 +550,7 @@ its own (a `409` is retryable, a `422` is not), but the code is what clients sho
 | `not_found` | `404` | No such record — including another user's record |
 | `stale_record` | `409` | `ActiveRecord::StaleObjectError` — optimistic-locking conflict |
 | `invalid_transition` | `422` | FSM `InvalidTransitionError` |
-| `validation_failed` | `422` | Model validation failure (create/update, sign-up, file upload); carries `details` |
+| `validation_failed` | `422` | Model validation failure (create/update, file upload); carries `details` |
 | `invalid_url` | `422` | Bad or private/internal pre-fill URL |
 | `rate_limited` | `429` | Rack::Attack throttle; `Retry-After` header set |
 | `prefill_failed` | `502` | AI extraction failed |
@@ -762,9 +826,10 @@ boundaries throughout.
 Production sends via SMTP (Resend); development previews only; test collects in
 `ActionMailer::Base.deliveries`.
 
-- `WelcomeMailer` — on sign-up, via `deliver_later`. `deliver_now` with
-  `raise_delivery_errors = true` meant a mail failure 500'd a successful registration, and the
-  retry then said "email taken".
+- `WelcomeMailer` — sent when an account is created, via `deliver_later`. Its only caller is the
+  `users:create` Rake task (§ Registration is closed); it used to be the sign-up endpoint.
+  `deliver_later` rather than `deliver_now` because with `raise_delivery_errors = true` a mail
+  failure would take the account creation down with it.
 - `FollowUpMailer#digest(user, applications)` — from `FollowUpReminderJob`, one per user per
   business day. The subject names the company when there is exactly one application
   (*"Follow up on your Mercari application"* — the single case is the common case and deserves to
@@ -783,10 +848,9 @@ STARTTLS port `2587`. The `From:` domain must be verified in Resend first.
   - `sign_in`: per-IP, plus **email-keyed** throttles (`10/5min`, `50/hour`) capping guesses
     against a single account across all IPs. IP-only throttling is defeated by a botnet or a
     shared NAT egress.
-  - `sign_up`: 3/hour per IP. The *other* unauthenticated write, and the one that is easy to
-    forget: every sign-up writes a user and sends a welcome mail, so an uncapped one is a
-    spam-account and outbound-email vector — and the mail reputation it burns is not ours to
-    spend.
+    `sign_in` is now the **only** unauthenticated write there is to throttle — the sign-up
+    endpoint it used to sit beside is gone (§ Registration is closed), and with it the
+    spam-account and outbound-mail vector that its 3/hour cap existed to close.
   - `prefill`: per-IP, plus **per-account** caps (10/min, 50/hour, 100/day) keyed on the JWT
     `sub`. The endpoint costs money (a Claude call plus an outbound fetch), so an uncapped
     per-account path is a cost and abuse vector — most sharply through the shared demo login.
@@ -884,8 +948,9 @@ Tailwind utilities.
 
 ### Auth flow — the token never reaches the browser
 
-1. Sign-in and sign-up forms POST plain credentials to Next route handlers
-   (`app/api/auth/session/route.ts`, `app/api/auth/register/route.ts`).
+1. The sign-in form POSTs plain credentials to a Next route handler
+   (`app/api/auth/session/route.ts`). It is the only such handler — registration is closed, so
+   there is no second credential-accepting entry point.
 2. Those handlers proxy to Rails, capture the JWT from the `Authorization` response header, and
    store it in an `httpOnly` cookie named `session`.
 3. `DELETE /api/auth/session` hits Rails to rotate the JTI, then clears the cookie.
@@ -901,9 +966,9 @@ set correctly.
 
 **Origin checks are mandatory on the auth route handlers.** Next's built-in CSRF protection covers
 Server Actions, *not* route handlers, so without an `Origin` allowlist a cross-site form or fetch
-can drive a login (classic login-CSRF) or a sign-up. `web/app/lib/csrf.ts` enforces same-origin by
-default, with `ALLOWED_ORIGIN` to pin; cross-origin → `403`. It guards both `POST` handlers and the
-session `DELETE`.
+can drive a login (classic login-CSRF). `web/app/lib/csrf.ts` enforces same-origin by default, with
+`ALLOWED_ORIGIN` to pin; cross-origin → `403`. It guards the session `POST` and the session
+`DELETE`.
 
 **Expired sessions** bounce through `/api/auth/expired`, which clears the cookie and redirects to
 `/sign-in?expired=1` with a notice. A `401` must never dead-end on an error box.
@@ -959,6 +1024,53 @@ cursor pagination, and the endpoint table — and then links out to the rswag Sw
 one click further in. The endpoint table's methods and paths are code and are not translated; only
 the sentence beside each one is.
 
+### Legal pages — `/privacy`, `/terms`
+
+Two prose pages in both locales, linked from the site footer, `OPEN_PATHS` so a signed-in user can
+still read them. They exist because the app holds resumes, and a service that holds resumes without
+saying what it does with them is not defensible whether or not anyone made it fill in a form.
+
+There is no legal entity behind this app and the pages say so: the operator is a natural person
+(§ Registration is closed explains why that is not an exemption). They are written to be **true
+about the system as built**, not to imitate a company's boilerplate, and every claim in them is
+checkable against this file:
+
+- what is collected — an email address, application records, and one resume plus one cover letter
+  per application; **plus, incidentally, IP addresses**, which are not a feature but are
+  unavoidable: Rack::Attack keys its throttle counters on them (Solid Cache, so they land in
+  Postgres rows), Honeybadger attaches them to an error report's `cgi_data`, and production request
+  logs carry them;
+- where it lives — `bytea` in a single Railway-managed Postgres, with a daily `pg_dump` run by the
+  private `karirkalyan-backups` repository, whose artifacts expire after 60 days;
+- who else touches it — **five** parties, and the pages name all five, because a sub-processor you
+  decline to name is the one the policy exists to disclose:
+  - **Railway** — hosting and the database, so everything;
+  - **GitHub** — the nightly `pg_dump` runs on a GitHub-hosted runner and is stored as a GitHub
+    Actions artifact, which means **GitHub holds a copy of every resume**. It is easy to forget
+    because the backup repository is private and the workflow is boring, and it is precisely the
+    kind of omission that makes a policy false;
+  - **Anthropic** — only the URL pasted into AI pre-fill, never a document;
+  - **Resend** — outbound mail, so email addresses;
+  - **Honeybadger** — error reports, which carry the request context above.
+- what is *not* there — no analytics, no tracking pixels, no advertising, no third-party JavaScript.
+  Two cookies, both functional: the `session` cookie that holds the JWT, and next-intl's
+  `NEXT_LOCALE`, which remembers the chosen language. Neither is a tracker, and the pages say
+  "two functional cookies", not "no cookies" — see below;
+- how to get it out, and how to get it erased — the two export endpoints (§ API contract) and an
+  email to the operator, who runs `DELETE /api/v1/auth/account`.
+
+**Do not write a promise the code does not keep.** The page must not offer a self-service delete
+button (there isn't one — that is the deliberate trade in § Registration is closed), must not claim
+encryption at rest beyond what Railway actually provides, must not name a retention period the
+backup script does not enforce, must not say "nothing is shared with anyone else" while a nightly
+job ships the whole database to GitHub, and must not promise erasure is immediate when it is a human
+reading mail. The failure mode of a privacy policy is not being too short; it is saying something
+untrue.
+
+`/terms` is correspondingly small: the service is a portfolio demo, provided as-is with no warranty
+and no uptime commitment, the demo account is shared and world-writable so nothing private belongs
+in it, and the operator may reset or delete it at any time.
+
 ### Route guard — `web/proxy.ts`
 
 Next.js 16 renamed `middleware.ts` → `proxy.ts`; a `middleware.ts` file is **ignored**. Export a
@@ -969,15 +1081,19 @@ categories, checked in this order:
 
 | Category | Paths | Without a cookie | With a cookie |
 | --- | --- | --- | --- |
-| `OPEN_PATHS` | `/about`, `/docs` | renders | renders |
-| `PUBLIC_PATHS` | `/`, `/sign-in`, `/sign-up` | renders | `307` → `/dashboard` |
+| `OPEN_PATHS` | `/about`, `/docs`, `/privacy`, `/terms` | renders | renders |
+| `PUBLIC_PATHS` | `/`, `/sign-in` | renders | `307` → `/dashboard` |
 | everything else | `/dashboard`, `/applications/*`, … | `307` → `/sign-in` | renders |
 
 `OPEN_PATHS` is checked first and skips both redirects. `/about` and `/docs` explain how the system
 is built rather than selling it, so bouncing a signed-in reader to the dashboard would hide them
 from the people most likely to read them — which is why they are not more `PUBLIC_PATHS` entries.
-The signed-in app shell's "For reviewers" footer links to both, and that link only resolves because
-of this. Matching is by segment: `/about` also covers `/about/anything`, but never `/aboutish`.
+`/privacy` and `/terms` are there for a sharper reason: the people they most concern are the ones
+already signed in and holding data in the system, and a privacy policy a user cannot reach while
+logged in is not a privacy policy. The signed-in app shell's "For reviewers" footer links to
+`/about` and `/docs`, and the site footer links to the two legal pages; those links only resolve
+because of this. Matching is by segment: `/about` also covers `/about/anything`, but never
+`/aboutish`.
 
 `config.matcher` **must** exclude `/robots.txt`, `/sitemap.xml`, and `/llms.txt`, or crawlers get a
 `307` to sign-in and the whole SEO surface becomes unreachable.
@@ -1171,8 +1287,8 @@ with `alternates.languages` producing `hreflang` links for `en`, `ja`, and `x-de
 from `getPathname()` rather than string concatenation, so the prefix rule has one source of truth.
 
 Its `ROUTES` list holds only what a signed-out crawler can reach: `/`, `/about`, `/docs`,
-`/sign-up`, `/sign-in`. Everything behind the session cookie is a `307` and has no business being
-advertised.
+`/privacy`, `/terms`, `/sign-in`. Everything behind the session cookie is a `307` and has no
+business being advertised.
 
 #### Metadata description comes from the catalog
 
@@ -1217,11 +1333,11 @@ Two places do this resolution, because a failure reaches the UI by two paths:
   directly through `localFailure()`, since they have neither code nor status to key on.
 - `errorMessage()` in `(auth)/sign-in/sign-in-form.tsx` — the auth form talks to the
   `/api/auth/*` route handlers over `fetch`, not through a server action, so it parses the
-  response body itself and runs the same resolution. The route handlers pass the upstream
-  `code`/`details` through (the register handler forwards the Rails envelope unchanged; the
-  session handler substitutes its own copy for security-sensitive statuses but keeps the
-  code). Per-call status overrides remain as the fallback layer — a `401` there means bad
-  credentials, not a dead session.
+  response body itself and runs the same resolution. The session route handler passes the
+  upstream `code`/`details` through, substituting its own copy for security-sensitive statuses
+  but keeping the code. Per-call status overrides remain as the fallback layer — a `401` there
+  means bad credentials, not a dead session. (It used to be two handlers; the register one went
+  with § Registration is closed.)
 
 Catalog presence is tested with next-intl's `t.has()`, so steps 1–2 need no hardcoded list of
 known codes in TypeScript — the catalogs themselves are the list, and `en`/`ja` key parity is
@@ -1263,7 +1379,7 @@ Two-tier, mirroring Awano's Vitest + Playwright split.
 |---|---|---|---|
 | Unit | RSpec, no DB | No | FSM logic, service logic in isolation |
 | Request | RSpec request specs | Yes, real Postgres | Full HTTP stack — routing, auth, response shape |
-| E2E | Playwright | Yes | sign up → create → transition → timeline |
+| E2E | Playwright | Yes | sign in → create → transition → timeline |
 
 Unit specs for `ApplicationFSM` have zero database setup — pure Ruby: given these inputs, does
 `assert_transition!` raise? Fast, no factories. This mirrors Awano's `vi.mock`-based Vitest tests.
@@ -1275,6 +1391,30 @@ Every request spec is wrapped in `prosopite` for N+1 detection.
 **Do not mock the database in request specs.** Mocked tests pass while real migrations are broken.
 A real DB catches migration errors, constraint violations, and N+1 queries that mocks silently
 ignore.
+
+The E2E suite used to open each run by registering a throwaway `e2e-${Date.now()}@example.com`,
+which is exactly the affordance § Registration is closed removed. It now signs in as **`e2e`**, an
+account `db/seeds.rb` creates alongside `demo` and leaves empty. Two accounts because they are
+load-bearing in opposite directions: `demo` must stay full (it is the portfolio walkthrough), and
+`e2e` must start empty (a spec that asserts on the first row of the list cannot share a fixture
+with 12 pre-loaded ones). Seeding is idempotent, so the CI job runs `db:seed` after `db:migrate`;
+locally the accounts survive across runs, and the specs assert on the row they just created rather
+than on the list being empty.
+
+Two things about that account are easy to get wrong:
+
+- **It must never exist in production.** `db/seeds.rb` is not a dev fixture — `Demo::ResetService`
+  calls `load_seed` and `DemoResetJob` runs hourly in production (§ Background jobs), so anything
+  unguarded there is live on prod within the hour. The `e2e` block is wrapped in
+  `unless Rails.env.production?`. An unguarded one would be a second real account with a password
+  nobody chose — the exact door § Registration is closed shuts. Its address is `@karirkalyan.test`,
+  a reserved TLD that cannot receive mail, and both halves come from `E2E_EMAIL` / `E2E_PASSWORD`
+  with defaults duplicated in `web/e2e/credentials.ts`. Change one side, change the other.
+- **Only the `setup` project may sign in.** Playwright drives the *development* server, and
+  Rack::Attack is enabled everywhere but test (§ Security): sign-in is throttled at 5/min per IP.
+  `e2e/auth.setup.ts` signs in once, saves the session, and every spec inherits it through
+  `storageState` — so the throttle counter sees one attempt per run no matter how many specs there
+  are, which is what keeps a growing suite from throttling itself.
 
 Coverage: SimpleCov, branch coverage on, 80% floor.
 
@@ -1395,6 +1535,28 @@ this document), move the `CHANGELOG.md` **Unreleased** block under a version hea
 ## Decisions log
 
 Reversed decisions keep both entries. A spec that hides its own history teaches nothing.
+
+### Registration closed, in v1.4.1
+
+The app shipped with open sign-up because that is what `rails generate devise` hands you, not
+because anyone decided a stranger should be able to put their resume in this database. Once the
+question was asked out loud the answer was not close: the demo account tells the portfolio story
+better than an empty new one, and every real user the sign-up form could attract would arrive
+owing them a custodial promise this deployment cannot make. Closing it removed more code than it
+added. Full reasoning in § Registration is closed.
+
+The alternatives considered and rejected: **an invite code** (the same custody problem, plus a
+mechanism to build), and **leaving it open and writing a careful privacy policy** (a policy is a
+promise, not a control — it does not make one `pg_dump` a backup strategy).
+
+### No document version history
+
+`applications.resume` is a single `bytea` column; re-uploading overwrites. Keeping the previous *n*
+versions was considered in v1.4.1 and rejected. Every retained version is another megabyte in the
+primary Postgres whose only backup is a daily dump, and the honest form of the feature is a
+`documents` table plus object storage — a real migration in service of a file nobody reads. The
+overwrite is also the *only* deletion path a user has for a document, which is worth more than an
+undo.
 
 ### Job queue — Solid Queue over Sidekiq *(reversal — supersedes the entry below)*
 

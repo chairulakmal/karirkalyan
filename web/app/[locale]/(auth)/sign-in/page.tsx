@@ -21,7 +21,7 @@ export default async function SignInPage({
           {t("expired")}
         </p>
       )}
-      <AuthForm defaultMode="sign-in" />
+      <AuthForm />
     </>
   );
 }

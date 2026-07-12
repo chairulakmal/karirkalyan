@@ -34,6 +34,15 @@ pipeline. Built as a portfolio project by Chairul Akmal.
   which is the keyboard-accessible path.
 - Cursor-based pagination on the applications list
 
+## Registration is closed
+
+There is no sign-up form and no sign-up endpoint. The app holds resumes — the most PII-dense
+document most people own — and it is deliberately not built to be anyone's custodian but its
+author's. Visitors sign in to the shared demo account below, which is the full app with twelve
+applications already in it, not a stripped sandbox. Accounts are created by the operator with
+`bin/rails users:create`. Data and erasure requests go to karirkalyan@cypherpunkzero.com; there
+is no self-service delete button, and the app does not claim one.
+
 ## Tech stack
 
 - Backend: Rails 8 API-only, Ruby 3.4.9, PostgreSQL 18, Devise + devise-jwt
@@ -52,6 +61,8 @@ pipeline. Built as a portfolio project by Chairul Akmal.
 - API reference (Swagger UI): https://api-production-4899.up.railway.app/api-docs
 - Japanese: the same pages under /ja (e.g. https://kk.chairulakmal.com/ja/about)
 - Demo account: demo@karirkalyan.com / oretachinomachida (12 pre-loaded Tokyo tech applications)
+- Privacy policy: https://kk.chairulakmal.com/privacy
+- Terms: https://kk.chairulakmal.com/terms
 
 ## Source
 

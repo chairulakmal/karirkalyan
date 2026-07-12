@@ -15,6 +15,8 @@
 /test-results
 /playwright-report
 /playwright/.cache
+# the signed-in session the setup project saves — a real cookie, never committed
+/e2e/.auth
 
 # next.js
 /.next/

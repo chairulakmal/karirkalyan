@@ -68,9 +68,8 @@ class Rack::Attack
   throttle("auth/sign_in/email", limit: 10, period: 5.minutes) { |req| sign_in_email(req) }
   throttle("auth/sign_in/email/hourly", limit: 50, period: 1.hour) { |req| sign_in_email(req) }
 
-  throttle("auth/sign_up", limit: 3, period: 1.hour) do |req|
-    req.ip if req.path == "/api/v1/auth/sign_up" && req.post?
-  end
+  # There is no auth/sign_up throttle because there is no sign-up endpoint — see
+  # SPEC.md § Registration is closed. sign_in is the only unauthenticated write left.
 
   # AI URL pre-fill fans out to a paid Claude call + an outbound HTTP fetch.
   # Per-IP cap (coarse, also covers multi-account abuse from one IP)...

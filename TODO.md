@@ -2,17 +2,17 @@
 
 Open work only. Shipped work lives in [`CHANGELOG.md`](CHANGELOG.md).
 
-**Current release: `v1.4.0`** — tagged 2026-07-12, published as a
-[GitHub Release](https://github.com/chairulakmal/karirkalyan/releases/tag/v1.4.0). "The search,
-this week": the follow-up digest, `JapanCalendar`'s dead zones, the CSV export, and the
-full-account export. A minor — four new capabilities, but no migration, so the `v1.3.1` image
-would still boot against the database it leaves behind. See `CHANGELOG.md`.
+**Current release: `v1.4.1`** — "Close the door": public sign-up closed, `/privacy` and `/terms` in
+both locales, and `DELETE /api/v1/auth/account` given a spec, a contract entry and a request spec.
+A **patch**, because it *removes* a capability rather than adding one and touches no schema — the
+`v1.4.0` image boots against the database it leaves behind. See `CHANGELOG.md`.
 
-`v1.3.1` (2026-07-12) was the patch that carried the dependency refresh, the Sidekiq/Redis purge,
-Postgres 18 in dev and CI, the docs audit, and the versioning policy itself. `v1.3.0`
-(2026-07-11, `f455853`) was ghost prediction, which also absorbed the two production items the
-performance release had parked (the `timeline_entries` index and the `/me` fold — both struck
-off below).
+`v1.4.0` (2026-07-12) was "the search, this week": the follow-up digest, `JapanCalendar`'s dead
+zones, the CSV export, and the full-account export. `v1.3.1` (2026-07-12) was the patch that
+carried the dependency refresh, the Sidekiq/Redis purge, Postgres 18 in dev and CI, the docs
+audit, and the versioning policy itself. `v1.3.0` (2026-07-11, `f455853`) was ghost prediction,
+which also absorbed the two production items the performance release had parked (the
+`timeline_entries` index and the `/me` fold — both struck off below).
 
 **North star (decided 2026-07-11): be the best career app for its one loyal user.** Portfolio
 value follows from that, not the other way round — a reviewer can tell a tool with a real
@@ -23,16 +23,17 @@ entity is triggered by accepting an offer, not by finishing a prior release), an
 gains an **Operations** section for the worst-day work — backups, export — that no feature
 admission test covers.
 
-**Nothing in flight.** `v1.4.0` shipped; the next release in the plan is `v1.4.1` — **"Close the
-door"**: public sign-up off, privacy policy and terms in both locales. It jumped the queue ahead of
-the refactors on 2026-07-12, and the reason is the only one that should ever move a release
-forward: it is not about what the app can *do*, it is about what it is *holding*. Open sign-up
-means strangers' resumes; closing it makes almost the entire data-protection question disappear
-rather than answering it. The code-quality release it displaced is now `v1.4.2`, still ahead of
-`v1.5.0`, so the `Applications::ListQuery` constraint below still holds. The dev-server memory leak carries
-no release tag on purpose: it is **maintenance, not a release**. Its stopgap already shipped (`cf7cd8d` — 8 GB heap +
-heap-snapshot flag live in `web/package.json`), and what remains is filing upstream when the
-next crash writes a snapshot.
+**Nothing in flight.** `v1.4.1` shipped; the next release in the plan is `v1.4.2` — the code-quality
+patch that "Close the door" displaced: extract `Applications::ListQuery`, settle `API_BASE` vs
+`API_BASE_URL`, give downloaded files names that say which application they belong to, and throttle
+the upload path. It stays ahead of `v1.5.0`, so the `Applications::ListQuery` constraint below still
+holds. The dev-server memory leak carries no release tag on purpose: it is **maintenance, not a
+release**. Its stopgap already shipped (`cf7cd8d` — 8 GB heap + heap-snapshot flag live in
+`web/package.json`), and what remains is filing upstream when the next crash writes a snapshot.
+
+**One operational precondition before the tag ships:** `/privacy` and `/terms` name
+`karirkalyan@cypherpunkzero.com` as the address an erasure request goes to. That mailbox has to
+actually receive mail — a published contact that bounces is worse than none.
 
 ---
 
@@ -48,7 +49,7 @@ behind — which is the whole of the major test.
 | --- | --- | --- |
 | ~~`v1.3.1`~~ | patch | **Shipped 2026-07-12.** Everything that had accumulated on `main` since the v1.3.0 tag. |
 | ~~`v1.4.0`~~ | minor | **Shipped 2026-07-12.** Follow-up digest, calendar-aware dead zones, CSV export, full-account export. |
-| `v1.4.1` | patch | **Close the door**: public sign-up off, privacy policy + terms (EN + JA) |
+| ~~`v1.4.1`~~ | patch | **Shipped 2026-07-12.** Public sign-up closed, `/privacy` + `/terms` (EN + JA), account-deletion endpoint documented. |
 | `v1.4.2` | patch | `Applications::ListQuery` extraction, `API_BASE` naming, download filenames, upload throttle |
 | `v1.5.0` | minor | The Japan market layer: recruiter channel + `agencies`, 年収 comp structure, Japanese-level filter |
 | `v1.5.1` | patch | Japanese phrase-based line breaking |
@@ -78,45 +79,14 @@ through a dead zone only works because the idempotency key derives from `follow_
 than from the day the job runs.** Key it on the run date and a held reminder is silently lost.
 That single choice is what makes the calendar a *deferral* and not a *deletion*.
 
-### `v1.4.1` — patch. "Close the door"
+### ~~`v1.4.1` — patch. "Close the door"~~ — shipped 2026-07-12
 
-**Ships before everything below, including the refactors.** Decided 2026-07-12.
-
-Public sign-up is open today (`/sign-up` is in `PUBLIC_PATHS` in `web/proxy.ts`), which means any
-stranger can create an account and upload a PDF — and a resume is the most PII-dense document a
-person owns: full name, address, phone number, employment history. That, not the app's existence,
-is what makes this a data-protection question at all. Japan's APPI dropped its 5,000-record
-small-handler exemption in 2017, so "it is tiny" was never a defence, and having no legal entity
-is not one either: a natural person can be the data controller, and the absence of a company
-means the liability lands on Akmal personally rather than on nobody.
-
-**The decision: close public sign-up.** The demo account (already advertised in `llms.txt` and on
-the marketing page) stays the way a reviewer tries the app, so nothing about the portfolio story
-is lost — and third-party PII simply stops arriving. This is the cheapest possible resolution of
-the whole question, and it is available precisely *because* the north star is one loyal user.
-
-Three pieces:
-
-- [ ] **Close public sign-up.** Remove the route and the page; drop `/sign-up` from `PUBLIC_PATHS`
-      and re-point the homepage CTA. **Watch the Devise coupling**: `devise_for` with
-      `:registerable` is what generates `POST /api/v1/auth/sign_up`, and it is also what generates
-      the `DELETE` (account destroy) on the same path — `skip: [:registrations]` takes both away.
-      Keep the destroy route.
-- [ ] **Privacy policy + terms, EN and JA** — new `/privacy` and `/terms` pages under the existing
-      i18n routing (never one locale without the other; the README rule applies here with more
-      force, not less). Content follows the code, so keep it honest and short: what is stored
-      (email, application records, one resume and one cover letter per application, as `bytea` in
-      Railway Postgres), that a nightly `pg_dump` goes to a **private** GitHub repo on 60-day
-      retention, who the sub-processors are (Railway, Anthropic for the URL prefill, the mail
-      provider, Honeybadger), that there is no analytics and no tracking, and how to reach a
-      human. **Do not promise a self-service delete button that does not exist** (below).
-- [ ] **Document the account-deletion endpoint.** `DELETE /api/v1/auth/sign_up` is already routed
-      and already cascades correctly (`dependent: :destroy` on `User#applications` and
-      `#timeline_entries`), but it has **no spec, no UI and no mention in SPEC.md — it works by
-      accident**. Give it a request spec and an API-contract entry. A *button* is deliberately
-      **not** in scope: with sign-up closed there is no third party who needs self-service
-      erasure, and the v1.4.0 account export already covers the portability half. Revisit only if
-      sign-up ever reopens.
+All three pieces landed; see `CHANGELOG.md`. Public sign-up is closed (no endpoint, no page),
+`/privacy` and `/terms` ship in both locales, and `DELETE /api/v1/auth/account` now has a spec, a
+contract entry and a request spec. The Devise coupling trap was real: `skip: [:registrations]`
+would have taken the deletion endpoint with the sign-up one, so the destroy half is re-declared by
+hand in a `devise_scope`. A self-service delete **button** remains deliberately out of scope —
+revisit only if sign-up ever reopens.
 
 ### `v1.4.2` — patch. Sequenced before `v1.5.0`, not filler
 

@@ -10,7 +10,8 @@ const ROUTES = [
   { href: "/", changeFrequency: "monthly", priority: 1 },
   { href: "/about", changeFrequency: "monthly", priority: 0.8 },
   { href: "/docs", changeFrequency: "monthly", priority: 0.8 },
-  { href: "/sign-up", changeFrequency: "yearly", priority: 0.7 },
+  { href: "/privacy", changeFrequency: "yearly", priority: 0.5 },
+  { href: "/terms", changeFrequency: "yearly", priority: 0.5 },
   { href: "/sign-in", changeFrequency: "yearly", priority: 0.5 },
 ] as const satisfies ReadonlyArray<{
   href: string;

@@ -9,13 +9,16 @@ const handleI18n = createMiddleware(routing);
 //
 // PUBLIC: reachable *only* without a session. A signed-in visitor is bounced to
 // the dashboard, so they never see the marketing or auth pages again.
-const PUBLIC_PATHS = ["/", "/sign-in", "/sign-up"];
+// There is no /sign-up: registration is closed (SPEC.md § Registration is closed).
+const PUBLIC_PATHS = ["/", "/sign-in"];
 
 // OPEN: reachable either way, with no redirect in either direction. `/about` and
 // `/docs` describe the project rather than selling it, so bouncing a signed-in
 // reader to the dashboard would be hiding them from the people most likely to
-// read them. This is why they are not simply more PUBLIC_PATHS entries.
-const OPEN_PATHS = ["/about", "/docs"];
+// read them. `/privacy` and `/terms` are open for a sharper reason: they concern
+// the people already holding data in the system, and a privacy policy you cannot
+// reach while signed in is not a privacy policy.
+const OPEN_PATHS = ["/about", "/docs", "/privacy", "/terms"];
 
 const isDev = process.env.NODE_ENV === "development";
 
