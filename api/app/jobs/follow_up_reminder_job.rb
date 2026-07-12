@@ -1,40 +1,80 @@
 class FollowUpReminderJob < ApplicationJob
   queue_as :default
 
+  # How far back "overdue" reaches. Past this, a forgotten follow-up date is not a
+  # reminder, it is archaeology — and resurrecting it as a nudge helps nobody.
+  LOOKBACK = 30.days
+
   def perform
-    # Zone-aware "due today": Time.zone.today.all_day is the JST day expressed as
-    # a UTC range, so a JST user's reminder fires on their day — not a day early,
-    # which DATE(follow_up_at) (compared in UTC) would cause.
-    due = Application
-      .where(follow_up_at: Time.zone.today.all_day)
-      .where.not(status: ApplicationFSM::TERMINAL_STATES)
+    today = Time.zone.today
+    return if hold_for_dead_zone(today)
 
-    due.find_each do |application|
-      key = "reminder-#{application.id}-#{Date.current}"
-      next if TimelineEntry.exists?(idempotency_key: key)
+    reminded = due_on_or_before(today).group_by(&:user).filter_map do |user, applications|
+      won = applications.select { |application| claim(application) }
+      next if won.empty?
 
-      begin
-        TimelineEntry.create!(
-          application:     application,
-          actor:           application.user,
-          from_status:     application.status,
-          to_status:       application.status,
-          note:            "Follow-up reminder",
-          idempotency_key: key
-        )
-      rescue ActiveRecord::RecordNotUnique
-        # exists?-then-create! isn't atomic: a concurrent run (e.g. an
-        # overlapping retry) can insert between the check and the create.
-        # The unique index on idempotency_key is the real guarantee — losing
-        # the race means the reminder is already handled, so skip the email.
-        next
-      end
-
-      # The TimelineEntry above is the exactly-once anchor (unique idempotency
-      # key). Email delivery is decoupled via deliver_later — a separate,
-      # independently-retriable mail job — so a transient SMTP failure retries
-      # the email without ever duplicating the timeline entry.
-      FollowUpMailer.reminder(application).deliver_later
+      FollowUpMailer.digest(user, won).deliver_later
+      [ user, won ]
     end
+
+    Rails.logger.info(
+      "[follow_up_reminder] digests=#{reminded.size} applications=#{reminded.sum { |_, won| won.size }}"
+    )
+  end
+
+  private
+
+  # A reminder that fires on 1 January is noise: nobody is reading it and no company
+  # is answering it. Returning early *defers* rather than drops, because the scope
+  # below reaches backwards — see #due_on_or_before.
+  def hold_for_dead_zone(today)
+    reason = JapanCalendar.dead_zone_reason(today)
+    return false if reason.nil?
+
+    Rails.logger.info("[follow_up_reminder] held — #{today} is a dead zone (#{reason})")
+    true
+  end
+
+  # Everything due *by* the end of today (JST), not everything due exactly today.
+  #
+  # The difference is what makes the dead-zone skip a deferral instead of a deletion:
+  # a reminder falling inside Golden Week is held on its own day and then picked up
+  # by the next business day's run, because that run still sees it. LOOKBACK bounds
+  # how far back that reaching goes.
+  def due_on_or_before(today)
+    Application
+      .includes(:user)
+      .where(follow_up_at: (today - LOOKBACK).beginning_of_day..today.end_of_day)
+      .where.not(status: ApplicationFSM::TERMINAL_STATES)
+      .order(:follow_up_at)
+  end
+
+  # Writes the TimelineEntry that *is* the exactly-once guarantee, and reports whether
+  # this run won it. Only a winner goes into the digest, so an at-least-once redelivery
+  # of the job cannot mail the same reminder twice.
+  #
+  # The key is keyed on follow_up_at, never on Date.current. That is what lets an
+  # overdue application sit in the scope every morning without being nudged every
+  # morning — and it means moving follow_up_at re-arms the reminder, which is exactly
+  # what a user who moved the date meant.
+  def claim(application)
+    TimelineEntry.create!(
+      application:     application,
+      actor:           application.user,
+      from_status:     application.status,
+      to_status:       application.status,
+      note:            "Follow-up reminder",
+      idempotency_key: idempotency_key(application)
+    )
+    true
+  rescue ActiveRecord::RecordNotUnique
+    # exists?-then-create! isn't atomic: a concurrent run (an overlapping retry) can
+    # insert between the check and the create. The unique index on idempotency_key is
+    # the real guarantee — losing the race means the reminder is already handled.
+    false
+  end
+
+  def idempotency_key(application)
+    "reminder-#{application.id}-#{application.follow_up_at.in_time_zone.to_date}"
   end
 end

@@ -20,9 +20,11 @@ entity is triggered by accepting an offer, not by finishing a prior release), an
 gains an **Operations** section for the worst-day work — backups, export — that no feature
 admission test covers.
 
-**Nothing in flight.** The backlog below is now scoped into releases — see the release plan
-directly beneath. The dev-server memory leak carries no release tag on purpose: it is
-**maintenance, not a release**. Its stopgap already shipped (`cf7cd8d` — 8 GB heap +
+**In flight: `v1.4.0`** on `feat/v1.4.0-digest-and-exports` — all four items (the digest, the
+calendar dead zones, the CSV export, the full-account export) are implemented and struck off
+below; what remains is the test run and the PR. The backlog below is scoped into releases — see
+the release plan directly beneath. The dev-server memory leak carries no release tag on purpose:
+it is **maintenance, not a release**. Its stopgap already shipped (`cf7cd8d` — 8 GB heap +
 heap-snapshot flag live in `web/package.json`), and what remains is filing upstream when the
 next crash writes a snapshot.
 
@@ -206,10 +208,9 @@ loyal user, losing that history is strictly worse than lacking any feature in th
         `/var/lib/postgresql/18/docker`, and the old `.../data` mount would have parked
         the live data dir outside the named volume. Upgrading a machine with a 16 volume
         needs `docker compose down -v` + `db:setup`.
-- [ ] **Full-account export** *(`v1.4.0`)* — JSON plus resume files, downloadable from the app. The
-      loyal-user version of the CSV table-stakes item (CSV covers applications only; it
-      recovers neither resumes nor timeline). CSV stays as a convenience view; this is the
-      data-safety artefact, and the second, provider-independent leg of the backup story.
+- [x] **Full-account export** — shipped in `v1.4.0`. `GET /api/v1/exports/account`: a zip of
+      `account.json` (behind a `schema_version`) plus every resume and cover letter, downloadable
+      from the dashboard. The second, provider-independent leg of the backup story.
 - [x] **Error tracking — conscious asymmetry, decided 2026-07-11.** Honeybadger covers the
       API (`api/Gemfile`, wired in production). `web/` has no client-side error tracking,
       and that is accepted for a single-user app: the one user *is* the error reporter.
@@ -291,13 +292,11 @@ for the whole section, not a footnote on one item.
 
 **Table stakes** — re-ranked 2026-07-11 by the north star, not by what a checklist expects:
 
-- [ ] **Follow-up digest email** *(`v1.4.0`)* — first: Solid Queue landed, the mailer already
-      exists, and it is useful *this week* of an active search. Ships together with the
-      calendar-aware dead zones below — they are the same edit to `FollowUpReminderJob`.
-- [ ] **CSV export** of applications *(`v1.4.0`)* — a convenience view; the data-safety version is
-      the full-account export in Operations above. Ships *with* that export, not before it: same
-      controller, same serializer, same download surface, so building CSV alone means opening
-      those files twice.
+- [x] **Follow-up digest email** — shipped in `v1.4.0`. `FollowUpMailer#reminder` became
+      `#digest`: one email per user per day, grouped by user from the applications the job
+      claimed, instead of one email per application.
+- [x] **CSV export** of applications — shipped in `v1.4.0`, alongside the full-account export as
+      planned. `GET /api/v1/exports/applications`, formula-injection escaped.
 - [ ] **Email verification** (Devise `:confirmable`) *(`v1.6.0`, riding along)* — last, and
       labelled honestly: it guards a signup problem a single-user app does not have. A portfolio
       checkbox, ranked as one.
@@ -384,10 +383,10 @@ way ("one data-entry session a year"); that is the pattern.
       (989 respondents) puts the median international developer at **¥9.5M** — but ¥13.5M at
       international companies with no Japan entity vs ¥8.5M at Japanese-HQ firms, so any
       comparison UI should surface employer type, not just the number.
-- [ ] **Calendar-aware follow-ups** *(`v1.4.0`, with the digest — one edit to the same job)*.
-      `FollowUpReminderJob` already runs at 08:15 JST. Teach it
-      the dead zones — the New Year holidays, Golden Week, Obon — when nudging a company achieves
-      nothing. A reminder that knows not to fire on 1 January is a small touch that reads as care.
+- [x] **Calendar-aware follow-ups** — shipped in `v1.4.0`, with the digest, as one edit to the same
+      job. `JapanCalendar` holds the digest on weekends, national holidays, New Year, Golden Week
+      and Obon; the held reminders go out on the next business day, exactly once, because the
+      idempotency key derives from `follow_up_at` rather than from the day the job runs.
 - [ ] **Japanese-level filter** *(`v1.5.0`)*. Record the Japanese proficiency a posting demands (JLPT N1/N2,
       "business level", conversational, none) against what the user holds, and filter on it.
       **Researched 2026-07-11:** this taxonomy matches how the market actually filters — both

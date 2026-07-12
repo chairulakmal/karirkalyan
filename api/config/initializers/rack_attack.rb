@@ -32,20 +32,30 @@ class Rack::Attack
     nil
   end
 
-  # Authenticated caller's id (JWT `sub`) for the paid AI endpoint, decoded
-  # straight from the Authorization header so we can cap per-account, not just
-  # per-IP. Memoised on the Rack env so the three prefill throttles decode once.
-  def self.prefill_user_id(req)
-    return unless req.path == "/api/v1/applications/prefill" && req.post?
-
-    req.env.fetch("rack_attack.prefill_user_id") do
-      req.env["rack_attack.prefill_user_id"] = begin
+  # Authenticated caller's id (JWT `sub`), decoded straight from the Authorization
+  # header so the endpoints below can cap per-account, not just per-IP. Memoised on
+  # the Rack env so the several throttles sharing a request decode once.
+  def self.account_id(req)
+    req.env.fetch("rack_attack.account_id") do
+      req.env["rack_attack.account_id"] = begin
         token = Warden::JWTAuth::HeaderParser.from_env(req.env)
         token && Warden::JWTAuth::TokenDecoder.new.call(token)["sub"]
       rescue StandardError
         nil
       end
     end
+  end
+
+  def self.prefill_user_id(req)
+    return unless req.path == "/api/v1/applications/prefill" && req.post?
+
+    account_id(req)
+  end
+
+  def self.export_user_id(req)
+    return unless req.path.start_with?("/api/v1/exports/") && req.get?
+
+    account_id(req)
   end
 
   throttle("auth/sign_in", limit: 5, period: 1.minute) do |req|
@@ -74,6 +84,14 @@ class Rack::Attack
   throttle("ai/prefill/account/minute", limit: 10, period: 1.minute) { |req| prefill_user_id(req) }
   throttle("ai/prefill/account/hour", limit: 50, period: 1.hour) { |req| prefill_user_id(req) }
   throttle("ai/prefill/account/day", limit: 100, period: 1.day) { |req| prefill_user_id(req) }
+
+  # Exports are not a money vector — they are a *work* vector. /exports/account reads
+  # every blob the user owns and assembles the zip in memory, so a signed-in client
+  # looping it is the cheapest way to push this app over its memory ceiling. Capped
+  # per-account rather than per-IP because the cost is a function of whose data is
+  # being assembled, not of where the request came from.
+  throttle("exports/account/minute", limit: 10, period: 1.minute) { |req| export_user_id(req) }
+  throttle("exports/account/hour", limit: 60, period: 1.hour) { |req| export_user_id(req) }
 
   self.throttled_responder = lambda do |request|
     match_data  = request.env["rack.attack.match_data"] || {}

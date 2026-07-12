@@ -5,6 +5,41 @@ Open work lives in [`TODO.md`](TODO.md).
 
 ---
 
+## v1.4.0 — pending tag
+
+**"The search, this week."** A minor: four capabilities, no migration, and nothing removed from
+the database — the v1.3.1 image would still boot against it, which is the whole of the test. The
+four are two pairs, not four errands: the digest and the calendar are the same edit to
+`FollowUpReminderJob`, and the two exports are the same controller and the same download surface.
+*(feat/v1.4.0-digest-and-exports)*
+
+- **One follow-up digest per user per day**, replacing one email per application. `FollowUpMailer`
+  loses `#reminder` and gains `#digest`; the job groups the applications it claimed by user and
+  sends once. A morning with six due follow-ups used to mean six emails, which is how a reminder
+  system teaches you to ignore it.
+- **The digest is calendar-aware.** `JapanCalendar` (`app/lib/japan_calendar.rb`) is now the only
+  thing that knows what a business day in Japan is: weekends, national holidays via the `holidays`
+  gem (a gem and not a list, because 春分の日/秋分の日 move with the equinoxes and 振替休日 is a
+  rule, not a date), plus New Year, Golden Week and Obon. On those days the job holds.
+  **Held is not dropped** — the idempotency key derives from `follow_up_at`, *not* from the day the
+  job runs, so the next business day sends the held reminder exactly once. The same property is
+  what stops an overdue application being nudged every single morning, and what makes moving
+  `follow_up_at` re-arm the reminder.
+- **CSV export** (`GET /api/v1/exports/applications`) — one row per application, formula-injection
+  escaped (a cell opening with `=`, `+`, `-` or `@` is prefixed with a quote) and `force_quotes`.
+  A convenience view: it recovers a table, not an account.
+- **Full-account export** (`GET /api/v1/exports/account`) — a zip of `account.json` (user, every
+  application, every timeline entry, behind a `schema_version`) plus every resume and cover letter
+  under `resumes/` and `cover-letters/`. This is the data-safety artefact and the reason the pair
+  exists: the real history lives in one Railway Postgres on a plan with no managed backups, and
+  this is the leg the user can pull without a provider, a cron runner, or a shell.
+- Both exports are `send_data`, scoped to `current_user`, `nosniff`, and throttled **per account**
+  (10/min, 60/hour) — not a money vector but a work vector, since the archive reads every blob the
+  user owns. They surface on the dashboard as two links proxied through
+  `web/app/api/exports/*/route.ts`, so the JWT stays server-side like every other download.
+
+---
+
 ## v1.3.1 — 2026-07-12
 
 **A patch, and the first release cut by the policy it contains.** Nothing here is a new

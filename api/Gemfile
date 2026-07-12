@@ -30,6 +30,18 @@ gem "lograge"
 # Official Anthropic SDK; key from ANTHROPIC_API_KEY (no-ops/raises cleanly if unset).
 gem "anthropic", "~> 1.44"
 
+# Japanese national holidays for FollowUpReminderJob's dead zones. A gem rather than a
+# hardcoded list because 春分の日/秋分の日 move with the equinoxes and 振替休日 is a rule,
+# not a date — see SPEC.md § JapanCalendar.
+gem "holidays", "~> 8.8"
+
+# Zips the full-account export in memory (Zip::OutputStream.write_buffer).
+gem "rubyzip", "~> 3.2", require: "zip"
+
+# Exports::ApplicationsCsv. Explicit because csv stopped being a default gem in Ruby 3.4
+# — bundled, but not on the load path unless it is declared.
+gem "csv", "~> 3.3"
+
 group :development, :test do
   gem "dotenv-rails"
   gem "debug", platforms: %i[ mri windows ], require: "debug/prelude"

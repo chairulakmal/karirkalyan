@@ -13,7 +13,13 @@ pipeline. Built as a portfolio project by Chairul Akmal.
   return to applied. The transition table in api/app/lib/application_fsm.rb is the only
   authority on which moves are legal — this list is a summary and may lag it.
 - Writes an immutable TimelineEntry on every status transition (full audit trail)
-- Sends follow-up reminders via idempotent Solid Queue background jobs
+- Sends follow-up reminders via idempotent Solid Queue background jobs, batched into one digest
+  per user per day rather than one email per application. The digest holds on weekends, Japanese
+  national holidays, New Year, Golden Week and Obon, and the held reminders go out on the next
+  business day — deferred, not dropped.
+- Exports your data two ways: a CSV of your applications, and a full-account zip containing
+  account.json plus every resume and cover letter you uploaded. Both are downloads from the
+  dashboard; the zip is the one that can actually restore an account.
 - Stores resume and cover letter as PostgreSQL bytea per application
 - Exposes a stats dashboard via pure SQL aggregation (no N+1)
 - Predicts which applications have been ghosted: the dashboard flags any application sitting in

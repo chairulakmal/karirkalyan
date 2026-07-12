@@ -90,6 +90,31 @@ export default async function Dashboard() {
         </div>
       )}
 
+      {/* Plain anchors, not next-intl <Link>: these are API routes, not localized
+          pages. The API sends Content-Disposition: attachment, so the browser
+          downloads rather than navigating — no `download` attribute needed, and the
+          server keeps naming the file. */}
+      <section className="border border-dune bg-linen p-5">
+        <p className="kk-label">{t("exports.eyebrow")}</p>
+        <p className="mt-2 text-sm leading-relaxed text-ink-soft">{t("exports.blurb")}</p>
+        <div className="mt-4 flex flex-wrap gap-3">
+          {/* eslint-disable-next-line @next/next/no-html-link-for-pages */}
+          <a
+            href="/api/exports/applications"
+            className="border border-dune px-4 py-2 text-sm font-medium text-midnight transition hover:border-cobalt hover:text-cobalt"
+          >
+            {t("exports.csv")}
+          </a>
+          {/* eslint-disable-next-line @next/next/no-html-link-for-pages */}
+          <a
+            href="/api/exports/account"
+            className="border border-dune px-4 py-2 text-sm font-medium text-midnight transition hover:border-cobalt hover:text-cobalt"
+          >
+            {t("exports.archive")}
+          </a>
+        </div>
+      </section>
+
       <ApplicationsList
         initialItems={applications}
         initialMeta={meta}

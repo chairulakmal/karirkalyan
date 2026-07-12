@@ -32,9 +32,8 @@ Two consequences worth stating plainly:
   [`CHANGELOG.md`](CHANGELOG.md), including the pre-1.0.0 build phases that used to sit at the
   top of this file.
 
-Last synced against the code: **2026-07-11**, post-`v1.3.0` (ghost prediction and the query
-layer it introduced; `/me` folded into the dashboard payload; the widened `timeline_entries`
-index).
+Last synced against the code: **2026-07-12**, `v1.4.0` (the follow-up digest and `JapanCalendar`'s
+dead zones; the two exports, their per-account throttle, and the dashboard download surface).
 
 ---
 
@@ -305,6 +304,26 @@ Wipes the shared "Try demo" account back to a clean seed. Invoked hourly by `Dem
 to the demo user only. Without it, the shared account accumulates every visitor's data
 indefinitely.
 
+#### `Exports::ApplicationsCsv` and `Exports::AccountArchive`
+
+Signature: `new(user).call` → a `String` of bytes, ready for `send_data`. Each also exposes
+`#filename`, so the date-stamped download name (`karirkalyan-applications-2026-07-12.csv`) is
+decided next to the bytes it names rather than in the controller.
+
+They are services, not queries: a query answers a question about the data, and these two *produce
+an artefact* from it. What they share is the read — `user.applications` with `timeline_entries`
+preloaded — and that is deliberately not extracted into a common parent. Two subclasses of an
+`Export` base class, to share one `includes`, would be inheritance used as a hiding place.
+
+`ApplicationsCsv` is `CSV.generate` over the columns a spreadsheet can hold, blobs excluded and
+replaced with `has_resume` / `has_cover_letter` booleans. It **quotes every field
+(`force_quotes: true`)** and prefixes any cell that opens with `=`, `+`, `-`, or `@` with a
+single quote: a company literally named `=cmd|...` is a CSV-injection payload the moment the file
+is opened in Excel, and this is a file we hand a user and expect them to open in Excel. The escape
+is the [OWASP-recommended](https://owasp.org/www-community/attacks/CSV_Injection) one.
+
+`AccountArchive` builds the zip described under § API contract → Exports.
+
 #### `AllowedHosts` — `app/lib/allowed_hosts.rb`
 
 Host-authorization patterns for Rails' `HostAuthorization`. **The patterns here are deliberately
@@ -444,6 +463,9 @@ GET    /api/v1/transitions                        the FSM's effective transition
 GET    /api/v1/dashboard                          SQL aggregation + facets + ghost risk + user
 GET    /api/v1/me                                 authenticated user's profile
 
+GET    /api/v1/exports/applications               CSV of every application — text/csv
+GET    /api/v1/exports/account                    full account archive — application/zip
+
 GET    /up                                        deep health check — pings Postgres
 GET    /api-docs                                  Swagger UI (rswag)
 GET    /api-docs/v1/swagger.yaml                  generated from request specs
@@ -577,6 +599,50 @@ under "No link"), and one facet pair per row does not scale forever. At personal
 is the right amount of effort, and deriving from data already stored beats asking the user to tag
 every row.
 
+#### Exports — two endpoints, two different jobs
+
+Both live on `Api::V1::ExportsController`, both stream through `send_data`, and both are scoped to
+`current_user`. They look like one feature and are not:
+
+| | `GET /exports/applications` | `GET /exports/account` |
+|---|---|---|
+| Media type | `text/csv` | `application/zip` |
+| Contains | applications, one row each | applications, timeline, resumes, cover letters, user |
+| Built by | `Exports::ApplicationsCsv` | `Exports::AccountArchive` |
+| It is for | reading the data somewhere else | **getting the data back** |
+
+The CSV is a **convenience view**: a spreadsheet, one row per application, no blobs and no
+timeline. It recovers a table, not an account.
+
+The archive is the **data-safety artefact**, and the reason this exists at all: the real
+job-search history lives in one Railway Postgres, and the Hobby plan has no managed backups.
+Scheduled `pg_dump`s cover that from the outside (§ Deployment); this covers it from the inside,
+and is the leg the user can pull without a provider, a cron runner, or a shell. It contains
+`account.json` — user, every application with every column, every timeline entry — plus the PDFs
+under `resumes/` and `cover-letters/`, named `{application_id}-{slug}.pdf`. `account.json` carries
+a `schema_version` so a future importer can tell what it is reading, and each application row
+names its own files, so the mapping survives even if the slug is unhelpful (company names in
+Japanese `parameterize` to an empty string — the id is what makes the name unique, the slug is
+only there to be readable).
+
+**The archive is built in memory** (`Zip::OutputStream.write_buffer`), which is a deliberate cap,
+not an oversight: blobs are capped at 1 MB each and this is a single-user app, so the peak is
+bounded by `applications × 2 MB` and a few dozen applications is a few dozen megabytes. If that
+ever stops being true the fix is streaming, and the throttle below is what buys the time to notice.
+
+**The download surface** is a section on `/dashboard` with two links, proxied to Rails by
+`app/api/exports/{applications,account}/route.ts` — the same `apiProxy` the resume and cover-letter
+downloads use, so the JWT stays server-side (§ Auth flow). Two rules that look like slips and are
+not:
+
+- They are **plain `<a>` tags**, not the `Link` from `i18n/navigation.ts`. These are API routes,
+  not localized pages: a client-side navigation would fetch the route and do nothing visible. The
+  ESLint rule `@next/next/no-html-link-for-pages` cannot tell the difference and is disabled on
+  those two lines.
+- There is **no `download` attribute**. Rails already sends `Content-Disposition: attachment` with
+  the filename it chose (`karirkalyan-applications-2026-07-12.csv`), so the browser downloads
+  rather than navigates, and the server stays the one place that names the file.
+
 ### Background jobs — Solid Queue
 
 **Adapter:** `:solid_queue` in production (`config/application.rb`), `:async` in development,
@@ -604,23 +670,91 @@ constraint.
 | `clear_solid_queue_finished_jobs` | hourly at :12 | Bounds the jobs table |
 | `reset_demo_account` | hourly at :42 | `DemoResetJob` |
 
-#### Idempotent jobs
+#### `FollowUpReminderJob` — one digest per user, deferred out of dead zones
+
+The job runs every morning at 08:15 JST and does three things in order.
+
+**1. It stops on a dead zone.** If today is not a business day in Japan (`JapanCalendar`, below),
+the job returns immediately — no timeline entries, no mail. A reminder that fires on 1 January is
+noise: nobody is reading it and no company is answering it.
+
+**2. It collects what is due, including what is overdue.** The scope is `follow_up_at <= end of
+today` (JST), non-terminal, and no further back than `LOOKBACK` (30 days). Not "due exactly
+today" — that would make step 1 a *deletion*: a reminder falling inside Golden Week would be
+skipped on its day and never looked at again. Because the scope reaches backwards, a held reminder
+is simply picked up by the next business day's run, which is what "defer" means here.
+
+The lookback is the other half of that: it bounds how far back "overdue" reaches, so a follow-up
+date set eight months ago and forgotten does not resurrect itself as a nudge. Past 30 days it is
+not a reminder, it is archaeology.
+
+**3. It sends one email per user, not one per application.** Applications are grouped by user and
+handed to `FollowUpMailer#digest` as a batch. Three follow-ups due on the same morning are one
+email with three entries — the inbox cost of the feature scales with *days*, not with how well the
+search is going, which is the point. Timeline entries are still written per application: the
+timeline is the application's history, and "you were reminded" belongs on each one.
+
+#### Idempotency — keyed on the follow-up date, not the day it fires
 
 Solid Queue guarantees at-least-once delivery. `FollowUpReminderJob` writes a `TimelineEntry` with
-`idempotency_key = "reminder-{id}-{date}"`. The check is **not** `exists?`-then-`create!` — that
-race is real — it relies on the unique index and rescues `ActiveRecord::RecordNotUnique` for true
-exactly-once. Same pattern as Stripe idempotency keys.
+`idempotency_key = "reminder-{application_id}-{follow_up_at as a JST date}"`. The check is **not**
+`exists?`-then-`create!` — that race is real — it relies on the unique index and rescues
+`ActiveRecord::RecordNotUnique` for true exactly-once. Same pattern as Stripe idempotency keys.
+
+**The key is derived from `follow_up_at`, not from `Date.current`**, and that is what makes
+deferral safe. A reminder held through Golden Week and delivered on 7 May still carries the key of
+the date it was *set for*, so:
+
+- the deferred send cannot double up with the run that held it, and
+- an overdue application, which now sits in the scope every day until it is answered, is reminded
+  **once** rather than every morning until the user gives up on us.
+
+It also buys a property worth having on purpose: **moving `follow_up_at` re-arms the reminder.**
+A new date is a new key, so rescheduling a follow-up produces a new nudge, which is exactly what a
+user who moved the date meant.
+
+(The old key was `reminder-{id}-{Date.current}`. Under the old "due exactly today" scope those two
+are the same string for every entry ever written, so the change is backward-compatible: no
+historical reminder re-fires.)
 
 The `TimelineEntry` is written first, as the exactly-once anchor; the email is then decoupled via
 `deliver_later` onto the `mailers` queue, so a transient SMTP failure retries the email without
-duplicating the entry.
+duplicating the entry. Only applications whose entry this run actually *won* go into the digest.
+
+#### `JapanCalendar` — `app/lib/japan_calendar.rb`
+
+The dead zones, and the single place that knows what a business day in Japan is:
+
+| Dead zone | Dates |
+|---|---|
+| Weekends | Saturday, Sunday |
+| National holidays | via the `holidays` gem, region `:jp`, `:observed` |
+| New Year (年末年始) | 29 December – 3 January |
+| Golden Week | 29 April – 5 May |
+| Obon (お盆) | 13 – 16 August |
+
+`holidays` is a dependency rather than a hardcoded list because two of Japan's holidays are
+**astronomical** — 春分の日 and 秋分の日 move with the equinoxes and are fixed by cabinet
+proclamation each February — and because 振替休日 (a holiday falling on a Sunday displaces the
+following Monday) is a rule, not a date. Both are exactly the kind of thing a hand-maintained
+array gets quietly wrong in a year nobody is looking. The `:observed` region is what turns
+substitute holidays on.
+
+The last three rows are *not* public holidays and the gem does not know them. Golden Week's span
+is a run of real holidays with working days wedged between; Obon has no legal status at all. They
+are in the table anyway because the question this job asks is not "is the post office open" but
+**"will a company answer a nudge sent today"** — and in mid-August, it will not.
+
+**Annual refresh cost: one `bundle update holidays`.** That is the whole maintenance surface, and
+it is why the gem earns its place under the perishable-facts rule in `TODO.md`.
 
 #### Time zone
 
 `config.time_zone = "Tokyo"`. `active_record.default_timezone` is deliberately **not** set, so
 timestamps are still stored in UTC — only presentation and `Time.zone`-based queries (such as the
-reminder job's "today") are JST. Comparing `DATE(follow_up_at)` in UTC gave JST users reminders a
-day early; the job now uses a zone-aware day range.
+reminder job's "today", and the JST date inside its idempotency key) are JST. Comparing
+`DATE(follow_up_at)` in UTC gave JST users reminders a day early; the job uses zone-aware day
+boundaries throughout.
 
 ### Mail
 
@@ -631,7 +765,10 @@ Production sends via SMTP (Resend); development previews only; test collects in
 - `WelcomeMailer` — on sign-up, via `deliver_later`. `deliver_now` with
   `raise_delivery_errors = true` meant a mail failure 500'd a successful registration, and the
   retry then said "email taken".
-- `FollowUpMailer#reminder` — from `FollowUpReminderJob`.
+- `FollowUpMailer#digest(user, applications)` — from `FollowUpReminderJob`, one per user per
+  business day. The subject names the company when there is exactly one application
+  (*"Follow up on your Mercari application"* — the single case is the common case and deserves to
+  read like a sentence) and counts them when there are several (*"3 follow-ups due today"*).
 
 **Railway blocks outbound SMTP on ports 587 and 465**, so production uses Resend's alternate
 STARTTLS port `2587`. The `From:` domain must be verified in Resend first.
@@ -653,13 +790,21 @@ STARTTLS port `2587`. The `From:` domain must be verified in Resend first.
   - `prefill`: per-IP, plus **per-account** caps (10/min, 50/hour, 100/day) keyed on the JWT
     `sub`. The endpoint costs money (a Claude call plus an outbound fetch), so an uncapped
     per-account path is a cost and abuse vector — most sharply through the shared demo login.
+  - `exports`: **per-account** caps (10/min, 60/hour) keyed on the JWT `sub`, same decoder as
+    prefill. Not a money vector — a *work* vector: `/exports/account` reads every blob the user
+    owns and assembles the zip in memory, so a signed-in client looping it is the cheapest way to
+    push this app over its memory ceiling. The cap is per-account rather than per-IP because the
+    cost is a function of whose data is being assembled, not of where the request came from.
 - **Optimistic locking** — a `lock_version` column activates Rails' built-in optimistic locking.
   Two concurrent writers: the second gets `StaleObjectError` → `409`. One column, one
   `rescue_from`, no library.
 - **Uploads** — size is checked from multipart metadata *before* `.read`, so an oversized file
   never enters memory. Then the 1 MB model cap, then PDF magic-byte validation (`%PDF`), which
   cannot be spoofed by renaming a file. The frontend's `accept=".pdf"` is UX only.
-- **Downloads** — `current_user`-scoped, `X-Content-Type-Options: nosniff`, PDF only.
+- **Downloads** — `current_user`-scoped, `X-Content-Type-Options: nosniff`. PDF for the per-
+  application files; the two export endpoints add `text/csv` and `application/zip`, and carry the
+  same `nosniff` header for the same reason (a CSV that a browser decides to sniff as HTML is a
+  stored-XSS delivery mechanism, and its cells contain user-supplied company names).
 - **Param filtering** — `filter_parameter_logging.rb` filters `passw` and `email`; lograge logs
   `request.filtered_parameters`, so credentials do not leak into logs.
 

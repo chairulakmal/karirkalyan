@@ -1,0 +1,22 @@
+KarirKalyan · Follow-up reminder
+=================================
+
+<% if @applications.one? %>
+Time to follow up on <%= @applications.first.company %>.
+<% else %>
+You have <%= @applications.size %> follow-ups due.
+<% end %>
+<% @applications.each do |application| %>
+--------------------------------
+<%= application.role %> at <%= application.company %>
+
+  Current status: <%= application.status.tr("_", " ").capitalize %>
+  Follow-up date: <%= application.follow_up_at&.in_time_zone&.strftime("%B %-d, %Y") %>
+
+  Open: <%= @origin %>/applications/<%= application.id %>
+<% end %>
+--------------------------------
+
+---
+You're receiving this because you set a follow-up date on these applications in
+KarirKalyan.
