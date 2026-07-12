@@ -225,8 +225,10 @@ loyal user, losing that history is strictly worse than lacking any feature in th
         with zero errors; all 17 tables and every row came back (`users:3 |
         applications:19 | timeline_entries:32`, status spread intact). Drill steps are
         documented in the backups repo README.
-    - [ ] Document the drill (or point to the backups repo) in SPEC.md § Deployment. *(docs —
-          straight to `main`, no release)*
+    - [x] **Documented in SPEC.md § Deployment → Backups** — done in the v1.4.1 docs audit.
+          The 60-day retention is now written down on this side of the fence, because
+          `/privacy` states it four times (including in the erasure promise) and it was
+          checkable only from a private repo nobody auditing this one can open.
   - [x] **Local dev Postgres 16 → 18 — done 2026-07-11** (`api/docker-compose.yml`, both
         CI workflows, SPEC.md, both READMEs, `api/README.md`, `llms.txt`). Production was
         confirmed already on 18.4 (`postgres-ssl:18`), so nothing changed on Railway; the
@@ -253,8 +255,9 @@ loyal user, losing that history is strictly worse than lacking any feature in th
       in the download filename keeps a re-uploaded resume from clobbering the saved copy of the old
       one. **Do not re-lift this without a storage change to justify it.**
 - [ ] **Throttle uploads, and cap applications per account** *(`v1.4.2` — patch: no capability,
-      no migration)*. `rack_attack.rb` throttles sign-in, sign-up, the AI prefill and the account
-      export, but **nothing throttles the upload path** (`PATCH /applications/:id` with a resume or
+      no migration)*. `rack_attack.rb` throttles sign-in, the AI prefill and the account
+      export (there is no sign-up throttle because `v1.4.1` removed the endpoint), but
+      **nothing throttles the upload path** (`PATCH /applications/:id` with a resume or
       cover letter). The exposure is smaller than it looks and it is worth being precise about why:
       an upload **overwrites** — `applications.resume` is a single `bytea`, there is no version
       history — and `Application::MAX_FILE_SIZE` caps each blob at 1 MB with a PDF content check.
@@ -379,9 +382,11 @@ for the whole section, not a footnote on one item.
       claimed, instead of one email per application.
 - [x] **CSV export** of applications — shipped in `v1.4.0`, alongside the full-account export as
       planned. `GET /api/v1/exports/applications`, formula-injection escaped.
-- [ ] **Email verification** (Devise `:confirmable`) *(`v1.6.0`, riding along)* — last, and
-      labelled honestly: it guards a signup problem a single-user app does not have. A portfolio
-      checkbox, ranked as one.
+- [ ] **Email verification** (Devise `:confirmable`) — **only if registration ever reopens.**
+      Dropped from `v1.6.0` by `v1.4.1`: `:confirmable` confirms that whoever typed an address
+      into a sign-up form can read that mailbox, and there is no sign-up form. The operator types
+      the address into `users:create` himself, so there is nothing left to verify. It was already
+      labelled a portfolio checkbox; it is now a checkbox for a box that does not exist.
 
 **Ghost prediction — shipped in `v1.3.0`.** See CHANGELOG § v1.3.0 and SPEC.md § Query
 layer. The market research that justified it, and the stage distribution the global defaults

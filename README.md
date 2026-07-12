@@ -24,7 +24,8 @@ A full-stack job application tracker — Rails 8 API + Next.js 16 frontend.
 | Concurrency | Optimistic locking (`lock_version`) → `409 Conflict` |
 | Background jobs | Solid Queue (Postgres-backed, runs inside Puma — no extra service); idempotency key pattern (at-least-once safe) |
 | Email | ActionMailer over SMTP (Resend) — welcome email when an account is created + one follow-up **digest** per user per day at 08:15 JST (Solid Queue recurring task), never one email per application |
-| Registration | Closed. There is no sign-up form — the app holds resumes, and it is deliberately not built to be anyone's custodian but its author's. Sign in to the demo account below; it *is* the full app |
+| Registration | Closed. There is no sign-up form — the app holds resumes, and it is deliberately not built to be anyone's custodian but its author's. Sign in to the demo account above; it *is* the full app. Real accounts are made by the operator on the server (`bin/rails users:create`), and since closing the door also removes the password-reset flow, a forgotten password is `bin/rails users:set_password` — which rotates the JWT `jti`, signing that user out everywhere |
+| Legal pages | [`/privacy`](https://kk.chairulakmal.com/privacy) and [`/terms`](https://kk.chairulakmal.com/terms), both locales, written to be true about the system as built rather than to imitate boilerplate: five named sub-processors, two functional cookies, no analytics, and no promise of a self-service delete button, because there isn't one — erasure is an email to the operator, who runs `DELETE /api/v1/auth/account` |
 | Calendar awareness | The digest holds on weekends, Japanese national holidays, New Year, Golden Week and Obon — nobody reads a nudge sent into 正月. Held reminders are *deferred*, not dropped: the next business day sends them, exactly once |
 | AI pre-fill | Paste a job URL → Claude Haiku 4.5 extracts company/role/notes for review before saving; server-side service, SSRF-guarded + rate-limited, reads Japanese postings natively |
 | Caching | Solid Cache (Postgres-backed) — Rack::Attack throttle counters shared across all Puma workers, no Redis |
@@ -168,7 +169,9 @@ cd api && docker compose up -d
 # 2. API on :3001
 bundle install
 bin/rails db:create db:migrate
-bin/rails db:seed          # optional — demo account + 12 sample applications
+bin/rails db:seed          # REQUIRED — creates the demo account (+ 12 sample applications).
+                           # Registration is closed, so this is how you get a login;
+                           # the operator's alternative is `bin/rails users:create`.
 bin/rails server
 
 # 3. Frontend on :3000, in a second terminal

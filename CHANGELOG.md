@@ -5,6 +5,24 @@ Open work lives in [`TODO.md`](TODO.md).
 
 ---
 
+## Unreleased
+
+Rides along with the next patch. *(fix/privacy-truth-and-doc-drift)*
+
+- **Honeybadger Insights is off.** It was on, which meant honeybadger's Rails plugin shipped an
+  event per request, per SQL query and per mailer send — a stream of telemetry from healthy
+  traffic, not just from failures — while `/privacy` told users, in two languages, that Honeybadger
+  "receives error reports". The cheaper fix was to widen the sentence; the right one was to stop
+  sending the data, so that the sentence is true as written. Found by the post-v1.4.1 docs audit.
+- **Three false claims corrected on `/privacy`, both locales.** The page said the request log
+  records your IP (lograge emits `time`, `request_id` and `params` — no IP), and that Anthropic
+  receives the job-posting *URL* (the server fetches the page itself and sends Claude the stripped
+  text; the URL never leaves the box — SPEC had this exactly backwards). It now also says the
+  pre-fill is fetched server-side, which is a fact in the user's favour: the job board never learns
+  who was reading.
+
+---
+
 ## v1.4.1 — 2026-07-12
 
 **"Close the door."** A patch, and the mechanical test says so without argument: it *removes* a

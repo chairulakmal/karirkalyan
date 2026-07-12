@@ -61,8 +61,11 @@ Everything in the frontend auth design follows from that.
 ### Registration is closed
 
 **There is no way for a stranger to create an account.** No `POST /api/v1/auth/sign_up`, no
-`/sign-up` page, no invite flow. Visitors sign in to the shared read-write demo account, whose
-credentials are printed on the homepage. New accounts are created by the operator, on the server,
+`/sign-up` page, no invite flow. Visitors sign in to the shared read-write demo account through the
+**`Try demo account` button on `/sign-in`**, which fills the form for them; the credentials are also
+published in both READMEs and in `llms.txt`, and they ship in the sign-in page's own JavaScript
+bundle — so treat them as world-readable, which is the assumption § Legal pages already makes when
+it calls the demo account world-writable. New accounts are created by the operator, on the server,
 with `bin/rails users:create EMAIL=… PASSWORD=…` — the one surviving caller of `WelcomeMailer`.
 
 This is deliberate, and it is the single most surprising thing about the system, so the reasoning
@@ -1038,8 +1041,10 @@ checkable against this file:
 - what is collected — an email address, application records, and one resume plus one cover letter
   per application; **plus, incidentally, IP addresses**, which are not a feature but are
   unavoidable: Rack::Attack keys its throttle counters on them (Solid Cache, so they land in
-  Postgres rows), Honeybadger attaches them to an error report's `cgi_data`, and production request
-  logs carry them;
+  Postgres rows), and Honeybadger attaches them to an error report's `cgi_data`. The **request log
+  does not** carry them: lograge replaces Rails' default request line (the one with `for <ip>`) and
+  its `custom_options` emit `time`, `request_id` and `params` — nothing else. Do not restore the
+  IP to that lambda without changing the legal pages in the same commit;
 - where it lives — `bytea` in a single Railway-managed Postgres, with a daily `pg_dump` run by the
   private `karirkalyan-backups` repository, whose artifacts expire after 60 days;
 - who else touches it — **five** parties, and the pages name all five, because a sub-processor you
@@ -1049,9 +1054,23 @@ checkable against this file:
     Actions artifact, which means **GitHub holds a copy of every resume**. It is easy to forget
     because the backup repository is private and the workflow is boring, and it is precisely the
     kind of omission that makes a policy false;
-  - **Anthropic** — only the URL pasted into AI pre-fill, never a document;
+  - **Anthropic** — the **text of the page** pasted into AI pre-fill, and nothing else. The server
+    fetches the URL itself and sends Claude the stripped text (≤12k chars); the URL string never
+    leaves the box, and neither does a resume, a cover letter, or anything else from the account.
+    An earlier version of this list said "only the URL, never a document", which named the one
+    thing that is *not* sent and denied the one that is;
   - **Resend** — outbound mail, so email addresses;
-  - **Honeybadger** — error reports, which carry the request context above.
+  - **Honeybadger** — error reports, which carry the request context above, and **only** error
+    reports: `insights: enabled: false` in `honeybadger.yml`. With Insights on, honeybadger's Rails
+    plugin ships an event per request, per SQL query and per mailer send — a stream of telemetry
+    from healthy traffic, not just from failures. It is off so that the sentence on `/privacy`
+    ("Honeybadger receives error reports") is true as written. Turning it on is a change to what a
+    sub-processor sees, and the legal pages move in the same PR.
+- one outbound request that is *not* a sub-processor — AI pre-fill makes the **server** fetch the
+  job posting, so the site hosting it (LinkedIn, a company careers page) sees a request from
+  Railway's IP, not from the user's browser. No personal data goes with it, so it does not join the
+  list of five; the pages say it anyway, because it is the only case of the app talking to a host
+  the *user* chose, and because the answer is a good one — the job board never learns who looked;
 - what is *not* there — no analytics, no tracking pixels, no advertising, no third-party JavaScript.
   Two cookies, both functional: the `session` cookie that holds the JWT, and next-intl's
   `NEXT_LOCALE`, which remembers the chosen language. Neither is a tracker, and the pages say
@@ -1441,6 +1460,32 @@ master key with production is unnecessary. Without one of these, the app aborts 
 
 **Builder:** Railpack or a Dockerfile. Never Nixpacks — it is deprecated.
 
+### Backups
+
+The **Railway Hobby plan has no managed backups**, so the data is defended from outside this
+repository: the private [`karirkalyan-backups`](https://github.com/chairulakmal/karirkalyan-backups)
+repo runs a daily `pg_dump` on a GitHub-hosted runner at 05:15 JST and keeps the gzipped result as
+a GitHub Actions artifact on **60-day retention** — set explicitly in the workflow, because the
+platform default is 90 days and four sentences on `/privacy`, including the erasure promise, name
+the number 60. It is written here so a future reader can check the claim without cross-repo access;
+if that retention ever changes, the legal pages (both locales) change with it.
+
+Two properties worth knowing, both load-bearing for the privacy page:
+
+- **The dump is the full database**, which means **GitHub holds a copy of every resume**. That is
+  why GitHub is one of the five named sub-processors in § Legal pages — the backup repo is private
+  and the workflow is boring, which is exactly what makes it the disclosure a policy forgets.
+- **It only dumps when the data changed.** The job fingerprints `users` / `applications` /
+  `timeline_entries` (`count @ max(updated_at)`) and skips when the fingerprint matches the one the
+  previous run committed, so `solid_queue` / `solid_cache` churn never triggers a dump. The
+  fingerprint commit doubles as the keep-alive against GitHub's 60-day cron auto-disable.
+
+A restore drill passed 2026-07-11: `db-dump-7` restored into a scratch Postgres 18.4 with zero
+errors, all 17 tables and every row intact. The drill steps live in the backups repo's README. The
+dump is deliberately **not** a live mirror on a free Postgres tier — a second live database is HA
+machinery for an app whose actual need is an undo button, and free tiers expire, pause idle
+databases, and add a version-compatibility surface to maintain.
+
 ### Production lessons, recorded so they are not relearned
 
 - **No Thruster.** It fronted Puma on a different port, creating a double proxy
@@ -1488,9 +1533,15 @@ volume cannot be read by an 18 server).
 ```bash
 cd api && docker compose up -d    # postgres 18 only — no Redis
 
-cd api && bundle install && bin/rails db:create db:migrate && bin/rails server  # :3001
-cd web && npm install && npm run dev                                            # :3000
+cd api && bundle install && bin/rails db:create db:migrate db:seed && bin/rails server  # :3001
+cd web && npm install && npm run dev                                                    # :3000
 ```
+
+`db:seed` is **not optional** any more. Registration is closed (§ Registration is closed), so a
+freshly migrated database has no account and the app has no sign-up form to make one with: seeding
+is how you get a login. It creates the demo account, its 12 sample applications, and — outside
+production — the `e2e` account the Playwright suite signs in as. It is idempotent, so re-running it
+is safe and CI runs it after `db:migrate`. The operator's alternative is `bin/rails users:create`.
 
 Jobs run inline via the `:async` adapter in development — there is no worker process to start.
 
