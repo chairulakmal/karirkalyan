@@ -225,6 +225,19 @@ loyal user, losing that history is strictly worse than lacking any feature in th
 - [x] **Error tracking — conscious asymmetry, decided 2026-07-11.** Honeybadger covers the
       API (`api/Gemfile`, wired in production). `web/` has no client-side error tracking,
       and that is accepted for a single-user app: the one user *is* the error reporter.
+- [ ] **Throttle uploads, and cap applications per account** *(`v1.4.1` — patch: no capability,
+      no migration)*. `rack_attack.rb` throttles sign-in, sign-up, the AI prefill and the account
+      export, but **nothing throttles the upload path** (`PATCH /applications/:id` with a resume or
+      cover letter). The exposure is smaller than it looks and it is worth being precise about why:
+      an upload **overwrites** — `applications.resume` is a single `bytea`, there is no version
+      history — and `Application::MAX_FILE_SIZE` caps each blob at 1 MB with a PDF content check.
+      So a client looping PATCH burns CPU and write I/O but its storage footprint stays flat at
+      2 MB per application. **The unbounded axis is `POST /applications`**, which nothing caps: every
+      new application is another 2 MB of storage allowance, on a database whose whole backup story
+      is a nightly `pg_dump`. Two throttles, both per-account (the cost is a function of whose data
+      it is, not where the request came from — same reasoning as the export throttle above): a
+      write/upload cap, and a ceiling on applications per account. The per-account pattern and the
+      `429` responder already exist; this is a config change, not a design.
 
 ### UI & accessibility
 
@@ -298,10 +311,12 @@ loyal user, losing that history is strictly worse than lacking any feature in th
 
       `MMDD` is the **upload** date, not the application date: `resume_updated_at` /
       `cover_letter_updated_at` already exist per field (the detail page's "uploaded 3 days ago"
-      reads them), so it costs nothing to compute, and it is the one component that distinguishes
-      two *versions* of the same document — the thing you actually squint at after re-uploading a
-      resume twice for the same company. It **disambiguates rather than guarantees**, which is why
-      the application id stays in the name: same company, same role, same day is a real collision.
+      reads them), so it costs nothing to compute. What it buys is *in the user's downloads
+      folder*, not in the app — the app stores exactly one resume per application (`applications.resume`
+      is a single `bytea`, and an upload overwrites it), so the stamp is what stops a re-uploaded
+      resume's download from silently overwriting the copy of the old one you already saved. It
+      **disambiguates rather than guarantees**, which is why the application id stays in the name:
+      same company, same role, same day is a real collision.
 
       **The one thing still open: the slugger.** `parameterize` is what produces the empty string
       today, so it cannot be the answer — this needs transliteration, and the fallback when even
