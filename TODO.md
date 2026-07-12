@@ -289,21 +289,24 @@ loyal user, losing that history is strictly worse than lacking any feature in th
       `resumes/12.pdf`. In the per-application download,
       `ApplicationsController#resume` / `#cover_letter` `send_data` a hardcoded `resume.pdf` /
       `cover_letter.pdf`, so *every* application's file saves under the same name and the second
-      one collides with the first. Both should carry company + role, plus an `MMDD` stamp of the
-      **upload** time — `resume_updated_at` / `cover_letter_updated_at` already exist per field
-      (the detail page's "uploaded 3 days ago" reads them), so the data is there and it costs four
-      characters. It earns them: it is the one component that distinguishes *versions* of the same
-      document, which is the thing you actually squint at in a downloads folder when you have
-      re-uploaded a resume twice for the same company.
-      Three things to settle before writing it: (1) a **transliteration**, not `parameterize`, or
-      Japanese companies keep slugging to nothing; (2) `MMDD` is a **disambiguator, not a
-      uniqueness guarantee** — two applications to the same company for the same role, uploaded
-      the same day, is a real thing, so the application id still has to be in the name (or the
-      stamp has to grow, which costs more than four characters); (3) the **budget**. Under 20
-      characters total leaves ~9 after `-resume.pdf`, and `MMDD` plus an id eats most of that
-      before company or role gets a single letter — so either the cap is per-segment (company ≤ 20,
-      role ≤ 20) or the suffix and stamp sit outside the count. Decide that first; it determines
-      the whole format.
+      one collides with the first.
+
+      **The format, settled:** `{company}-{role}-{MMDD}-{id}-resume.pdf`. The 20-character cap is
+      **per segment** — company ≤ 20, role ≤ 20 — and the stamp, the id and the `-resume.pdf`
+      suffix sit **outside** the count. A single 20-char budget for the whole name was the
+      alternative and it does not close: the suffix alone is 11 characters.
+
+      `MMDD` is the **upload** date, not the application date: `resume_updated_at` /
+      `cover_letter_updated_at` already exist per field (the detail page's "uploaded 3 days ago"
+      reads them), so it costs nothing to compute, and it is the one component that distinguishes
+      two *versions* of the same document — the thing you actually squint at after re-uploading a
+      resume twice for the same company. It **disambiguates rather than guarantees**, which is why
+      the application id stays in the name: same company, same role, same day is a real collision.
+
+      **The one thing still open: the slugger.** `parameterize` is what produces the empty string
+      today, so it cannot be the answer — this needs transliteration, and the fallback when even
+      that yields nothing must be decided rather than defaulted into.
+
       Rails owns the fix on both surfaces — the Next proxy passes `Content-Disposition` straight
       through, and SPEC.md § Exports already commits to the server being the one place that names
       a file.
