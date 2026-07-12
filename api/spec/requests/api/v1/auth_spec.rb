@@ -69,7 +69,8 @@ RSpec.describe "Auth", type: :request do
         because there is no longer a user to look its `sub` up against.
 
         There is no self-service button for this in the UI, and no sign-up endpoint to undo it
-        with — see SPEC.md § Registration is closed.
+        with — see SPEC.md § Registration is closed. The shared demo account is exempt: its
+        credentials are public, so anyone could otherwise erase it.
       DESC
 
       response "204", "account erased" do
@@ -82,6 +83,14 @@ RSpec.describe "Auth", type: :request do
         let(:Authorization) { nil }
         run_test! do |response|
           expect(JSON.parse(response.body)).to include("error", "code" => "unauthenticated")
+        end
+      end
+
+      response "403", "the demo account cannot be erased" do
+        let(:user)          { create(:user, email: Demo::ResetService::DEMO_EMAIL) }
+        let(:Authorization) { jwt_for(user) }
+        run_test! do |response|
+          expect(JSON.parse(response.body)).to include("code" => "forbidden")
         end
       end
     end
@@ -122,6 +131,21 @@ RSpec.describe "Auth", type: :request do
       end.not_to change(Application, :count)
 
       expect(User.exists?(other.id)).to be(true)
+    end
+
+    # The demo credentials are published — on the sign-in page, in llms.txt, in the
+    # README — and this endpoint is documented in Swagger. Without the guard, the one
+    # button a reviewer is invited to press is also the button that deletes the
+    # portfolio's centrepiece for up to an hour, until DemoResetJob rebuilds it.
+    it "refuses to erase the demo account" do
+      demo = create(:user, email: Demo::ResetService::DEMO_EMAIL)
+
+      expect do
+        delete "/api/v1/auth/account", headers: { "Authorization" => jwt_for(demo) }
+      end.not_to change(User, :count)
+
+      expect(response).to have_http_status(:forbidden)
+      expect(response.parsed_body["code"]).to eq("forbidden")
     end
   end
 

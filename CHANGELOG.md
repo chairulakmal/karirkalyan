@@ -23,16 +23,27 @@ makes almost the entire data-protection question disappear rather than answering
   closed lists the five things it would owe users.
 - **The Devise trap this had to dodge:** `:registerable` generates the sign-up `POST` *and* the
   account-destroy `DELETE` from one controller, so `skip: [:registrations]` silently takes the
-  deletion endpoint with it. Registrations are skipped and the destroy half re-declared by hand
-  in a `devise_scope`, on a path that says what it does.
+  deletion endpoint with it. Registrations are skipped and the destroy half re-declared by hand as
+  an ordinary route, on a path that says what it does. The controller no longer subclasses
+  `Devise::RegistrationsController` either — inheriting it would keep `create` alive as a method in
+  the one release whose point is that it is gone.
 - **`DELETE /api/v1/auth/account`** is now specified, contract-documented and request-tested. It
   cascades to applications, timeline entries and the blobs inside them, and revokes the JWT for
   free: JTIMatcher validates a token by looking its `sub` up in `users`, and there is no longer a
-  user to find. A self-service delete *button* is deliberately **not** here — with sign-up closed
-  there is no third party who needs one, and the legal pages do not pretend otherwise.
+  user to find. The demo account is exempt (`403`) — its credentials are published, so without the
+  guard any visitor could delete the portfolio's centrepiece until the next hourly reset. A
+  self-service delete *button* is deliberately **not** here: with sign-up closed there is no third
+  party who needs one, and the legal pages do not pretend otherwise.
+- **`bin/rails users:set_password EMAIL=… [PASSWORD=…]`**, which closing the door made mandatory
+  rather than optional: `User` has no `:recoverable` module, so there is no reset flow — and a user
+  who forgot their password can no longer just sign up again. It rotates `jti`, so every existing
+  token for that account dies with the old password.
 - **`/privacy` and `/terms`**, in English and Japanese. Every claim on them is checkable against
-  the code: what is collected, where it is stored, the sub-processors, the two export endpoints,
-  and erasure by emailing the operator. Japan's APPI has had no small-handler exemption since
+  the code: what is collected (including the IP addresses the rate limiter, the error reporter and
+  the request log keep, which are collected whether or not anyone wants them), where it is stored,
+  all five sub-processors — GitHub among them, because the nightly `pg_dump` is a GitHub Actions
+  artifact, which means GitHub holds a copy of every resume and a policy that omitted it would be
+  false — the two export endpoints, and erasure by emailing the operator. Japan's APPI has had no small-handler exemption since
   2017 and a natural person can be a data controller, so "it's a portfolio project" was never the
   answer. Both pages are in `OPEN_PATHS` — a privacy policy a user cannot reach while logged in
   is not a privacy policy.

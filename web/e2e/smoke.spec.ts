@@ -1,34 +1,20 @@
-import { test, expect, type Page } from "@playwright/test";
+import { test, expect } from "@playwright/test";
 
 /**
  * Smoke tests covering critical happy paths.
  *
- * These used to open by registering a throwaway account, which is exactly the
- * affordance v1.4.1 removed (SPEC.md § Registration is closed). They now sign in
- * as `e2e@karirkalyan.com`, seeded by `db/seeds.rb` and left empty — deliberately
- * not the demo account, which holds twelve applications and would swamp any
- * assertion about the row a test just created.
+ * These arrive already signed in: the `setup` project (`e2e/auth.setup.ts`) signs in
+ * once as the seeded `e2e` account and hands the session to every test here. They used
+ * to open by registering a throwaway account, which is exactly the affordance v1.4.1
+ * removed (SPEC.md § Registration is closed).
  *
- * The account outlives a run, so nothing here may assume an empty dashboard.
- * Each test names its company uniquely and asserts on that.
+ * The account outlives a run, so nothing here may assume an empty dashboard. Each test
+ * names its company uniquely and asserts on that.
  */
-const EMAIL = "e2e@karirkalyan.com";
-const PASSWORD = "oretachinomachida";
-
-async function signIn(page: Page) {
-  await page.goto("/sign-in");
-  await page.getByLabel("Email").fill(EMAIL);
-  await page.getByLabel("Password").fill(PASSWORD);
-  await page.getByRole("button", { name: /^sign in$/i }).click();
-  await page.waitForURL("/dashboard");
-  await expect(page.getByRole("heading", { name: "Dashboard" })).toBeVisible();
-}
-
-test("sign in, create an application, transition status", async ({ page }) => {
+test("create an application and transition its status", async ({ page }) => {
   const company = `Mercari ${Date.now()}`;
 
-  await signIn(page);
-
+  await page.goto("/dashboard");
   await page.getByRole("link", { name: /new application/i }).first().click();
   await page.waitForURL("/applications/new");
 
@@ -57,10 +43,8 @@ test("sign in, create an application, transition status", async ({ page }) => {
   await expect(timeline).toContainText("Applied");
 });
 
-test("create application with resume attached at creation", async ({ page }) => {
+test("create an application with a resume attached at creation", async ({ page }) => {
   const company = `Sansan ${Date.now()}`;
-
-  await signIn(page);
 
   await page.goto("/applications/new");
   await page.getByLabel("Company").fill(company);

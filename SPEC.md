@@ -91,20 +91,29 @@ is here rather than in a commit message:
 The trap to know before touching `config/routes.rb`: Devise's `:registerable` module generates the
 sign-up `POST` **and** the account-destroy `DELETE` from the same `registrations` controller, so
 reaching for `skip: [:registrations]` alone would silently take the deletion endpoint with it.
-`devise_for` therefore skips `:registrations` *and* the destroy half is re-declared by hand inside
-a `devise_scope :user` block, on a path that says what it does:
+`devise_for` therefore skips `:registrations`, and the destroy half is re-declared as an ordinary
+route — no `devise_scope` — on a path that says what it does:
 
 ```ruby
-devise_scope :user do
-  delete "/api/v1/auth/account", to: "api/v1/auth/registrations#destroy",
-    as: :destroy_user_registration
-end
+devise_for :users, path: "/api/v1/auth", skip: [ :registrations ], …
+
+namespace :api do
+  namespace :v1 do
+    namespace :auth do
+      delete "account", to: "registrations#destroy"
+    end
 ```
 
-`Api::V1::Auth::RegistrationsController` still subclasses `Devise::RegistrationsController` — that
-is what supplies `authenticate_scope!`, which resolves the caller from the JWT — but `create` is
-gone from it, and `bin/rails routes` shows exactly four auth routes: sign-in (new + create),
-sign-out, and account-destroy.
+`Api::V1::Auth::RegistrationsController` is deliberately **not** a `Devise::RegistrationsController`
+subclass: inheriting it would drag `new`, `create`, `edit`, `update` and `cancel` in as live
+methods — unroutable, but a loaded gun in a drawer, in the one release whose point is that the gun
+is gone. It subclasses `ApplicationController` instead, which is where `authenticate_user!`,
+`current_user` and `render_error` come from anyway; nothing was lost. `bin/rails routes` shows
+exactly four auth routes: sign-in (new + create), sign-out, and account-destroy.
+
+The demo account is exempt from destruction (`403 forbidden`). Its credentials are published, this
+endpoint is in Swagger, and `DemoResetJob` only rebuilds on the hour — without the guard, any
+visitor could make "Try demo account" 401 for the next fifty-nine minutes.
 
 Reopening registration is a product decision, not a config change: it would owe users a privacy
 policy that promises more than "the operator's own data" (§ Legal pages), a self-service delete
@@ -1027,21 +1036,36 @@ about the system as built**, not to imitate a company's boilerplate, and every c
 checkable against this file:
 
 - what is collected — an email address, application records, and one resume plus one cover letter
-  per application;
+  per application; **plus, incidentally, IP addresses**, which are not a feature but are
+  unavoidable: Rack::Attack keys its throttle counters on them (Solid Cache, so they land in
+  Postgres rows), Honeybadger attaches them to an error report's `cgi_data`, and production request
+  logs carry them;
 - where it lives — `bytea` in a single Railway-managed Postgres, with a daily `pg_dump` run by the
   private `karirkalyan-backups` repository, whose artifacts expire after 60 days;
-- who else touches it — Railway (hosting, database), Anthropic (only the URL you paste into AI
-  pre-fill, never a document), the mail provider, Honeybadger (errors);
-- what is *not* there — no analytics, no tracking pixels, no advertising, no third-party
-  JavaScript at all;
+- who else touches it — **five** parties, and the pages name all five, because a sub-processor you
+  decline to name is the one the policy exists to disclose:
+  - **Railway** — hosting and the database, so everything;
+  - **GitHub** — the nightly `pg_dump` runs on a GitHub-hosted runner and is stored as a GitHub
+    Actions artifact, which means **GitHub holds a copy of every resume**. It is easy to forget
+    because the backup repository is private and the workflow is boring, and it is precisely the
+    kind of omission that makes a policy false;
+  - **Anthropic** — only the URL pasted into AI pre-fill, never a document;
+  - **Resend** — outbound mail, so email addresses;
+  - **Honeybadger** — error reports, which carry the request context above.
+- what is *not* there — no analytics, no tracking pixels, no advertising, no third-party JavaScript.
+  Two cookies, both functional: the `session` cookie that holds the JWT, and next-intl's
+  `NEXT_LOCALE`, which remembers the chosen language. Neither is a tracker, and the pages say
+  "two functional cookies", not "no cookies" — see below;
 - how to get it out, and how to get it erased — the two export endpoints (§ API contract) and an
   email to the operator, who runs `DELETE /api/v1/auth/account`.
 
 **Do not write a promise the code does not keep.** The page must not offer a self-service delete
 button (there isn't one — that is the deliberate trade in § Registration is closed), must not claim
-encryption at rest beyond what Railway actually provides, and must not name a retention period the
-backup script does not enforce. The failure mode of a privacy policy is not being too short; it is
-saying something untrue.
+encryption at rest beyond what Railway actually provides, must not name a retention period the
+backup script does not enforce, must not say "nothing is shared with anyone else" while a nightly
+job ships the whole database to GitHub, and must not promise erasure is immediate when it is a human
+reading mail. The failure mode of a privacy policy is not being too short; it is saying something
+untrue.
 
 `/terms` is correspondingly small: the service is a portfolio demo, provided as-is with no warranty
 and no uptime commitment, the demo account is shared and world-writable so nothing private belongs
@@ -1376,6 +1400,21 @@ load-bearing in opposite directions: `demo` must stay full (it is the portfolio 
 with 12 pre-loaded ones). Seeding is idempotent, so the CI job runs `db:seed` after `db:migrate`;
 locally the accounts survive across runs, and the specs assert on the row they just created rather
 than on the list being empty.
+
+Two things about that account are easy to get wrong:
+
+- **It must never exist in production.** `db/seeds.rb` is not a dev fixture — `Demo::ResetService`
+  calls `load_seed` and `DemoResetJob` runs hourly in production (§ Background jobs), so anything
+  unguarded there is live on prod within the hour. The `e2e` block is wrapped in
+  `unless Rails.env.production?`. An unguarded one would be a second real account with a password
+  nobody chose — the exact door § Registration is closed shuts. Its address is `@karirkalyan.test`,
+  a reserved TLD that cannot receive mail, and both halves come from `E2E_EMAIL` / `E2E_PASSWORD`
+  with defaults duplicated in `web/e2e/credentials.ts`. Change one side, change the other.
+- **Only the `setup` project may sign in.** Playwright drives the *development* server, and
+  Rack::Attack is enabled everywhere but test (§ Security): sign-in is throttled at 5/min per IP.
+  `e2e/auth.setup.ts` signs in once, saves the session, and every spec inherits it through
+  `storageState` — so the throttle counter sees one attempt per run no matter how many specs there
+  are, which is what keeps a growing suite from throttling itself.
 
 Coverage: SimpleCov, branch coverage on, 80% floor.
 

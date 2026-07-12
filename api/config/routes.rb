@@ -8,22 +8,21 @@ Rails.application.routes.draw do
 
   # Registration is closed — there is no sign-up route (SPEC.md § Registration is closed).
   # Devise's :registerable generates the sign-up POST *and* the account-destroy DELETE from
-  # one controller, so `skip: [:registrations]` would take both. It is skipped here and the
-  # destroy half is re-declared by hand, on a path that says what it does.
+  # the same controller, so skipping :registrations would silently take the deletion endpoint
+  # with it. It is skipped, and the destroy half re-declared below on a path that says what
+  # it does — as a plain route, because the controller is no longer a Devise one.
   devise_for :users,
     path: "/api/v1/auth",
     path_names: { sign_in: "sign_in", sign_out: "sign_out" },
     skip: [ :registrations ],
     controllers: { sessions: "api/v1/auth/sessions" }
 
-  devise_scope :user do
-    delete "/api/v1/auth/account",
-      to: "api/v1/auth/registrations#destroy",
-      as: :destroy_user_registration
-  end
-
   namespace :api do
     namespace :v1 do
+      namespace :auth do
+        delete "account", to: "registrations#destroy"
+      end
+
       resources :applications do
         collection do
           post :prefill

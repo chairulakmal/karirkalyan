@@ -1,17 +1,23 @@
 import { defineConfig, devices } from "@playwright/test";
 
+import { STORAGE_STATE } from "./e2e/credentials";
+
 /**
  * E2E configuration.
  *
  * Starts the Rails API on :3001 and Next.js on :3000 if they aren't already
  * running. Requires Postgres up locally (run `docker compose up -d` from `api/`
- * first) — it is the only container.
+ * first) — it is the only container, and it must be seeded (`bin/rails db:seed`).
  *
- * Tests sign in as the seeded `e2e` account (`bin/rails db:seed`) — they used to
- * register a throwaway one, which is the affordance v1.4.1 removed. The account
- * therefore survives a run, so no test may assume an empty dashboard: each names
- * its company uniquely and asserts on the row it just created. Nothing needs
- * cleaning up between runs; the rows simply accumulate in the dev database.
+ * The `setup` project signs in once as the seeded `e2e` account and every other
+ * project inherits that session — tests used to register a throwaway account each,
+ * which is the affordance v1.4.1 removed. Two consequences:
+ *
+ * - The account survives a run, so no test may assume an empty dashboard: each names
+ *   its company uniquely and asserts on the row it just created. Nothing is cleaned
+ *   up between runs; the rows simply accumulate in the dev database.
+ * - Only `setup` may touch the sign-in form. Rack::Attack throttles it — see
+ *   `e2e/auth.setup.ts`.
  */
 export default defineConfig({
   testDir: "./e2e",
@@ -31,8 +37,13 @@ export default defineConfig({
 
   projects: [
     {
+      name: "setup",
+      testMatch: /auth\.setup\.ts/,
+    },
+    {
       name: "chromium",
-      use: { ...devices["Desktop Chrome"] },
+      use: { ...devices["Desktop Chrome"], storageState: STORAGE_STATE },
+      dependencies: ["setup"],
     },
   ],
 

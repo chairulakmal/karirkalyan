@@ -4,16 +4,19 @@ import { useRouter } from "@/i18n/navigation";
 import { useState, useTransition } from "react";
 import { useTranslations } from "next-intl";
 import { Field } from "@/app/components/field";
-import { isApiErrorDetail } from "@/app/lib/api-error";
 
-// `/api/auth/session` answers with `{ error, code, details? }`, mirroring the Rails
-// API behind it. Localization keys off the machine-readable `code` (per-field
-// `details` first), with the status map as the fallback — same resolution
-// order as `apiFailure()` in app/lib/actions.ts; see SPEC.md § Server-side
-// error messages. Never string-match the `error` sentence.
+// `/api/auth/session` answers with `{ error, code }`, mirroring the Rails API behind
+// it. Localization keys off the machine-readable `code`, with the status map as the
+// fallback — the same resolution order as `apiFailure()` in app/lib/actions.ts; see
+// SPEC.md § Server-side error messages. Never string-match the `error` sentence.
+//
+// There is no per-field `details` arm here, unlike `apiFailure()`: sign-in is the only
+// call this form makes, and it fails with `invalid_credentials`, never
+// `validation_failed`. The registration path that used to produce field errors is gone
+// (SPEC.md § Registration is closed).
 const KEYED_STATUSES = new Set([403, 404, 409, 422, 429, 502, 503]);
 
-type FailureBody = { code?: string; details?: unknown } | null;
+type FailureBody = { code?: string } | null;
 
 // One mode, no toggle: registration is closed, so signing in is the only thing
 // this form can do. See SPEC.md § Registration is closed.
@@ -35,14 +38,6 @@ export function AuthForm() {
     body: FailureBody,
     overrides: Record<number, string> = {},
   ): string {
-    if (body?.code === "validation_failed" && Array.isArray(body.details)) {
-      const messages = body.details
-        .filter(isApiErrorDetail)
-        .map((d) => `field.${d.field}_${d.code}`)
-        .filter((key) => tErrors.has(key))
-        .map((key) => tErrors(key));
-      if (messages.length > 0) return messages.join(" ");
-    }
     if (body?.code && tErrors.has(`code.${body.code}`)) {
       return tErrors(`code.${body.code}`);
     }
