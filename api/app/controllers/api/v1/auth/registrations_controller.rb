@@ -1,26 +1,24 @@
 module Api
   module V1
     module Auth
+      # Half a registrations controller, on purpose. Registration is closed
+      # (SPEC.md § Registration is closed), so `create` is gone and the only
+      # action left is the account-destroy half that Devise's :registerable
+      # module generates from the same controller. Accounts are created
+      # server-side: `bin/rails users:create`.
       class RegistrationsController < Devise::RegistrationsController
-        include ErrorRendering
-
         respond_to :json
 
-        def create
-          build_resource(sign_up_params)
-
-          if resource.save
-            # deliver_later, not deliver_now: production sets raise_delivery_errors,
-            # so a transient SMTP failure here would 500 the request even though the
-            # account was already created. Enqueue it and let the mail job retry.
-            WelcomeMailer.welcome(resource).deliver_later
-            render json: { user: { id: resource.id, email: resource.email } }, status: :created
-          else
-            # The single-string { error:, code: } envelope, like every other
-            # failure — this used to return { errors: [...] }, an array the
-            # API contract never allowed.
-            render_validation_failed(resource)
-          end
+        # DELETE /api/v1/auth/account
+        #
+        # `authenticate_scope!` (prepended by Devise for :destroy) resolves the
+        # caller from the JWT and assigns `resource`. Destroying the user cascades
+        # to their applications, timeline entries and the blobs inside them, and
+        # revokes the token for free: JTIMatcher validates a JWT by looking its
+        # `sub` up in `users`, and there is no longer a user to find.
+        def destroy
+          resource.destroy!
+          head :no_content
         end
       end
     end

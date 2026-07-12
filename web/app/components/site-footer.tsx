@@ -24,6 +24,12 @@ export async function SiteFooter({ wide = false }: { wide?: boolean }) {
           <Link href="/docs" className="underline underline-offset-4 hover:text-midnight">
             {t("apiDocs")}
           </Link>
+          <Link href="/privacy" className="underline underline-offset-4 hover:text-midnight">
+            {t("privacy")}
+          </Link>
+          <Link href="/terms" className="underline underline-offset-4 hover:text-midnight">
+            {t("terms")}
+          </Link>
           <Link
             href={`${REPO_URL}/blob/main/LICENSE`}
             target="_blank"

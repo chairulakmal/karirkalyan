@@ -7,7 +7,11 @@ import { defineConfig, devices } from "@playwright/test";
  * running. Requires Postgres up locally (run `docker compose up -d` from `api/`
  * first) — it is the only container.
  *
- * Tests register a unique email per run, so no DB cleanup is needed.
+ * Tests sign in as the seeded `e2e` account (`bin/rails db:seed`) — they used to
+ * register a throwaway one, which is the affordance v1.4.1 removed. The account
+ * therefore survives a run, so no test may assume an empty dashboard: each names
+ * its company uniquely and asserts on the row it just created. Nothing needs
+ * cleaning up between runs; the rows simply accumulate in the dev database.
  */
 export default defineConfig({
   testDir: "./e2e",

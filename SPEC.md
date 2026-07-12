@@ -89,9 +89,22 @@ is here rather than in a commit message:
   request; nobody can trip over the button.
 
 The trap to know before touching `config/routes.rb`: Devise's `:registerable` module generates the
-sign-up `POST` **and** the account-destroy `DELETE` from the same `registrations` controller.
-`skip: [:registrations]` would take both. The module and the controller stay; only `create` is
-gone, and the route file lists the two remaining actions explicitly.
+sign-up `POST` **and** the account-destroy `DELETE` from the same `registrations` controller, so
+reaching for `skip: [:registrations]` alone would silently take the deletion endpoint with it.
+`devise_for` therefore skips `:registrations` *and* the destroy half is re-declared by hand inside
+a `devise_scope :user` block, on a path that says what it does:
+
+```ruby
+devise_scope :user do
+  delete "/api/v1/auth/account", to: "api/v1/auth/registrations#destroy",
+    as: :destroy_user_registration
+end
+```
+
+`Api::V1::Auth::RegistrationsController` still subclasses `Devise::RegistrationsController` — that
+is what supplies `authenticate_scope!`, which resolves the caller from the JWT — but `create` is
+gone from it, and `bin/rails routes` shows exactly four auth routes: sign-in (new + create),
+sign-out, and account-destroy.
 
 Reopening registration is a product decision, not a config change: it would owe users a privacy
 policy that promises more than "the operator's own data" (§ Legal pages), a self-service delete
@@ -1296,11 +1309,11 @@ Two places do this resolution, because a failure reaches the UI by two paths:
   directly through `localFailure()`, since they have neither code nor status to key on.
 - `errorMessage()` in `(auth)/sign-in/sign-in-form.tsx` — the auth form talks to the
   `/api/auth/*` route handlers over `fetch`, not through a server action, so it parses the
-  response body itself and runs the same resolution. The route handlers pass the upstream
-  `code`/`details` through (the register handler forwards the Rails envelope unchanged; the
-  session handler substitutes its own copy for security-sensitive statuses but keeps the
-  code). Per-call status overrides remain as the fallback layer — a `401` there means bad
-  credentials, not a dead session.
+  response body itself and runs the same resolution. The session route handler passes the
+  upstream `code`/`details` through, substituting its own copy for security-sensitive statuses
+  but keeping the code. Per-call status overrides remain as the fallback layer — a `401` there
+  means bad credentials, not a dead session. (It used to be two handlers; the register one went
+  with § Registration is closed.)
 
 Catalog presence is tested with next-intl's `t.has()`, so steps 1–2 need no hardcoded list of
 known codes in TypeScript — the catalogs themselves are the list, and `en`/`ja` key parity is

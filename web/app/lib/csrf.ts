@@ -1,10 +1,9 @@
 // Origin allowlist check for the auth route handlers.
 //
 // Next's built-in CSRF protection only covers Server Actions, not route
-// handlers, so a cross-site page could POST to /api/auth/session or
-// /api/auth/register and drive a login/sign-up (login-CSRF). Requiring the
-// request's Origin to match our own closes that: a cross-site caller sends its
-// own Origin, which won't match.
+// handlers, so a cross-site page could POST to /api/auth/session and drive a
+// login (login-CSRF). Requiring the request's Origin to match our own closes
+// that: a cross-site caller sends its own Origin, which won't match.
 //
 // Browsers always send an Origin header on POST/DELETE fetches (same-origin
 // included), so a missing Origin on these state-changing methods is itself

@@ -5,6 +5,42 @@ Open work lives in [`TODO.md`](TODO.md).
 
 ---
 
+## v1.4.1 — 2026-07-12
+
+**"Close the door."** A patch, and the mechanical test says so without argument: it *removes* a
+capability rather than adding one, and touches no schema — the v1.4.0 image boots against the
+database this leaves behind. It jumped the queue ahead of the refactors for the only reason that
+should ever move a release forward: it is not about what the app can do, it is about what it is
+holding. This app stores resumes. Open sign-up meant strangers' resumes, and closing the door
+makes almost the entire data-protection question disappear rather than answering it.
+*(feat/v1.4.1-close-the-door, PR #62)*
+
+- **Public sign-up is closed.** There is no `POST /api/v1/auth/sign_up` and no `/sign-up` page.
+  Visitors sign in to the shared demo account, which is the full app with twelve applications in
+  it — an empty new account was always the worse demonstration anyway. Accounts are created with
+  `bin/rails users:create EMAIL=… PASSWORD=…`, which is also `WelcomeMailer`'s only caller now.
+  Reopening registration is a product decision, not a config flag: SPEC.md § Registration is
+  closed lists the five things it would owe users.
+- **The Devise trap this had to dodge:** `:registerable` generates the sign-up `POST` *and* the
+  account-destroy `DELETE` from one controller, so `skip: [:registrations]` silently takes the
+  deletion endpoint with it. Registrations are skipped and the destroy half re-declared by hand
+  in a `devise_scope`, on a path that says what it does.
+- **`DELETE /api/v1/auth/account`** is now specified, contract-documented and request-tested. It
+  cascades to applications, timeline entries and the blobs inside them, and revokes the JWT for
+  free: JTIMatcher validates a token by looking its `sub` up in `users`, and there is no longer a
+  user to find. A self-service delete *button* is deliberately **not** here — with sign-up closed
+  there is no third party who needs one, and the legal pages do not pretend otherwise.
+- **`/privacy` and `/terms`**, in English and Japanese. Every claim on them is checkable against
+  the code: what is collected, where it is stored, the sub-processors, the two export endpoints,
+  and erasure by emailing the operator. Japan's APPI has had no small-handler exemption since
+  2017 and a natural person can be a data controller, so "it's a portfolio project" was never the
+  answer. Both pages are in `OPEN_PATHS` — a privacy policy a user cannot reach while logged in
+  is not a privacy policy.
+- The `auth/sign_up` Rack::Attack throttle is gone with the endpoint it guarded; `sign_in` is now
+  the only unauthenticated write left to throttle. The E2E suite used to open every run by
+  registering a throwaway account — exactly the affordance this release removed — and now signs in
+  as `e2e`, seeded alongside `demo` and left empty.
+
 ## v1.4.0 — 2026-07-12
 
 **"The search, this week."** A minor: four capabilities, no migration, and nothing removed from

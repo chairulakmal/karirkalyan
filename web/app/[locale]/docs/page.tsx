@@ -21,9 +21,9 @@ export async function generateMetadata({
 // names the sentence in the catalog, changes with locale. The order mirrors
 // `api/config/routes.rb`.
 const ENDPOINTS = [
-  { method: "POST", path: "/api/v1/auth/sign_up", key: "signUp" },
   { method: "POST", path: "/api/v1/auth/sign_in", key: "signIn" },
   { method: "DELETE", path: "/api/v1/auth/sign_out", key: "signOut" },
+  { method: "DELETE", path: "/api/v1/auth/account", key: "destroyAccount" },
   { method: "GET", path: "/api/v1/applications", key: "index" },
   { method: "POST", path: "/api/v1/applications", key: "create" },
   { method: "POST", path: "/api/v1/applications/prefill", key: "prefill" },

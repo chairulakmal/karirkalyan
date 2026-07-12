@@ -6,9 +6,7 @@ import { useTranslations } from "next-intl";
 import { Field } from "@/app/components/field";
 import { isApiErrorDetail } from "@/app/lib/api-error";
 
-type Mode = "sign-in" | "sign-up";
-
-// `/api/auth/*` answers with `{ error, code, details? }`, mirroring the Rails
+// `/api/auth/session` answers with `{ error, code, details? }`, mirroring the Rails
 // API behind it. Localization keys off the machine-readable `code` (per-field
 // `details` first), with the status map as the fallback — same resolution
 // order as `apiFailure()` in app/lib/actions.ts; see SPEC.md § Server-side
@@ -17,11 +15,12 @@ const KEYED_STATUSES = new Set([403, 404, 409, 422, 429, 502, 503]);
 
 type FailureBody = { code?: string; details?: unknown } | null;
 
-export function AuthForm({ defaultMode = "sign-in" }: { defaultMode?: Mode }) {
+// One mode, no toggle: registration is closed, so signing in is the only thing
+// this form can do. See SPEC.md § Registration is closed.
+export function AuthForm() {
   const t = useTranslations("auth");
   const tErrors = useTranslations("errors");
   const router = useRouter();
-  const [mode, setMode] = useState<Mode>(defaultMode);
   const [error, setError] = useState<string | null>(null);
   const [pending, startTransition] = useTransition();
   const [demoPending, setDemoPending] = useState(false);
@@ -75,41 +74,13 @@ export function AuthForm({ defaultMode = "sign-in" }: { defaultMode?: Mode }) {
   }
 
   async function onSubmit(formData: FormData) {
-    const email = String(formData.get("email") ?? "");
-    const password = String(formData.get("password") ?? "");
-
-    if (mode === "sign-in") {
-      await doSignIn(email, password);
-      return;
-    }
-
-    setError(null);
-    const register = await fetch("/api/auth/register", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ email, password }),
-    });
-    if (!register.ok) {
-      setError(
-        errorMessage(register.status, await failureBody(register), {
-          409: "signUpFailed",
-          422: "signUpFailed",
-        }),
-      );
-      return;
-    }
-    await doSignIn(email, password);
+    await doSignIn(String(formData.get("email") ?? ""), String(formData.get("password") ?? ""));
   }
 
   async function onDemoSignIn() {
     setDemoPending(true);
     await doSignIn("demo@karirkalyan.com", "oretachinomachida");
     setDemoPending(false);
-  }
-
-  function switchMode(next: Mode) {
-    setMode(next);
-    setError(null);
   }
 
   return (
@@ -129,38 +100,13 @@ export function AuthForm({ defaultMode = "sign-in" }: { defaultMode?: Mode }) {
         <div className="flex-grow border-t border-dune" />
       </div>
 
-      <div className="flex border border-dune text-sm font-medium">
-        <button
-          type="button"
-          onClick={() => switchMode("sign-in")}
-          className={`flex-1 py-2 transition ${
-            mode === "sign-in"
-              ? "bg-midnight text-linen"
-              : "text-ink-soft hover:text-midnight"
-          }`}
-        >
-          {t("signIn")}
-        </button>
-        <button
-          type="button"
-          onClick={() => switchMode("sign-up")}
-          className={`flex-1 py-2 transition ${
-            mode === "sign-up"
-              ? "bg-midnight text-linen"
-              : "text-ink-soft hover:text-midnight"
-          }`}
-        >
-          {t("createAccount")}
-        </button>
-      </div>
-
       <form action={onSubmit} className="space-y-4">
         <Field name="email" label={t("email")} type="email" autoComplete="email" required />
         <Field
           name="password"
           label={t("password")}
           type="password"
-          autoComplete={mode === "sign-in" ? "current-password" : "new-password"}
+          autoComplete="current-password"
           required
           minLength={8}
         />
@@ -170,11 +116,13 @@ export function AuthForm({ defaultMode = "sign-in" }: { defaultMode?: Mode }) {
           disabled={busy}
           className="w-full bg-cobalt px-4 py-2.5 text-sm font-medium text-linen transition hover:bg-cobalt-2 disabled:opacity-50"
         >
-          {pending
-            ? mode === "sign-in" ? t("signingIn") : t("creating")
-            : mode === "sign-in" ? t("signIn") : t("createAccount")}
+          {pending ? t("signingIn") : t("signIn")}
         </button>
       </form>
+
+      <p className="border-t border-dune pt-4 text-xs leading-relaxed text-ink-soft">
+        {t("registrationClosed")}
+      </p>
     </div>
   );
 }

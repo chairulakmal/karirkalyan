@@ -1,5 +1,7 @@
 class WelcomeMailer < ApplicationMailer
-  # Sent once, on successful sign-up, from RegistrationsController#create.
+  # Sent once when an account is created. Its only caller is the `users:create`
+  # Rake task — registration is closed, so there is no sign-up endpoint to call
+  # it any more (SPEC.md § Registration is closed).
   def welcome(user)
     @user                = user
     @new_application_url = "#{frontend_origin}/applications/new"

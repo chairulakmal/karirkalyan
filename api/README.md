@@ -157,9 +157,12 @@ Outputs to `swagger/v1/swagger.yaml`.
 ## API routes
 
 ```
-POST   /api/v1/auth/sign_up
 POST   /api/v1/auth/sign_in
 DELETE /api/v1/auth/sign_out
+DELETE /api/v1/auth/account                # erases the account and everything under it
+
+# There is no sign-up route — registration is closed (SPEC.md § Registration is
+# closed). Accounts are made with `bin/rails users:create EMAIL=… PASSWORD=…`.
 
 GET    /api/v1/applications
 POST   /api/v1/applications

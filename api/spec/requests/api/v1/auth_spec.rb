@@ -1,45 +1,6 @@
 require "swagger_helper"
 
 RSpec.describe "Auth", type: :request do
-  path "/api/v1/auth/sign_up" do
-    post "Register a new account" do
-      tags "Auth"
-      consumes "application/json"
-      produces "application/json"
-      parameter name: :body, in: :body, schema: {
-        type: :object,
-        properties: {
-          user: {
-            type: :object,
-            properties: {
-              email:    { type: :string, example: "user@example.com" },
-              password: { type: :string, example: "password123" }
-            },
-            required: %w[email password]
-          }
-        },
-        required: %w[user]
-      }
-
-      response "201", "account created" do
-        let(:body) { { user: { email: "new@example.com", password: "password123" } } }
-        run_test!
-      end
-
-      response "422", "validation failed (duplicate email or blank password)" do
-        let(:existing) { create(:user, email: "taken@example.com") }
-        let(:body)     { { user: { email: "taken@example.com", password: "password123" } } }
-        before { existing }
-        run_test! do |response|
-          payload = JSON.parse(response.body)
-          expect(payload["error"]).to be_a(String)
-          expect(payload["code"]).to eq("validation_failed")
-          expect(payload["details"]).to include("field" => "email", "code" => "taken")
-        end
-      end
-    end
-  end
-
   path "/api/v1/auth/sign_in" do
     post "Sign in" do
       tags "Auth"
@@ -98,25 +59,82 @@ RSpec.describe "Auth", type: :request do
     end
   end
 
-  # Welcome email on sign-up (part of behaviour, not part of the OpenAPI spec).
-  # deliver_later: the mail is enqueued (not sent inline) so an SMTP failure can't
-  # 500 a request whose account already saved — assert on the enqueued job.
-  describe "POST /api/v1/auth/sign_up — welcome email" do
-    it "enqueues a welcome email on successful registration" do
+  path "/api/v1/auth/account" do
+    delete "Erase the account and everything under it" do
+      tags "Auth"
+      security [ bearerAuth: [] ]
+      description <<~DESC
+        Destroys the caller's user record. Applications, timeline entries and the uploaded
+        resumes and cover letters inside them cascade with it, and the JWT stops validating
+        because there is no longer a user to look its `sub` up against.
+
+        There is no self-service button for this in the UI, and no sign-up endpoint to undo it
+        with — see SPEC.md § Registration is closed.
+      DESC
+
+      response "204", "account erased" do
+        let(:user)          { create(:user) }
+        let(:Authorization) { jwt_for(user) }
+        run_test!
+      end
+
+      response "401", "not authenticated" do
+        let(:Authorization) { nil }
+        run_test! do |response|
+          expect(JSON.parse(response.body)).to include("error", "code" => "unauthenticated")
+        end
+      end
+    end
+  end
+
+  # Cascade and revocation are the whole point of the endpoint, and neither is visible
+  # in a status code — assert them separately from the rswag contract above.
+  describe "DELETE /api/v1/auth/account — what it takes with it" do
+    let(:user)  { create(:user) }
+    let(:token) { jwt_for(user) }
+
+    it "erases the user's applications and timeline entries" do
+      application = create(:application, user: user)
+      create(:timeline_entry, application: application, actor: user)
+
       expect do
-        post "/api/v1/auth/sign_up",
-          params: { user: { email: "fresh@example.com", password: "password123" } },
-          as: :json
-      end.to have_enqueued_mail(WelcomeMailer, :welcome)
+        delete "/api/v1/auth/account", headers: { "Authorization" => token }
+      end.to change(User, :count).by(-1)
+        .and change(Application, :count).by(-1)
+        .and change(TimelineEntry, :count).by(-1)
+
+      expect(response).to have_http_status(:no_content)
     end
 
-    it "does not enqueue a welcome email when registration fails" do
-      create(:user, email: "dupe@example.com")
+    it "leaves the JWT unusable" do
+      delete "/api/v1/auth/account", headers: { "Authorization" => token }
+
+      get "/api/v1/me", headers: { "Authorization" => token }
+      expect(response).to have_http_status(:unauthorized)
+    end
+
+    it "does not touch anyone else's data" do
+      other = create(:user)
+      create(:application, user: other)
+
       expect do
-        post "/api/v1/auth/sign_up",
-          params: { user: { email: "dupe@example.com", password: "password123" } },
-          as: :json
-      end.not_to have_enqueued_mail(WelcomeMailer, :welcome)
+        delete "/api/v1/auth/account", headers: { "Authorization" => token }
+      end.not_to change(Application, :count)
+
+      expect(User.exists?(other.id)).to be(true)
+    end
+  end
+
+  # Registration is closed (SPEC.md § Registration is closed). The sign-up path is not
+  # routed at all — this is the spec that fails if someone re-adds :registrations to
+  # devise_for and quietly reopens the door.
+  describe "registration is closed", type: :routing do
+    it "does not route POST /api/v1/auth/sign_up" do
+      expect(post: "/api/v1/auth/sign_up").not_to be_routable
+    end
+
+    it "does not route GET /api/v1/auth/sign_up" do
+      expect(get: "/api/v1/auth/sign_up").not_to be_routable
     end
   end
 end

@@ -66,7 +66,6 @@
     "chooseFile": "Choose a PDF file.",
     "urlRequired": "Paste a job posting URL first.",
     "invalidCredentials": "That email and password don't match an account.",
-    "signUpFailed": "Couldn't create the account. That email may already be registered.",
     "code": {
       "unauthenticated": "Your session is no longer valid. Sign in again to continue.",
       "invalid_credentials": "That email and password don't match an account.",
@@ -117,6 +116,8 @@
   "footer": {
     "copyright": "© 2026 Chairul Akmal",
     "apiDocs": "API docs",
+    "privacy": "Privacy",
+    "terms": "Terms",
     "license": "MIT License",
     "githubAria": "GitHub repository"
   },
@@ -144,7 +145,7 @@
     "title": "The API, and how it behaves",
     "lede": "The frontend you are reading is one client of a Rails 8 JSON API. Every endpoint is documented by its own request spec — the OpenAPI schema is generated from the tests, so it cannot drift from the implementation. This page is the shape of the thing; the Swagger UI is the reference.",
     "authTitle": "Authentication",
-    "authBody": "Sign-up and sign-in return a JWT in the <code>Authorization</code> header. In this frontend that token never reaches client-side JavaScript: a Next.js route handler receives it and writes an <code>httpOnly</code> cookie, and every later request is proxied server-side. Signing out rotates the token's <code>jti</code>, which revokes every device at once.",
+    "authBody": "Signing in returns a JWT in the <code>Authorization</code> header — there is no sign-up endpoint, because registration is closed. In this frontend that token never reaches client-side JavaScript: a Next.js route handler receives it and writes an <code>httpOnly</code> cookie, and every later request is proxied server-side. Signing out rotates the token's <code>jti</code>, which revokes every device at once.",
     "scopeTitle": "Everything is scoped to you",
     "scopeBody": "Every record is reached through <code>current_user.applications</code>. Asking for someone else's application returns <em>404</em>, not <em>403</em> — a 403 would confirm the row exists.",
     "errorsTitle": "Errors carry a code",
@@ -161,9 +162,9 @@
     "paginationBody": "The applications list takes <code>?after=…&limit=20</code> — limit clamped to 1–100, default 10 — and answers with a <code>data</code> array beside a <code>meta</code> object carrying <code>next_cursor</code> and <code>has_more</code>. The cursor is a Base64 timestamp. A malformed one is ignored and you get the first page rather than an error. Filters compose with it server-side.",
     "endpointsTitle": "Endpoints",
     "endpoint": {
-      "signUp": "Create an account.",
       "signIn": "Exchange credentials for a token.",
       "signOut": "Revoke the token on every device.",
+      "destroyAccount": "Erase the account and everything under it. There is no sign-up endpoint to undo it with.",
       "index": "List your applications, paginated and filterable.",
       "create": "Create one. The status must be an entry state.",
       "prefill": "Read a job posting URL and fill the fields with Claude.",
@@ -184,6 +185,48 @@
     "sourceCode": "Read the source",
     "home": "Home"
   },
+  "privacy": {
+    "home": "Home",
+    "eyebrow": "Privacy",
+    "title": "What this app does with your data",
+    "updated": "Last updated 2026-07-12",
+    "lede": "KarirKalyan stores resumes, which are close to the most personal document a person owns. This page says exactly what it holds, where it lives, and who else can see it. Every claim here is checkable against the source.",
+    "whoTitle": "Who runs this",
+    "whoBody": "KarirKalyan is run by <strong>Chairul Akmal</strong>, an individual — there is no company behind it. It is a portfolio project that is also used in earnest, not a business. Being an individual does not make the operator any less responsible for the data on this page, and this policy is written on that basis.",
+    "collectedTitle": "What is collected",
+    "collectedBody": "Your email address and password (stored only as a bcrypt hash, never in the clear), the job applications you enter, the status history the app writes as you move them through the pipeline, and — if you upload them — one resume and one cover letter per application. Nothing else. There is no profile, no phone number, no address field: whatever is in the PDFs you upload is whatever the app holds about you.",
+    "storedTitle": "Where it lives",
+    "storedBody": "One PostgreSQL database, managed by <strong>Railway</strong>. The PDFs are rows in that same database (<code>bytea</code> columns), not a separate file host. A backup runs daily — a <code>pg_dump</code> pushed to a private repository, whose archives expire after 60 days. The database is not replicated anywhere else, and the operator does not keep copies on any personal machine.",
+    "sharedTitle": "Who else touches it",
+    "sharedBody": "Four services, each doing one job: <strong>Railway</strong> hosts the app and the database; the email provider delivers reminder digests to your address; <strong>Honeybadger</strong> receives error reports, with request parameters filtered so passwords and email addresses do not appear in them; and <strong>Anthropic</strong> receives the job-posting URL you paste into the AI pre-fill feature — the URL and the page it points at, and never a resume, a cover letter, or anything else from your account. Nobody's data is sold, and nothing is shared with anyone else.",
+    "notCollectedTitle": "What is not here",
+    "notCollectedBody": "No analytics. No tracking pixels. No advertising. No cookie banner, because there are no cookies to consent to beyond the one that holds your session. There is no third-party JavaScript on this site at all — the content security policy would block it if there were.",
+    "exportTitle": "Getting your data out",
+    "exportBody": "The dashboard has two export buttons and they are not decorative. The CSV is a spreadsheet of your applications; the <strong>account archive</strong> is a zip holding every field, every timeline entry, and every PDF you uploaded — enough to reconstruct the account somewhere else. Both are one click, no request, no waiting.",
+    "erasureTitle": "Getting it erased",
+    "erasureBody": "Email the address below and the operator will delete the account. Deletion is total and immediate: the user row, every application, every timeline entry, and every uploaded PDF go with it, and the backup archives holding them expire within 60 days. <strong>There is deliberately no self-service delete button in the app.</strong> The endpoint exists (<code>DELETE /api/v1/auth/account</code>) and is what the operator runs; it is not wired to a button, because an irreversible action with no recovery path does not belong one mis-click away.",
+    "contactTitle": "Contact",
+    "contactBody": "Questions, data requests, or erasure requests: <mail></mail>. It is a mailbox a person reads."
+  },
+  "terms": {
+    "home": "Home",
+    "eyebrow": "Terms",
+    "title": "Terms of use",
+    "updated": "Last updated 2026-07-12",
+    "lede": "Short, because the service is small and honest about what it is.",
+    "whatTitle": "What this is",
+    "whatBody": "KarirKalyan is a job application tracker, built and run by an individual as a portfolio project that is also used in earnest. It is free. It is not a company, not a product, and not sold to anyone.",
+    "accountsTitle": "Accounts",
+    "accountsBody": "<strong>There is no sign-up.</strong> Accounts are created by the operator, and nobody can register one from the web. If you have an account, you are responsible for what happens under it — the password is the whole of the security.",
+    "demoTitle": "The demo account",
+    "demoBody": "The demo credentials are published on the sign-in page, so the demo account is <strong>shared and world-writable</strong>: anyone reading this can change or delete anything in it. Put nothing in it you would mind a stranger seeing, and expect it to be reset to its seeded state without warning.",
+    "asIsTitle": "As-is, with no warranty",
+    "asIsBody": "The service is provided as-is. There is no uptime commitment, no support obligation, and no guarantee that data survives — though the operator does back it up daily, and the account archive export exists precisely so that your copy does not depend on the operator's. The service can change or stop at any time.",
+    "acceptableTitle": "Fair use",
+    "acceptableBody": "Do not attack the service, script it, or use it to store anything unlawful. Rate limits are enforced in code, and an account that tries to work around them can be removed.",
+    "changesTitle": "Changes",
+    "changesBody": "These terms may change. The date at the top says when they last did, and the full history is in the public git repository — every version of this page is a commit anyone can read."
+  },
   "auth": {
     "welcome": "Welcome",
     "tagline": "Track applications, transitions, and reminders.",
@@ -192,11 +235,10 @@
     "loadingDemo": "Loading demo…",
     "or": "or",
     "signIn": "Sign in",
-    "createAccount": "Create account",
     "email": "Email",
     "password": "Password",
     "signingIn": "Signing in…",
-    "creating": "Creating…"
+    "registrationClosed": "Registration is closed — this app holds resumes, and it is deliberately not built to be anyone's custodian but its author's. The demo account above is the full app, with twelve applications already in it."
   },
   "dashboard": {
     "eyebrow": "Overview",

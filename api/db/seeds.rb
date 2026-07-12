@@ -13,6 +13,20 @@ demo = User.find_or_create_by!(email: DEMO_EMAIL) do |u|
   u.password_confirmation = DEMO_PASSWORD
 end
 
+# The Playwright suite's account, and deliberately *not* the demo one. The E2E specs
+# assert on the row they just created, which they cannot do inside a fixture holding
+# twelve pre-loaded applications — and the demo account has to keep holding them,
+# because it is the portfolio walkthrough. Registration is closed (SPEC.md), so the
+# suite can no longer register a throwaway user of its own; it signs in as this.
+# Left empty on purpose.
+E2E_EMAIL    = "e2e@karirkalyan.com" unless defined?(E2E_EMAIL)
+E2E_PASSWORD = "oretachinomachida"   unless defined?(E2E_PASSWORD)
+
+User.find_or_create_by!(email: E2E_EMAIL) do |u|
+  u.password              = E2E_PASSWORD
+  u.password_confirmation = E2E_PASSWORD
+end
+
 seed_data = [
   # ── Marcari Inc. (Mercari) ── Full journey: accepted ──────────────────────
   {
