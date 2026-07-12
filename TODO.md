@@ -289,13 +289,21 @@ loyal user, losing that history is strictly worse than lacking any feature in th
       `resumes/12.pdf`. In the per-application download,
       `ApplicationsController#resume` / `#cover_letter` `send_data` a hardcoded `resume.pdf` /
       `cover_letter.pdf`, so *every* application's file saves under the same name and the second
-      one collides with the first. Both should carry company + role. Two things to settle before
-      writing it: (1) a **transliteration**, not `parameterize`, or Japanese companies keep
-      slugging to nothing — and any scheme still needs the application id as the differentiator,
-      since two applications to the same company for the same role are a real thing;
-      (2) the **budget**. Under 20 characters total leaves ~9 after `-resume.pdf`, which cannot
-      hold company *and* role — so either the cap is per-segment (company ≤ 20, role ≤ 20) or the
-      suffix comes out of the count. Decide that first; it determines the whole format.
+      one collides with the first. Both should carry company + role, plus an `MMDD` stamp of the
+      **upload** time — `resume_updated_at` / `cover_letter_updated_at` already exist per field
+      (the detail page's "uploaded 3 days ago" reads them), so the data is there and it costs four
+      characters. It earns them: it is the one component that distinguishes *versions* of the same
+      document, which is the thing you actually squint at in a downloads folder when you have
+      re-uploaded a resume twice for the same company.
+      Three things to settle before writing it: (1) a **transliteration**, not `parameterize`, or
+      Japanese companies keep slugging to nothing; (2) `MMDD` is a **disambiguator, not a
+      uniqueness guarantee** — two applications to the same company for the same role, uploaded
+      the same day, is a real thing, so the application id still has to be in the name (or the
+      stamp has to grow, which costs more than four characters); (3) the **budget**. Under 20
+      characters total leaves ~9 after `-resume.pdf`, and `MMDD` plus an id eats most of that
+      before company or role gets a single letter — so either the cap is per-segment (company ≤ 20,
+      role ≤ 20) or the suffix and stamp sit outside the count. Decide that first; it determines
+      the whole format.
       Rails owns the fix on both surfaces — the Next proxy passes `Content-Disposition` straight
       through, and SPEC.md § Exports already commits to the server being the one place that names
       a file.
