@@ -44,7 +44,7 @@ behind — which is the whole of the major test.
 | --- | --- | --- |
 | ~~`v1.3.1`~~ | patch | **Shipped 2026-07-12.** Everything that had accumulated on `main` since the v1.3.0 tag. |
 | ~~`v1.4.0`~~ | minor | **Shipped 2026-07-12.** Follow-up digest, calendar-aware dead zones, CSV export, full-account export. |
-| `v1.4.1` | patch | `Applications::ListQuery` extraction, `API_BASE` naming |
+| `v1.4.1` | patch | `Applications::ListQuery` extraction, `API_BASE` naming, download filenames |
 | `v1.5.0` | minor | The Japan market layer: recruiter channel + `agencies`, 年収 comp structure, Japanese-level filter |
 | `v1.5.1` | patch | Japanese phrase-based line breaking |
 | `v1.6.0` | minor | Hiring entity, timezone overlap + `.ics`, visa / status of residence, email verification |
@@ -75,11 +75,16 @@ That single choice is what makes the calendar a *deferral* and not a *deletion*.
 
 ### `v1.4.1` — patch. Sequenced before `v1.5.0`, not filler
 
-Extract `Applications::ListQuery`; settle `API_BASE` vs `API_BASE_URL`. This lands **first**
+Extract `Applications::ListQuery`; settle `API_BASE` vs `API_BASE_URL`; give downloaded resumes
+and cover letters filenames that say which application they belong to. The first lands **first**
 because `v1.5.0` adds three new filters to `ApplicationsController#index` — the exact method
 that already mixes filtering, cursor decoding, and serialization inline. Extract before, and the
 filters land in a query object with `Applications::GhostRiskQuery` as the pattern; extract after,
 and the controller thickens and then gets refactored under load.
+
+The filenames are the v1.4.0 fallout: shipping the account archive is what made it visible that
+neither download surface names a file usefully. It is still a patch — no new capability, no
+migration, and the previous image boots against an unchanged database.
 
 ### `v1.5.0` — minor. The Japan market layer
 
@@ -276,6 +281,24 @@ loyal user, losing that history is strictly worse than lacking any feature in th
 - [ ] **`API_BASE` vs `API_BASE_URL`** *(`v1.4.1`)* — two near-identical names for different things
       (`web/app/lib/api.ts:107` is the internal fetch base; `web/app/lib/links.ts:2` is the public
       Railway URL used for doc links). Rename or comment.
+- [ ] **Name downloaded resumes and cover letters after the application, not after nothing**
+      *(`v1.4.1`)* — the same disease on two surfaces. In the archive,
+      `Exports::AccountArchive#blob_path` (`api/app/services/exports/account_archive.rb:85`)
+      builds `resumes/{id}-{company.parameterize}.pdf`, and a **Japanese company name
+      parameterizes to an empty string** — so the fallback fires and the entry is a bare
+      `resumes/12.pdf`. In the per-application download,
+      `ApplicationsController#resume` / `#cover_letter` `send_data` a hardcoded `resume.pdf` /
+      `cover_letter.pdf`, so *every* application's file saves under the same name and the second
+      one collides with the first. Both should carry company + role. Two things to settle before
+      writing it: (1) a **transliteration**, not `parameterize`, or Japanese companies keep
+      slugging to nothing — and any scheme still needs the application id as the differentiator,
+      since two applications to the same company for the same role are a real thing;
+      (2) the **budget**. Under 20 characters total leaves ~9 after `-resume.pdf`, which cannot
+      hold company *and* role — so either the cap is per-segment (company ≤ 20, role ≤ 20) or the
+      suffix comes out of the count. Decide that first; it determines the whole format.
+      Rails owns the fix on both surfaces — the Next proxy passes `Content-Disposition` straight
+      through, and SPEC.md § Exports already commits to the server being the one place that names
+      a file.
 
 ### Feature ideas
 
