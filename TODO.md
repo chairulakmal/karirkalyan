@@ -2,14 +2,17 @@
 
 Open work only. Shipped work lives in [`CHANGELOG.md`](CHANGELOG.md).
 
-**Current release: `v1.3.1`** — tagged 2026-07-12, published as a
-[GitHub Release](https://github.com/chairulakmal/karirkalyan/releases/tag/v1.3.1). A patch: the
-dependency refresh, the Sidekiq/Redis purge, Postgres 18 in dev and CI, the docs audit, and the
-versioning policy itself. No new capability, and no migration — see `CHANGELOG.md`.
+**Current release: `v1.4.0`** — tagged 2026-07-12, published as a
+[GitHub Release](https://github.com/chairulakmal/karirkalyan/releases/tag/v1.4.0). "The search,
+this week": the follow-up digest, `JapanCalendar`'s dead zones, the CSV export, and the
+full-account export. A minor — four new capabilities, but no migration, so the `v1.3.1` image
+would still boot against the database it leaves behind. See `CHANGELOG.md`.
 
-`v1.3.0` (2026-07-11, `f455853`) was ghost prediction, which also absorbed the two production
-items the performance release had parked (the `timeline_entries` index and the `/me` fold —
-both struck off below).
+`v1.3.1` (2026-07-12) was the patch that carried the dependency refresh, the Sidekiq/Redis purge,
+Postgres 18 in dev and CI, the docs audit, and the versioning policy itself. `v1.3.0`
+(2026-07-11, `f455853`) was ghost prediction, which also absorbed the two production items the
+performance release had parked (the `timeline_entries` index and the `/me` fold — both struck
+off below).
 
 **North star (decided 2026-07-11): be the best career app for its one loyal user.** Portfolio
 value follows from that, not the other way round — a reviewer can tell a tool with a real
@@ -20,11 +23,10 @@ entity is triggered by accepting an offer, not by finishing a prior release), an
 gains an **Operations** section for the worst-day work — backups, export — that no feature
 admission test covers.
 
-**In flight: `v1.4.0`** on `feat/v1.4.0-digest-and-exports` — all four items (the digest, the
-calendar dead zones, the CSV export, the full-account export) are implemented and struck off
-below; what remains is the test run and the PR. The backlog below is scoped into releases — see
-the release plan directly beneath. The dev-server memory leak carries no release tag on purpose:
-it is **maintenance, not a release**. Its stopgap already shipped (`cf7cd8d` — 8 GB heap +
+**Nothing in flight.** `v1.4.0` shipped; the next release in the plan is `v1.4.1` (the
+`Applications::ListQuery` extraction and the `API_BASE` naming), which is sequenced *before*
+`v1.5.0` on purpose — see the release plan directly beneath. The dev-server memory leak carries
+no release tag on purpose: it is **maintenance, not a release**. Its stopgap already shipped (`cf7cd8d` — 8 GB heap +
 heap-snapshot flag live in `web/package.json`), and what remains is filing upstream when the
 next crash writes a snapshot.
 
@@ -41,7 +43,7 @@ behind — which is the whole of the major test.
 | Release | Level | Contents |
 | --- | --- | --- |
 | ~~`v1.3.1`~~ | patch | **Shipped 2026-07-12.** Everything that had accumulated on `main` since the v1.3.0 tag. |
-| `v1.4.0` | minor | Follow-up digest, calendar-aware dead zones, CSV export, full-account export |
+| ~~`v1.4.0`~~ | minor | **Shipped 2026-07-12.** Follow-up digest, calendar-aware dead zones, CSV export, full-account export. |
 | `v1.4.1` | patch | `Applications::ListQuery` extraction, `API_BASE` naming |
 | `v1.5.0` | minor | The Japan market layer: recruiter channel + `agencies`, 年収 comp structure, Japanese-level filter |
 | `v1.5.1` | patch | Japanese phrase-based line breaking |
@@ -58,14 +60,18 @@ The work had been sitting on `main` untagged: dependency refresh, Postgres 18 in
 Sidekiq/Redis purge, the docs audit, the versioning policy, and this scoping. No new capability
 among them, and no migration — a patch by definition, and the first release the policy cut.
 
-### `v1.4.0` — minor. "The search, this week"
+### ~~`v1.4.0` — minor. "The search, this week"~~ — shipped 2026-07-12
 
 The follow-up digest, the calendar dead zones, CSV export, and the full-account export from
-Operations. Grouped, not bundled arbitrarily: the digest and the holiday-awareness are the
-**same edit to `FollowUpReminderJob`**, and CSV and the JSON+resumes export are the **same
-controller, serializer, and download surface** — splitting either pair means opening the same
-files twice. All four reuse machinery that already exists (Solid Queue, the mailer, bytea
-storage), and all four pay off *during* an active search, which is what the north star asks for.
+Operations. Grouped, not bundled arbitrarily: the digest and the holiday-awareness were the
+**same edit to `FollowUpReminderJob`**, and CSV and the JSON+resumes export were the **same
+controller and download surface** — splitting either pair would have meant opening the same
+files twice. The grouping held: it landed as one PR (#61).
+
+The one thing the plan did not predict, and the piece worth remembering: **holding the digest
+through a dead zone only works because the idempotency key derives from `follow_up_at` rather
+than from the day the job runs.** Key it on the run date and a held reminder is silently lost.
+That single choice is what makes the calendar a *deferral* and not a *deletion*.
 
 ### `v1.4.1` — patch. Sequenced before `v1.5.0`, not filler
 

@@ -5,13 +5,13 @@ Open work lives in [`TODO.md`](TODO.md).
 
 ---
 
-## v1.4.0 — pending tag
+## v1.4.0 — 2026-07-12
 
 **"The search, this week."** A minor: four capabilities, no migration, and nothing removed from
 the database — the v1.3.1 image would still boot against it, which is the whole of the test. The
 four are two pairs, not four errands: the digest and the calendar are the same edit to
 `FollowUpReminderJob`, and the two exports are the same controller and the same download surface.
-*(feat/v1.4.0-digest-and-exports)*
+*(feat/v1.4.0-digest-and-exports, PR #61)*
 
 - **One follow-up digest per user per day**, replacing one email per application. `FollowUpMailer`
   loses `#reminder` and gains `#digest`; the job groups the applications it claimed by user and
