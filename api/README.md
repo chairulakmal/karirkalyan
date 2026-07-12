@@ -63,7 +63,9 @@ Recurring work is declared in `config/recurring.yml`:
 | `reset_demo_account` | hourly, at :42 | `DemoResetJob` — see [Demo data](#demo-data) |
 | `clear_solid_queue_finished_jobs` | hourly, at :12 | Keeps the jobs table from growing unbounded |
 
-`FollowUpReminderJob`: for each application whose `follow_up_at` falls due, it writes a `TimelineEntry` (the exactly-once idempotency anchor) and enqueues a `FollowUpMailer.reminder` email via `deliver_later` on the `mailers` queue. Decoupling delivery means a transient SMTP failure retries the email without ever duplicating the timeline entry.
+`FollowUpReminderJob`: it collects every application whose `follow_up_at` has fallen due (reaching back 30 days, so nothing that was held is lost), writes a `TimelineEntry` per application (the exactly-once idempotency anchor), groups the winners **by user**, and enqueues one `FollowUpMailer.digest` via `deliver_later` on the `mailers` queue — one email per user per day, not one per application. Decoupling delivery means a transient SMTP failure retries the email without ever duplicating the timeline entry.
+
+The job **holds** on any day `JapanCalendar` does not call a business day: weekends, national holidays (via the `holidays` gem, so 春分の日 tracks the equinox and 振替休日 is applied), New Year, Golden Week, Obon. Held is not dropped — the idempotency key is derived from `follow_up_at`, **not** from the day the job runs, so the next business day picks the reminder up and sends it exactly once. The same property means an overdue application is not re-nudged every morning, and moving `follow_up_at` re-arms it.
 
 There is **no job dashboard**. The `Sidekiq::Web` mount was removed with Sidekiq; inspect the queue in `psql` (`solid_queue_*` tables) or add Mission Control if it's ever worth a screen.
 
@@ -143,8 +145,11 @@ Outputs to `swagger/v1/swagger.yaml`.
 | File | Purpose |
 |---|---|
 | `app/lib/application_fsm.rb` | FSM — `TRANSITIONS` array + `assert_transition!` |
+| `app/lib/japan_calendar.rb` | The only definition of a business day in Japan — holidays, New Year, Golden Week, Obon |
 | `app/services/applications/transition_service.rb` | Status change + audit entry in one transaction |
 | `app/services/applications/url_prefill_service.rb` | AI URL pre-fill — fetch + strip + Claude extraction, SSRF-guarded |
+| `app/services/exports/applications_csv.rb` | CSV export — formula-injection escaped, `force_quotes` |
+| `app/services/exports/account_archive.rb` | Full-account zip — `account.json` + resumes + cover letters |
 | `app/jobs/follow_up_reminder_job.rb` | Daily Solid Queue recurring job with idempotency key |
 | `config/recurring.yml` | Recurring-task schedule (reminders, demo reset, job cleanup) |
 | `spec/requests/api/v1/applications_spec.rb` | Request specs — also source for OpenAPI generation |
@@ -165,6 +170,9 @@ DELETE /api/v1/applications/:id
 PATCH  /api/v1/applications/:id/transition
 GET    /api/v1/applications/:id/resume
 GET    /api/v1/applications/:id/cover_letter
+
+GET    /api/v1/exports/applications      # CSV of every application — text/csv
+GET    /api/v1/exports/account           # full account: JSON + uploaded PDFs — application/zip
 
 GET    /api/v1/transitions               # the FSM transition table — the board reads this
                                          #   instead of mirroring it in TypeScript

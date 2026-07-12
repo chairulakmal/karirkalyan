@@ -27,6 +27,9 @@ Rails.application.routes.draw do
         end
       end
 
+      get "exports/applications", to: "exports#applications"
+      get "exports/account",      to: "exports#account"
+
       get "transitions", to: "transitions#index"
       get "dashboard",   to: "dashboard#index"
       get "me",          to: "me#show"

@@ -472,6 +472,34 @@ paths:
                         format: date-time
         '401':
           description: not authenticated
+  "/api/v1/exports/applications":
+    get:
+      summary: Download every application as CSV
+      tags:
+      - Exports
+      security:
+      - bearerAuth: []
+      description: 'A convenience view: one row per application, blobs excluded. The
+        data-safety artefact is GET /api/v1/exports/account.'
+      responses:
+        '200':
+          description: CSV of the user's applications
+        '401':
+          description: not authenticated
+  "/api/v1/exports/account":
+    get:
+      summary: Download the full account archive as a zip
+      tags:
+      - Exports
+      security:
+      - bearerAuth: []
+      description: account.json (user, applications, timeline) plus the stored resumes
+        and cover letters. The leg of the backup story the user can pull themselves.
+      responses:
+        '200':
+          description: zip archive of the whole account
+        '401':
+          description: not authenticated
   "/api/v1/me":
     get:
       summary: Get the authenticated user's profile

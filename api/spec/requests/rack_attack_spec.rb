@@ -125,4 +125,45 @@ RSpec.describe "Rack::Attack throttling", type: :request, skip_n_plus_one: true 
       expect(response).to have_http_status(:ok)
     end
   end
+
+  # Not a money vector but a work vector: /exports/account reads every blob the user owns
+  # and assembles the zip in memory, so a signed-in client looping it is the cheapest way
+  # to push the app over its memory ceiling. Capped per-account, so rotating the source IP
+  # (as below) buys an attacker nothing.
+  describe "GET /api/v1/exports — per-account cap" do
+    let(:user) { create(:user) }
+
+    it "returns 429 after 10 exports for one account within 1 minute" do
+      token = jwt_for(user)
+      10.times do |i|
+        get "/api/v1/exports/account",
+          headers: { "Authorization" => token, "REMOTE_ADDR" => "198.51.100.#{i}" }
+        expect(response).to have_http_status(:ok)
+      end
+
+      get "/api/v1/exports/account",
+        headers: { "Authorization" => token, "REMOTE_ADDR" => "198.51.100.200" }
+
+      expect(response).to have_http_status(:too_many_requests)
+      expect(response.headers["Retry-After"]).to eq("60")
+    end
+
+    # One budget across both endpoints — the cost is a function of whose data is being
+    # assembled, not of which URL asked for it.
+    it "counts both export endpoints against the same budget" do
+      token = jwt_for(user)
+      10.times { get "/api/v1/exports/applications", headers: { "Authorization" => token } }
+
+      get "/api/v1/exports/account", headers: { "Authorization" => token }
+      expect(response).to have_http_status(:too_many_requests)
+    end
+
+    it "caps each account independently" do
+      token = jwt_for(user)
+      10.times { get "/api/v1/exports/account", headers: { "Authorization" => token } }
+
+      get "/api/v1/exports/account", headers: { "Authorization" => jwt_for(create(:user)) }
+      expect(response).to have_http_status(:ok)
+    end
+  end
 end

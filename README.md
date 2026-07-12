@@ -23,13 +23,15 @@ A full-stack job application tracker — Rails 8 API + Next.js 16 frontend.
 | Auth | Devise + devise-jwt with JTI revocation — stateless JWT with real logout |
 | Concurrency | Optimistic locking (`lock_version`) → `409 Conflict` |
 | Background jobs | Solid Queue (Postgres-backed, runs inside Puma — no extra service); idempotency key pattern (at-least-once safe) |
-| Email | ActionMailer over SMTP (Resend) — welcome email on sign-up + daily follow-up reminder at 08:15 JST (Solid Queue recurring task) |
+| Email | ActionMailer over SMTP (Resend) — welcome email on sign-up + one follow-up **digest** per user per day at 08:15 JST (Solid Queue recurring task), never one email per application |
+| Calendar awareness | The digest holds on weekends, Japanese national holidays, New Year, Golden Week and Obon — nobody reads a nudge sent into 正月. Held reminders are *deferred*, not dropped: the next business day sends them, exactly once |
 | AI pre-fill | Paste a job URL → Claude Haiku 4.5 extracts company/role/notes for review before saving; server-side service, SSRF-guarded + rate-limited, reads Japanese postings natively |
 | Caching | Solid Cache (Postgres-backed) — Rack::Attack throttle counters shared across all Puma workers, no Redis |
 | File storage | PostgreSQL `bytea`, 1 MB cap, PDF magic-byte validation |
 | Dashboard | Pure SQL aggregation — no N+1, no records loaded into Ruby |
 | Ghost prediction | Flags applications that have gone quiet for longer than *your own* p90 reply time, reconstructed from the audit trail with a window function — no new column, no new table. Falls back to a global default until you have five replies at a stage, and says which it used |
 | Kanban board | Drag a card, run an FSM transition — optimistic, with a `409` snap-back. The board fetches the transition table from `GET /api/v1/transitions` rather than mirroring it in TypeScript; a card menu lists every legal next state as the accessible path |
+| Data export | Two downloads, two jobs: a CSV of your applications (a spreadsheet view, formula-injection escaped) and a full-account `.zip` — `account.json` plus every resume and cover letter, so the data can actually be recovered, not just read |
 | API docs | rswag — request specs and OpenAPI spec share one source |
 | Testing | Unit specs (no DB) + request specs (real PostgreSQL) |
 | i18n | The product ships in English *and* Japanese — not just a translated README. next-intl with ICU message catalogs; `ja` is prefixed, `en` is bare, so every page keeps one canonical URL, with `hreflang` and the sitemap to match |
@@ -112,14 +114,19 @@ A 90-second walkthrough for reviewers landing cold. Read these files in order an
 ```
 api/
   app/lib/application_fsm.rb              ← FSM: a TRANSITIONS array, no gem, read top to bottom
+  app/lib/japan_calendar.rb               ← The only thing that knows what a business day in Japan is
   app/services/applications/
     transition_service.rb                 ← Status change + audit row in one DB transaction
+  app/services/exports/
+    applications_csv.rb                   ← Spreadsheet view — formula-injection escaped
+    account_archive.rb                    ← account.json + every uploaded PDF, zipped in memory
   app/queries/applications/
     ghost_risk_query.rb                   ← Reads stage dwell times out of the audit trail (window function)
   app/jobs/follow_up_reminder_job.rb      ← Idempotent recurring job (idempotency_key pattern)
   app/controllers/api/v1/
     applications_controller.rb            ← REST + transition + binary file download
     dashboard_controller.rb               ← Pure SQL aggregation — no N+1, no records loaded
+    exports_controller.rb                 ← Two send_data endpoints, both scoped to current_user
   app/models/
     application.rb                        ← FSM-controlled status, bytea file columns + magic-byte validation
     timeline_entry.rb                     ← Append-only audit log
