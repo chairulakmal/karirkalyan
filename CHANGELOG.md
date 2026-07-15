@@ -62,6 +62,22 @@ reopened by accident, and each names the condition under which it may be.
 - **No client-side error tracking in `web/` — a conscious asymmetry.** *(2026-07-11)*
   Honeybadger covers the API (`api/Gemfile`, wired in production); the frontend reports nothing,
   and that is accepted for a single-user app: the one user *is* the error reporter.
+- **No offer-comparison view.** *(2026-07-15)* Once `v1.6.0` (normalized 年収) and `v1.7.0`
+  (visa, hiring entity, timezone) land their fields, a side-by-side compare of applications in
+  `offer` status was the obvious UI over them — considered in the 2026-07-15 scoping pass and
+  skipped. Simultaneous offers are rare for a single user, and the moment two exist is a
+  spreadsheet moment: high-stakes, one-off, and better served by the CSV export than by a view
+  maintained year-round for a day that may not come. The fields themselves ship regardless; a
+  sortable column or two on the list may cover the rest. **Reopen the day two live offers
+  actually coexist** — that is the trigger, not a release number.
+- **No duplicate-posting detection beyond the ownership warning.** *(2026-07-15)* A fuzzy
+  company+role match at create/prefill time ("looks like #12") was considered in the same pass
+  and rejected: one user with tens of applications recognizes a duplicate himself, and the
+  duplicate that actually costs money — two agencies submitting to the same company — is
+  exactly what `v1.6.0`'s ownership-window warning already fires on. A second, fuzzier warning
+  next to it would add false positives, not protection. **Reopen only if application volume
+  grows past what a human scans** — which would mean the app has outgrown its one-user premise
+  anyway.
 
 ---
 
