@@ -6,38 +6,51 @@
 
 [🇯🇵 日本語](README.ja.md)
 
-A full-stack job application tracker — Rails 8 API + Next.js 16 frontend.
+A full-stack job application tracker — Rails 8 API + Next.js 16. It tracks which companies you've applied to, where each application stands, and when to follow up. I'm the author, and I use it for my real-life job search — every feature here exists because I needed it. The product ships in English *and* Japanese.
 
 **Live:** [kk.chairulakmal.com](https://kk.chairulakmal.com) · **API docs:** Swagger UI at [`/api-docs`](https://api-production-4899.up.railway.app/api-docs) on the API service
 
 **Demo account** — click **Try demo account** on the [sign-in page](https://kk.chairulakmal.com/sign-in) to explore a prefilled Tokyo tech job search (12 mock applications across Marcari, Vine Corp, Rokuton, and more — all FSM states covered). Prefer signing in manually? `demo@karirkalyan.com` / `oretachinomachida`.
 
+**Stack** — Rails 8 API-only · Ruby 3.4.9 · PostgreSQL 18 · Devise + devise-jwt · Next.js 16 App Router · Tailwind CSS. Docker Compose locally, Railway in production (same Postgres major in both). One database carries everything — background jobs (Solid Queue), cache (Solid Cache), uploaded files (`bytea`) — so there is no Redis, no object store, and no separate worker service.
+
 ---
 
 ## Technical highlights
 
-| Concern | Approach |
-|---|---|
-| State machine | Custom PORO — no gem; transitions are a plain array, easy to audit |
-| Audit trail | `TimelineEntry` written atomically with every status change |
-| Auth | Devise + devise-jwt with JTI revocation — stateless JWT with real logout |
-| Concurrency | Optimistic locking (`lock_version`) → `409 Conflict` |
-| Background jobs | Solid Queue (Postgres-backed, runs inside Puma — no extra service); idempotency key pattern (at-least-once safe) |
-| Email | ActionMailer over SMTP (Resend) — welcome email when an account is created + one follow-up **digest** per user per day at 08:15 JST (Solid Queue recurring task), never one email per application |
-| Registration | Closed. There is no sign-up form — the app holds resumes, and it is deliberately not built to be anyone's custodian but its author's. Sign in to the demo account above; it *is* the full app. Real accounts are made by the operator on the server (`bin/rails users:create`), and since closing the door also removes the password-reset flow, a forgotten password is `bin/rails users:set_password` — which rotates the JWT `jti`, signing that user out everywhere |
-| Legal pages | [`/privacy`](https://kk.chairulakmal.com/privacy) and [`/terms`](https://kk.chairulakmal.com/terms), both locales, written to be true about the system as built rather than to imitate boilerplate: five named sub-processors, two functional cookies, no analytics, and no promise of a self-service delete button, because there isn't one — erasure is an email to the operator, who runs `DELETE /api/v1/auth/account` |
-| Calendar awareness | The digest holds on weekends, Japanese national holidays, New Year, Golden Week and Obon — nobody reads a nudge sent into 正月. Held reminders are *deferred*, not dropped: the next business day sends them, exactly once |
-| AI pre-fill | Paste a job URL → Claude Haiku 4.5 extracts company/role/notes for review before saving; server-side service, SSRF-guarded + rate-limited, reads Japanese postings natively |
-| Caching | Solid Cache (Postgres-backed) — Rack::Attack throttle counters shared across all Puma workers, no Redis |
-| File storage | PostgreSQL `bytea`, 1 MB cap, PDF magic-byte validation |
-| Dashboard | Pure SQL aggregation — no N+1, no records loaded into Ruby |
-| Ghost prediction | Flags applications that have gone quiet for longer than *your own* p90 reply time, reconstructed from the audit trail with a window function — no new column, no new table. Falls back to a global default until you have five replies at a stage, and says which it used |
-| Kanban board | Drag a card, run an FSM transition — optimistic, with a `409` snap-back. The board fetches the transition table from `GET /api/v1/transitions` rather than mirroring it in TypeScript; a card menu lists every legal next state as the accessible path |
-| Data export | Two downloads, two jobs: a CSV of your applications (a spreadsheet view, formula-injection escaped) and a full-account `.zip` — `account.json` plus every resume and cover letter, so the data can actually be recovered, not just read |
-| API docs | rswag — request specs and OpenAPI spec share one source |
-| Testing | Unit specs (no DB) + request specs (real PostgreSQL) |
-| i18n | The product ships in English *and* Japanese — not just a translated README. next-intl with ICU message catalogs; `ja` is prefixed, `en` is bare, so every page keeps one canonical URL, with `hreflang` and the sitemap to match |
-| Pagination | Cursor-based (`?after=<base64_cursor>&limit=20`) |
+### Domain modeling
+
+- **State machine as a plain Ruby module** — [`application_fsm.rb`](api/app/lib/application_fsm.rb) is a PORO with a `TRANSITIONS` array. No gem — open the file and you can read every allowed transition. Diagram and design notes [below](#finite-state-machine).
+- **Transactional audit trail** — every status change goes through `Applications::TransitionService`, which writes the status update and a `TimelineEntry` in a single transaction. Direct attribute writes to `status` are not used anywhere.
+- **Optimistic locking** — `lock_version` turns a concurrent edit into a `409 Conflict` instead of a silent overwrite.
+- **The frontend never copies the FSM** — the Kanban board fetches the transition table from `GET /api/v1/transitions` rather than mirroring it in TypeScript. Dragging a card runs a real transition — optimistic, with a `409` snap-back — and a card menu lists every legal next state, so the board also works without drag-and-drop.
+
+### One Postgres, no Redis
+
+- **Background jobs** — Solid Queue, Postgres-backed, running inside Puma — no extra service. Recurring jobs use an idempotency-key pattern, so at-least-once delivery is safe.
+- **Cache & rate limiting** — Solid Cache backs Rack::Attack, so throttle counters are shared across all Puma workers.
+- **File storage** — resumes and cover letters live in PostgreSQL `bytea`: 1 MB cap, PDF magic-byte validation.
+- **Dashboard** — pure SQL aggregation. No N+1, no records loaded into Ruby.
+- **Pagination** — cursor-based (`?after=<base64_cursor>&limit=20`).
+
+### Built for my own job search
+
+- **Ghost prediction** — flags applications that have been quiet for longer than *your own* p90 reply time. The p90 is rebuilt from the audit trail with a window function — no new column, no new table. Until a stage has five replies it uses a global default, and the UI says which one it used.
+- **AI pre-fill** — paste a job URL and Claude Haiku 4.5 extracts company/role/notes for review before saving. Server-side service, SSRF-guarded and rate-limited; reads Japanese postings natively.
+- **Calendar-aware email** — one follow-up **digest** per user per day at 08:15 JST, never one email per application (ActionMailer over SMTP via Resend, scheduled as a Solid Queue recurring task; the only other mail is a welcome email when an account is created). The digest skips weekends, Japanese national holidays, New Year, Golden Week and Obon. Skipped reminders are deferred, not dropped: they go out the next business day, exactly once.
+- **Data export, two shapes** — a CSV of your applications (a spreadsheet view, formula-injection escaped) and a full-account `.zip` — `account.json` plus every resume and cover letter, so the data can actually be recovered, not just read.
+- **The product is bilingual, not just the README** — next-intl with ICU message catalogs; `ja` is prefixed, `en` is bare, so every page keeps one canonical URL, with `hreflang` and the sitemap to match.
+
+### Security & trust
+
+- **A JWT that never reaches the browser** — Devise + devise-jwt with JTI revocation: stateless tokens with real logout, stored in an `httpOnly` cookie set by a Next.js route handler. Details in [Authentication](#authentication).
+- **Registration is closed — on purpose.** There is no sign-up form: the app stores resumes, and I built it to store mine, not to be a custodian of anyone else's. Sign in to the demo account above — it *is* the full app. I create real accounts on the server (`bin/rails users:create`). Closing sign-up also removed the password-reset flow, so a forgotten password is fixed with `bin/rails users:set_password`, which rotates the JWT `jti` and signs that user out everywhere.
+- **Legal pages that tell the truth** — [`/privacy`](https://kk.chairulakmal.com/privacy) and [`/terms`](https://kk.chairulakmal.com/terms), in both languages, say what the system actually does instead of copying boilerplate: five named sub-processors, two functional cookies, no analytics, and no promise of a self-service delete button, because there isn't one. Erasure is an email to me, and I run `DELETE /api/v1/auth/account`.
+
+### Verification
+
+- **API docs generated from tests** — rswag: request specs and the OpenAPI spec share one source.
+- **Two-tier testing** — unit specs with no DB (fast), request specs against a real PostgreSQL (no mocked database).
 
 ---
 
@@ -93,10 +106,6 @@ Several transitions are omitted from the diagram to keep it readable: any non-te
 Status changes go through `Applications::TransitionService`, which asserts the transition before touching the database, then writes the status update and a `TimelineEntry` in a single transaction. Direct attribute writes to `status` are not used anywhere.
 
 **Creation vs. transitions.** The FSM governs *changes*; *creation* sets the initial state. Since people add jobs at whatever stage they're really at, a new application can start in one of three entry states — `wishlist`, `draft`, or `applied` — chosen on the form. `status` is never mass-assignable (the entry value is validated against a curated allow-list), so creation can't be used to jump straight to a later stage; everything past the entry states is reachable only by transitioning. When you add a job you've already applied to, an optional applied date backdates `applied_at` so the dashboard's timing metrics stay accurate.
-
----
-
-Also see [Awano](https://github.com/chairulakmal/awano) — a Next.js multi-tenant support desk using the same patterns (FSM, transactional audit trail, service layer, two-tier testing) in a different stack.
 
 ---
 
@@ -200,12 +209,4 @@ More detail — env vars, tests, demo-data reset — is in [api/README.md](api/R
 
 Rails does what Rails is good at — data integrity, background jobs, serving an API. Putting Next.js in front of it buys one thing that a pure client-side bundler like Vite cannot: a server. The JWT is exchanged in a Next.js route handler and stored in an `httpOnly` cookie, so it never touches client-side JavaScript and an XSS bug cannot exfiltrate it. Without a server layer you would have to build one anyway just to set that cookie.
 
-Next.js is also the stack of the other portfolio project, [Awano](https://github.com/chairulakmal/awano) (a multi-tenant support desk). Read the two side by side and you'll see the same patterns — FSM, transactional audit trail, service layer, two-tier testing — expressed once in Rails and once in Next.js.
-
----
-
-## Stack
-
-- **Backend:** Rails 8 API-only, Ruby 3.4.9, PostgreSQL 18, Devise + devise-jwt
-- **Frontend:** Next.js 16 App Router, Tailwind CSS
-- **Infra:** Docker Compose (local); Railway (production) — managed PostgreSQL 18, same major as local; Solid Queue + Solid Cache on the same Postgres (no Redis)
+Next.js is also the stack of my other portfolio project, [Awano](https://github.com/chairulakmal/awano) (a multi-tenant support desk). Read the two side by side and you'll see the same patterns — FSM, transactional audit trail, service layer, two-tier testing — expressed once in Rails and once in Next.js.
