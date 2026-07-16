@@ -32,15 +32,16 @@ Two consequences worth stating plainly:
   [`CHANGELOG.md`](CHANGELOG.md), including the pre-1.0.0 build phases that used to sit at the
   top of this file.
 
-Last synced against the code: **2026-07-16**, `v1.4.1` — full audit against `api/` and `web/`; the
-error-code table gained the `forbidden` row and the `invalid_url` scope was corrected to match the
-code. Since the tag, § Query layer gained `Applications::ListQuery` — an extraction, not a
-behaviour change: it moves `GET /api/v1/applications`'s filtering and cursor decoding out of the
-controller and writes down the contract that action already had. Also since the tag, § Error codes
-split pre-fill failure into `invalid_url` / `prefill_blocked` / `prefill_unreachable` /
-`prefill_failed`: the `invalid_url` scope this line previously recorded as "corrected to match the
-code" was correct about the code and wrong about the world — the code was conflating four
-outcomes, and it is the code that has now moved.
+Last synced against the code: **2026-07-17**, `v1.4.3` — § Query layer gained
+`Applications::ListQuery`, an extraction rather than a behaviour change: it moves
+`GET /api/v1/applications`'s filtering and cursor decoding out of the controller and writes down
+the contract that action already had. § Error codes split pre-fill failure into `invalid_url` /
+`prefill_blocked` / `prefill_unreachable` / `prefill_failed`: the `invalid_url` scope the
+`v1.4.1` audit recorded as "corrected to match the code" was correct about the code and wrong
+about the world — the code was conflating four outcomes, and it is the code that has now moved.
+After the tag, § `UrlPrefillService` **retracted a factual claim**: no board is currently known to
+block us, and the TokyoDev challenge this spec asserted as standing policy did not survive
+re-probing. The retraction changed no code — only what the spec claims to know.
 
 ---
 
@@ -451,12 +452,39 @@ blank form as success would be the same class of lie as the status codes above. 
 fires before the fetch**, not after: a server with no `ANTHROPIC_API_KEY` would otherwise spend the
 full guarded round trip, up to 13s of timeouts, on a result it cannot use.
 
-**A blocked fetch is expected degradation, not a bug to engineer around.** A Cloudflare-fronted
-board — TokyoDev among them — answers a non-browser client with `403` and `cf-mitigated:
-challenge`, with our User-Agent and with a stock Chrome one alike, so this is not a UA blocklist
-to dress around. Defeating the challenge is out of scope by choice, which is exactly why
-`prefill_blocked` is worth its own code: a site we cannot read is a permanent, honest outcome, and
-telling the user their URL was malformed instead would be a lie.
+**A blocked fetch is expected degradation, not a bug to engineer around.** A site may refuse an
+automated reader outright — `401`/`403`, or a `cf-mitigated` header on any status — and
+`prefill_blocked` reports that as what it is: the URL is fine, a retry fetches the same wall, and
+telling the user their URL was malformed instead would be a lie. Defeating a challenge is out of
+scope by choice; rotating User-Agents or proxying to get around one is not a fix, it is a lie told
+to the site instead of the user.
+
+**No board is currently known to block us.** `prefill_blocked` guards a state that is real and
+cheap to report, but as of 2026-07-17 nothing in production is observed to be in it.
+
+<details>
+<summary><strong>Why this section named TokyoDev until 2026-07-17, and why it no longer does</strong></summary>
+
+It claimed TokyoDev answered any non-browser client with `403` + `cf-mitigated: challenge`, "with
+our User-Agent and with a stock Chrome one alike". That claim did not survive scrutiny, and the way
+it failed is worth keeping.
+
+The evidence behind it was a `403` seen while **many TokyoDev URLs were being fetched at once from
+a laptop**, during the debugging session that produced `v1.4.3`. Bot mitigation scores *the client
+it answers*, so a burst like that can manufacture the very block it appears to document — and the
+block outlives the burst, which makes a reaction look like standing policy. Worse, the `api` service
+could not have contributed a single observation: until `v1.4.3` the IPv6-first bug killed the
+connect with `ENETUNREACH` before a packet left the box, and TokyoDev is Cloudflare-fronted, so the
+server had **never reached it at all**. The claim described a path that could not have produced it.
+
+Re-probed on 2026-07-17, TokyoDev answered this service's exact `User-Agent` with `200` — six of
+six — and a stock Chrome one likewise, and pre-fill against a TokyoDev posting works in production.
+
+The rule this leaves behind: **a self-inflicted block is indistinguishable from a real one at the
+moment you observe it.** Probe a third-party site one request at a time, or the finding is about
+you rather than about the site.
+
+</details>
 
 #### `Demo::ResetService`
 

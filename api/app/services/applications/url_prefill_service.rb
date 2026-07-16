@@ -179,10 +179,11 @@ module Applications
       raise FetchError, "Couldn't reach that URL."
     end
 
-    # A refusal, not a failure: the URL is fine and a retry will fetch the same
-    # wall. Cloudflare-fronted boards answer any non-browser client this way, and
-    # they do it to a stock Chrome User-Agent too — so this is a state to report
-    # honestly, not a blocklist to dress around.
+    # A refusal, not a failure: the URL is fine and a retry fetches the same wall,
+    # so this is a state to report honestly rather than dress around by rotating
+    # User-Agents. No board is currently known to answer us this way — this comment
+    # named TokyoDev until 2026-07-17 on evidence that did not hold up; SPEC.md
+    # § UrlPrefillService has the account, and the probing rule it left behind.
     def blocked?(response)
       response["cf-mitigated"].present? || BLOCKED_STATUSES.include?(response.code.to_i)
     end

@@ -87,13 +87,29 @@ contract broken.
   *before* the fetch rather than after it, instead of spending up to 13s of SSRF-guarded timeouts
   on a result the server has no way to use.
 
-**Not attempted: defeating the challenge.** TokyoDev answers any non-browser client with `403` +
-`cf-mitigated: challenge`, verified against both our User-Agent and a stock Chrome one — so this
-is not a UA blocklist to dress around. Some sites will 403; that is expected degradation, not a
-bug to engineer around. The honest error is the deliverable. The recovery path it points to — let
-the user paste the posting text and extract from that — is deliberately **not** here: it is a
-capability, which by the mechanical test makes it a minor, and it is scoped to `v1.6.0` where it
-serves the share-sheet flow's failure mode.
+**Not attempted: defeating a challenge.** Some sites refuse automated readers; that is expected
+degradation, not a bug to engineer around, and the honest error is the deliverable. The recovery
+path it points to — let the user paste the posting text and extract from that — is deliberately
+**not** here: it is a capability, which by the mechanical test makes it a minor, and it is scoped
+to `v1.6.0` where it serves the share-sheet flow's failure mode.
+
+> **Corrected 2026-07-17, hours after this tag.** As published, this section claimed TokyoDev
+> "answers any non-browser client with `403` + `cf-mitigated: challenge`, verified against both our
+> User-Agent and a stock Chrome one". **That was false**, and the GitHub release notes for `v1.4.3`
+> still carry it — they are left standing as the record of what was believed on the day.
+>
+> The `403` was observed while many TokyoDev URLs were fetched at once from a laptop during this
+> release's own debugging. Bot mitigation scores the client it answers, so the burst is a likely
+> cause of the block it appeared to document — and the `api` service had never reached TokyoDev at
+> all, because the `ENETUNREACH` bug at the top of this section killed every connect to a
+> Cloudflare-fronted host before a packet left the box. Re-probed hours after the tag, TokyoDev
+> answered this service's exact User-Agent with `200`, six of six, a stock Chrome one likewise, and
+> pre-fill against a TokyoDev posting works in production.
+>
+> **Nothing in the code changed** — `prefill_blocked` names a real state and stays, and the paste
+> fallback keeps its `v1.6.0` slot on the reasoning above, which never depended on TokyoDev.
+> What was wrong was the evidence, and the lesson is in SPEC.md § `UrlPrefillService`: a
+> self-inflicted block is indistinguishable from a real one at the moment you observe it.
 
 ### The post-`v1.4.1` docs audit *(fix/privacy-truth-and-doc-drift)*
 
