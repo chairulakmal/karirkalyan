@@ -44,10 +44,20 @@ module Api
       def prefill
         fields = Applications::UrlPrefillService.new(params[:url]).call
         render json: fields
+      # Order matters twice over: BlockedError subclasses FetchError, and every
+      # class here subclasses Error. The base-class rescue stays last and now
+      # means only what it says — InvalidUrlError, the URL itself being the
+      # problem. It used to catch FetchError as well, which told users who had
+      # pasted a perfectly good URL that their URL was malformed.
       rescue Applications::UrlPrefillService::ConfigError => e
         render_error(e.message, code: "prefill_unavailable", status: :service_unavailable)
-      rescue Applications::UrlPrefillService::ExtractionError => e
+      rescue Applications::UrlPrefillService::UnreadableError,
+             Applications::UrlPrefillService::ExtractionError => e
         render_error(e.message, code: "prefill_failed", status: :bad_gateway)
+      rescue Applications::UrlPrefillService::BlockedError => e
+        render_error(e.message, code: "prefill_blocked", status: :unprocessable_entity)
+      rescue Applications::UrlPrefillService::FetchError => e
+        render_error(e.message, code: "prefill_unreachable", status: :bad_gateway)
       rescue Applications::UrlPrefillService::Error => e
         render_error(e.message, code: "invalid_url", status: :unprocessable_entity)
       end

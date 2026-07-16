@@ -8,8 +8,84 @@ Open work lives in [`TODO.md`](TODO.md). Settled decisions-not-to-build are reco
 
 ## Unreleased
 
-Rides along with the next patch, `v1.4.2` — the code-quality release "Close the door" displaced.
-Grouped by the branch each change landed on.
+Two patches' worth of work, grouped by the branch each change landed on. The pre-fill taxonomy
+below is `v1.4.3`; everything under it is `v1.4.2` — the code-quality release "Close the door"
+displaced. They are split because `v1.4.3` answers a production report and should not wait on the
+rest of `v1.4.2`, which still has open items (see `TODO.md`).
+
+### URL pre-fill: two bugs behind one prod report *(fix/prefill-error-taxonomy — `v1.4.3`)*
+
+Both found chasing a single failure: pre-fill dying on a TokyoDev posting. The logs could not tell
+the two apart — lograge records `time`/`request_id`/`params` and never the body, and both failures
+rendered a `422` from the same rescue. Response timing (25.7ms and 5.5ms, far too fast for a real
+TLS round trip) plus a read of the source is what separated them.
+
+Review then found six more defects clustered around the same code, and they are listed here rather
+than deferred because five of them are the *same* bug as the two above — an outcome reported as
+something it isn't. Still a patch by the mechanical test: no migration, no capability, no `v1`
+contract broken.
+
+- **The connection now pins an IPv4 address, not whichever address DNS listed first.** Outbound
+  IPv6 is disabled on the `api` service, and Cloudflare-fronted hosts answer AAAA-first — so
+  `addresses.first` handed `Net::HTTP` an address the container cannot dial, and the connect died
+  with `ENETUNREACH` before a packet left the box. Every Cloudflare-fronted board was affected,
+  which is most of them. **This does not weaken the SSRF guard**, and the distinction is worth
+  being precise about: validation still runs over *every* resolved address and a single internal
+  one still rejects the whole URL. The preference decides which *already-validated* address gets
+  dialled — never whether validation ran. Enabling outbound IPv6 on Railway was the alternative,
+  and was rejected: it makes the fetch depend on a platform toggle no reader of the code can see.
+- **"The site blocked us" is no longer reported as "your URL is malformed".** The controller
+  rescued `UrlPrefillService::Error` — the *base class* — and rendered `invalid_url`, so every
+  `FetchError` reached the user as an accusation about a URL they had pasted correctly.
+  `FetchError` now has its own rescue ahead of the base class, and the taxonomy splits by what it
+  asks the user to do: `prefill_blocked` (`422`) for a site that refuses automated readers —
+  `401`/`403`, or a `cf-mitigated` header on any status — and `prefill_unreachable` (`502`) for a
+  page we genuinely could not get. A `429` is deliberately *not* blocked: it is the one refusal
+  that lifts, and `prefill_blocked`'s copy would tell the user to give up and type it by hand —
+  this release's own bug in a new costume. It falls through to `prefill_unreachable`, which asks
+  for a retry. **Adding codes is append-only and so patch-safe**; both landed in SPEC.md § Error
+  codes and in *both* locale catalogs, parity intact.
+- **A page with no readable text is no longer a `FetchError` either.** Not in the original scope —
+  found while implementing it. The service raised `FetchError` for a page it had fetched
+  perfectly well, so honouring the fix as written would have swapped one lie ("your URL is
+  malformed") for another ("we couldn't reach it"). It now raises `UnreadableError` and maps to
+  the existing `prefill_failed`, whose copy — *fill in the details manually* — was already the
+  true thing to say.
+- **A Japanese posting over the body cap returned an untyped `500`.** `byteslice` is byte-indexed
+  and Japanese runs three bytes to the character, so a cut at the cap landed mid-character and the
+  next `gsub!` raised `ArgumentError` from outside every rescue — on precisely the postings this
+  service exists to read. The truncated body is now `.scrub`bed, which drops the partial character.
+- **The SSRF guard could be switched off by an environment variable.** `Net::HTTP.new(host, port)`
+  defaults its third argument to `:ENV`, so under an `http_proxy` var Net::HTTP dials the proxy,
+  lets *it* re-resolve the hostname, and ignores `ipaddr` entirely — the rebinding pin becomes
+  decoration. No proxy var is set today; passing `nil` explicitly makes sure setting one later
+  cannot quietly disable the defence.
+- **The guard now re-runs, in full, on every redirect hop.** `fetch` recurses on a `Location` and
+  never passes back through `validated_uri`, and `URI.join` will happily produce `ftp://host:80/x`
+  from a `Location` header — which cleared a port-only check and then died in `Net::HTTP::Get.new`
+  as another untyped `500`. Scheme, port and every resolved address are re-checked per hop.
+- **A hop's rejection is no longer blamed on the user.** The guard raises `InvalidUrlError` — an
+  accusation about the URL the *user* pasted. True on hop 0; a lie on every hop after it, where
+  the *site* chose the destination. Past hop 0 it is now a `FetchError`. Same bug as the headline
+  one, one level down.
+- **The guard's error messages were an internal-hostname oracle.** "Doesn't resolve" and "resolves
+  somewhere internal" read differently, so probing `redis.railway.internal` told you which names
+  exist — and the demo account's credentials are published, so "authenticated" is no barrier to
+  whoever is asking. Every rejection now says the same thing; the real reason goes to the log,
+  where the operator can see it and the prober can't.
+- **An all-empty extraction is no longer a `200`.** Claude reading a challenge page, a login wall
+  or an SPA shell and finding no posting handed the user a blank form and called it success. It
+  now raises `ExtractionError` → `prefill_failed`. A missing `ANTHROPIC_API_KEY` also fails
+  *before* the fetch rather than after it, instead of spending up to 13s of SSRF-guarded timeouts
+  on a result the server has no way to use.
+
+**Not attempted: defeating the challenge.** TokyoDev answers any non-browser client with `403` +
+`cf-mitigated: challenge`, verified against both our User-Agent and a stock Chrome one — so this
+is not a UA blocklist to dress around. Some sites will 403; that is expected degradation, not a
+bug to engineer around. The honest error is the deliverable. The recovery path it points to — let
+the user paste the posting text and extract from that — is deliberately **not** here: it is a
+capability, which by the mechanical test makes it a minor, and it is scoped to `v1.5.0` where it
+serves the share-sheet flow's failure mode.
 
 ### The post-`v1.4.1` docs audit *(fix/privacy-truth-and-doc-drift)*
 

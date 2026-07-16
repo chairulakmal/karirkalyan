@@ -204,7 +204,7 @@ RSpec.describe "Applications", type: :request do
         end
       end
 
-      response "422", "bad or private/internal URL" do
+      response "422", "the URL is unusable (invalid_url), or the site refused an automated reader (prefill_blocked)" do
         let(:Authorization) { jwt_for(user) }
         let(:body)          { { url: "http://10.0.0.1/admin" } }
         before do
@@ -216,6 +216,73 @@ RSpec.describe "Applications", type: :request do
 
         run_test! do |response|
           expect(JSON.parse(response.body)).to include("error", "code" => "invalid_url")
+        end
+      end
+
+      # BlockedError subclasses FetchError, which subclasses Error — so this also
+      # pins the rescue order the controller depends on. Get it wrong and the code
+      # silently regresses to `invalid_url`, which is the bug v1.4.3 fixes.
+      response "422", "the URL is unusable (invalid_url), or the site refused an automated reader (prefill_blocked)" do
+        let(:Authorization) { jwt_for(user) }
+        let(:body)          { { url: "https://www.tokyodev.com/companies/x/jobs/y" } }
+        before do
+          service = instance_double(Applications::UrlPrefillService)
+          allow(service).to receive(:call)
+            .and_raise(Applications::UrlPrefillService::BlockedError, "That site blocks automated readers.")
+          allow(Applications::UrlPrefillService).to receive(:new).and_return(service)
+        end
+
+        run_test! do |response|
+          expect(JSON.parse(response.body)).to include("error", "code" => "prefill_blocked")
+        end
+      end
+
+      response "502", "the page could not be fetched (prefill_unreachable), or it was fetched and yielded no posting (prefill_failed)" do
+        let(:Authorization) { jwt_for(user) }
+        let(:body)          { { url: "https://example.com/jobs/42" } }
+        before do
+          service = instance_double(Applications::UrlPrefillService)
+          allow(service).to receive(:call)
+            .and_raise(Applications::UrlPrefillService::FetchError, "Couldn't reach that URL.")
+          allow(Applications::UrlPrefillService).to receive(:new).and_return(service)
+        end
+
+        run_test! do |response|
+          expect(JSON.parse(response.body)).to include("error", "code" => "prefill_unreachable")
+        end
+      end
+
+      # The fetch worked; the page had nothing in it. Reporting this as
+      # unreachable would swap one lie for another, so it gets its own rescue —
+      # and UnreadableError does not subclass FetchError, which is what keeps
+      # the branch above from swallowing it.
+      response "502", "the page could not be fetched (prefill_unreachable), or it was fetched and yielded no posting (prefill_failed)" do
+        let(:Authorization) { jwt_for(user) }
+        let(:body)          { { url: "https://example.com/spa-shell" } }
+        before do
+          service = instance_double(Applications::UrlPrefillService)
+          allow(service).to receive(:call)
+            .and_raise(Applications::UrlPrefillService::UnreadableError, "That page had no readable text to work with.")
+          allow(Applications::UrlPrefillService).to receive(:new).and_return(service)
+        end
+
+        run_test! do |response|
+          expect(JSON.parse(response.body)).to include("error", "code" => "prefill_failed")
+        end
+      end
+
+      response "503", "ANTHROPIC_API_KEY is not configured" do
+        let(:Authorization) { jwt_for(user) }
+        let(:body)          { { url: "https://example.com/jobs/42" } }
+        before do
+          service = instance_double(Applications::UrlPrefillService)
+          allow(service).to receive(:call)
+            .and_raise(Applications::UrlPrefillService::ConfigError, "URL pre-fill is not configured.")
+          allow(Applications::UrlPrefillService).to receive(:new).and_return(service)
+        end
+
+        run_test! do |response|
+          expect(JSON.parse(response.body)).to include("error", "code" => "prefill_unavailable")
         end
       end
 

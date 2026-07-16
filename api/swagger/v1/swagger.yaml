@@ -96,7 +96,13 @@ paths:
         '200':
           description: extracted fields returned for the user to review
         '422':
-          description: bad or private/internal URL
+          description: the URL is unusable (invalid_url), or the site refused an automated
+            reader (prefill_blocked)
+        '502':
+          description: the page could not be fetched (prefill_unreachable), or it
+            was fetched and yielded no posting (prefill_failed)
+        '503':
+          description: ANTHROPIC_API_KEY is not configured
         '401':
           description: not authenticated
       requestBody:
