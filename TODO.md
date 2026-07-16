@@ -4,14 +4,16 @@ Open work only, grouped by the release that ships it. Shipped work lives in
 [`CHANGELOG.md`](CHANGELOG.md), and so do the settled decisions-not-to-build (dark mode,
 document version history, client-side error tracking — see its § Decisions). Last cut back to
 open work on 2026-07-13; restructured by release on 2026-07-15 so each item is told once, in
-the section of the release that ships it. Three things happened on 2026-07-16: the board triage
+the section of the release that ships it. Four things happened on 2026-07-16: the board triage
 cards joined `v1.8.0`; `v1.4.3` and the prefill paste fallback were added out of one prod bug;
-and `v1.4.2`'s first two items closed and left the file.
+`v1.4.2`'s first two items closed and left the file; and `v1.4.3` itself closed entire, so its
+section left too — the release survives only as a row in the plan and an entry in the changelog.
 
-**Current release: `v1.4.1`** (2026-07-12, "Close the door"). **Nothing is in flight.** `v1.4.2`'s
-first two items merged untagged (PR #64) and left this file for `CHANGELOG.md` § Unreleased, which
-is where the rest of that release is accruing too. What each shipped release contained is
-`CHANGELOG.md`'s job to say, not this file's.
+**Current release: `v1.4.1`** (2026-07-12, "Close the door"). **In flight:
+`fix/prefill-error-taxonomy`** — all of `v1.4.3`. `v1.4.2`'s first two items merged untagged
+(PR #64) and left this file for `CHANGELOG.md` § Unreleased, which is where the rest of that
+release is accruing too. What each shipped release contained is `CHANGELOG.md`'s job to say, not
+this file's.
 
 **North star (decided 2026-07-11): be the best career app for its one loyal user.** Portfolio
 value follows from that, not the other way round — a reviewer can tell a tool with a real
@@ -49,7 +51,7 @@ seeker's professional context isn't just light-themed, it's mobile.
 | Release | Level | Contents |
 | --- | --- | --- |
 | `v1.4.2` | patch | Download filenames, upload throttle, the profile-card fold — **plus the two done items and the privacy/doc-drift fix, both in `CHANGELOG.md` § Unreleased** |
-| `v1.4.3` | patch | Prefill: IPv4-first address pinning, and an error taxonomy that stops blaming the user's URL |
+| `v1.4.3` | patch | Prefill: IPv4-first address pinning, and an error taxonomy that stops blaming the user's URL — **fully landed, nothing open; see `CHANGELOG.md` § Unreleased** |
 | `v1.5.0` | minor | The pocket app: share-sheet capture, passkey sign-in, push digest, installed-app shell — **plus the prefill paste fallback the share sheet needs** |
 | `v1.6.0` | minor | The Japan market layer: recruiter channel + `agencies`, 年収 comp structure, Japanese-level filter |
 | `v1.6.1` | patch | Japanese phrase-based line breaking |
@@ -192,6 +194,18 @@ migration, and the previous image boots against an unchanged database.
       it is, not where the request came from — same reasoning as the export throttle, `CHANGELOG.md`
       § v1.4.0): a write/upload cap, and a ceiling on applications per account. The per-account
       pattern and the `429` responder already exist; this is a config change, not a design.
+- [ ] **Make en/ja key parity a check, not a convention** *(added 2026-07-16 — `v1.4.3` found the
+      gap while adding four catalog keys)*. `CLAUDE.md` and this file both say parity must hold,
+      and **nothing enforces it**: no test, no CI step, and next-intl's type augmentation is not
+      wired up, so a key landing in `en.json` alone compiles, lints and builds clean. The
+      consequence is quiet rather than loud — `t.has()` means a miss degrades to status-keyed copy
+      instead of crashing — which is exactly why review will not reliably catch it: nothing is
+      visibly broken in the locale the reviewer reads. A leaf-key diff of the two catalogs, failing
+      the `web/` job on any asymmetry, is a few lines and turns a rule held by discipline into one
+      held by CI. **Decide the counting convention when it is written**: the FSM reason chips
+      (`en.json` § `board`) are arrays, and dict-only counting versus counting array elements is
+      what made a docs audit report a false drift here. Whatever the check counts, it must count
+      the same thing on both sides — which is also why the hardcoded counts are gone from the docs.
 - [ ] **Fold "Your data" into the profile card, and make the card a component** (`web/`-only).
       The dashboard renders the same
       `<section className="border border-dune bg-linen p-5">` twice: the **profile** block
@@ -221,83 +235,11 @@ migration, and the previous image boots against an unchanged database.
       data" in EN but 「データの書き出し」 (*exporting data*) in JA — not a translation of each
       other, and only the EN one reads as a card title. Merging under a single heading is a copy
       decision in both locales, and whichever eyebrow loses becomes a dead catalog key to delete
-      (the key-parity check is 337/337 and should stay that way).
+      (en/ja key parity holds and should stay that way).
 
       Carry the two comments at `:93–96` and the `eslint-disable no-html-link-for-pages` lines with
       the move — the export anchors are plain `<a>`s to `/api/exports/*` because those are API
       routes, not localized pages, and that is a fact about the destination, not a style lapse.
-
----
-
-## `v1.4.3` — patch. The prefill bug, and the lie it tells (diagnosed 2026-07-16)
-
-**Sequenced after `v1.4.2`, and it is two bugs, not one.** Both were found chasing a single
-report — prefill failing on a TokyoDev posting
-(`/companies/hennge/jobs/senior-frontend-engineer-svelte-hennge-tadrill`). Neither adds a
-capability and neither has a migration, so the previous image boots against an unchanged
-database: patch, by the mechanical test.
-
-**Worth knowing before either item: the logs cannot tell these apart.** `lograge.rb` logs
-`time/request_id/params` and never the rendered body, and both failures render a `422` from the
-same `rescue` — so grepping for the error string finds nothing. The diagnosis came from response
-timing (25.7ms and 5.5ms — far too fast for a real TLS round trip to an external edge, which is
-what an immediate `ENETUNREACH` looks like) plus reading the source. Same-status-different-cause
-is the shape of this whole section.
-
-- [ ] **Pin to an IPv4 address, not `addresses.first`.** `UrlPrefillService#guard_against_internal_host!`
-      (`api/app/services/applications/url_prefill_service.rb:152`) returns `addresses.first`, and
-      `#fetch` pins `http.ipaddr` to it. `Resolv.getaddresses("www.tokyodev.com")` returns
-      Cloudflare's **IPv6 addresses first** — and Outbound IPv6 is **disabled** on the `api`
-      service in production (`railway outbound-network ipv6 status --service api` →
-      `{"ipv6": {"enabled": false, "staged": false}}`, confirmed 2026-07-16). So the connect dies
-      with `ENETUNREACH` before a packet leaves the container, is caught by the
-      `rescue SocketError, SystemCallError, …` at `:126`, and surfaces as
-      `FetchError, "Couldn't reach that URL."` Prefer IPv4 when choosing which
-      *already-validated* address to dial:
-      `addresses.sort_by { |a| IPAddr.new(a).ipv4? ? 0 : 1 }.first`.
-
-      **This does not weaken the SSRF guard**, and that is the point worth writing down before
-      the code: the loop above still rejects if *any* resolved address is internal, so reordering
-      changes which validated address gets dialled, never whether validation ran. The
-      DNS-rebinding defence the pin exists for (`:94–99`) is untouched — we still dial an address
-      we checked rather than letting Net::HTTP re-resolve.
-
-      **Enabling Outbound IPv6 on Railway is the rejected alternative**: it is a redeploy, it
-      does not fix the TokyoDev URL (see the next item — a completed connection just reaches the
-      Cloudflare challenge), and it leaves the service one resolver-order change away from the
-      same bug on any other dual-stack host. Prefer IPv4 in code regardless of the toggle.
-- [ ] **Stop reporting "the site blocked us" as "your URL is malformed".**
-      `ApplicationsController#prefill` (`:51`) rescues the `UrlPrefillService::Error` base class
-      and renders `code: "invalid_url"` — which catches `FetchError` as well as `InvalidUrlError`,
-      because `FetchError` has no rescue of its own. So when a fetch fails for any reason the user
-      is told *"That couldn't be read as a job posting URL."* (`en.json`), and the only sensible
-      response to that message is to retype a URL that was never wrong. TokyoDev is the live case:
-      Cloudflare returns **`403` with `cf-mitigated: challenge`** and the `Just a moment…` JS
-      interstitial to any non-browser client — verified 2026-07-16 with both the service's
-      `KarirKalyan-Prefill/1.0` UA **and** a stock Chrome UA, so this is not a UA blocklist to
-      dress around.
-
-      **The split:** give `FetchError` its own `rescue` ahead of the base-class one, and keep
-      `invalid_url` for what it actually means — `InvalidUrlError`: bad format, disallowed port,
-      private address. Then distinguish *blocked* (`403`/`401`/`429`, or a `cf-mitigated` header)
-      from *unreachable*, because they ask the user for different things. A new error code lands
-      in SPEC.md § Error codes **and** both locale catalogs — key parity is 337/337 and stays that
-      way.
-
-      **What this release deliberately does not do: make the error actionable.** A truthful
-      "this site blocks automated readers" is still a dead end with no next step — the recovery
-      path is the paste fallback, which is a capability and therefore `v1.5.0`. Shipping the
-      honest message first is still right: the current message actively misdirects, and that
-      earns a fix a release earlier than the cure.
-
-      **Not on the table: defeating the challenge.** TokyoDev's `robots.txt` *allows* `/` (only
-      `/c/` and `/frames/` are disallowed), so their stated policy is not the obstacle — but the
-      challenge is still an access control, and the kit for getting past it (TLS-fingerprint
-      spoofing, FlareSolverr, residential proxies) is an arms race that breaks on any Cloudflare
-      tune and reads badly in a repo whose audience is hiring reviewers. A headless browser is
-      the legitimate version, and it is Chrome in the Railway container, a new memory floor, and
-      per-fetch latency — for one job board. **Some sites will 403; that is expected degradation,
-      not a bug to engineer around.**
 
 ---
 
@@ -340,6 +282,11 @@ The capture flow and the shell are the release — they are what changes the use
 - [ ] **Paste fallback for postings the fetcher cannot read** *(added 2026-07-16 — the recovery
       path `v1.4.3`'s honest error message has nowhere to point)*. When the fetch is blocked, let
       the user paste the posting text into a textarea and run the extraction on that instead.
+      **`v1.4.3` left the signal this hangs on**: a blocked fetch is now its own error code,
+      `prefill_blocked`, distinct from a URL that is genuinely bad — so `web/` can offer the
+      textarea on exactly the failure the paste box cures, and stay out of the way on the ones it
+      does not. Before that split every prefill failure arrived as `invalid_url`, and a paste box
+      shown on all of them would have been noise on three failures out of four.
       **The pipeline is already `fetch → to_text → extract` and only the first step ever fails** —
       `extract` takes text and knows nothing about where it came from, so this is a second entry
       point into an existing path, not a second pipeline. No new infra, no circumvention.
@@ -359,6 +306,15 @@ The capture flow and the shell are the release — they are what changes the use
       opposite question. Sequencing note for `v1.6.0`: a pasted posting should populate
       `posting_snapshot` the same way a fetched one does — the snapshot's value is that
       extractions are re-runnable, and that is truer for postings that can never be re-fetched.
+
+      **First task, and it is a prerequisite, not a detail:** `PrefillResult`'s failure arm in
+      `web/app/lib/actions.ts` declares only `{ ok: false; error: string }`, while `apiFailure`
+      actually returns `code` and `status` alongside it. The signal `v1.4.3` created reaches the
+      server action and is then thrown away by the type, so nothing in `web/` can branch on
+      `prefill_blocked` today. Widening that arm is what makes both this item and a
+      `prefill_unreachable`-only Retry button possible. It was deliberately not done in `v1.4.3`:
+      a `code` field no caller reads is dead weight, and the branch that reads it is the
+      capability that makes this a minor.
 
       **Two things to decide when it is scoped, not in QA:** whether the textarea is always
       available or only appears after a fetch fails (always-on invites manual entry where the URL
@@ -663,8 +619,8 @@ none at all — so the release passes the major test the same way the rest of th
       - **Both locales, no hardcoded English.** The board brands stay untranslated (`jobBoardLabel`'s
         existing rule), but the `(none)` sentinel's label and the elapsed-time string are catalog
         keys. Elapsed time has a formatter already — `timeAgo(iso, locale)` in `format.ts` — so
-        prefer feeding it the entered-at instant over inventing a second duration format. Key parity
-        is 337/337 and stays that way.
+        prefer feeding it the entered-at instant over inventing a second duration format. En/ja key parity
+        holds and stays that way.
 
       **Testing, per the existing split:** the excerpt/truncation logic is pure — unit spec, no DB.
       The two new payload fields are a request spec against real Postgres, and the case worth

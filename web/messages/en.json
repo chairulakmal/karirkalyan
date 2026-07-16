@@ -69,12 +69,15 @@
     "code": {
       "unauthenticated": "Your session is no longer valid. Sign in again to continue.",
       "invalid_credentials": "That email and password don't match an account.",
+      "forbidden": "The demo account can't be deleted — it's shared, so everyone reviewing this project needs it.",
       "not_found": "That application no longer exists.",
       "stale_record": "This application was changed elsewhere. Reload and try again.",
       "invalid_transition": "That status change isn't allowed from the current status.",
       "validation_failed": "Those details couldn't be saved. Check the form and try again.",
       "invalid_url": "That couldn't be read as a job posting URL.",
+      "prefill_blocked": "That site blocks automated readers, so the posting couldn't be fetched. Fill in the details manually.",
       "rate_limited": "Too many requests. Wait a moment and try again.",
+      "prefill_unreachable": "That page couldn't be reached. Check it opens in your browser, then try again.",
       "prefill_failed": "The job posting couldn't be read. Fill in the details manually.",
       "prefill_unavailable": "URL pre-fill is temporarily unavailable."
     },
@@ -152,8 +155,8 @@
       "code": "Code",
       "when": "When",
       "409": "An optimistic-locking conflict — the row changed under you.",
-      "422": "An illegal FSM transition, a validation failure, or a bad pre-fill URL.",
-      "502": "AI extraction failed.",
+      "422": "An illegal FSM transition, a validation failure, a bad pre-fill URL, or a site that refuses to be read by anything but a browser.",
+      "502": "A pre-fill that got nowhere: the page couldn't be fetched, or it was fetched and yielded no posting.",
       "503": "The AI key is missing, or Postgres is down."
     },
     "paginationTitle": "Cursor pagination",

@@ -36,7 +36,11 @@ Last synced against the code: **2026-07-16**, `v1.4.1` — full audit against `a
 error-code table gained the `forbidden` row and the `invalid_url` scope was corrected to match the
 code. Since the tag, § Query layer gained `Applications::ListQuery` — an extraction, not a
 behaviour change: it moves `GET /api/v1/applications`'s filtering and cursor decoding out of the
-controller and writes down the contract that action already had.
+controller and writes down the contract that action already had. Also since the tag, § Error codes
+split pre-fill failure into `invalid_url` / `prefill_blocked` / `prefill_unreachable` /
+`prefill_failed`: the `invalid_url` scope this line previously recorded as "corrected to match the
+code" was correct about the code and wrong about the world — the code was conflating four
+outcomes, and it is the code that has now moved.
 
 ---
 
@@ -405,14 +409,54 @@ Because the server fetches a user-supplied URL, the SSRF guard is load-bearing:
   link-local ranges — including the cloud metadata endpoint `169.254.169.254`.
 - **Pins the connection to the validated IP** (`http.ipaddr`), so a DNS rebind between check and
   connect cannot redirect the fetch. Restricts to ports 80/443.
-- Re-validates on **every redirect hop**.
-- Body-size cap on the fetch; character cap on the text sent to Claude.
+- **The pin prefers an IPv4 address** when the host resolves to both. Outbound IPv6 is disabled on
+  the `api` service, so dialling a AAAA record dies with `ENETUNREACH` before a packet leaves the
+  container — and Cloudflare-fronted hosts resolve IPv6-first, which makes that the common case
+  rather than the edge. This does not weaken the guard: every resolved address is still validated
+  and a single internal one still rejects the whole URL. The preference only decides which
+  *already-validated* address gets dialled, never whether validation ran.
+- **The connection never proxies** (`Net::HTTP.new(host, port, nil)`). The default `p_addr` is
+  `:ENV`, under which an `http_proxy` variable makes Net::HTTP dial the proxy and ignore `ipaddr`
+  entirely — the proxy re-resolves the hostname and the rebinding defence above becomes
+  decoration. Passing `nil` means a future env change cannot silently switch the guard off.
+- Re-validates **scheme, port, and every resolved address on every redirect hop**. Scheme matters
+  per hop because `fetch` recurses into itself and never passes back through `validated_uri`, and
+  `URI.join` will produce `ftp://host:80/x` from a `Location` header — which clears a port-only
+  check.
+- **A guard rejection past hop 0 is a `FetchError`, not an `InvalidUrlError`.** The user chose
+  hop 0; the site chose the rest. Blaming a pasted URL for where the site redirected is the same
+  lie this taxonomy exists to end, one hop later.
+- **Every guard rejection returns one message** — "That URL can't be fetched." — whether the host
+  failed to resolve or resolved somewhere internal. Distinct copy would turn a blind SSRF into an
+  internal-hostname oracle: probe `redis.railway.internal`, read which names exist off the
+  wording. The demo account's credentials are published, so authentication is not a barrier here.
+  The specific reason is logged server-side.
+- Body-size cap on the fetch; character cap on the text sent to Claude. The body is `scrub`bed
+  after the byte-cap: `byteslice` is byte-indexed, Japanese text is three bytes a character, and a
+  cut landing mid-character makes every later `gsub` raise `ArgumentError` — an untyped `500` on
+  exactly the postings this service exists to read.
 
 Rate limits are enforced per-IP *and* per-account — see Security.
 
-Errors are typed and mapped: bad, private, or unreadable URL → `422`, missing `ANTHROPIC_API_KEY`
-→ `503` (the rest of the app keeps working without it), AI failure → `502`. The user can always
-fill the form in by hand.
+Errors are typed so that each one tells the user a different true thing, and the mapping is the
+whole point of the taxonomy: `InvalidUrlError` → `invalid_url` (your URL is the problem — fix it),
+`BlockedError` → `prefill_blocked` (the site refuses automated readers; nothing to fix),
+`FetchError` → `prefill_unreachable` (check the page is live, then retry), `UnreadableError` and
+`ExtractionError` → `prefill_failed` (we read the page, it yielded no posting), `ConfigError` →
+`prefill_unavailable`. Statuses are in § Error codes. The user can always fill the form in by hand.
+
+Two edges of that mapping are deliberate. **An extraction where every field comes back empty is an
+`ExtractionError`, not a `200`** — Claude read the page and found no posting in it, so rendering a
+blank form as success would be the same class of lie as the status codes above. And **`ConfigError`
+fires before the fetch**, not after: a server with no `ANTHROPIC_API_KEY` would otherwise spend the
+full guarded round trip, up to 13s of timeouts, on a result it cannot use.
+
+**A blocked fetch is expected degradation, not a bug to engineer around.** A Cloudflare-fronted
+board — TokyoDev among them — answers a non-browser client with `403` and `cf-mitigated:
+challenge`, with our User-Agent and with a stock Chrome one alike, so this is not a UA blocklist
+to dress around. Defeating the challenge is out of scope by choice, which is exactly why
+`prefill_blocked` is worth its own code: a site we cannot read is a permanent, honest outcome, and
+telling the user their URL was malformed instead would be a lie.
 
 #### `Demo::ResetService`
 
@@ -663,9 +707,11 @@ its own (a `409` is retryable, a `422` is not), but the code is what clients sho
 | `stale_record` | `409` | `ActiveRecord::StaleObjectError` — optimistic-locking conflict |
 | `invalid_transition` | `422` | FSM `InvalidTransitionError` |
 | `validation_failed` | `422` | Model validation failure (create/update, file upload); carries `details` |
-| `invalid_url` | `422` | Bad or private/internal pre-fill URL — also a page that was reachable but yielded no readable text (`FetchError`) |
+| `invalid_url` | `422` | The pre-fill URL itself is the problem — malformed, a port other than 80/443, or a private/internal address. Never fetched (`InvalidUrlError`) |
+| `prefill_blocked` | `422` | The site refused an automated reader — `401`/`403`, or a `cf-mitigated` header on any status. The URL is fine and retrying will not help (`BlockedError`). An upstream `429` is deliberately *not* this: it is the one refusal that lifts, so it resolves to `prefill_unreachable` and the user is told to retry |
 | `rate_limited` | `429` | Rack::Attack throttle; `Retry-After` header set |
-| `prefill_failed` | `502` | AI extraction failed |
+| `prefill_unreachable` | `502` | The pre-fill page could not be fetched — DNS, connect, TLS, timeout, redirect loop, or an HTTP error the site did not refuse us with (`FetchError`) |
+| `prefill_failed` | `502` | The page was fetched but yielded nothing usable — no readable text (`UnreadableError`), or the Claude call failed or came back empty (`ExtractionError`) |
 | `prefill_unavailable` | `503` | `ANTHROPIC_API_KEY` missing — the rest of the app keeps working |
 
 Codes are append-only: renaming or removing one is a breaking change to `web/`'s message
@@ -1518,8 +1564,12 @@ Two places do this resolution, because a failure reaches the UI by two paths:
   with § Registration is closed.)
 
 Catalog presence is tested with next-intl's `t.has()`, so steps 1–2 need no hardcoded list of
-known codes in TypeScript — the catalogs themselves are the list, and `en`/`ja` key parity is
-already enforced.
+known codes in TypeScript — the catalogs themselves are the list. `en`/`ja` key parity is a
+convention held by review, not a check: nothing in `web/`'s tests or CI fails when a key lands
+in one catalog and not the other. `t.has()` means the consequence is a fallback rather than a
+crash — a `ja` reader gets the status-keyed copy of step 3 — but that is degradation nobody is
+alerted to, which is why the rule that both catalogs move together is written down in
+`CLAUDE.md` rather than left to memory.
 
 Localizing *in Rails* was rejected for the original reason: it would mean an i18n dependency,
 locale negotiation on every request, and a second message catalog to keep in sync, for strings
