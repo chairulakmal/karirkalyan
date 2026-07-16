@@ -5,15 +5,17 @@ Open work only, grouped by the release that ships it. Shipped work lives in
 document version history, client-side error tracking — see its § Decisions). Last cut back to
 open work on 2026-07-13; restructured by release on 2026-07-15 so each item is told once, in
 the section of the release that ships it. Four things happened on 2026-07-16: the board triage
-cards joined `v1.8.0`; `v1.4.3` and the prefill paste fallback were added out of one prod bug;
+cards joined `v1.9.0`; `v1.4.3` and the prefill paste fallback were added out of one prod bug;
 `v1.4.2`'s first two items closed and left the file; and `v1.4.3` itself closed entire, so its
 section left too — the release survives only as a row in the plan and an entry in the changelog.
 
-**Current release: `v1.4.1`** (2026-07-12, "Close the door"). **In flight:
-`fix/prefill-error-taxonomy`** — all of `v1.4.3`. `v1.4.2`'s first two items merged untagged
-(PR #64) and left this file for `CHANGELOG.md` § Unreleased, which is where the rest of that
-release is accruing too. What each shipped release contained is `CHANGELOG.md`'s job to say, not
-this file's.
+**Current release: `v1.4.1`** (2026-07-12, "Close the door"). **Nothing in flight** —
+`fix/prefill-error-taxonomy` merged on 2026-07-17 (PR #65), so all of `v1.4.3` is on `main`,
+untagged. `v1.4.2`'s first two items merged untagged the same way (PR #64); all of it is
+accruing in `CHANGELOG.md` § Unreleased. The nearest open work is `v1.4.2`'s four items, then
+`v1.5.0` — **the stage filter, scoped 2026-07-17**, which took the `v1.5.0` slot and slid every
+release below it one minor. What each shipped release contained is `CHANGELOG.md`'s job to say,
+not this file's.
 
 **North star (decided 2026-07-11): be the best career app for its one loyal user.** Portfolio
 value follows from that, not the other way round — a reviewer can tell a tool with a real
@@ -31,7 +33,7 @@ outranks anything else in this file on the day it happens.
 
 ---
 
-## The plan — `v1.4.2` → `v1.8.0` (scoped 2026-07-12, amended 2026-07-13, extended 2026-07-15)
+## The plan — `v1.4.2` → `v1.9.0` (scoped 2026-07-12, amended 2026-07-13 and 2026-07-17, extended 2026-07-15)
 
 **The whole backlog fits under 1.x.** Only one item forces a major, and `SPEC.md` § Versioning
 & releases already names it: the **`positions` entity**, because it adds a table *and* changes
@@ -42,44 +44,58 @@ behind — which is the whole of the major test.
 **Amended 2026-07-13 — the mobile access layer.** The original plan was deep on the data model
 and silent on where its one user physically is: during an active search, postings are met on the
 phone, and the access story was a desktop one — browser, URL, a password form the 1-day JWT
-resurfaces every morning. `v1.5.0` is now **"the pocket app"**, inserted *ahead of* the Japan
+resurfaces every morning. `v1.6.0` is now **"the pocket app"**, inserted *ahead of* the Japan
 market layer because both pay off while the search is active, and the share-sheet capture flow
 multiplies exactly the prefill pipeline the Japan layer bets on. Everything downstream slid one
 minor. The dark-mode decision's argument (`CHANGELOG.md` § Decisions) continues here: a job
 seeker's professional context isn't just light-themed, it's mobile.
 
+**Amended 2026-07-17 — the stage filter takes `v1.5.0`, and everything slides again.** The
+dashboard's status chips are radio buttons wearing a filter's clothes: exactly one stage at a
+time, or all thirteen. The one question the list cannot answer is the one asked most —
+*what's still live?* — because "active" is seven stages and the control only holds one. Adding
+multi-select is a **user-visible capability**, which the mechanical test in `SPEC.md`
+§ Versioning & releases makes a minor and not a patch, so it could not ride `v1.4.2`. It is
+sequenced ahead of the pocket app because the phone inherits whatever the filter becomes:
+shipping the app shell first would mean shipping the radio-button filter to the smaller screen,
+then rebuilding it there. The pocket app moves to `v1.6.0` and each downstream release slides
+one minor — the second such slide, on the same reasoning as the first.
+
 | Release | Level | Contents |
 | --- | --- | --- |
-| `v1.4.2` | patch | Download filenames, upload throttle, the profile-card fold — **plus the two done items and the privacy/doc-drift fix, both in `CHANGELOG.md` § Unreleased** |
+| `v1.4.2` | patch | Download filenames, upload throttle, en/ja key parity as a CI check, the profile-card fold — **plus the two done items and the privacy/doc-drift fix, both in `CHANGELOG.md` § Unreleased** |
 | `v1.4.3` | patch | Prefill: IPv4-first address pinning, and an error taxonomy that stops blaming the user's URL — **fully landed, nothing open; see `CHANGELOG.md` § Unreleased** |
-| `v1.5.0` | minor | The pocket app: share-sheet capture, passkey sign-in, push digest, installed-app shell — **plus the prefill paste fallback the share sheet needs** |
-| `v1.6.0` | minor | The Japan market layer: recruiter channel + `agencies`, 年収 comp structure, Japanese-level filter |
-| `v1.6.1` | patch | Japanese phrase-based line breaking |
-| `v1.7.0` | minor | Hiring entity, timezone overlap + `.ics`, visa / status of residence |
-| `v1.8.0` | minor | The follow-through: dashboard stat cards, board triage cards, cover-letter talking points, push interview/deadline alerts, public HSP calculator, interview stage notes |
+| `v1.5.0` | minor | The stage filter: multi-select status chips on the dashboard list, on by default, with "hide inactive" and friends — plus `active_states` on `/transitions` |
+| `v1.6.0` | minor | The pocket app: share-sheet capture, passkey sign-in, push digest, installed-app shell — **plus the prefill paste fallback the share sheet needs** |
+| `v1.7.0` | minor | The Japan market layer: recruiter channel + `agencies`, 年収 comp structure, Japanese-level filter |
+| `v1.7.1` | patch | Japanese phrase-based line breaking |
+| `v1.8.0` | minor | Hiring entity, timezone overlap + `.ics`, visa / status of residence |
+| `v1.9.0` | minor | The follow-through: dashboard stat cards, board triage cards, cover-letter talking points, push interview/deadline alerts, public HSP calculator, interview stage notes |
 
 `v1.3.1` through `v1.4.1` shipped 2026-07-12 — see `CHANGELOG.md` for what each contained.
 
 **Provenance.** Items were verified against the code on 2026-07-10 — all still hold. The
 market-dependent claims (Japan market, global remote) were verified against current web sources
 on 2026-07-11 — citations inline where a claim came from research rather than the code. Items
-were scoped into releases on 2026-07-12 and renumbered on 2026-07-13 when the pocket app became
-`v1.5.0`. Each item below carries its release tag; the table above is the summary of those
-tags, not a second source of truth.
+were scoped into releases on 2026-07-12 and renumbered twice — on 2026-07-13 when the pocket app
+was inserted, and on 2026-07-17 when the stage filter took `v1.5.0` and pushed the pocket app to
+`v1.6.0`. The stage filter's UX decisions were verified against current web sources on
+2026-07-17; citations inline. Each item below carries its release tag; the table above is the
+summary of those tags, not a second source of truth.
 
 **Context for the feature releases.** A generic tracker is a CRUD demo; the differentiators in
-`v1.6.0`–`v1.7.0` are the ones a Tokyo hiring reviewer could not have seen in someone else's
+`v1.7.0`–`v1.8.0` are the ones a Tokyo hiring reviewer could not have seen in someone else's
 portfolio, because they encode knowledge of the market rather than knowledge of Rails. The
 table stakes are already in — the follow-up digest and CSV export shipped in `v1.4.0`, ghost
 prediction in `v1.3.0` (see `CHANGELOG.md`) — and the pre-1.0.0 Phase 9 notes (now in
 `CHANGELOG.md`) also name an analytics dashboard and an AI cover-letter assist as the declared
-roadmap; both were scoped into `v1.8.0` on 2026-07-15, each in a deliberately reduced shape
+roadmap; both were scoped into `v1.9.0` on 2026-07-15, each in a deliberately reduced shape
 (stat cards, not a page; talking points, not drafts). Most of what follows touches `api/`; that
 is fine — the `web/`-only constraint was a property of v1.1.0, not a permanent rule.
 
 ### Standing rules
 
-- **The trap that would break this plan: every new column in `v1.5.0`–`v1.8.0` must be
+- **The trap that would break this plan: every new column in `v1.6.0`–`v1.9.0` must be
   nullable or defaulted.** A `NOT NULL` column with no default means the previous image's
   `INSERT`s fail against the new database — and by the mechanical test that quietly turns a
   minor into a **major**. It is the only way this plan accidentally violates its own
@@ -103,8 +119,9 @@ is fine — the `web/`-only constraint was a property of v1.1.0, not a permanent
 ## `v1.4.2` — patch. Sequenced before `v1.5.0`, not filler
 
 **Two items closed, both in `CHANGELOG.md` § Unreleased** (`refactor/applications-list-query`):
-the `Applications::ListQuery` extraction — which was sequenced first because `v1.6.0`'s three
-filters and `v1.8.0`'s triage cards both land on `ApplicationsController#index` — and the
+the `Applications::ListQuery` extraction — which was sequenced first because `v1.5.0`'s stage
+filter, `v1.7.0`'s three filters and `v1.9.0`'s triage cards all land on
+`ApplicationsController#index`; the very next release cashes that bet — and the
 `API_BASE` / `API_BASE_URL` rename, now `INTERNAL_API_URL` (`web/app/lib/api.ts`) and a
 module-private `PUBLIC_API_ORIGIN` (`web/app/lib/links.ts`).
 
@@ -243,7 +260,177 @@ migration, and the previous image boots against an unchanged database.
 
 ---
 
-## `v1.5.0` — minor. "The pocket app" (inserted 2026-07-13)
+## `v1.5.0` — minor. "The stage filter" (inserted 2026-07-17)
+
+Make the dashboard's applications list
+(`web/app/[locale]/(app)/dashboard/applications-list.tsx`) answer *what's still live?* — the
+question it is asked most and currently cannot answer at all. The status chips look like a
+filter but behave like a radio group: `Filters.status` is `Status | null`, so the reachable
+views are **one stage, or all thirteen**. "Active" is seven stages (`ACTIVE_STATUSES`,
+`web/app/lib/format.ts:45`), "dead" is four, and neither is expressible. The list already
+*knows* the distinction — it suppresses the overdue-follow-up warning on non-active rows
+(`applications-list.tsx:260`) — it just won't let the user filter by it.
+
+**Scope boundary: the dashboard list only.** Not the board (`web/app/lib/board.tsx` is
+columns-by-status; a status filter there means hiding columns, a different question), and not
+the two dropdowns — company and board stay single-select. The chips are the whole item.
+
+**The default inverts: all chips ON.** Today one chip is selected and the user opts *in*; the
+model becomes all thirteen selected and the user opts *out* — "hide inactive" rather than
+"show these seven". **Researched 2026-07-17, and the sources do not endorse this — read the
+tension before building it.** No UX body gives a rule for the default selection state of a
+multi-select set, and the prevailing convention is deselected-by-default. Two GOV.UK lines come
+closest, and they point opposite ways:
+
+- [*Filter a list*](https://design-patterns.service.justice.gov.uk/patterns/filter-a-list/):
+  **"The list should first appear unfiltered."** All-ON **satisfies** this — thirteen of thirteen
+  *is* the unfiltered list. No conflict.
+- [*Checkboxes*](https://design-system.service.gov.uk/components/checkboxes/): **"Do not
+  pre-select checkbox options as this makes it more likely that users will not realise they've
+  missed a question [and] submit the wrong answer."** This is the real objection — but its
+  reasoning is **form submission**: there is no question to miss here and nothing to submit
+  wrong. Adjacent, not on point. Recorded because it is the strongest thing standing against
+  this decision and it should not be buried.
+
+The precedent for going ahead is a **closed, fully-known set the user subtracts from** — Google
+Flights and Kayak default every airline on. Thirteen FSM states the user already has a mental
+model of is that shape. Chart legends share the instinct (every series visible, click to hide),
+but that is a charting-library convention about *visual layers*, not research about *records* —
+a hint that the gesture reads naturally, not evidence.
+
+**So: a judgement call with a named precedent and a documented objection, not a sourced rule.**
+No controlled comparison of the two defaults appears to exist. If it doesn't survive contact, the
+fallback is today's opt-in default with the presets kept — which is why the presets are specified
+independently of the default and must not depend on it.
+
+**What Baymard *does* settle** ([combining filter
+options](https://baymard.com/blog/allow-applying-of-multiple-filter-values)): multiple values
+*within one filter type* follow **OR** logic — matching any selected value — while separate
+filter types AND together. So `status` OR-s internally and still ANDs with company/board, which
+is exactly what `where(status: [...])` does for free. The same source says to **style
+multi-select values as checkboxes** so the inclusive semantics are visible; the chips must
+therefore stop looking like radio buttons.
+
+**The consequence that makes this cheap: all-ON and all-OFF-today are the same query.** Thirteen
+of thirteen states selected is an unfiltered list — identical to the current "All" chip. The
+inversion is a *mental-model and affordance* change, not a new result set, and it costs nothing
+on the wire.
+
+- [ ] **`status` accepts a list, server-side** — `Applications::ListQuery`
+      (`api/app/queries/applications/list_query.rb`) widens `filter_by_status` from
+      `where(status: status)` to a comma-separated list intersected with
+      `ApplicationFSM::VALID_STATES`. **Backward-compatible on the wire**: `status=applied`
+      parses as a one-element list, and today's server already *ignores* `status=applied,offer`
+      as an unknown state rather than erroring — so old and new never crash on each other.
+      **One param, not two.** No `exclude_status` companion: over a closed set, "hide
+      {ghosted, rejected}" *is* "show the other eleven", so show/hide is one control with two
+      framings. A second param could contradict the first (`status=applied&exclude_status=applied`)
+      and there is no right answer to that. Consistent with the research: **no design system in
+      the survey — NN/g, Baymard, GOV.UK, Material, HIG, Polaris, Atlassian — documents an
+      include/exclude mode toggle for filters.** Filtering is inclusion everywhere it is
+      specified.
+- [ ] **The empty-list trap** — `where(status: [])` matches **zero rows, silently**. That is a
+      real hazard the moment a list can be empty, and it contradicts `ListQuery`'s stated
+      contract: every param is nil-tolerant, junk falls back to the *unfiltered first page*
+      because these arrive from navigation, not a form. So: an empty or all-unknown list is
+      **unfiltered**, same as `nil`. The client must never rely on that — it is the defence for
+      a hand-edited URL. Which forces the UI rule below.
+- [ ] **Zero chips selected is a UI state, not a query.** All thirteen selected → send **no
+      `status` param at all** (byte-identical to today's "All"). Zero selected → **do not
+      fetch**; render an empty state locally that says every stage is hidden and offers one
+      click back. Otherwise "hide all" either shows everything (server's nil-tolerance) or an
+      unexplained blank — NN/g's
+      [empty-state guidance](https://www.nngroup.com/articles/empty-state-interface-design/)
+      calls out that *"totally empty states cause confusion about how and whether the system is
+      working"*, and wants a reason given, not a blank panel. The existing `noMatches` copy is
+      the wrong message here: nothing failed to match, the user hid it.
+- [ ] **Presets: "All", "Active", "None"** — the bulk actions the chips are tedious without.
+      **The wire format is explicit chips, not a macro**: "Active" expands client-side to
+      `status=wishlist,draft,applied,phone_screen,technical,final_round,offer` and lights those
+      seven. A `status=active` macro would make the param polymorphic — a state *or* a group —
+      the same near-miss naming the `API_BASE` / `API_BASE_URL` rename (`v1.4.2`) was done to
+      remove. A preset is a **shortcut to a chip selection**, and stays visibly so: after
+      clicking it the user sees which seven, and can toggle one off.
+- [ ] **`active_states` on `/transitions`, and delete `ACTIVE_STATUSES`** — *the invariant this
+      item would otherwise damage*. "Active" is currently a hardcoded TypeScript set
+      (`web/app/lib/format.ts:45`) and **is not derivable from what the server sends**: it
+      excludes the three `TERMINAL_STATES` *plus* `rejected`, `ghosted` and `withdrawn`. It
+      survives today as a display detail; promoting it to a **user-facing filter contract**
+      makes it FSM vocabulary mirrored in TypeScript, which is the one thing this codebase does
+      not do. `GET /transitions` already exists to serve exactly this — `states`, `entry_states`,
+      `terminal_states` (`api/app/controllers/api/v1/transitions_controller.rb:13`) — so add
+      `active_states`, own the definition in `ApplicationFSM`, and delete the TS copy. Four call
+      sites: `format.ts:45`, `details-editor.tsx:78`, `applications-list.tsx:260`, `board.tsx:97`
+      and `:100`. **Do this first** — the preset is downstream of it.
+- [ ] **Chips become checkboxes, semantically** — they are `<button>`s with radio behaviour
+      today and must become independently-toggleable. **The APG has no chip pattern**; chips map
+      onto an existing one, and the choice is real — Material's own MDC gives filter chips
+      `role="checkbox"` while Angular Material chose `role="option"` in a `listbox`. **Go
+      checkbox**: [the APG checkbox pattern](https://www.w3.org/WAI/ARIA/apg/patterns/checkbox/)
+      is the fit for independent multi-select toggles, it matches Baymard's "style them as
+      checkboxes" advice above, and GOV.UK wants native semantics — *"group checkboxes together
+      in a `<fieldset>` with a `<legend>` that describes them"*. The
+      [toggle-button pattern](https://www.w3.org/WAI/ARIA/apg/patterns/button/) (`aria-pressed`)
+      is defensible but awkward here: *"it is critical the label on a toggle does not change when
+      its state changes"*, so the accessible name is stuck as the bare stage name. `listbox` is
+      the wrong shape — it models one selection acted on as a unit, and APG forbids mixing
+      `aria-selected` with `aria-checked`. **Selected state cannot be dimming alone** —
+      unselected chips are `opacity-40` today, which both risks
+      [WCAG 1.4.1](https://www.w3.org/WAI/WCAG21/Understanding/use-of-color.html) (*"colour is
+      not used as the only visual means of conveying information"* — a dimmed brand colour is
+      still colour) and drags the label toward failing contrast. Needs a structural mark: a
+      check, a filled box.
+- [ ] **Keep the counts on the chips, and keep them global — this is mostly *right*, not a
+      compromise.** Counts matter: NN/g ties them directly to the failure mode this item
+      creates — *"facets also show the number of elements available under each filter, and thus
+      help users avoid zero-search results"*
+      ([applying filters](https://www.nngroup.com/articles/applying-filters/)) — and Baymard
+      agrees *"the number of matching products next to each filter option... gives users
+      confidence before they click"*. **Do not drop them when the chips go multi-select.**
+      On narrowing, the convention is **disjunctive faceting**: within *one* facet group, counts
+      ignore that group's own selections, so OR-ing `applied` + `rejected` must **not** collapse
+      the unselected `technical` chip's count to zero — otherwise every count decays toward zero
+      as you select and the numbers stop predicting anything. Status is one group, so **global
+      is the correct within-group answer** and today's `by_status` already gives it. *(Sourced
+      from Algolia/Meilisearch docs — a search-vendor convention, not a UX research body; NN/g
+      and Baymard imply the mechanic but never state it.)* **The one real gap** is cross-group:
+      status counts should narrow by company/board and can't, because `facets` carries only
+      `[company, board]` pairs — no status — so the dropdowns narrow each other
+      (`buckets(pick, constrainTo)`) while the chips answer a different question. That is a
+      dashboard-payload change and belongs with `v1.9.0`'s stat cards, which reopen the payload
+      anyway.
+- [ ] **`SPEC.md` in the same PR** — `SPEC.md:758` currently reads *"`status` (exact)"* and
+      becomes a list. Check `SPEC.md:1917` while there: the board section rejects per-column
+      pagination partly because *"it needs a new `status` filter parameter on the API"* — that
+      argument's premise changes when this ships, so either the reasoning is restated or the
+      rejection is re-argued. Do not leave it silently false.
+
+**Explicitly not in this release.** **URL state** — filters are `useState` only and no filtered
+view is linkable or survives reload. That is a real limitation and arguably worse once a
+selection is thirteen chips wide, but it is a routing change (`i18n/navigation.ts`), not a
+filter change; it stays out so this item doesn't grow a second spine. **Batch vs instant
+filtering** — each chip click refetches, and NN/g notes batch filtering's *"risk that users will
+select a combination of criteria that leads to zero results"* while
+[interactive filtering](https://www.nngroup.com/articles/applying-filters/) suits users still
+learning the space. Per-click refetch is the right default here and is already what the code
+does; revisit only if it feels slow.
+
+**Deferred with a known price: thirteen chips is over the sourced limit.** Baymard's
+[Macy's filter testing](https://baymard.com/blog/macys-filtering-experience) puts the number
+plainly — *"Around 10 values is the sweetspot... displaying much more than 10 values impeded the
+user's overview of the other available filtering types"* — and the recommended shape is 4–8
+high-traffic values inline with the tail behind a "show more" disclosure, which beat both the
+full-list and inline-scroll alternatives. Thirteen states is past that line. It is deferred
+anyway because **the list already renders all thirteen today** and this release does not make
+that worse — but the presets are now doing double duty: they are the mitigation for a chip row
+that is, by evidence, too long to scan. If the row proves unscannable in use, the fix is
+Baymard's — the seven active stages inline, the six closed ones behind a disclosure — and
+`active_states` from the item above is already the split that needs. **Do not re-record this as
+"no evidence found"**: the evidence exists and this release is choosing against it knowingly.
+
+---
+
+## `v1.6.0` — minor. "The pocket app" (inserted 2026-07-13)
 
 The mobile access layer: make opening KarirKalyan on the phone feel like opening a good Android
 app, not a desktop site. During an active search, postings are met on the phone — LinkedIn's
@@ -277,7 +464,7 @@ The capture flow and the shell are the release — they are what changes the use
       so it would look like the feature doesn't exist. The app is installed **once, via Chrome**;
       browsing stays in Brave, and sharing *from* Brave still reaches the WebAPK — the share
       source doesn't matter. That one-sentence install step goes in the docs. Sequencing
-      rationale: `v1.6.0`'s three fields are all captured at prefill time, so mobile capture
+      rationale: `v1.7.0`'s three fields are all captured at prefill time, so mobile capture
       multiplies the exact pipeline that release bets on — which is why this lands first.
 - [ ] **Paste fallback for postings the fetcher cannot read** *(added 2026-07-16 — the recovery
       path `v1.4.3`'s honest error message has nowhere to point)*. When the fetch is blocked, let
@@ -291,19 +478,19 @@ The capture flow and the shell are the release — they are what changes the use
       `extract` takes text and knows nothing about where it came from, so this is a second entry
       point into an existing path, not a second pipeline. No new infra, no circumvention.
 
-      **It rides `v1.5.0` because it is the share sheet's failure mode, not a stray fix.** The
+      **It rides `v1.6.0` because it is the share sheet's failure mode, not a stray fix.** The
       capture item above is a URL landing in `UrlPrefillService` — so every site that 403s the
       fetcher is a share that dead-ends in the release's headline flow. Cloudflare-fronted boards
       and login-walled ones (LinkedIn, which the fetcher will never reach) are exactly the places
       postings are met on a phone. If the release runs heavy this is **not** in the cut order:
       it is small, and it is what stops the capture flow from failing in public.
 
-      **The v1.6.0 tension, stated rather than left to trip someone:** the `posting snapshot` item
+      **The v1.7.0 tension, stated rather than left to trip someone:** the `posting snapshot` item
       rejects "a manual paste field" for failing the near-zero-entry test. That rejection stands
       and does not conflict — it is about *automatic capture at prefill time*, where a paste field
       would be manual entry replacing something free. This is a **fallback for when the automatic
       path is impossible**, where the alternative is not free capture but no capture. Same widget,
-      opposite question. Sequencing note for `v1.6.0`: a pasted posting should populate
+      opposite question. Sequencing note for `v1.7.0`: a pasted posting should populate
       `posting_snapshot` the same way a fetched one does — the snapshot's value is that
       extractions are re-runnable, and that is truer for postings that can never be re-fetched.
 
@@ -361,7 +548,7 @@ The capture flow and the shell are the release — they are what changes the use
 
 The four items above describe the *features*; these are the setup they each fail silently
 without, and none of it exists in the tree today (no service worker, no VAPID, no `webauthn`
-gem — verified 2026-07-15). Each is greenfield, so each is a real `v1.5.0` line item, not a
+gem — verified 2026-07-15). Each is greenfield, so each is a real `v1.6.0` line item, not a
 footnote.
 
 - [ ] **VAPID key lifecycle** *(prerequisite for push)*. Push is dead on arrival
@@ -404,14 +591,14 @@ nonces no longer match the header. The other two are the scope boundary above.
 
 ---
 
-## `v1.6.0` — minor. The Japan market layer
+## `v1.7.0` — minor. The Japan market layer
 
 Recruiter channel + `agencies` + the ownership-window warning; 年収 as a comp *structure*, not a
 number; the Japanese-level requirement filter. One release because all three pass the **field
 admission test the same way** — each is captured by `UrlPrefillService` at prefill time from the
 posting text. That is one extraction pass, one migration, one form pass; three releases would be
 three trips through the same three files. This is also the release a Tokyo reviewer could not
-have seen in someone else's portfolio — and after `v1.5.0`, its three fields land into a capture
+have seen in someone else's portfolio — and after `v1.6.0`, its three fields land into a capture
 flow that starts on the phone's share sheet, where the postings actually are. All three items
 were **researched against current web sources 2026-07-11**, and each falls under the
 perishable-facts refresh rule above. A fourth item joined on 2026-07-15 — the posting
@@ -466,7 +653,7 @@ snapshot — because it rides the same `UrlPrefillService` pass this release alr
       bigger rows on a database whose blobs are already 1 MB-capped on purpose, plus
       sanitization work to ever render it), and a manual paste field (works for postings met
       offline, but fails the near-zero-entry test that governs this whole section). **That second
-      rejection is narrower than it reads, and `v1.5.0`'s paste fallback does not overturn it**
+      rejection is narrower than it reads, and `v1.6.0`'s paste fallback does not overturn it**
       (amended 2026-07-16): what fails the test is a paste field *replacing* free capture at
       prefill time. A paste fallback for postings the fetcher physically cannot read competes with
       no capture at all. When both have landed, a pasted posting should fill `posting_snapshot`
@@ -475,9 +662,9 @@ snapshot — because it rides the same `UrlPrefillService` pass this release alr
 
 ---
 
-## `v1.6.1` — patch. Japanese phrase-based line breaking
+## `v1.7.1` — patch. Japanese phrase-based line breaking
 
-No new capability, so it cannot be a minor — but it is worth the most **right after `v1.6.0`**,
+No new capability, so it cannot be a minor — but it is worth the most **right after `v1.7.0`**,
 which is the release that fills the UI with the Japanese compound nouns (agency names, comp
 structures, JLPT levels) that wrap mid-word today.
 
@@ -499,7 +686,7 @@ structures, JLPT levels) that wrap mid-word today.
 
 ---
 
-## `v1.7.0` — minor. "Can you actually take this job?"
+## `v1.8.0` — minor. "Can you actually take this job?"
 
 The theme is **constraints that decide whether an offer is even takeable** — the visa item and
 the hiring-entity item are the same question asked from opposite directions, and the `.ics`
@@ -552,18 +739,18 @@ that was drift, fixed 2026-07-13. What survives of it is the conditional item fu
 
 ---
 
-## `v1.8.0` — minor. The follow-through (scoped 2026-07-15, extended 2026-07-16)
+## `v1.9.0` — minor. The follow-through (scoped 2026-07-15, extended 2026-07-16)
 
 Six items — five from the 2026-07-15 scoping pass, the board triage cards added 2026-07-16 —
 and all of a kind: each one harvests machinery an earlier release built — the FSM + timeline
 (stats, stage notes, triage cards), the prefill pipeline (talking points, and the `notes` the
-triage cards excerpt), the push channel (`v1.5.0`) plus the `.ics` event data (`v1.7.0`), and
-the visa research (`v1.7.0`). Every schema touch is a nullable column — the triage cards touch
+triage cards excerpt), the push channel (`v1.6.0`) plus the `.ics` event data (`v1.8.0`), and
+the visa research (`v1.8.0`). Every schema touch is a nullable column — the triage cards touch
 none at all — so the release passes the major test the same way the rest of the plan does.
 
 - [ ] **Dashboard stat cards — cards, not a page** *(decided 2026-07-15)*. Response rate,
       time-in-stage, and ghost rate as 2–3 cards next to the existing `avg_days_to_offer` line —
-      all queries over the FSM and `timeline_entries`, zero schema. After `v1.6.0` they can
+      all queries over the FSM and `timeline_entries`, zero schema. After `v1.7.0` they can
       slice by channel and Japanese level. **Alternative rejected:** a dedicated `/insights`
       page — a new route and nav weight for one user; if the cards earn promotion later, the
       queries move with them.
@@ -578,7 +765,7 @@ none at all — so the release passes the major test the same way the rest of th
 
       **Sequencing: `Applications::ListQuery` already landed**, which is what makes this cheap —
       the two new fields below go into a query object built to hold filters, not into a controller
-      that would then get refactored under load. Same reason `v1.6.0`'s three filters wait on the
+      that would then get refactored under load. Same reason `v1.7.0`'s three filters wait on the
       same extraction.
 
       **Scope, smaller than it looks — `notes` needs no API work.** `#index` renders records
@@ -648,15 +835,15 @@ none at all — so the release passes the major test the same way the rest of th
       generic AI voice is a real risk in a market where the letter *is* the signal, and the
       prompt-maintenance carry is heavier. This closes the second declared Phase 9 roadmap item
       in reduced shape.
-- [ ] **Push interview + deadline alerts.** New payloads on the push channel `v1.5.0` builds,
-      fed by the event data `v1.7.0`'s `.ics` work structures — interview reminders, offer
+- [ ] **Push interview + deadline alerts.** New payloads on the push channel `v1.6.0` builds,
+      fed by the event data `v1.8.0`'s `.ics` work structures — interview reminders, offer
       deadlines, and the CoE lead-time warning surfaced as a push, not just a page.
       **Alternatives rejected:** email-only via the existing digest (the channel will already
       exist; using it is the cheaper half), and leaving reminders to the phone's calendar
       (deadline arithmetic like CoE lead time never becomes a calendar event on its own).
 - [ ] **Public HSP (高度専門職) points calculator — standalone page, not an in-app tool**
       *(decided 2026-07-15)*. A public, no-auth calculator on the marketing side, sharing the
-      `v1.7.0` visa item's research (70-point threshold, J-Skip at ¥20M+). No schema.
+      `v1.8.0` visa item's research (70-point threshold, J-Skip at ¥20M+). No schema.
       **Chosen with eyes open against the north star:** it serves strangers, not the one loyal
       user — the trade is portfolio/SEO value for a page whose refresh rides the visa item's
       annual pass (perishable-facts rule applies). **Alternative rejected:** in-app, wired to
@@ -675,7 +862,7 @@ none at all — so the release passes the major test the same way the rest of th
 ## Conditional — open, but deliberately tagged to no release
 
 - [ ] **`timeline_entries` offer-lookup index** — still open, and still conditional; nothing in
-      `v1.4`–`v1.8` grows that table (the `v1.8.0` stage notes add a nullable column, not rows). The
+      `v1.4`–`v1.9` grows that table (the `v1.9.0` stage notes add a nullable column, not rows). The
       `avg_days_to_offer` subquery filters `to_status = 'offer'`, and there is deliberately no
       index on `to_status`: at personal-tracker scale a user's timeline is a few hundred rows,
       already reachable through `(application_id, created_at)`. Add `(to_status, application_id,
@@ -728,11 +915,11 @@ release**. Its stopgap already shipped (`cf7cd8d` — 8 GB heap + heap-snapshot 
 
 ---
 
-## `2.0.0` and beyond — triggered by accepting an offer, not by finishing `v1.8.0`
+## `2.0.0` and beyond — triggered by accepting an offer, not by finishing `v1.9.0`
 
 Direction decided 2026-07-11: KarirKalyan's long-term identity is a **career growth tracker**,
 not just an application tracker — the name already says so (karir = career; the product is
-currently narrower than its own name). This whole cluster sits **outside the `v1.4`–`v1.8`
+currently narrower than its own name). This whole cluster sits **outside the `v1.4`–`v1.9`
 plan** — not because it is unimportant, but because `positions` is the `2.0.0` (it adds a table
 *and* changes what `accepted` means in the FSM), and its scoping trigger is a date in the
 user's life, not a release number. Giving it a release slot in the plan would contradict that.
@@ -787,8 +974,8 @@ user's life, not a release number. Giving it a release slot in the plan would co
 
 - [ ] **Career intelligence — benchmark reports from published surveys** *(post-`2.0.0`: its
       headline view — comp percentile for the current position — needs `positions`. The
-      offer-comp-vs-median slice becomes buildable once `v1.6.0` lands the 年収 structure, but
-      the call — decided 2026-07-15, closing the "may ride a later `v1.7.x`" question — is to
+      offer-comp-vs-median slice becomes buildable once `v1.7.0` lands the 年収 structure, but
+      the call — decided 2026-07-15, closing the "may ride a later `v1.8.x`" question — is to
       keep it bundled here: no annual refresh-cost commitment before `positions` makes the full
       view buildable.)* An in-app,
       yearly-refreshed summary of reliable market sources: the [TokyoDev annual
