@@ -32,12 +32,32 @@ Two consequences worth stating plainly:
   [`CHANGELOG.md`](CHANGELOG.md), including the pre-1.0.0 build phases that used to sit at the
   top of this file.
 
-Last synced against the code: **2026-07-12**, `v1.4.1` (registration closed, the `/privacy` and
-`/terms` pages, and `DELETE /api/v1/auth/account` given a spec and a contract entry).
+Last synced against the code: **2026-07-16**, `v1.4.1` — full audit against `api/` and `web/`; the
+error-code table gained the `forbidden` row and the `invalid_url` scope was corrected to match the
+code. No behaviour-changing work has landed unsynced since the tag.
+
+---
+
+## Contents
+
+- [How to use this file](#how-to-use-this-file)
+- [System overview](#system-overview) — [Registration is closed](#registration-is-closed)
+- [Backend (`api/`)](#backend-api) — [Tech stack](#backend-tech-stack) · [Data model](#data-model) · [State machine](#state-machine) · [Service layer](#service-layer) · [Query layer](#query-layer) · [API contract](#api-contract) · [Background jobs](#background-jobs) · [Mail](#mail) · [Security](#security) · [Observability](#observability)
+- [Frontend (`web/`)](#frontend-web) — [Tech stack](#frontend-tech-stack) · [Design system](#design-system) · [Auth flow](#auth-flow) · [Public pages](#public-pages) · [Legal pages](#legal-pages) · [Route guard](#route-guard) · [Board view](#board-view) · [i18n](#i18n)
+- [Testing strategy](#testing-strategy)
+- [Deployment (Railway)](#deployment-railway)
+- [Local development](#local-development)
+- [Versioning & releases](#versioning--releases)
+- [Decisions log](#decisions-log)
+- [What this project is demonstrating](#what-this-project-is-demonstrating)
 
 ---
 
 ## System overview
+
+> **At a glance** · Two deployables. `api/` (Rails 8) owns data, auth, the FSM, and background
+> jobs; `web/` (Next.js 16) owns the UI and the browser session. The one hard rule at the
+> boundary: **the JWT never reaches client-side JavaScript.**
 
 ```
 karirkalyan/
@@ -60,6 +80,11 @@ Everything in the frontend auth design follows from that.
 
 ### Registration is closed
 
+> **At a glance** · No public sign-up — no endpoint, no page, no invite. Visitors use the shared
+> demo account; real accounts are created by the operator, server-side. The trade is deliberate:
+> it avoids a custodial promise over strangers' resumes this deployment cannot keep. Account
+> *deletion* stays (`DELETE /api/v1/auth/account`).
+
 **There is no way for a stranger to create an account.** No `POST /api/v1/auth/sign_up`, no
 `/sign-up` page, no invite flow. Visitors sign in to the shared read-write demo account through the
 **`Try demo account` button on `/sign-in`**, which fills the form for them; the credentials are also
@@ -67,6 +92,9 @@ published in both READMEs and in `llms.txt`, and they ship in the sign-in page's
 bundle — so treat them as world-readable, which is the assumption § Legal pages already makes when
 it calls the demo account world-writable. New accounts are created by the operator, on the server,
 with `bin/rails users:create EMAIL=… PASSWORD=…` — the one surviving caller of `WelcomeMailer`.
+
+<details>
+<summary><strong>Why registration is closed — the full argument</strong></summary>
 
 This is deliberate, and it is the single most surprising thing about the system, so the reasoning
 is here rather than in a commit message:
@@ -91,6 +119,11 @@ is here rather than in a commit message:
   /api/v1/auth/account` stays, and cascades (§ API contract). The operator can honour an erasure
   request; nobody can trip over the button.
 
+</details>
+
+<details>
+<summary><strong>The <code>routes.rb</code> trap, and why <code>RegistrationsController</code> is not a Devise subclass</strong></summary>
+
 The trap to know before touching `config/routes.rb`: Devise's `:registerable` module generates the
 sign-up `POST` **and** the account-destroy `DELETE` from the same `registrations` controller, so
 reaching for `skip: [:registrations]` alone would silently take the deletion endpoint with it.
@@ -114,6 +147,8 @@ is gone. It subclasses `ApplicationController` instead, which is where `authenti
 `current_user` and `render_error` come from anyway; nothing was lost. `bin/rails routes` shows
 exactly four auth routes: sign-in (new + create), sign-out, and account-destroy.
 
+</details>
+
 The demo account is exempt from destruction (`403 forbidden`). Its credentials are published, this
 endpoint is in Swagger, and `DemoResetJob` only rebuilds on the hour — without the guard, any
 visitor could make "Try demo account" 401 for the next fifty-nine minutes.
@@ -127,7 +162,7 @@ button, an upload throttle, a per-account application cap, and a backup story th
 
 ## Backend (`api/`)
 
-### Tech stack
+### Backend tech stack
 
 | Technology | Alternative considered | Reason |
 |---|---|---|
@@ -147,6 +182,10 @@ button, an upload throttle, a per-account application cap, and a backup story th
 uses RSpec, so that folder would be dead weight. `--skip-test` signals the choice.
 
 ### Data model
+
+> **At a glance** · Three tables. `users` (Devise auth, `jti` for JWT revocation), `applications`
+> (the core FSM entity — `status`, plus `resume`/`cover_letter` as `bytea`), and `timeline_entries`
+> (append-only audit log, one row per status change).
 
 #### `users`
 
@@ -228,7 +267,12 @@ created directly in an entry state (`wishlist`, `draft`, `applied`) has no `to_s
 that state. Anything deriving stage history from this table has to account for it — see the
 ghost-risk query, which does.
 
-### State machine — `app/lib/application_fsm.rb`
+### State machine
+
+> **At a glance** · `api/app/lib/application_fsm.rb` — a hand-written PORO, not a gem. 13 states;
+> `TRANSITIONS` is the single source of truth for legal moves. Three states are terminal
+> (`accepted`, `declined`, `archived`); three *look* terminal but revive to `applied` (`rejected`,
+> `withdrawn`, `ghosted`). Creation is not a transition — it sets one of three `ENTRY_STATES`.
 
 #### Why a custom PORO instead of a gem
 
@@ -309,6 +353,11 @@ stays lean. A board view gets the whole effective table in one request from
 
 ### Service layer
 
+> **At a glance** · Writes go through explicit service objects, never model callbacks.
+> `TransitionService` is the only path for a status change (FSM check + timeline row in one
+> transaction). Also here: `UrlPrefillService` (AI pre-fill over an SSRF-guarded fetch),
+> `Demo::ResetService`, and the two `Exports::*` artefact builders.
+
 #### Why service objects instead of fat models or callbacks
 
 ActiveRecord callbacks (`after_save`, `before_update`) fire on every save — including seeds,
@@ -359,9 +408,9 @@ Because the server fetches a user-supplied URL, the SSRF guard is load-bearing:
 
 Rate limits are enforced per-IP *and* per-account — see Security.
 
-Errors are typed and mapped: bad or private URL → `422`, missing `ANTHROPIC_API_KEY` → `503` (the
-rest of the app keeps working without it), AI failure → `502`. The user can always fill the form
-in by hand.
+Errors are typed and mapped: bad, private, or unreadable URL → `422`, missing `ANTHROPIC_API_KEY`
+→ `503` (the rest of the app keeps working without it), AI failure → `502`. The user can always
+fill the form in by hand.
 
 #### `Demo::ResetService`
 
@@ -405,7 +454,11 @@ This is documented because it already happened once and took production down (CH
 `JobBoard.from_url` strips a URL to a host key (`linkedin.com`). The `JobBoard::NONE` sentinel
 selects applications added without a link. There is no `source` column and no per-board parser.
 
-### Query layer — `app/queries/`
+### Query layer
+
+> **At a glance** · `api/app/queries/` — the read-side counterpart to services: non-trivial read
+> models that belong to no single controller and mutate nothing. Today there is one,
+> `GhostRiskQuery`, which flags applications the user has probably been ghosted on.
 
 Services exist for *writes*: an explicit user action changes state (§ Service layer). Query objects
 are the read-side counterpart — a non-trivial read model that belongs to no single controller and
@@ -415,6 +468,14 @@ mutates nothing. `app/queries/` holds them. Today there is one.
 
 Signature: `new(user:).call`. Answers one question: **which applications has the user probably been
 ghosted on?**
+
+> **At a glance** · It reads each `timeline_entries` row as an *exit* from a stage, derives how
+> long every stage took, and flags an application still sitting in a monitored stage (`applied`,
+> `phone_screen`) past the user's own p90 response time. No new column, no new table — the audit
+> log already holds everything it needs.
+
+<details>
+<summary><strong>How time-in-stage is derived from the audit log (and why the obvious reading is wrong)</strong></summary>
 
 The `ghosted` state has always existed in the FSM, but nothing ever *suggested* it — the user had to
 notice the silence themselves, which is precisely the thing a person in the middle of a job search
@@ -454,6 +515,8 @@ replied at all* — so exits to `ghosted`, `withdrawn`, and `archived` are exclu
 long silence would push their own threshold up, and the predictor would grow steadily more reluctant
 to predict. Everything else is a response — an advance up the pipeline, or a rejection.
 
+</details>
+
 **The threshold.** Per stage in `RISK_STAGES = %w[applied phone_screen]` — the two stages where the
 next move is the company's and silence therefore means something — take
 `percentile_cont(0.9)` over the user's own completed response times. An application currently
@@ -472,7 +535,10 @@ Cold start is the real design problem, and it is handled in three parts:
 The payload names which of the two applied (`basis: "personal" | "default"`) and the sample size
 behind it, and the UI says so. A number this consequential should not arrive unexplained.
 
-**Why two stages, and why the defaults are what they are.** Ghosting is the mainstream case, not
+<details>
+<summary><strong>Why two stages, and why the defaults are what they are</strong></summary>
+
+Ghosting is the mainstream case, not
 an edge case: [53% of job seekers were ghosted by an employer in the past
 year](https://www.ihire.com/resourcecenter/employer/pages/53-percent-of-job-seekers-have-been-ghosted-by-a-potential-employer)
 (up from 38% in 2024), and [61% report being ghosted *after* an
@@ -482,7 +548,14 @@ after application, 16% after a phone screen, 12% after multiple interviews — a
 `DEFAULT_P90` pair is sanity-checked against: silence after an application is both commoner and
 tolerated longer than silence after someone has spoken to you.
 
+</details>
+
 ### API contract
+
+> **At a glance** · All routes are JSON, all under `/api/v1`, all authenticated and scoped
+> per-user (cross-user access → `404`, never `403`). Errors share one envelope:
+> `{ error, code, details? }` — clients branch on the stable `code`, never the English `error`.
+> Endpoint list, error-code table, and payload shapes below.
 
 All routes are JSON. Every error response is:
 
@@ -550,11 +623,12 @@ its own (a `409` is retryable, a `422` is not), but the code is what clients sho
 |---|---|---|
 | `unauthenticated` | `401` | Missing, expired, or revoked JWT (Devise failure app) |
 | `invalid_credentials` | `401` | Sign-in with a wrong email or password |
+| `forbidden` | `403` | Deleting the shared demo account — it is exempt from destruction (§ Registration is closed) |
 | `not_found` | `404` | No such record — including another user's record |
 | `stale_record` | `409` | `ActiveRecord::StaleObjectError` — optimistic-locking conflict |
 | `invalid_transition` | `422` | FSM `InvalidTransitionError` |
 | `validation_failed` | `422` | Model validation failure (create/update, file upload); carries `details` |
-| `invalid_url` | `422` | Bad or private/internal pre-fill URL |
+| `invalid_url` | `422` | Bad or private/internal pre-fill URL — also a page that was reachable but yielded no readable text (`FetchError`) |
 | `rate_limited` | `429` | Rack::Attack throttle; `Retry-After` header set |
 | `prefill_failed` | `502` | AI extraction failed |
 | `prefill_unavailable` | `503` | `ANTHROPIC_API_KEY` missing — the rest of the app keeps working |
@@ -710,7 +784,12 @@ not:
   the filename it chose (`karirkalyan-applications-2026-07-12.csv`), so the browser downloads
   rather than navigates, and the server stays the one place that names the file.
 
-### Background jobs — Solid Queue
+### Background jobs
+
+> **At a glance** · Solid Queue on the primary Postgres — no Redis, no separate worker service.
+> Workers run inside Puma (`SOLID_QUEUE_IN_PUMA`). Three recurring tasks: the follow-up reminder
+> digest (08:15 JST, skipped on Japanese dead zones), finished-job cleanup, and the hourly demo
+> reset.
 
 **Adapter:** `:solid_queue` in production (`config/application.rb`), `:async` in development,
 `:test` in test.
@@ -825,6 +904,10 @@ boundaries throughout.
 
 ### Mail
 
+> **At a glance** · Two mailers — `WelcomeMailer` (on account creation) and `FollowUpMailer#digest`
+> (one per user per business day). Production sends via Resend over STARTTLS port `2587`, because
+> Railway blocks 587/465.
+
 `ActionMailer` is re-enabled in `config/application.rb` (the `--api` default disables it).
 Production sends via SMTP (Resend); development previews only; test collects in
 `ActionMailer::Base.deliveries`.
@@ -842,6 +925,10 @@ Production sends via SMTP (Resend); development previews only; test collects in
 STARTTLS port `2587`. The `From:` domain must be verified in Resend first.
 
 ### Security
+
+> **At a glance** · JWT auth with one JTI per user (sign-out revokes all devices). Rack::Attack
+> throttles keyed per-IP *and* per-account/email through Solid Cache. Optimistic locking on writes,
+> magic-byte-checked uploads, `nosniff` downloads, credentials filtered from logs.
 
 - **Auth** — Devise + devise-jwt. The JWT is issued in the `Authorization` response header. **One
   JTI per user**, via `JTIMatcher`: sign-out rotates it and therefore revokes *all* devices.
@@ -888,7 +975,7 @@ STARTTLS port `2587`. The `From:` domain must be verified in Resend first.
 
 ## Frontend (`web/`)
 
-### Tech stack
+### Frontend tech stack
 
 | Technology | Alternative considered | Reason |
 |---|---|---|
@@ -912,7 +999,12 @@ toolchains.
 Vite would be right if this were a public app where a stateless token in `localStorage` was
 acceptable, or if a cookie server already existed.
 
-### Design system — `web/app/globals.css`
+### Design system
+
+> **At a glance** · `web/app/globals.css` is the single entry point where `design/assets/tokens.css`
+> reaches the app, via Tailwind v4's `@theme inline`. Ten colours, three typefaces (Fraunces /
+> Manrope / IBM Plex Mono), **radius 0** — sharp corners are the editorial voice. No UI kit, no form
+> library, no state library.
 
 `design/assets/tokens.css` is the brand book; `globals.css` is the only place those tokens enter the
 app, through Tailwind v4's `@theme inline`. Ten colours — the nine brand hues plus `--color-danger`,
@@ -949,7 +1041,12 @@ Three things there are easy to get wrong:
 `.kk-num` (mono ordinal, tabular figures) are the only other custom classes; everything else is
 Tailwind utilities.
 
-### Auth flow — the token never reaches the browser
+### Auth flow
+
+> **At a glance** · The JWT never reaches client JS. A Next route handler proxies sign-in to Rails,
+> lifts the token from the `Authorization` header, and stores it in an `httpOnly` `session` cookie;
+> server-side `apiFetch` re-attaches it as a Bearer. Origin checks guard the auth handlers — Next's
+> built-in CSRF defence covers Server Actions, not route handlers.
 
 1. The sign-in form POSTs plain credentials to a Next route handler
    (`app/api/auth/session/route.ts`). It is the only such handler — registration is closed, so
@@ -980,7 +1077,12 @@ A `401` from upstream is the *only* thing that may surface as a `401`. Collapsin
 upstream status into `401` once turned a total API outage into "Invalid email or password" for
 every user — see CHANGELOG v1.0.1.
 
-### Public pages — `/`, `/about`, `/docs`
+### Public pages
+
+> **At a glance** · `/` argues one claim — a job tracker built on a finite state machine — with a
+> pipeline diagram that is an *illustration*, never a second copy of the transition table. `/about`
+> states four build decisions as the cheaper alternative each one rejected; `/docs` frames the API
+> and links out to Swagger.
 
 The homepage argues one claim: this is a job tracker **built on a finite state machine** — thirteen
 states, an explicit transition table, an immutable audit trail, the stack named outright. Its primary
@@ -1027,7 +1129,12 @@ cursor pagination, and the endpoint table — and then links out to the rswag Sw
 one click further in. The endpoint table's methods and paths are code and are not translated; only
 the sentence beside each one is.
 
-### Legal pages — `/privacy`, `/terms`
+### Legal pages
+
+> **At a glance** · `/privacy` and `/terms`, both locales, reachable while signed in (`OPEN_PATHS`).
+> They exist because the app holds resumes, and are written to be *true about the system as built*:
+> five named sub-processors (Railway, GitHub, Anthropic, Resend, Honeybadger), two functional
+> cookies, no self-service delete. Never a promise the code does not keep.
 
 Two prose pages in both locales, linked from the site footer, `OPEN_PATHS` so a signed-in user can
 still read them. They exist because the app holds resumes, and a service that holds resumes without
@@ -1090,7 +1197,12 @@ untrue.
 and no uptime commitment, the demo account is shared and world-writable so nothing private belongs
 in it, and the operator may reset or delete it at any time.
 
-### Route guard — `web/proxy.ts`
+### Route guard
+
+> **At a glance** · `web/proxy.ts` (Next 16 renamed `middleware.ts` → `proxy.ts`; a `middleware.ts`
+> is silently ignored). Auth is the presence of the `session` cookie, across three path classes:
+> `OPEN_PATHS` always render, `PUBLIC_PATHS` bounce to `/dashboard` when signed in, everything else
+> bounces to `/sign-in` when not. It also resolves the locale and sets the per-request CSP nonce.
 
 Next.js 16 renamed `middleware.ts` → `proxy.ts`; a `middleware.ts` file is **ignored**. Export a
 function named `proxy`.
@@ -1127,7 +1239,12 @@ root layout opts the whole app into dynamic rendering**, so every page's scripts
 There is consequently no static optimization left to lose — which is why locale-prefixed routing in
 v1.1.0 costs nothing.
 
-### Board view — `/board`
+### Board view
+
+> **At a glance** · `/board` (labelled "Kanban") — one column per active status, cards moved by drag
+> or menu, each move a real FSM transition. It *fetches* the legal-move table from
+> `GET /api/v1/transitions` rather than mirroring it. Bounded fetch-all, native HTML5 drag,
+> optimistic moves that revert on `409`.
 
 A Kanban view of the same applications the dashboard lists: one column per active status, cards
 moved by drag or by menu, each move a real FSM transition. It lives under the `(app)` route group,
@@ -1199,7 +1316,12 @@ additionally triggers `router.refresh()`, since the board's copy of that applica
 definition. `revalidateApplication()` in `actions.ts` revalidates `/board` alongside
 `/applications/[id]` and `/dashboard`, so moves made elsewhere reach the board on next render.
 
-### i18n — `next-intl`, English and Japanese
+### i18n
+
+> **At a glance** · `next-intl`, `en` (default, unprefixed) and `ja` (prefixed;
+> `localePrefix: "as-needed"`). Copy lives in ICU catalogs at `web/messages/{en,ja}.json`. Rails
+> stays English-only; `web/` localizes failures on the machine-readable error `code`. All
+> navigation goes through `i18n/navigation.ts`, never the `next/*` originals.
 
 Locales are `en` (default) and `ja`. Copy lives in ICU message catalogs at `web/messages/{en,ja}.json`.
 
