@@ -1,5 +1,5 @@
 import { cookies } from "next/headers";
-import { API_BASE, SESSION_COOKIE_NAME } from "@/app/lib/api";
+import { INTERNAL_API_URL, SESSION_COOKIE_NAME } from "@/app/lib/api";
 import { forbiddenOrigin, isAllowedOrigin } from "@/app/lib/csrf";
 
 // POST = sign-in. Proxies email/password to Rails, captures the JWT from the
@@ -17,7 +17,7 @@ export async function POST(request: Request) {
     return Response.json({ error: "Email and password required" }, { status: 400 });
   }
 
-  const upstream = await fetch(`${API_BASE}/api/v1/auth/sign_in`, {
+  const upstream = await fetch(`${INTERNAL_API_URL}/api/v1/auth/sign_in`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ user: { email: body.email, password: body.password } }),
@@ -74,7 +74,7 @@ export async function DELETE(request: Request) {
   const token = cookieStore.get(SESSION_COOKIE_NAME)?.value;
 
   if (token) {
-    await fetch(`${API_BASE}/api/v1/auth/sign_out`, {
+    await fetch(`${INTERNAL_API_URL}/api/v1/auth/sign_out`, {
       method: "DELETE",
       headers: { Authorization: token },
     });

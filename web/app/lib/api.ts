@@ -1,7 +1,18 @@
 import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
 
-const API_URL = process.env.API_URL ?? "http://localhost:3001";
+/**
+ * Where `web/`'s server-side code reaches Rails. Server-to-server only: in
+ * production this resolves to the private `api.railway.internal` address, which
+ * a browser cannot reach at all.
+ *
+ * Not to be confused with `PUBLIC_API_ORIGIN` (app/lib/links.ts) — that is the
+ * API's public URL, and exists only to build outbound doc links for a browser
+ * to follow. Nothing fetches through it.
+ *
+ * The env var keeps its deployed name (`API_URL`); only the binding is renamed.
+ */
+export const INTERNAL_API_URL = process.env.API_URL ?? "http://localhost:3001";
 const SESSION_COOKIE = "session";
 
 import { type ApiErrorDetail, isApiErrorDetail } from "./api-error";
@@ -42,7 +53,7 @@ export async function apiFetch<T = unknown>(
   headers.set("Accept", "application/json");
   if (token) headers.set("Authorization", token);
 
-  const response = await fetch(`${API_URL}/api/v1${path}`, {
+  const response = await fetch(`${INTERNAL_API_URL}/api/v1${path}`, {
     ...init,
     headers,
     cache: "no-store",
@@ -92,7 +103,7 @@ export async function apiProxy(path: string): Promise<Response> {
   const headers = new Headers();
   if (token) headers.set("Authorization", token);
 
-  const upstream = await fetch(`${API_URL}/api/v1${path}`, {
+  const upstream = await fetch(`${INTERNAL_API_URL}/api/v1${path}`, {
     headers,
     cache: "no-store",
   });
@@ -115,7 +126,6 @@ export async function apiProxy(path: string): Promise<Response> {
 }
 
 export const SESSION_COOKIE_NAME = SESSION_COOKIE;
-export const API_BASE = API_URL;
 
 // Pulls the API's failure envelope — `{ error, code, details? }` — out of an
 // error body, tolerating shapes that predate or fall outside the contract.

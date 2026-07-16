@@ -4,11 +4,13 @@ Open work only, grouped by the release that ships it. Shipped work lives in
 [`CHANGELOG.md`](CHANGELOG.md), and so do the settled decisions-not-to-build (dark mode,
 document version history, client-side error tracking — see its § Decisions). Last cut back to
 open work on 2026-07-13; restructured by release on 2026-07-15 so each item is told once, in
-the section of the release that ships it. The board triage cards joined `v1.8.0` on 2026-07-16.
+the section of the release that ships it. The board triage cards joined `v1.8.0` on 2026-07-16,
+and `v1.4.2`'s first two items closed and left the file the same day.
 
-**Current release: `v1.4.1`** (2026-07-12, "Close the door"). **Nothing is in flight**, but
-`v1.4.2` has already started accruing — see its section. What each shipped release contained is
-`CHANGELOG.md`'s job to say, not this file's.
+**Current release: `v1.4.1`** (2026-07-12, "Close the door"). **In flight:**
+`refactor/applications-list-query` — the first two `v1.4.2` items are done and left this file for
+`CHANGELOG.md` § Unreleased. What each shipped release contained is `CHANGELOG.md`'s job to say,
+not this file's.
 
 **North star (decided 2026-07-11): be the best career app for its one loyal user.** Portfolio
 value follows from that, not the other way round — a reviewer can tell a tool with a real
@@ -19,7 +21,7 @@ operations work — backups, export, abuse throttles — earns its place without
 feature admission test, because nothing else in the repo defends the data.
 
 **One standing promise outranks everything here on the day it breaks:** `/privacy` and `/terms`
-name `karirkalyan@cypherpunkzero.com` (`web/app/lib/links.ts:7`) as the address an erasure request
+name `karirkalyan@cypherpunkzero.com` (`web/app/lib/links.ts:13`) as the address an erasure request
 goes to; the mailbox is set up and was verified to receive mail (2026-07-12). It is a **published
 promise**, not a gate — if that routing ever breaks, the legal pages are lying, so fixing it
 outranks anything else in this file on the day it happens.
@@ -45,7 +47,7 @@ seeker's professional context isn't just light-themed, it's mobile.
 
 | Release | Level | Contents |
 | --- | --- | --- |
-| `v1.4.2` | patch | `Applications::ListQuery` extraction, `API_BASE` naming, download filenames, upload throttle, the profile-card fold — **plus the privacy/doc-drift fix already on `main`** |
+| `v1.4.2` | patch | Download filenames, upload throttle, the profile-card fold — **plus the two done items and the privacy/doc-drift fix, both in `CHANGELOG.md` § Unreleased** |
 | `v1.5.0` | minor | The pocket app: share-sheet capture, passkey sign-in, push digest, installed-app shell |
 | `v1.6.0` | minor | The Japan market layer: recruiter channel + `agencies`, 年収 comp structure, Japanese-level filter |
 | `v1.6.1` | patch | Japanese phrase-based line breaking |
@@ -96,27 +98,21 @@ is fine — the `web/`-only constraint was a property of v1.1.0, not a permanent
 
 ## `v1.4.2` — patch. Sequenced before `v1.5.0`, not filler
 
-**Already on `main`, untagged** (`deeedd0`, PR #63 — the post-`v1.4.1` docs audit): Honeybadger
-Insights turned **off**, three false claims corrected on `/privacy` in both locales, and the doc
-drift the audit turned up (`web/README.md`'s dead `/sign-up` route, swagger's Production server
-pointing at the Next.js app, `db:seed` called "optional" in three guides, Postgres 16 on the
-landing page). It sits in `CHANGELOG.md` § Unreleased and rides this tag rather than earning one
-— no capability, no migration — and it does not change what `v1.4.2` *is*: still the
-code-quality patch that "Close the door" displaced. Everything below stays a patch the same
-way: no new capability, no migration, and the previous image boots against an unchanged
-database.
+**Two items closed, both in `CHANGELOG.md` § Unreleased** (`refactor/applications-list-query`):
+the `Applications::ListQuery` extraction — which was sequenced first because `v1.6.0`'s three
+filters and `v1.8.0`'s triage cards both land on `ApplicationsController#index` — and the
+`API_BASE` / `API_BASE_URL` rename, now `INTERNAL_API_URL` (`web/app/lib/api.ts`) and a
+module-private `PUBLIC_API_ORIGIN` (`web/app/lib/links.ts`).
 
-- [ ] **Extract `Applications::ListQuery` — lands first, and must land before `v1.6.0`.**
-      `ApplicationsController#index` mixes filtering, cursor decoding, and serialization inline.
-      `api/app/queries/` now exists (`Applications::GhostRiskQuery`), so the destination and its
-      conventions are settled; this is now a straight extraction with a pattern to follow. The
-      sequencing is the point: `v1.6.0` adds three filters (channel, comp, Japanese level) to
-      exactly this method — extract first and they land in a query object rather than thickening
-      a controller that then has to be refactored under load. (The insertion of the pocket app
-      between them changes nothing here: `v1.5.0` does not touch `#index`.)
-- [ ] **`API_BASE` vs `API_BASE_URL`** — two near-identical names for different things
-      (`web/app/lib/api.ts:107` is the internal fetch base; `web/app/lib/links.ts:2` is the public
-      Railway URL used for doc links). Rename or comment.
+**Also already on `main`, untagged** (`deeedd0`, PR #63 — the post-`v1.4.1` docs audit):
+Honeybadger Insights turned **off**, three false claims corrected on `/privacy` in both locales,
+and the doc drift the audit turned up (`web/README.md`'s dead `/sign-up` route, swagger's
+Production server pointing at the Next.js app, `db:seed` called "optional" in three guides,
+Postgres 16 on the landing page). It rides this tag rather than earning one — no capability, no
+migration — and it does not change what `v1.4.2` *is*: still the code-quality patch that "Close
+the door" displaced. Everything below stays a patch the same way: no new capability, no
+migration, and the previous image boots against an unchanged database.
+
 - [ ] **Name downloaded resumes and cover letters after the application, not after nothing** —
       the v1.4.0 fallout: shipping the account archive is what made it visible that neither
       download surface names a file usefully. The same disease on two surfaces. In the archive,
@@ -515,10 +511,10 @@ none at all — so the release passes the major test the same way the rest of th
       is the company's, which is what ghost risk already watches; these two are the columns where
       the stalled item is the user's own to move.
 
-      **Sequencing: lands after the `v1.4.2` `Applications::ListQuery` extraction**, for exactly
-      the reason that item already gives about `v1.6.0`'s three filters — this adds fields to the
-      same `ApplicationsController#index`, and should land in a query object rather than thicken a
-      controller that then gets refactored under load.
+      **Sequencing: `Applications::ListQuery` already landed**, which is what makes this cheap —
+      the two new fields below go into a query object built to hold filters, not into a controller
+      that would then get refactored under load. Same reason `v1.6.0`'s three filters wait on the
+      same extraction.
 
       **Scope, smaller than it looks — `notes` needs no API work.** `#index` renders records
       through `as_json`, so `notes` already ships on every board row, and `web/app/lib/types.ts`
@@ -530,15 +526,15 @@ none at all — so the release passes the major test the same way the rest of th
         `jobBoardLabel(host, noBoardLabel)` (`web/app/lib/format.ts`) already exists and already
         maps hosts to brands, but it takes a *host* and no board card has one — and deriving it in
         TypeScript from `app.url` would be a second implementation of `from_url`'s www-strip and
-        downcase. That is the `API_BASE`/`API_BASE_URL` disease with a parser attached.
+        downcase, in the language that does not own the rule.
       - **`days_in_stage`** — reuse the name and the formula `GhostRiskQuery#in_flight` already
         uses: `COALESCE(MAX(timeline_entries.created_at), applied_at, created_at)` against a
         Ruby-bound `Time.current`. **Not `updated_at`**, which drifts on any edit — the same
         reasoning the `avg_days_to_offer` query is already commented with. It falls out correctly
         for these two columns for free: a `draft` has no timeline rows and a null `applied_at`, so
         it COALESCEs to `created_at`, its real age. **One name, not two** — `days_in_state` for an
-        identical computation would be the same near-miss naming this file already has an item to
-        clean up. The shared expression is the argument for building this next to the stat cards
+        identical computation would re-create exactly the near-miss naming the `API_BASE` /
+        `API_BASE_URL` rename was done to remove. The shared expression is the argument for building this next to the stat cards
         above, which name time-in-stage as a query over the same two tables.
 
       **Traps:**
