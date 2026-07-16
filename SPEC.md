@@ -34,7 +34,9 @@ Two consequences worth stating plainly:
 
 Last synced against the code: **2026-07-16**, `v1.4.1` — full audit against `api/` and `web/`; the
 error-code table gained the `forbidden` row and the `invalid_url` scope was corrected to match the
-code. No behaviour-changing work has landed unsynced since the tag.
+code. Since the tag, § Query layer gained `Applications::ListQuery` — an extraction, not a
+behaviour change: it moves `GET /api/v1/applications`'s filtering and cursor decoding out of the
+controller and writes down the contract that action already had.
 
 ---
 
@@ -457,12 +459,45 @@ selects applications added without a link. There is no `source` column and no pe
 ### Query layer
 
 > **At a glance** · `api/app/queries/` — the read-side counterpart to services: non-trivial read
-> models that belong to no single controller and mutate nothing. Today there is one,
-> `GhostRiskQuery`, which flags applications the user has probably been ghosted on.
+> models that mutate nothing. Two live here: `ListQuery`, which turns the application index's
+> filter and cursor params into a page of records, and `GhostRiskQuery`, which flags applications
+> the user has probably been ghosted on.
 
 Services exist for *writes*: an explicit user action changes state (§ Service layer). Query objects
-are the read-side counterpart — a non-trivial read model that belongs to no single controller and
-mutates nothing. `app/queries/` holds them. Today there is one.
+are the read-side counterpart — a non-trivial read model that mutates nothing. `app/queries/` holds
+them.
+
+A read model earns a query object when it is **more than a scope**: `GhostRiskQuery` composes a
+window function with a percentile aggregate, and `ListQuery` composes four filters with cursor
+decoding and a lookahead. A one-line `where` does not qualify and belongs on the model.
+
+#### `Applications::ListQuery`
+
+Signature: `new(user:, status:, company:, source:, after:, limit:).call` — every filter keyword is
+optional and nil-tolerant. Backs `GET /api/v1/applications` and nothing else. Returns
+`{ records:, next_cursor:, has_more: }`; the controller renders that into the `{ data, meta }`
+envelope of § Cursor pagination and does nothing else.
+
+> **At a glance** · Applies the `status` / `company` / `source` filters, decodes the `after` cursor,
+> clamps `limit` to 1–100, and fetches `limit + 1` rows to learn whether a next page exists. All
+> filtering is server-side and composes with pagination.
+
+**Why it is a query object at all**, given it wraps no exotic SQL: the filters are the growth axis.
+`ApplicationsController#index` previously inlined filtering, cursor decoding, and the lookahead in
+one method, and the planned market-layer filters (channel, compensation, Japanese level) all land on
+this exact read path — each one thickening a controller action rather than composing into an object
+built to hold them. Extracting first is what stops that.
+
+**Ignoring bad input rather than rejecting it** is the deliberate contract, inherited from the
+pre-extraction behaviour and now stated in one place. An unknown `status` (not in
+`ApplicationFSM::VALID_STATES`), a malformed `after` cursor, and a non-numeric `limit` are each
+dropped, and the request returns the first page rather than a `422`. These params come from
+navigation — a stale bookmark, an edited URL — not from a form, and a browsable list that 422s on a
+typo'd query string is worse than one that shows the unfiltered page.
+
+The `source` filter is a host substring match (`ILIKE`), not a column: § `JobBoard` explains why
+there is no `source` column, and `JobBoard::NONE` selects applications with no link at all.
+`sanitize_sql_like` escapes the pattern, so a `%` in the param is a literal `%`.
 
 #### `Applications::GhostRiskQuery`
 
@@ -675,7 +710,9 @@ than erroring. Manual implementation, no gem — roughly 20 lines, and it shows 
 than gem reach.
 
 Filters compose with pagination server-side: `status` (exact), `company` (exact), `source` (host
-substring, `ILIKE`).
+substring, `ILIKE`). The mechanism — filters, cursor decoding, the `limit + 1` lookahead behind
+`has_more`, and the rule that bad input is ignored rather than rejected — lives in
+§ `Applications::ListQuery`; the controller only renders what it returns.
 
 #### The dashboard payload — `GET /api/v1/dashboard`
 

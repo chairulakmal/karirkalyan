@@ -23,42 +23,19 @@ module Api
       end
 
       def index
-        limit = [ [ params.fetch(:limit, 10).to_i, 1 ].max, 100 ].min
-        scope = current_user.applications.order(created_at: :desc)
+        page = Applications::ListQuery.new(
+          user:    current_user,
+          status:  params[:status],
+          company: params[:company],
+          source:  params[:source],
+          after:   params[:after],
+          limit:   params[:limit]
+        ).call
 
-        if params[:status].present? && ApplicationFSM::VALID_STATES.include?(params[:status])
-          scope = scope.where(status: params[:status])
-        end
-
-        scope = scope.where(company: params[:company]) if params[:company].present?
-
-        # Crude "job board" filter: match the URL host as a substring. The
-        # NONE sentinel selects applications added without a link.
-        if params[:source].present?
-          scope =
-            if params[:source] == JobBoard::NONE
-              scope.where("url IS NULL OR url = ''")
-            else
-              like = "%#{ActiveRecord::Base.sanitize_sql_like(params[:source])}%"
-              scope.where("url ILIKE ?", like)
-            end
-        end
-
-        if params[:after].present?
-          begin
-            cursor_time = Time.zone.parse(Base64.urlsafe_decode64(params[:after]))
-            scope = scope.where("created_at < ?", cursor_time)
-          rescue ArgumentError
-            # malformed cursor — ignore, return first page
-          end
-        end
-
-        records     = scope.limit(limit + 1).to_a
-        has_more    = records.size > limit
-        records     = records.first(limit)
-        next_cursor = has_more ? Base64.urlsafe_encode64(records.last.created_at.iso8601(6)) : nil
-
-        render json: { data: records, meta: { next_cursor: next_cursor, has_more: has_more } }
+        render json: {
+          data: page[:records],
+          meta: { next_cursor: page[:next_cursor], has_more: page[:has_more] }
+        }
       end
 
       # POST /api/v1/applications/prefill — extracts company/role/notes from a

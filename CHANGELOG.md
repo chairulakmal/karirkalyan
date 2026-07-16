@@ -8,7 +8,10 @@ Open work lives in [`TODO.md`](TODO.md). Settled decisions-not-to-build are reco
 
 ## Unreleased
 
-Rides along with the next patch. *(fix/privacy-truth-and-doc-drift)*
+Rides along with the next patch, `v1.4.2` — the code-quality release "Close the door" displaced.
+Grouped by the branch each change landed on.
+
+### The post-`v1.4.1` docs audit *(fix/privacy-truth-and-doc-drift)*
 
 - **Honeybadger Insights is off.** It was on, which meant honeybadger's Rails plugin shipped an
   event per request, per SQL query and per mailer send — a stream of telemetry from healthy
@@ -25,6 +28,36 @@ Rides along with the next patch. *(fix/privacy-truth-and-doc-drift)*
   text; the URL never leaves the box — SPEC had this exactly backwards). It now also says the
   pre-fill is fetched server-side, which is a fact in the user's favour: the job board never learns
   who was reading.
+
+### Code quality *(refactor/applications-list-query)*
+
+- **`Applications::ListQuery` — `GET /api/v1/applications` gets a query object.**
+  `ApplicationsController#index` inlined filtering, cursor decoding and the `limit + 1` lookahead
+  in one 35-line method; it is now a call and a render, and `app/queries/` holds the mechanism
+  next to `GhostRiskQuery`. **Behaviour is unchanged by design** — the existing request specs
+  covering filters, pagination and the `NONE` sentinel passed untouched, which is what makes this
+  an extraction rather than a rewrite. The sequencing is the point: `v1.6.0`'s market-layer
+  filters (channel, compensation, Japanese level) all land on this exact read path, and they now
+  compose into an object built to hold them instead of thickening a controller that would then
+  need refactoring under load. The contract that action always had is now *written down* in
+  SPEC.md § Query layer rather than implied by control flow — in particular the deliberate rule
+  that bad input is **ignored, not rejected**: an unknown status, a malformed cursor and a junk
+  limit each return the first page, because these params come from navigation (a stale bookmark,
+  a hand-edited URL) and a browsable list that `422`s on a typo'd query string is worse than one
+  that shows the unfiltered page.
+- **One behaviour change, and it is a bug fix.** `?limit=` (present but empty) returned **one**
+  row, because `"".to_i` is `0` and the old clamp floored it to 1. It now returns the default 10.
+  Nothing requests it that way; the old result was an artifact of the clamp, not a contract.
+- **`API_BASE` / `API_BASE_URL` → `INTERNAL_API_URL` / `PUBLIC_API_ORIGIN`.** Two near-identical
+  names for opposite things, and it was worse than it looked: `API_BASE` was a bare alias of a
+  private `API_URL` const, so the confusable pair was really a triple. The surviving names state
+  the distinction that matters — `INTERNAL_API_URL` (`app/lib/api.ts`) is the server-to-server
+  fetch base, in production the private `api.railway.internal` address a browser cannot reach;
+  `PUBLIC_API_ORIGIN` (`app/lib/links.ts`) is the public URL, and exists *only* to build outbound
+  doc links. The latter is now module-private, since only `API_DOCS_URL` ever read it — the
+  ambiguity is gone from the export surface, not just renamed on it. **The `API_URL` env var keeps
+  its deployed name**: renaming it would mean a Railway variable change, which is not a
+  patch-level move and buys nothing the binding name doesn't.
 
 ---
 
