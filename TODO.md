@@ -4,13 +4,14 @@ Open work only, grouped by the release that ships it. Shipped work lives in
 [`CHANGELOG.md`](CHANGELOG.md), and so do the settled decisions-not-to-build (dark mode,
 document version history, client-side error tracking — see its § Decisions). Last cut back to
 open work on 2026-07-13; restructured by release on 2026-07-15 so each item is told once, in
-the section of the release that ships it. The board triage cards joined `v1.8.0` on 2026-07-16,
-and `v1.4.2`'s first two items closed and left the file the same day.
+the section of the release that ships it. Three things happened on 2026-07-16: the board triage
+cards joined `v1.8.0`; `v1.4.3` and the prefill paste fallback were added out of one prod bug;
+and `v1.4.2`'s first two items closed and left the file.
 
-**Current release: `v1.4.1`** (2026-07-12, "Close the door"). **In flight:**
-`refactor/applications-list-query` — the first two `v1.4.2` items are done and left this file for
-`CHANGELOG.md` § Unreleased. What each shipped release contained is `CHANGELOG.md`'s job to say,
-not this file's.
+**Current release: `v1.4.1`** (2026-07-12, "Close the door"). **Nothing is in flight.** `v1.4.2`'s
+first two items merged untagged (PR #64) and left this file for `CHANGELOG.md` § Unreleased, which
+is where the rest of that release is accruing too. What each shipped release contained is
+`CHANGELOG.md`'s job to say, not this file's.
 
 **North star (decided 2026-07-11): be the best career app for its one loyal user.** Portfolio
 value follows from that, not the other way round — a reviewer can tell a tool with a real
@@ -48,7 +49,8 @@ seeker's professional context isn't just light-themed, it's mobile.
 | Release | Level | Contents |
 | --- | --- | --- |
 | `v1.4.2` | patch | Download filenames, upload throttle, the profile-card fold — **plus the two done items and the privacy/doc-drift fix, both in `CHANGELOG.md` § Unreleased** |
-| `v1.5.0` | minor | The pocket app: share-sheet capture, passkey sign-in, push digest, installed-app shell |
+| `v1.4.3` | patch | Prefill: IPv4-first address pinning, and an error taxonomy that stops blaming the user's URL |
+| `v1.5.0` | minor | The pocket app: share-sheet capture, passkey sign-in, push digest, installed-app shell — **plus the prefill paste fallback the share sheet needs** |
 | `v1.6.0` | minor | The Japan market layer: recruiter channel + `agencies`, 年収 comp structure, Japanese-level filter |
 | `v1.6.1` | patch | Japanese phrase-based line breaking |
 | `v1.7.0` | minor | Hiring entity, timezone overlap + `.ics`, visa / status of residence |
@@ -227,6 +229,78 @@ migration, and the previous image boots against an unchanged database.
 
 ---
 
+## `v1.4.3` — patch. The prefill bug, and the lie it tells (diagnosed 2026-07-16)
+
+**Sequenced after `v1.4.2`, and it is two bugs, not one.** Both were found chasing a single
+report — prefill failing on a TokyoDev posting
+(`/companies/hennge/jobs/senior-frontend-engineer-svelte-hennge-tadrill`). Neither adds a
+capability and neither has a migration, so the previous image boots against an unchanged
+database: patch, by the mechanical test.
+
+**Worth knowing before either item: the logs cannot tell these apart.** `lograge.rb` logs
+`time/request_id/params` and never the rendered body, and both failures render a `422` from the
+same `rescue` — so grepping for the error string finds nothing. The diagnosis came from response
+timing (25.7ms and 5.5ms — far too fast for a real TLS round trip to an external edge, which is
+what an immediate `ENETUNREACH` looks like) plus reading the source. Same-status-different-cause
+is the shape of this whole section.
+
+- [ ] **Pin to an IPv4 address, not `addresses.first`.** `UrlPrefillService#guard_against_internal_host!`
+      (`api/app/services/applications/url_prefill_service.rb:152`) returns `addresses.first`, and
+      `#fetch` pins `http.ipaddr` to it. `Resolv.getaddresses("www.tokyodev.com")` returns
+      Cloudflare's **IPv6 addresses first** — and Outbound IPv6 is **disabled** on the `api`
+      service in production (`railway outbound-network ipv6 status --service api` →
+      `{"ipv6": {"enabled": false, "staged": false}}`, confirmed 2026-07-16). So the connect dies
+      with `ENETUNREACH` before a packet leaves the container, is caught by the
+      `rescue SocketError, SystemCallError, …` at `:126`, and surfaces as
+      `FetchError, "Couldn't reach that URL."` Prefer IPv4 when choosing which
+      *already-validated* address to dial:
+      `addresses.sort_by { |a| IPAddr.new(a).ipv4? ? 0 : 1 }.first`.
+
+      **This does not weaken the SSRF guard**, and that is the point worth writing down before
+      the code: the loop above still rejects if *any* resolved address is internal, so reordering
+      changes which validated address gets dialled, never whether validation ran. The
+      DNS-rebinding defence the pin exists for (`:94–99`) is untouched — we still dial an address
+      we checked rather than letting Net::HTTP re-resolve.
+
+      **Enabling Outbound IPv6 on Railway is the rejected alternative**: it is a redeploy, it
+      does not fix the TokyoDev URL (see the next item — a completed connection just reaches the
+      Cloudflare challenge), and it leaves the service one resolver-order change away from the
+      same bug on any other dual-stack host. Prefer IPv4 in code regardless of the toggle.
+- [ ] **Stop reporting "the site blocked us" as "your URL is malformed".**
+      `ApplicationsController#prefill` (`:51`) rescues the `UrlPrefillService::Error` base class
+      and renders `code: "invalid_url"` — which catches `FetchError` as well as `InvalidUrlError`,
+      because `FetchError` has no rescue of its own. So when a fetch fails for any reason the user
+      is told *"That couldn't be read as a job posting URL."* (`en.json`), and the only sensible
+      response to that message is to retype a URL that was never wrong. TokyoDev is the live case:
+      Cloudflare returns **`403` with `cf-mitigated: challenge`** and the `Just a moment…` JS
+      interstitial to any non-browser client — verified 2026-07-16 with both the service's
+      `KarirKalyan-Prefill/1.0` UA **and** a stock Chrome UA, so this is not a UA blocklist to
+      dress around.
+
+      **The split:** give `FetchError` its own `rescue` ahead of the base-class one, and keep
+      `invalid_url` for what it actually means — `InvalidUrlError`: bad format, disallowed port,
+      private address. Then distinguish *blocked* (`403`/`401`/`429`, or a `cf-mitigated` header)
+      from *unreachable*, because they ask the user for different things. A new error code lands
+      in SPEC.md § Error codes **and** both locale catalogs — key parity is 337/337 and stays that
+      way.
+
+      **What this release deliberately does not do: make the error actionable.** A truthful
+      "this site blocks automated readers" is still a dead end with no next step — the recovery
+      path is the paste fallback, which is a capability and therefore `v1.5.0`. Shipping the
+      honest message first is still right: the current message actively misdirects, and that
+      earns a fix a release earlier than the cure.
+
+      **Not on the table: defeating the challenge.** TokyoDev's `robots.txt` *allows* `/` (only
+      `/c/` and `/frames/` are disallowed), so their stated policy is not the obstacle — but the
+      challenge is still an access control, and the kit for getting past it (TLS-fingerprint
+      spoofing, FlareSolverr, residential proxies) is an arms race that breaks on any Cloudflare
+      tune and reads badly in a repo whose audience is hiring reviewers. A headless browser is
+      the legitimate version, and it is Chrome in the Railway container, a new memory floor, and
+      per-fetch latency — for one job board. **Some sites will 403; that is expected degradation,
+      not a bug to engineer around.**
+
+---
+
 ## `v1.5.0` — minor. "The pocket app" (inserted 2026-07-13)
 
 The mobile access layer: make opening KarirKalyan on the phone feel like opening a good Android
@@ -263,6 +337,35 @@ The capture flow and the shell are the release — they are what changes the use
       source doesn't matter. That one-sentence install step goes in the docs. Sequencing
       rationale: `v1.6.0`'s three fields are all captured at prefill time, so mobile capture
       multiplies the exact pipeline that release bets on — which is why this lands first.
+- [ ] **Paste fallback for postings the fetcher cannot read** *(added 2026-07-16 — the recovery
+      path `v1.4.3`'s honest error message has nowhere to point)*. When the fetch is blocked, let
+      the user paste the posting text into a textarea and run the extraction on that instead.
+      **The pipeline is already `fetch → to_text → extract` and only the first step ever fails** —
+      `extract` takes text and knows nothing about where it came from, so this is a second entry
+      point into an existing path, not a second pipeline. No new infra, no circumvention.
+
+      **It rides `v1.5.0` because it is the share sheet's failure mode, not a stray fix.** The
+      capture item above is a URL landing in `UrlPrefillService` — so every site that 403s the
+      fetcher is a share that dead-ends in the release's headline flow. Cloudflare-fronted boards
+      and login-walled ones (LinkedIn, which the fetcher will never reach) are exactly the places
+      postings are met on a phone. If the release runs heavy this is **not** in the cut order:
+      it is small, and it is what stops the capture flow from failing in public.
+
+      **The v1.6.0 tension, stated rather than left to trip someone:** the `posting snapshot` item
+      rejects "a manual paste field" for failing the near-zero-entry test. That rejection stands
+      and does not conflict — it is about *automatic capture at prefill time*, where a paste field
+      would be manual entry replacing something free. This is a **fallback for when the automatic
+      path is impossible**, where the alternative is not free capture but no capture. Same widget,
+      opposite question. Sequencing note for `v1.6.0`: a pasted posting should populate
+      `posting_snapshot` the same way a fetched one does — the snapshot's value is that
+      extractions are re-runnable, and that is truer for postings that can never be re-fetched.
+
+      **Two things to decide when it is scoped, not in QA:** whether the textarea is always
+      available or only appears after a fetch fails (always-on invites manual entry where the URL
+      would have worked; error-only hides the escape hatch until the user has already been told
+      no), and whether `MAX_TEXT_CHARS` (12,000) is enforced client-side with a visible counter —
+      a pasted page is trivially longer than a stripped one, and silently truncating someone's
+      paste at 12k is a worse lie than the error message this release is fixing.
 - [ ] **Passkey sign-in.** WebAuthn via `webauthn-ruby` hand-wired into Devise (the
       `devise-passkeys` gem is not mature enough to lean on), with an additive nullable
       `credentials` table — still a minor by the mechanical test. The provider chain is Chrome →
@@ -406,7 +509,13 @@ snapshot — because it rides the same `UrlPrefillService` pass this release alr
       against dead links. **Alternatives rejected (2026-07-15):** storing the full HTML (much
       bigger rows on a database whose blobs are already 1 MB-capped on purpose, plus
       sanitization work to ever render it), and a manual paste field (works for postings met
-      offline, but fails the near-zero-entry test that governs this whole section).
+      offline, but fails the near-zero-entry test that governs this whole section). **That second
+      rejection is narrower than it reads, and `v1.5.0`'s paste fallback does not overturn it**
+      (amended 2026-07-16): what fails the test is a paste field *replacing* free capture at
+      prefill time. A paste fallback for postings the fetcher physically cannot read competes with
+      no capture at all. When both have landed, a pasted posting should fill `posting_snapshot`
+      exactly as a fetched one does — a posting that can never be re-fetched is the strongest case
+      for snapshotting it.
 
 ---
 
