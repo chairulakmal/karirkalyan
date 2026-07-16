@@ -4,7 +4,7 @@ Open work only, grouped by the release that ships it. Shipped work lives in
 [`CHANGELOG.md`](CHANGELOG.md), and so do the settled decisions-not-to-build (dark mode,
 document version history, client-side error tracking — see its § Decisions). Last cut back to
 open work on 2026-07-13; restructured by release on 2026-07-15 so each item is told once, in
-the section of the release that ships it.
+the section of the release that ships it. The board triage cards joined `v1.8.0` on 2026-07-16.
 
 **Current release: `v1.4.1`** (2026-07-12, "Close the door"). **Nothing is in flight**, but
 `v1.4.2` has already started accruing — see its section. What each shipped release contained is
@@ -50,7 +50,7 @@ seeker's professional context isn't just light-themed, it's mobile.
 | `v1.6.0` | minor | The Japan market layer: recruiter channel + `agencies`, 年収 comp structure, Japanese-level filter |
 | `v1.6.1` | patch | Japanese phrase-based line breaking |
 | `v1.7.0` | minor | Hiring entity, timezone overlap + `.ics`, visa / status of residence |
-| `v1.8.0` | minor | The follow-through: dashboard stat cards, cover-letter talking points, push interview/deadline alerts, public HSP calculator, interview stage notes |
+| `v1.8.0` | minor | The follow-through: dashboard stat cards, board triage cards, cover-letter talking points, push interview/deadline alerts, public HSP calculator, interview stage notes |
 
 `v1.3.1` through `v1.4.1` shipped 2026-07-12 — see `CHANGELOG.md` for what each contained.
 
@@ -491,13 +491,14 @@ that was drift, fixed 2026-07-13. What survives of it is the conditional item fu
 
 ---
 
-## `v1.8.0` — minor. The follow-through (scoped 2026-07-15)
+## `v1.8.0` — minor. The follow-through (scoped 2026-07-15, extended 2026-07-16)
 
-Five items, all shaped by the same 2026-07-15 scoping pass, and all of a kind: each one
-harvests machinery an earlier release built — the FSM + timeline (stats, stage notes), the
-prefill pipeline (talking points), the push channel (`v1.5.0`) plus the `.ics` event data
-(`v1.7.0`), and the visa research (`v1.7.0`). Every schema touch is a nullable column, so the
-release passes the major test the same way the rest of the plan does.
+Six items — five from the 2026-07-15 scoping pass, the board triage cards added 2026-07-16 —
+and all of a kind: each one harvests machinery an earlier release built — the FSM + timeline
+(stats, stage notes, triage cards), the prefill pipeline (talking points, and the `notes` the
+triage cards excerpt), the push channel (`v1.5.0`) plus the `.ics` event data (`v1.7.0`), and
+the visa research (`v1.7.0`). Every schema touch is a nullable column — the triage cards touch
+none at all — so the release passes the major test the same way the rest of the plan does.
 
 - [ ] **Dashboard stat cards — cards, not a page** *(decided 2026-07-15)*. Response rate,
       time-in-stage, and ghost rate as 2–3 cards next to the existing `avg_days_to_offer` line —
@@ -505,6 +506,81 @@ release passes the major test the same way the rest of the plan does.
       slice by channel and Japanese level. **Alternative rejected:** a dedicated `/insights`
       page — a new route and nav weight for one user; if the cards earn promotion later, the
       queries move with them.
+- [ ] **Triage the two candidate-side board columns without opening each card** *(added
+      2026-07-16)*. `web/app/[locale]/(app)/board/board.tsx:251–252` renders every card as
+      company + role and nothing else, so deciding what to do with a `wishlist` or `draft` item
+      costs a detail-page visit each. Give **those two columns only** three facts — an excerpt
+      of `notes`, a source badge, and how long the item has sat where it is — and sort each
+      column stalest-first. `applied` and beyond keep today's card: past `applied` the next move
+      is the company's, which is what ghost risk already watches; these two are the columns where
+      the stalled item is the user's own to move.
+
+      **Sequencing: lands after the `v1.4.2` `Applications::ListQuery` extraction**, for exactly
+      the reason that item already gives about `v1.6.0`'s three filters — this adds fields to the
+      same `ApplicationsController#index`, and should land in a query object rather than thicken a
+      controller that then gets refactored under load.
+
+      **Scope, smaller than it looks — `notes` needs no API work.** `#index` renders records
+      through `as_json`, so `notes` already ships on every board row, and `web/app/lib/types.ts`
+      already declares it. The excerpt is a `web/`-only concern. Two fields are genuinely new on
+      the index payload:
+
+      - **`source`** — `JobBoard.from_url(url) || JobBoard::NONE`, the same call
+        `DashboardController#compute_stats` makes for `facets`. **It must be server-derived.**
+        `jobBoardLabel(host, noBoardLabel)` (`web/app/lib/format.ts`) already exists and already
+        maps hosts to brands, but it takes a *host* and no board card has one — and deriving it in
+        TypeScript from `app.url` would be a second implementation of `from_url`'s www-strip and
+        downcase. That is the `API_BASE`/`API_BASE_URL` disease with a parser attached.
+      - **`days_in_stage`** — reuse the name and the formula `GhostRiskQuery#in_flight` already
+        uses: `COALESCE(MAX(timeline_entries.created_at), applied_at, created_at)` against a
+        Ruby-bound `Time.current`. **Not `updated_at`**, which drifts on any edit — the same
+        reasoning the `avg_days_to_offer` query is already commented with. It falls out correctly
+        for these two columns for free: a `draft` has no timeline rows and a null `applied_at`, so
+        it COALESCEs to `created_at`, its real age. **One name, not two** — `days_in_state` for an
+        identical computation would be the same near-miss naming this file already has an item to
+        clean up. The shared expression is the argument for building this next to the stat cards
+        above, which name time-in-stage as a query over the same two tables.
+
+      **Traps:**
+
+      - **The timeline read must be a joined subquery, not per-row.** `#index` is a plain scope
+        `.to_a`'d, and the board follows it to exhaustion — up to 10 pages of 100 (`board/page.tsx`).
+        A naïve `MAX(created_at)` per record is a 1000-query page load.
+      - **`DashboardController` stays untouched**, and not just by preference: its cache key is
+        `count + MAX(updated_at) + Date.current` and its payload is deliberately aggregate —
+        `facets` ships `[company, board]` pairs, no per-row content. Per-item summaries there
+        would put per-row content behind a key that cannot see per-row change.
+      - **`board.tsx:88–89`'s comment has to change with the code.** It says position is not API
+        data and a client-side order would be a second source of truth — which is right today and
+        is *why* the sort key must be the server's `days_in_stage` rather than something the client
+        invents. Sorting on a server field is deriving order from server data; leaving the comment
+        as-is would make the next reader think the sort violates it.
+      - **Both locales, no hardcoded English.** The board brands stay untranslated (`jobBoardLabel`'s
+        existing rule), but the `(none)` sentinel's label and the elapsed-time string are catalog
+        keys. Elapsed time has a formatter already — `timeAgo(iso, locale)` in `format.ts` — so
+        prefer feeding it the entered-at instant over inventing a second duration format. Key parity
+        is 337/337 and stays that way.
+
+      **Testing, per the existing split:** the excerpt/truncation logic is pure — unit spec, no DB.
+      The two new payload fields are a request spec against real Postgres, and the case worth
+      writing is the one the formula exists to handle: an application whose `updated_at` was just
+      bumped by an edit still reports the age its timeline says it has.
+
+      **Deliberately not built: staleness stays plain elapsed time, not a flagged state.** If it
+      ever earns a threshold, the number should **not** be borrowed from `GhostRiskQuery::DEFAULT_P90`
+      (21/14 days) — those encode how long *companies* take to reply, and nobody is replying to a
+      wishlist item. The defensible source is the user's own p90 `wishlist|draft → applied` latency,
+      read from the same `stage_exits` CTE, personal-only with the existing `MIN_SAMPLE = 5` guard
+      and **no global default** — meaning it correctly does nothing until there are five data points.
+      Absent that, a threshold would be inventing a number about the user's own procrastination.
+
+      **Alternatives rejected (2026-07-16):** enriching every column (past `applied`, "how long has
+      this sat" is ghost risk's question, already answered on the dashboard — a second, thresholdless
+      copy on the card would be two voices on one fact); a `sort` param on `#index` (server-side
+      ordering for a client-side grouping the API does not model — the board already fetches
+      everything and buckets it in memory); and a per-row `notes` truncation on the server (the index
+      already ships full `notes` today, so truncating there is a payload change for a display
+      decision).
 - [ ] **Cover-letter talking points — bullets, not drafts** *(decided 2026-07-15)*. Extract
       posting-vs-resume match points as bullets, reusing the Claude pipeline that already reads
       both; the user writes the letter. **Alternative rejected:** full draft generation — a
