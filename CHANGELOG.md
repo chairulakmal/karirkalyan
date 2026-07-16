@@ -98,13 +98,17 @@ to `v1.6.0` where it serves the share-sheet flow's failure mode.
 > User-Agent and a stock Chrome one". **That was false**, and the GitHub release notes for `v1.4.3`
 > still carry it — they are left standing as the record of what was believed on the day.
 >
-> The `403` was observed while many TokyoDev URLs were fetched at once from a laptop during this
-> release's own debugging. Bot mitigation scores the client it answers, so the burst is a likely
-> cause of the block it appeared to document — and the `api` service had never reached TokyoDev at
-> all, because the `ENETUNREACH` bug at the top of this section killed every connect to a
-> Cloudflare-fronted host before a packet left the box. Re-probed hours after the tag, TokyoDev
-> answered this service's exact User-Agent with `200`, six of six, a stock Chrome one likewise, and
-> pre-fill against a TokyoDev posting works in production.
+> Every `403` behind it was seen from a laptop and none from this service — the probes were run
+> locally, never from inside the container. So the claim was never tested against the path it
+> described: the `ENETUNREACH` bug at the top of this section killed every connect to a
+> Cloudflare-fronted host before a packet left the box, and TokyoDev is one, so the `api` service
+> had never reached it at all. The laptop was also fetching many TokyoDev URLs at once, which is
+> itself a known way to get challenged — likely the reaction it recorded as policy, though that
+> part is inference and does not need settling. Re-probed hours after the tag — from a laptop
+> again, so this speaks for the site's mood and not for the container — TokyoDev answered this
+> service's exact User-Agent with `200`, six of six, and a stock Chrome one likewise: the block was
+> neither standing nor UA-based. What speaks for the container is production, where pre-fill
+> against a TokyoDev posting now works.
 >
 > **Nothing in the code changed** — `prefill_blocked` names a real state and stays, and the paste
 > fallback keeps its `v1.6.0` slot on the reasoning above, which never depended on TokyoDev.

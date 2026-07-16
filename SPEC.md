@@ -469,20 +469,33 @@ It claimed TokyoDev answered any non-browser client with `403` + `cf-mitigated: 
 our User-Agent and with a stock Chrome one alike". That claim did not survive scrutiny, and the way
 it failed is worth keeping.
 
-The evidence behind it was a `403` seen while **many TokyoDev URLs were being fetched at once from
-a laptop**, during the debugging session that produced `v1.4.3`. Bot mitigation scores *the client
-it answers*, so a burst like that can manufacture the very block it appears to document — and the
-block outlives the burst, which makes a reaction look like standing policy. Worse, the `api` service
-could not have contributed a single observation: until `v1.4.3` the IPv6-first bug killed the
-connect with `ENETUNREACH` before a packet left the box, and TokyoDev is Cloudflare-fronted, so the
-server had **never reached it at all**. The claim described a path that could not have produced it.
+**Every `403` behind it was seen from a laptop, and none from this service** — confirmed with the
+author, who ran the probes locally and never from inside the container. That alone sinks the claim:
+until `v1.4.3` the IPv6-first bug killed every connect to a Cloudflare-fronted host with
+`ENETUNREACH` before a packet left the box, and TokyoDev is one, so the `api` service had **never
+reached TokyoDev at all**. A statement about how a site answers *us* had been assembled entirely
+from observations of how it answers *something else*.
 
-Re-probed on 2026-07-17, TokyoDev answered this service's exact `User-Agent` with `200` — six of
-six — and a stock Chrome one likewise, and pre-fill against a TokyoDev posting works in production.
+What that something else was doing matters too: **fetching many TokyoDev URLs at once**, during the
+debugging session that produced this release. Bot mitigation scores the client it answers, so a
+burst is itself a known way to be challenged — the observation may well have been the site reacting
+to the probe rather than stating a policy. That much is inference, not proof; the site could equally
+have been in a defensive mode that hour. But it does not need proving, because the claim was never
+tested against the path it described.
 
-The rule this leaves behind: **a self-inflicted block is indistinguishable from a real one at the
-moment you observe it.** Probe a third-party site one request at a time, or the finding is about
-you rather than about the site.
+Re-probed on 2026-07-17, TokyoDev answered `200` — six of six to this service's exact
+`User-Agent`, and to a stock Chrome one likewise. **Those probes were from a laptop as well**, and
+by the second rule below they cannot speak for the container either; what they establish is only
+that the block was neither standing nor UA-based, which is enough to sink the claim as written.
+The evidence that actually speaks for this service is production: pre-fill against a TokyoDev
+posting works.
+
+Two rules this leaves behind. **A self-inflicted block is indistinguishable from a real one at the
+moment you observe it** — probe a third-party site one request at a time, or the finding is about
+you rather than about the site. And **a claim about how a site treats this service has to be
+measured from this service**: a laptop and the `api` container differ in IP, in reputation, and —
+as this very release proves — in whether they can reach the host at all. Nothing here is fixed by
+probing more politely from the wrong machine.
 
 </details>
 
