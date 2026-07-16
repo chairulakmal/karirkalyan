@@ -6,14 +6,22 @@ Open work lives in [`TODO.md`](TODO.md). Settled decisions-not-to-build are reco
 
 ---
 
-## Unreleased
+## v1.4.3 — 2026-07-17
 
-Two patches' worth of work, grouped by the branch each change landed on. The pre-fill taxonomy
-below is `v1.4.3`; everything under it is `v1.4.2` — the code-quality release "Close the door"
-displaced. They are split because `v1.4.3` answers a production report and should not wait on the
-rest of `v1.4.2`, which still has open items (see `TODO.md`).
+**There is no `v1.4.2` tag, and there never will be.** The number was scoped as a code-quality
+patch, but only part of it was written — the `ListQuery` extraction, the API base rename, and the
+post-`v1.4.1` docs audit — when a production report arrived and `v1.4.3` was scoped underneath it
+to answer it. The prefill work then landed on `main` *above* the half-finished `v1.4.2`, which put
+both patches at one commit and left one tag to carry them. Rather than hold the fix for the four
+items `v1.4.2` still had open, this release takes the number the prefill work was scoped as and
+ships everything on `main` under it. `v1.4.2`'s remaining items — download filenames, upload
+throttle, en/ja key parity as a CI check, the profile-card fold — are `v1.4.4`, still unwritten,
+still a patch. The gap in the sequence is the honest record of what happened; the alternative was
+renumbering a release the changelog had already described by name.
 
-### URL pre-fill: two bugs behind one prod report *(fix/prefill-error-taxonomy — `v1.4.3`)*
+Three branches, grouped below by the one each change landed on.
+
+### URL pre-fill: two bugs behind one prod report *(fix/prefill-error-taxonomy)*
 
 Both found chasing a single failure: pre-fill dying on a TokyoDev posting. The logs could not tell
 the two apart — lograge records `time`/`request_id`/`params` and never the body, and both failures
@@ -84,7 +92,7 @@ contract broken.
 is not a UA blocklist to dress around. Some sites will 403; that is expected degradation, not a
 bug to engineer around. The honest error is the deliverable. The recovery path it points to — let
 the user paste the posting text and extract from that — is deliberately **not** here: it is a
-capability, which by the mechanical test makes it a minor, and it is scoped to `v1.5.0` where it
+capability, which by the mechanical test makes it a minor, and it is scoped to `v1.6.0` where it
 serves the share-sheet flow's failure mode.
 
 ### The post-`v1.4.1` docs audit *(fix/privacy-truth-and-doc-drift)*
@@ -166,7 +174,7 @@ reopened by accident, and each names the condition under which it may be.
   job seeker actually asks is *"which resume did I send to this company?"*, and one document
   pinned to one application already answers it exactly. Version history exists at the layer that
   costs nothing: the account export zip is a point-in-time snapshot, and the `MMDD` stamp planned
-  for download filenames (`v1.4.2`) keeps a re-uploaded resume from clobbering the saved copy of
+  for download filenames (`v1.4.4`) keeps a re-uploaded resume from clobbering the saved copy of
   the old one. **Do not re-lift this without a storage change to justify it.**
 - **No client-side error tracking in `web/` — a conscious asymmetry.** *(2026-07-11)*
   Honeybadger covers the API (`api/Gemfile`, wired in production); the frontend reports nothing,

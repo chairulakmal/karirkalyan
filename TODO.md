@@ -7,15 +7,17 @@ open work on 2026-07-13; restructured by release on 2026-07-15 so each item is t
 the section of the release that ships it. Four things happened on 2026-07-16: the board triage
 cards joined `v1.9.0`; `v1.4.3` and the prefill paste fallback were added out of one prod bug;
 `v1.4.2`'s first two items closed and left the file; and `v1.4.3` itself closed entire, so its
-section left too — the release survives only as a row in the plan and an entry in the changelog.
+section left too. On 2026-07-17 `v1.4.3` was tagged and `v1.4.2` was skipped for good, which
+renumbered that section's four survivors to `v1.4.4`.
 
-**Current release: `v1.4.1`** (2026-07-12, "Close the door"). **Nothing in flight** —
-`fix/prefill-error-taxonomy` merged on 2026-07-17 (PR #65), so all of `v1.4.3` is on `main`,
-untagged. `v1.4.2`'s first two items merged untagged the same way (PR #64); all of it is
-accruing in `CHANGELOG.md` § Unreleased. The nearest open work is `v1.4.2`'s four items, then
-`v1.5.0` — **the stage filter, scoped 2026-07-17**, which took the `v1.5.0` slot and slid every
-release below it one minor. What each shipped release contained is `CHANGELOG.md`'s job to say,
-not this file's.
+**Current release: `v1.4.3`** (2026-07-17). **Nothing in flight.** `v1.4.2` was **never tagged
+and never will be**: the prefill fix landed on `main` above its four unwritten items, which put
+two patches at one commit, and `v1.4.3` took the tag rather than make a production fix wait.
+`CHANGELOG.md` § v1.4.3 carries the full account. Those four items are now **`v1.4.4`** — same
+work, same patch level, one number further along; the gap at `v1.4.2` is permanent. The nearest
+open work is that `v1.4.4`, then `v1.5.0` — **the stage filter, scoped 2026-07-17**, which took
+the `v1.5.0` slot and slid every release below it one minor. What each shipped release contained
+is `CHANGELOG.md`'s job to say, not this file's.
 
 **North star (decided 2026-07-11): be the best career app for its one loyal user.** Portfolio
 value follows from that, not the other way round — a reviewer can tell a tool with a real
@@ -33,7 +35,7 @@ outranks anything else in this file on the day it happens.
 
 ---
 
-## The plan — `v1.4.2` → `v1.9.0` (scoped 2026-07-12, amended 2026-07-13 and 2026-07-17, extended 2026-07-15)
+## The plan — `v1.4.4` → `v1.9.0` (scoped 2026-07-12, amended 2026-07-13 and 2026-07-17, extended 2026-07-15)
 
 **The whole backlog fits under 1.x.** Only one item forces a major, and `SPEC.md` § Versioning
 & releases already names it: the **`positions` entity**, because it adds a table *and* changes
@@ -55,7 +57,7 @@ dashboard's status chips are radio buttons wearing a filter's clothes: exactly o
 time, or all thirteen. The one question the list cannot answer is the one asked most —
 *what's still live?* — because "active" is seven stages and the control only holds one. Adding
 multi-select is a **user-visible capability**, which the mechanical test in `SPEC.md`
-§ Versioning & releases makes a minor and not a patch, so it could not ride `v1.4.2`. It is
+§ Versioning & releases makes a minor and not a patch, so it could not ride the patch below it. It is
 sequenced ahead of the pocket app because the phone inherits whatever the filter becomes:
 shipping the app shell first would mean shipping the radio-button filter to the smaller screen,
 then rebuilding it there. The pocket app moves to `v1.6.0` and each downstream release slides
@@ -63,8 +65,9 @@ one minor — the second such slide, on the same reasoning as the first.
 
 | Release | Level | Contents |
 | --- | --- | --- |
-| `v1.4.2` | patch | Download filenames, upload throttle, en/ja key parity as a CI check, the profile-card fold — **plus the two done items and the privacy/doc-drift fix, both in `CHANGELOG.md` § Unreleased** |
-| `v1.4.3` | patch | Prefill: IPv4-first address pinning, and an error taxonomy that stops blaming the user's URL — **fully landed, nothing open; see `CHANGELOG.md` § Unreleased** |
+| ~~`v1.4.2`~~ | — | **Never tagged; the number is skipped.** Its written half — the `ListQuery` extraction, the API base rename, the privacy/doc-drift fix — shipped inside `v1.4.3`; its unwritten half is `v1.4.4` below |
+| `v1.4.3` | patch | **Shipped 2026-07-17.** Prefill: IPv4-first address pinning, and an error taxonomy that stops blaming the user's URL — plus everything `v1.4.2` had written by then. See `CHANGELOG.md` |
+| `v1.4.4` | patch | Download filenames, upload throttle, en/ja key parity as a CI check, the profile-card fold — `v1.4.2`'s four open items, renumbered when its tag was skipped |
 | `v1.5.0` | minor | The stage filter: multi-select status chips on the dashboard list, on by default, with "hide inactive" and friends — plus `active_states` on `/transitions` |
 | `v1.6.0` | minor | The pocket app: share-sheet capture, passkey sign-in, push digest, installed-app shell — **plus the prefill paste fallback the share sheet needs** |
 | `v1.7.0` | minor | The Japan market layer: recruiter channel + `agencies`, 年収 comp structure, Japanese-level filter |
@@ -116,22 +119,15 @@ is fine — the `web/`-only constraint was a property of v1.1.0, not a permanent
 
 ---
 
-## `v1.4.2` — patch. Sequenced before `v1.5.0`, not filler
+## `v1.4.4` — patch. Sequenced before `v1.5.0`, not filler
 
-**Two items closed, both in `CHANGELOG.md` § Unreleased** (`refactor/applications-list-query`):
-the `Applications::ListQuery` extraction — which was sequenced first because `v1.5.0`'s stage
-filter, `v1.7.0`'s three filters and `v1.9.0`'s triage cards all land on
-`ApplicationsController#index`; the very next release cashes that bet — and the
-`API_BASE` / `API_BASE_URL` rename, now `INTERNAL_API_URL` (`web/app/lib/api.ts`) and a
-module-private `PUBLIC_API_ORIGIN` (`web/app/lib/links.ts`).
-
-**Also already on `main`, untagged** (`deeedd0`, PR #63 — the post-`v1.4.1` docs audit):
-Honeybadger Insights turned **off**, three false claims corrected on `/privacy` in both locales,
-and the doc drift the audit turned up (`web/README.md`'s dead `/sign-up` route, swagger's
-Production server pointing at the Next.js app, `db:seed` called "optional" in three guides,
-Postgres 16 on the landing page). It rides this tag rather than earning one — no capability, no
-migration — and it does not change what `v1.4.2` *is*: still the code-quality patch that "Close
-the door" displaced. Everything below stays a patch the same way: no new capability, no
+**This was `v1.4.2` until 2026-07-17.** Half of that release was written when a prod report
+arrived; the fix for it landed on `main` above the half, and shipped as `v1.4.3` carrying both.
+What shipped that way — the `Applications::ListQuery` extraction, the `API_BASE` / `API_BASE_URL`
+rename, and the post-`v1.4.1` privacy/doc-drift fix — is `CHANGELOG.md` § v1.4.3's to describe,
+not this file's. What is left is the four items below, renumbered but otherwise untouched: still
+the code-quality patch that "Close the door" displaced, still sequenced ahead of `v1.5.0` because
+the stage filter reads better on top of it. Each stays a patch the same way: no new capability, no
 migration, and the previous image boots against an unchanged database.
 
 - [ ] **Name downloaded resumes and cover letters after the application, not after nothing** —
@@ -348,7 +344,7 @@ on the wire.
       **The wire format is explicit chips, not a macro**: "Active" expands client-side to
       `status=wishlist,draft,applied,phone_screen,technical,final_round,offer` and lights those
       seven. A `status=active` macro would make the param polymorphic — a state *or* a group —
-      the same near-miss naming the `API_BASE` / `API_BASE_URL` rename (`v1.4.2`) was done to
+      the same near-miss naming the `API_BASE` / `API_BASE_URL` rename (`v1.4.3`) was done to
       remove. A preset is a **shortcut to a chip selection**, and stays visibly so: after
       clicking it the user sees which seven, and can toggle one off.
 - [ ] **`active_states` on `/transitions`, and delete `ACTIVE_STATUSES`** — *the invariant this
@@ -1014,5 +1010,5 @@ user's life, not a release number. Giving it a release slot in the plan would co
       alongside the English resume were considered for v1.x and deferred — more blobs on the
       pg_dump-backed database (the same cost the no-version-history decision refused) for
       documents whose real payoff arrives when generation ships. If uploads are wanted sooner,
-      the shape is a typed `documents` table reusing the `v1.4.2` filename machinery, not more
+      the shape is a typed `documents` table reusing the `v1.4.4` filename machinery, not more
       bytea columns.
