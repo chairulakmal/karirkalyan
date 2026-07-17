@@ -596,6 +596,21 @@ none at all — so the release passes the major test the same way the rest of th
 
 ## Conditional — open, but deliberately tagged to no release
 
+- [ ] **`web/` has no unit-test seam, so the paste box's branching is untested** *(added
+      2026-07-17, from `v1.6.0`'s paste-fallback review)* — `PASTE_CURES` decides whether the
+      escape hatch appears at all, and nothing exercises it. Every seam was checked and all four
+      are shut. Playwright runs on `push: branches: [main]` only (`web.yml:99`), so it never sees
+      a PR. The E2E job sets no `ANTHROPIC_API_KEY`, and `UrlPrefillService#call` calls `client`
+      **before** `fetch` on purpose — so every prefill there returns `prefill_unavailable`, the one
+      code `PASTE_CURES` deliberately excludes, meaning the box cannot open in CI even if a test
+      asked it to. The prefill is a server action calling Rails server-to-server, so Playwright's
+      `page.route()` has nothing to intercept. And `@playwright/test` is `web/`'s only test
+      dependency, so there is no component-level seam either. **Conditional because the fix is a
+      decision, not a task:** adding a unit runner to `web/` is config, CI wiring, and a precedent
+      binding every component after it — the same "decide the seam before the code" question
+      `v1.6.0`'s WebAuthn/push prerequisite already asks. Worth answering once for the whole
+      frontend, not twice. Note what is *not* untested: the cap, the taxonomy, and the SSRF
+      question all live in `api/`, and its specs pin them.
 - [ ] **Enforce the "no hardcoded FSM sets" claim in CI, instead of asserting it in prose**
       *(added 2026-07-17, from `v1.5.1`'s review)* — the claim in `README.md:26` has now been
       written three times and been wrong twice, each time because the grep behind it was never run

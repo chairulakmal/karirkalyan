@@ -152,10 +152,16 @@ export function NewApplicationForm({ entryStates }: { entryStates: Status[] }) {
           </button>
         </div>
         <p className="mt-2 text-xs text-ink-soft">{t("prefillHint")}</p>
+        {/* role="alert", like board.tsx's error line: this is the only thing that
+            tells the user a pre-fill failed, and on the paste path it carries the
+            server's refusal — the whole reason the cap is measured there and not
+            here. A message nobody hears is not a refusal. */}
         {prefillError ? (
-          <p className="mt-2 text-sm text-danger">{prefillError}</p>
+          <p role="alert" className="mt-2 text-sm text-danger">{prefillError}</p>
         ) : null}
-        {prefilled ? <p className="mt-2 text-sm text-cobalt">{t("prefillDone")}</p> : null}
+        {prefilled ? (
+          <p role="status" className="mt-2 text-sm text-cobalt">{t("prefillDone")}</p>
+        ) : null}
 
         {pasteOpen ? (
           <div className="mt-4 border-t border-cobalt/30 pt-4">
@@ -187,7 +193,12 @@ export function NewApplicationForm({ entryStates }: { entryStates: Status[] }) {
               className="mt-2 block w-full border border-dune bg-linen px-3 py-2 text-sm text-midnight placeholder:text-ink-soft"
             />
             <div className="mt-2 flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
-              <span id="paste-count" aria-live="polite" className="text-xs text-ink-soft">
+              {/* Not a live region, deliberately. It is already the textarea's
+                  description, and it blocks nothing — the server owns the cap — so
+                  there is no decision here to announce, only a number that would
+                  interrupt on every keystroke. The refusal is what has to be heard,
+                  and that is the role="alert" above. */}
+              <span id="paste-count" className="text-xs text-ink-soft">
                 {t("pasteCounter", { count: pastedChars })}
               </span>
               <button
