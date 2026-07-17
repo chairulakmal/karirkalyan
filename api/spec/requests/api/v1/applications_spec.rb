@@ -1,5 +1,12 @@
 require "swagger_helper"
 
+# The published description for /applications/prefill's 422. It is a constant, and
+# every 422 block below uses it, because rswag collapses same-status blocks into one
+# description in swagger.yaml — see the comment at the first one.
+PREFILL_422 = "the URL is unusable (invalid_url), the site refused an automated reader " \
+              "(prefill_blocked), or the paste exceeds the cap once stripped " \
+              "(prefill_paste_too_long)".freeze
+
 RSpec.describe "Applications", type: :request do
   let(:user) { create(:user) }
 
@@ -201,15 +208,35 @@ RSpec.describe "Applications", type: :request do
   end
 
   path "/api/v1/applications/prefill" do
-    post "Pre-fill application fields from a job URL (AI extraction)" do
+    post "Pre-fill application fields from a job posting (AI extraction)" do
       tags "Applications"
       security [ bearerAuth: [] ]
       consumes "application/json"
       produces "application/json"
+      # `url` or `text` — not both required, which is why neither is in `required`.
+      # `text` is the fallback for a posting the fetcher cannot read, and it wins if
+      # both arrive: nobody pastes a posting whose URL already worked.
       parameter name: :body, in: :body, schema: {
         type: :object,
-        properties: { url: { type: :string, example: "https://example.com/jobs/42" } },
-        required: %w[url]
+        properties: {
+          url: {
+            type:        :string,
+            example:     "https://example.com/jobs/42",
+            description: "The posting URL to fetch, strip, and extract. Supply this or `text`."
+          },
+          text: {
+            type:        :string,
+            example:     "Backend Engineer at Mercari. Tokyo, full-time. Ruby, Go…",
+            description: "The posting text, already fetched by the user — use when `url` " \
+                         "came back `prefill_blocked` or `prefill_failed`. Skips the fetch " \
+                         "and runs the same extraction. Must be under 12,000 characters " \
+                         "(`MAX_TEXT_CHARS`) **once stripped to text**, which is far more " \
+                         "than 12,000 characters of markup allows; an over-cap paste is " \
+                         "refused as `prefill_paste_too_long` rather than truncated. Takes " \
+                         "precedence over `url`, which is then echoed back unfetched. " \
+                         "Ignored unless it is a JSON string."
+          }
+        }
       }
 
       # The service fans out to an outbound fetch + a paid Claude call, so it is
@@ -233,7 +260,41 @@ RSpec.describe "Applications", type: :request do
         end
       end
 
-      response "422", "the URL is unusable (invalid_url), or the site refused an automated reader (prefill_blocked)" do
+      # The paste fallback's front door. `text` has to reach the service as `text`:
+      # if it were dropped, the request would quietly re-fetch the URL that just
+      # failed and the user would see the same refusal twice.
+      response "200", "extracted fields returned for the user to review" do
+        let(:Authorization) { jwt_for(user) }
+        let(:body) do
+          { text: "Mercari — Backend Engineer. Tokyo, full-time.",
+            url:  "https://blocked.example/jobs/42" }
+        end
+        before do
+          allow(Applications::UrlPrefillService).to receive(:new)
+            .with("https://blocked.example/jobs/42",
+                  text: "Mercari — Backend Engineer. Tokyo, full-time.")
+            .and_return(
+              instance_double(
+                Applications::UrlPrefillService,
+                call: { company: "Mercari", role: "Backend Engineer",
+                        notes: "Tokyo, full-time.", url: "https://blocked.example/jobs/42" }
+              )
+            )
+        end
+
+        run_test! do |response|
+          payload = JSON.parse(response.body)
+          expect(payload).to include("company" => "Mercari",
+                                     "url"     => "https://blocked.example/jobs/42")
+        end
+      end
+
+      # rswag flattens every response block sharing a status code into ONE description
+      # in swagger.yaml, last one wins — so all four 422s here carry the same string,
+      # enumerating all three codes. Give one its own prose and the published contract
+      # silently documents only that case. Which case each block pins is what the
+      # comments and the `code` assertions say.
+      response "422", PREFILL_422 do
         let(:Authorization) { jwt_for(user) }
         let(:body)          { { url: "http://10.0.0.1/admin" } }
         before do
@@ -248,10 +309,24 @@ RSpec.describe "Applications", type: :request do
         end
       end
 
+      # A JSON object in `text` is not a paste. ActionController::Parameters#to_s is
+      # a hash inspection, which is `present?` — so without the controller's type
+      # guard it would take the paste branch and be billed to us as a Claude call on
+      # garbage. Deliberately *not* stubbed: the point is that the real thing
+      # refuses, and it never reaches the network to do so.
+      response "422", PREFILL_422 do
+        let(:Authorization) { jwt_for(user) }
+        let(:body)          { { text: { a: 1 } } }
+
+        run_test! do |response|
+          expect(JSON.parse(response.body)).to include("error", "code" => "invalid_url")
+        end
+      end
+
       # BlockedError subclasses FetchError, which subclasses Error — so this also
       # pins the rescue order the controller depends on. Get it wrong and the code
       # silently regresses to `invalid_url`, which is the bug v1.4.3 fixes.
-      response "422", "the URL is unusable (invalid_url), or the site refused an automated reader (prefill_blocked)" do
+      response "422", PREFILL_422 do
         let(:Authorization) { jwt_for(user) }
         let(:body)          { { url: "https://www.tokyodev.com/companies/x/jobs/y" } }
         before do
@@ -263,6 +338,25 @@ RSpec.describe "Applications", type: :request do
 
         run_test! do |response|
           expect(JSON.parse(response.body)).to include("error", "code" => "prefill_blocked")
+        end
+      end
+
+      # The paste's own refusal. It is a 422 beside invalid_url and prefill_blocked
+      # rather than a 502: nothing upstream failed, the input is simply too big.
+      response "422", PREFILL_422 do
+        let(:Authorization) { jwt_for(user) }
+        let(:body)          { { text: "あ" * 20_000 } }
+        before do
+          service = instance_double(Applications::UrlPrefillService)
+          allow(service).to receive(:call)
+            .and_raise(Applications::UrlPrefillService::PasteTooLongError,
+                       "That paste is 20000 characters once formatting is stripped, " \
+                       "and the limit is 12000. Trim it and try again.")
+          allow(Applications::UrlPrefillService).to receive(:new).and_return(service)
+        end
+
+        run_test! do |response|
+          expect(JSON.parse(response.body)).to include("error", "code" => "prefill_paste_too_long")
         end
       end
 

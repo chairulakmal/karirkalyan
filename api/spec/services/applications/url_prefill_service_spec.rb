@@ -11,9 +11,19 @@ RSpec.describe Applications::UrlPrefillService do
     })
   end
   let(:message) { double("Message", content: [ tool_block ]) }
-  let(:client)  { double("Anthropic::Client") }
+  # A nested double rather than receive_message_chain, so specs can assert on what
+  # was actually sent to Claude — the chain matcher records no arguments.
+  let(:messages_api) { double("Messages") }
+  let(:client)       { double("Anthropic::Client", messages: messages_api) }
 
-  before { allow(client).to receive_message_chain(:messages, :create).and_return(message) }
+  before { allow(messages_api).to receive(:create).and_return(message) }
+
+  # The posting text as it actually reached Claude, per the stub above.
+  def posting_sent_to_claude
+    sent = nil
+    expect(messages_api).to have_received(:create) { |kwargs| sent = kwargs }
+    sent[:messages].first[:content]
+  end
 
   describe "#call" do
     context "happy path" do
@@ -30,6 +40,111 @@ RSpec.describe Applications::UrlPrefillService do
           notes:   "Tokyo, full-time. Ruby/Go backend.",
           url:     "https://example.com/jobs/42"
         )
+      end
+    end
+
+    # The fallback for a posting the fetcher cannot read. The load-bearing claim is
+    # that it is the *same* pipeline entered one step later, so these pin both
+    # halves: that the fetch never happens, and that to_text still does.
+    context "pasted text" do
+      let(:posting) { "Mercari — Backend Engineer. Tokyo, full-time." }
+
+      it "extracts from the paste without fetching or even resolving anything" do
+        service = described_class.new(nil, text: posting, client: client)
+        # Not a stub of #fetch — an assertion that nothing reaches it. Stubbing it
+        # would let a regression that quietly fetches pass this spec. Resolv is
+        # pinned alongside it: a regression that resolves the host without dialling
+        # it would leak the URL to DNS and satisfy the Net::HTTP check alone.
+        expect(Net::HTTP).not_to receive(:new)
+        expect(Resolv).not_to receive(:getaddresses)
+
+        expect(service.call).to include(company: "Mercari", role: "Backend Engineer")
+      end
+
+      it "prefers the paste over a url, and echoes that url back unfetched" do
+        service = described_class.new("https://blocked.example/jobs/42", text: posting, client: client)
+        expect(Net::HTTP).not_to receive(:new)
+
+        expect(service.call).to include(url: "https://blocked.example/jobs/42")
+      end
+
+      # No fetch means no SSRF surface, so the guard that would reject this URL is
+      # not consulted — the user pasted a page they loaded themselves. If this ever
+      # raises, something has started dialling the URL again.
+      it "does not run the SSRF guard on a url it will never dial" do
+        service = described_class.new("http://10.0.0.1/admin", text: posting, client: client)
+
+        expect(service.call).to include(company: "Mercari", url: "http://10.0.0.1/admin")
+      end
+
+      # A paste goes through to_text rather than around it, so a user who pasted
+      # from view-source gets the same conditioning a fetched page would.
+      it "strips tags and scripts from a paste taken out of view-source" do
+        described_class.new(
+          nil, text: "<body><script>tracking=1</script><h1>Mercari</h1></body>", client: client
+        ).call
+
+        expect(posting_sent_to_claude).to include("Mercari")
+        expect(posting_sent_to_claude).not_to include("tracking=1")
+      end
+
+      # The paste refuses where the fetch truncates. Japanese on purpose: the cap
+      # counts characters, so 20,000 of them are 60,000 bytes — a spec written with
+      # ASCII would pass against a byte-counting cap too.
+      it "refuses an over-cap paste rather than silently truncating it" do
+        expect { described_class.new(nil, text: "あ" * 20_000, client: client).call }
+          .to raise_error(described_class::PasteTooLongError, /20000 characters/)
+      end
+
+      it "names the stripped length, not the raw one, in the refusal" do
+        # 13,000 characters of text under 20,000 characters of markup: over the cap
+        # raw, comfortably under it stripped. The number in the message is the one
+        # the user cannot see, which is the whole reason the server owns this check.
+        padded = "<div class='#{"x" * 20_000}'>#{"あ" * 13_000}</div>"
+
+        expect { described_class.new(nil, text: padded, client: client).call }
+          .to raise_error(described_class::PasteTooLongError, /13000 characters/)
+      end
+
+      it "accepts a view-source paste whose markup strips back under the cap" do
+        # The case the form must not pre-judge: far over the cap as pasted, a third
+        # of it once stripped. SPEC.md § UrlPrefillService promises this works.
+        html = "<div class='#{"x" * 30_000}'><h1>Mercari</h1><p>#{"あ" * 5_000}</p></div>"
+
+        expect(described_class.new(nil, text: html, client: client).call)
+          .to include(company: "Mercari")
+      end
+
+      it "sends the whole paste to Claude when it is under the cap" do
+        described_class.new(nil, text: "あ" * 11_999, client: client).call
+
+        # Counts the posting's own characters, not the message length: the prompt
+        # carries a preamble too, so a length assertion would pin the wrong thing.
+        expect(posting_sent_to_claude.count("あ")).to eq(11_999)
+      end
+
+      it "rejects a paste with no readable text in it" do
+        expect { described_class.new(nil, text: "<div></div>   ", client: client).call }
+          .to raise_error(described_class::UnreadableError, /paste/)
+      end
+
+      # Blank text is not a paste — it is a field the user never filled — so the
+      # request falls through to the url path rather than failing as an empty paste.
+      it "falls through to the url when text is blank" do
+        service = described_class.new("https://example.com/jobs/42", text: "  ", client: client)
+        allow(service).to receive(:fetch).and_return("<html>Mercari — Backend Engineer</html>")
+
+        service.call
+
+        # The assertion is #fetch, not the returned url: both branches return the
+        # same string here (the url path echoes uri.to_s, the paste path echoes
+        # @raw_url), so a url expectation would pass whichever branch ran.
+        expect(service).to have_received(:fetch)
+      end
+
+      it "rejects a request carrying neither a url nor text" do
+        expect { described_class.new(nil, text: nil, client: client).call }
+          .to raise_error(described_class::InvalidUrlError)
       end
     end
 

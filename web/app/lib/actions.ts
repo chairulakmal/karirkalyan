@@ -120,22 +120,38 @@ export async function createApplication(formData: FormData): Promise<ActionFailu
   redirect({ href: `/applications/${res.data.id}`, locale });
 }
 
-export type PrefillResult =
-  | { ok: true; company: string; role: string; notes: string; url: string }
-  | { ok: false; error: string };
+type PrefillFields = { company: string; role: string; notes: string; url: string };
+
+// The failure arm is ActionFailure, not a bare { ok, error }: apiFailure has
+// always returned `code` and `status`, and narrowing them away here threw the
+// signal out at the door. The form branches on `code` to decide whether a failure
+// has a recovery worth offering — `prefill_blocked` and `prefill_failed` get the
+// paste box, `prefill_unreachable` gets a retry — which is exactly what the error
+// taxonomy was typed for. Never string-match `error`; that is what `code` is for.
+export type PrefillResult = ({ ok: true } & PrefillFields) | ActionFailure;
 
 export async function prefillFromUrl(url: string): Promise<PrefillResult> {
   const trimmed = url.trim();
   if (!trimmed) return localFailure("urlRequired");
 
-  const res = await apiFetch<{
-    company: string;
-    role: string;
-    notes: string;
-    url: string;
-  }>("/applications/prefill", {
+  const res = await apiFetch<PrefillFields>("/applications/prefill", {
     method: "POST",
     body: JSON.stringify({ url: trimmed }),
+  });
+
+  if (!res.ok) return apiFailure(res);
+  return { ok: true, ...res.data };
+}
+
+// The fallback for a posting the fetcher cannot read. `url` rides along unfetched
+// so a posting pasted after a block still records where it came from.
+export async function prefillFromText(text: string, url: string): Promise<PrefillResult> {
+  const trimmed = text.trim();
+  if (!trimmed) return localFailure("pasteRequired");
+
+  const res = await apiFetch<PrefillFields>("/applications/prefill", {
+    method: "POST",
+    body: JSON.stringify({ text: trimmed, url: url.trim() }),
   });
 
   if (!res.ok) return apiFailure(res);
