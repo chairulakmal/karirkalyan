@@ -8,12 +8,14 @@ Prosopite.raise        = true
 # loop as an N+1 even though the request under test issues exactly one. Pause around the loop
 # rather than tagging the example `skip_n_plus_one`, which would also stop the scanner watching
 # the request the spec actually exists to protect.
+#
+# Pause takes the block itself rather than pause/yield/ensure-resume: `resume` hard-sets the
+# scan flag true rather than restoring what it was, so the ensure form would switch scanning
+# *on* in a `skip_n_plus_one` example that had deliberately never started one. The block form
+# saves and restores the previous value.
 module ProsopiteHelpers
-  def without_n_plus_one_scanning
-    Prosopite.pause
-    yield
-  ensure
-    Prosopite.resume
+  def without_n_plus_one_scanning(&block)
+    Prosopite.pause(&block)
   end
 end
 

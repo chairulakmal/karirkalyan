@@ -136,9 +136,11 @@ RSpec.describe Application do
 
     # Per segment — the stamp, id and suffix sit outside the count, because a single 20-char
     # budget for the whole name does not close ("-cover-letter.pdf" alone is 17).
+    # Asserted as a value, not as `length <= SLUG_MAX_LENGTH` — that form passes for "" too, so it
+    # would still be green if the truncation ever ate the whole name.
     it "caps a segment at 20 codepoints" do
-      expect(described_class.download_slug("A Very Long Company Name That Goes On Forever").length)
-        .to be <= described_class::SLUG_MAX_LENGTH
+      expect(described_class.download_slug("A Very Long Company Name That Goes On Forever"))
+        .to eq("A-Very-Long-Company")
     end
 
     it "counts codepoints, not bytes — a kanji is one character, not three" do
