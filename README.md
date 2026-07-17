@@ -29,7 +29,7 @@ A full-stack job application tracker — Rails 8 API + Next.js 16. It tracks whi
 
 - **Background jobs** — Solid Queue, Postgres-backed, running inside Puma — no extra service. Recurring jobs use an idempotency-key pattern, so at-least-once delivery is safe.
 - **Cache & rate limiting** — Solid Cache backs Rack::Attack, so throttle counters are shared across all Puma workers.
-- **File storage** — resumes and cover letters live in PostgreSQL `bytea`: 1 MB cap, PDF magic-byte validation.
+- **File storage** — resumes and cover letters live in PostgreSQL `bytea`: 1 MB cap, PDF magic-byte validation, and a ceiling of 200 applications per account. The throttle and the ceiling do different jobs: a rate limit bounds a rate, and every window resets, so only a hard cap bounds total storage.
 - **Dashboard** — pure SQL aggregation. No N+1, no records loaded into Ruby.
 - **Pagination** — cursor-based (`?after=<base64_cursor>&limit=20`).
 
@@ -39,6 +39,7 @@ A full-stack job application tracker — Rails 8 API + Next.js 16. It tracks whi
 - **AI pre-fill** — paste a job URL and Claude Haiku 4.5 extracts company/role/notes for review before saving. Server-side service, SSRF-guarded and rate-limited; reads Japanese postings natively.
 - **Calendar-aware email** — one follow-up **digest** per user per day at 08:15 JST, never one email per application (ActionMailer over SMTP via Resend, scheduled as a Solid Queue recurring task; the only other mail is a welcome email when an account is created). The digest skips weekends, Japanese national holidays, New Year, Golden Week and Obon. Skipped reminders are deferred, not dropped: they go out the next business day, exactly once.
 - **Data export, two shapes** — a CSV of your applications (a spreadsheet view, formula-injection escaped) and a full-account `.zip` — `account.json` plus every resume and cover letter, so the data can actually be recovered, not just read.
+- **Downloads named after the application** — every PDF leaves as `株式会社メルカリ-バックエンドエンジニア-0712-12-resume.pdf`, whether you download it on its own or unzip it out of the archive: one method names both, so a file means the same thing whichever door it left by. Japanese names are kept, not transliterated — `parameterize` turns a Japanese company name into an empty string, and a download filename has no reason to be ASCII.
 - **The product is bilingual, not just the README** — next-intl with ICU message catalogs; `ja` is prefixed, `en` is bare, so every page keeps one canonical URL, with `hreflang` and the sitemap to match.
 
 ### Security & trust
@@ -51,6 +52,7 @@ A full-stack job application tracker — Rails 8 API + Next.js 16. It tracks whi
 
 - **API docs generated from tests** — rswag: request specs and the OpenAPI spec share one source.
 - **Two-tier testing** — unit specs with no DB (fast), request specs against a real PostgreSQL (no mocked database).
+- **en/ja catalog parity is a CI check, not a convention** — `npm run lint:i18n` diffs the two message catalogs and fails the build on any key that landed in one language only. It has to be a check: a missing Japanese key lints, typechecks and builds clean, because nothing about it is a type error. There is no English fallback — only one catalog is ever loaded, so next-intl renders the key path itself, and a Japanese reader gets the literal text `dashboard.yourData` where a sentence belongs. The page is loudly broken and CI called it fine.
 
 ---
 

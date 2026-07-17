@@ -9,10 +9,42 @@ Open work lives in [`TODO.md`](TODO.md). Settled decisions-not-to-build are reco
 ## v1.4.4 — 2026-07-17
 
 The four items `v1.4.2` left open, shipped under the number they were renumbered to when that tag
-was skipped for good. One branch, one PR *(feat/v1.4.4)*.
+was skipped for good — plus a fifth the review of those four turned up: **every Rack::Attack rate
+limit could be skipped by appending `.json` to the URL**, and had been able to since the throttles
+landed. That one leads, because it is the only item here that was already hurting production.
+One branch, one PR *(feat/v1.4.4)*.
 
 Still a patch by the mechanical test: no migration, no `v1` contract broken, and no new capability
 — every item here makes something the app already did work properly, or stops it working badly.
+
+### Security: every rate limit was opt-out by typing `.json`
+
+Found by a code review of this release's diff, but **not introduced by it** — it had been live in
+production since Rack::Attack landed. Confirmed with `Rails.application.routes.recognize_path`
+before a line was changed, not reasoned about:
+
+- **`POST /api/v1/auth/sign_in.json` routed to `auth/sessions#create` and matched neither the
+  per-IP cap nor the per-email cap.** The app's only unauthenticated write had *no rate limit at
+  all* for a client that typed four extra characters. `POST /api/v1/applications/prefill.json`
+  went the same way, and that one bills a vendor per call.
+- **The cause is a layering mistake, and it fails open.** Rack::Attack runs *above* the router, so
+  `req.path` is the raw `PATH_INFO` — the string the client typed. Rails normalises afterwards and
+  routes far more strings than a naive `==` matches: `resources` generates `(.:format)`, and
+  Journey tolerates trailing and duplicate slashes. `/api/v1/applications/`,
+  `/api/v1/applications/12.json` and `/api/v1/applications//12` all reach an action. A guard keyed
+  on `req.path` returns `nil` for each, and **a `nil` key means no counter and no limit** — so the
+  guard does not merely mis-key, it disappears.
+- **Fixed with `Rack::Attack.normalized_path`**, memoised on the env; all six guards now key off
+  it. The general rule is now in SPEC.md § Security, because it outlives this file: *anything above
+  the router sees the string the client sent; anything below sees the string the framework decided
+  it meant. Never key a security control off the former.*
+- **Three of the regression specs passed against the broken code, so they were deleted.**
+  Rack::Test rewrites the URI before it builds the env, so a request spec asking for
+  `/api/v1/applications//12` hands the middleware `/api/v1/applications/12` and is green whether or
+  not the fix exists. Only the `.json` form survives to `PATH_INFO` intact. The slash cases moved
+  to `spec/lib/rack_attack_normalized_path_spec.rb`, which builds the env by hand — the only level
+  at which the assertion can fail. Both halves were negative-tested against a stashed fix, and the
+  unit spec mutation-tested by removing `.squeeze("/")`.
 
 ### PDFs are named after the application they belong to
 
@@ -48,6 +80,16 @@ two different mechanisms wearing one sentence.
   `pg_dump`. It needs no new error code: it reports through the existing `validation_failed`
   envelope with detail code `too_many_applications` on field `base`, the same shape the 1 MB upload
   cap already uses, so no controller and no frontend branch changed.
+- **The copy for it was missed the first time, and the docs audit at the end of this release is
+  what caught it.** The ceiling landed with SPEC, TODO and this changelog all naming
+  `too_many_applications`, and *neither* catalog carrying a string for it — so the resolution
+  chain's `t.has()` filter dropped it and a user who filled their account would have been told
+  "Those details couldn't be saved. Check the form and try again." Nothing was wrong with the
+  form. `errors.field.base_too_many_applications` now exists in both locales and says the account
+  is full. It names no number: the ceiling is a constant in Ruby, and copy repeating it would be a
+  second copy free to drift. **The parity check one item down could not have caught this** — the
+  key was missing from both catalogs, which is perfectly symmetric. It checks symmetry, not
+  completeness, and SPEC.md now says so where someone will read it.
 - **It is a bound, not an invariant**, and SPEC.md says so: the count takes no lock, so concurrent
   creates at the ceiling can overshoot by the number in flight. A real guarantee costs a counter
   column and an advisory lock to defend a number chosen by judgement.
@@ -55,18 +97,31 @@ two different mechanisms wearing one sentence.
 
 ### en/ja catalog parity is now a check, not a convention
 
-next-intl resolves a missing key through `t.has()`, so a key that landed in `en.json` alone
-degraded to fallback copy: the page rendered, lint and typecheck and the build all passed, and only
-a Japanese reader ever saw it. Review cannot reliably catch a bug that is invisible in the locale
-the reviewer reads — which is why "both catalogs move together" being written down was never
-enough.
+A key that lands in `en.json` alone does **not** fall back to English — there is no English to fall
+back to. `i18n/request.ts` loads exactly one catalog and configures no fallback locale and no
+`getMessageFallback`, so next-intl's default takes over and renders the key path itself: a Japanese
+reader gets the literal string `dashboard.yourData` where a sentence belongs, and the only alarm is
+a `console.error` in a server log nobody reads. Lint, typecheck and the build all stay green,
+because nothing about a missing key is a type error. The page is loudly broken and CI called it
+fine. Review cannot reliably catch a bug that is invisible in the locale the reviewer reads —
+which is why "both catalogs move together" being written down was never enough.
+
+*(An earlier draft of this entry said the missing key "degraded to fallback copy". That was wrong,
+and it had been copied into SPEC, both READMEs and the script's own header before a review caught
+it. The silent-degradation story is real but belongs to a different path — `apiFailure()`'s
+`t.has()` filter, which drops a missing **error** key and falls through to generic copy. That is
+the mechanism that hid the ceiling's missing string, one item up.)*
 
 `web/scripts/check-i18n-parity.mjs` (`npm run lint:i18n`) now diffs the catalogs in the web CI job,
-ahead of the build. It counts **every leaf path, with array elements counted individually**, so an
-FSM reason chip present in English and missing in Japanese reports its missing index instead of
-hiding inside an opaque array — dict-only counting is what once made a docs audit report a false
-drift here. The catalogs were already at parity when it landed, so it went green: a ratchet, not a
-repair. It caught its first real change one commit later, which is the item below.
+ahead of the build. It counts **every path — containers as well as leaves, with array elements
+counted individually**, so an FSM reason chip present in English and missing in Japanese reports
+its missing index instead of hiding inside an opaque array (dict-only counting is what once made a
+docs audit report a false drift here), and a path that is a string in one catalog and an object in
+the other is reported as the shape drift it is. Recording containers is what makes that second
+rule work at all: without it the check was dead code with a comment vouching for coverage it did
+not have — which is exactly what it was when first written here, until a review caught it. The
+catalogs were already at parity when it landed, so it went green: a ratchet, not a repair. It
+caught its first real change one commit later, which is the item below.
 
 ### "Your data" and the profile block are one card
 

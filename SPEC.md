@@ -34,11 +34,14 @@ Two consequences worth stating plainly:
 
 Last synced against the code: **2026-07-17**, `v1.4.4` (in flight) — § i18n gained
 § Catalog parity is checked in CI: `en`/`ja` key parity was a convention held by review, and this
-document said so; it is now a script in the `web` job, counting leaf paths with array elements
+document said so; it is now a script in the `web` job, counting every path with array elements
 counted individually so a missing FSM reason chip cannot hide inside an array. § Security gained a
 per-account write throttle on the application endpoints and `Application::MAX_PER_USER`, a hard
 ceiling of 200 applications per account: the throttle bounds the rate of the upload path, and the
-ceiling is what bounds total storage, which no throttle can. § API contract gained
+ceiling is what bounds total storage, which no throttle can — and every path guard in
+`rack_attack.rb` now keys off `Rack::Attack.normalized_path` rather than raw `req.path`, because
+Rails routes `/api/v1/auth/sign_in.json` to the same action while an `==` guard misses it and
+fails open. § API contract gained
 § Download filenames, and § Exports now defers to it: both download surfaces name their PDFs
 through one `Application#download_basename`, where the controller previously sent a hardcoded
 `resume.pdf` for every application and the archive built a different name from `parameterize`
@@ -1139,6 +1142,19 @@ STARTTLS port `2587`. The `From:` domain must be verified in Resend first.
   1-day expiry, no refresh flow. This is intended, not a bug.
 - **Rack::Attack** — throttle counters go through `Rails.cache` (Solid Cache), so they are shared
   across Puma workers rather than counted per worker.
+  - **Every path guard keys off `Rack::Attack.normalized_path`, never `req.path`.** This is the
+    one rule in this section that is load-bearing rather than descriptive. Rack::Attack runs
+    *above* the router, so `req.path` is the raw `PATH_INFO` — the string the client typed. Rails
+    normalises it afterwards, and routes far more strings to a controller than a naive `==` will
+    match: `resources :applications` generates `(.:format)`, and Journey tolerates trailing and
+    duplicate slashes. `POST /api/v1/auth/sign_in.json`, `.../sign_in/`, and
+    `/api/v1/applications//12` all reach their action. A guard written as
+    `req.path == "/api/v1/auth/sign_in"` returns `nil` for all three, and a `nil` key means *no
+    counter and no limit* — so the guard fails **open**, and the throttle becomes opt-out by
+    suffix. `normalized_path` collapses duplicate slashes, strips a format extension and a
+    trailing slash, and memoises on the Rack env like `account_id`. **The general rule, which
+    outlives this file: anything above the router sees the string the client sent; anything below
+    sees the string the framework decided it meant. Never key a security control off the former.**
   - `sign_in`: per-IP, plus **email-keyed** throttles (`10/5min`, `50/hour`) capping guesses
     against a single account across all IPs. IP-only throttling is defeated by a botnet or a
     shared NAT egress.
@@ -1685,6 +1701,15 @@ An upstream failure resolves to localized copy in this order — first hit wins:
    (`errors.field.email_taken`, `errors.field.resume_too_long`); every entry with catalog
    copy is rendered, joined into one message. Fields or inner codes without an entry are
    skipped rather than guessed at.
+
+   `errors.field.base_too_many_applications` is the one whose *field* is `base` rather than a
+   real column — the `MAX_PER_USER` ceiling (§ Security), where no field is wrong and the
+   account is simply full. It reads as a lookup like any other because `base` is what Rails
+   calls a record-level error, and the resolution above never assumed the field was a form
+   input. **Its copy does not name the number**, deliberately: the ceiling is a constant in
+   Ruby, and a catalog that repeated it would be a second copy free to drift the day it moves.
+   The API's English sentence names it; the localized copy says the account is full and to
+   delete something.
 2. **The code.** `errors.code.<code>` — `invalid_credentials`, `stale_record`,
    `invalid_transition`, `invalid_url`, `prefill_failed`, and the rest of the § Error codes
    taxonomy each have an entry.
@@ -1733,24 +1758,29 @@ key landing in one catalog and not the other fails the `Lint, typecheck & build`
 `conserve-main` requires. Before `v1.4.4` this rule was held by review alone, and a `ja` key
 could go missing through lint, typecheck and build without a word (above).
 
-**What it counts is every leaf path, with array elements counted individually.** A leaf is a
-string; a path is the dotted route to it, with array indices as `[n]` segments — so
-`transitions.reasons.ghosted` is not one key but three
-(`transitions.reasons.ghosted[0..2]`), one per FSM reason chip. Three rules follow, and the
-script reports each separately:
+**What it counts is every path, with array elements counted individually and containers counted
+as well as descended into.** A path is the dotted route to a node, with array indices as `[n]`
+segments — so `transitions.reasons.ghosted` contributes four paths, not one: the array itself,
+plus `[0..2]`, one per FSM reason chip. Two rules follow, and the script reports each
+separately:
 
 - **A path in one catalog and not the other is drift.** This one rule does most of the work,
-  because walking to the leaves collapses the other shapes of drift into it. An array of a
+  because walking the whole tree collapses the other shapes of drift into it. An array of a
   different **length** is caught for free — a `ghosted` with two chips in `ja` has no `[2]`, so
   `[2]` reports missing. That is the whole reason elements are counted rather than the array
   being treated as one opaque leaf: a reason chip that exists in English and not in Japanese is
   exactly the bug this check is for, and dict-only counting cannot see it — that blindness is
-  what made an earlier docs audit report a *false* drift here. A key that turns from a string
-  into a nested object on one side collapses in too, reported as the old path going missing and
-  the new one appearing unmatched.
-- **A leaf whose type differs is drift too** — a `5` in one catalog against a `"5"` in the other.
-  Nothing in the catalogs is a non-string today, so this rule is a guard rather than a working
-  part; it is five lines, and the alternative is that the one day it matters, nothing says so.
+  what made an earlier docs audit report a *false* drift here.
+- **A path whose type differs is drift too** — most usefully a `string` in one catalog against
+  an `object` in the other, meaning the two disagree about the shape of the copy and `t()` finds
+  out at runtime instead of here. This rule only works because the walker records containers
+  rather than only leaves: on a leaves-only walk a key that became an object would never appear
+  as a path at all — only its children would — so the comparison would find `undefined` on one
+  side and short-circuit, and the check would be dead code with a comment vouching for coverage
+  it did not have. That is exactly what it was when first written in this release, and a review
+  caught it. Recording containers also makes an empty `{}` visible, which a leaves-only walk
+  drops silently. The rule additionally covers a `5` against a `"5"`; nothing in the catalogs is
+  a non-string scalar today, so that half is a guard rather than a working part.
 
 The convention matters more than which convention it is: whatever the script counts, it must
 count the same thing on both sides. It walks both catalogs with one function for precisely that
@@ -1759,6 +1789,16 @@ reason.
 It is a script rather than a test because `web/` has no unit-test runner — Playwright E2E is the
 only suite, and booting a browser to compare two JSON files would be absurd. It has no
 dependencies and reads nothing but the two catalogs, so it costs the CI job well under a second.
+
+**It checks symmetry, not completeness, and the difference is not academic.** A key the API needs
+and *neither* catalog has is perfectly symmetric, so the check passes — which is exactly what
+happened to `errors.field.base_too_many_applications` in this release: the ceiling shipped with
+SPEC, TODO and CHANGELOG all naming the detail code, and both catalogs missing it, so the one user
+who hit the ceiling would have been told to check the form. The parity check ran green over that
+the whole time and was right to. The gap it closes is a key in one catalog and not the other; the
+gap it cannot close is a code the API emits that the catalogs have never heard of, which is
+step 1's `t.has()` filter degrading exactly as designed. Adding an error code is not done when the
+API renders it — it is done when both catalogs can say it.
 
 #### Locale-sensitive formatting
 

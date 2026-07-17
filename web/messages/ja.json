@@ -88,7 +88,8 @@
       "resume_too_long": "履歴書は1MB以下にしてください。",
       "resume_not_a_pdf": "履歴書はPDFファイルにしてください。",
       "cover_letter_too_long": "カバーレターは1MB以下にしてください。",
-      "cover_letter_not_a_pdf": "カバーレターはPDFファイルにしてください。"
+      "cover_letter_not_a_pdf": "カバーレターはPDFファイルにしてください。",
+      "base_too_many_applications": "登録できる応募の上限に達しています。新しく追加するには、いずれかの応募を削除してください。"
     }
   },
   "home": {
