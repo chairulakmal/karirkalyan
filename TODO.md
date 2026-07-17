@@ -10,12 +10,16 @@ cards joined `v1.9.0`; `v1.4.3` and the prefill paste fallback were added out of
 section left too. On 2026-07-17 `v1.4.3` was tagged and `v1.4.2` was skipped for good, which
 renumbered that section's four survivors to `v1.4.4`.
 
-**Current release: `v1.4.3`** (2026-07-17). **Nothing in flight.** `v1.4.2` was **never tagged
+**Current release: `v1.4.3`** (2026-07-17). **`v1.4.4` is in flight** — all four of its items are
+written and sitting on `feat/v1.4.4`, ticked below with what each one learned in the building;
+`CHANGELOG.md` § v1.4.4 has the account. The section stays here, ticked rather than deleted, until
+the tag exists — the items leave this file on tagging day, the way `v1.4.2`'s first two did.
+`v1.4.2` was **never tagged
 and never will be**: the prefill fix landed on `main` above its four unwritten items, which put
 two patches at one commit, and `v1.4.3` took the tag rather than make a production fix wait.
 `CHANGELOG.md` § v1.4.3 carries the full account. Those four items are now **`v1.4.4`** — same
-work, same patch level, one number further along; the gap at `v1.4.2` is permanent. The nearest
-open work is that `v1.4.4`, then `v1.5.0` — **the stage filter, scoped 2026-07-17**, which took
+work, same patch level, one number further along; the gap at `v1.4.2` is permanent. With `v1.4.4`
+written, the nearest genuinely open work is `v1.5.0` — **the stage filter, scoped 2026-07-17**, which took
 the `v1.5.0` slot and slid every release below it one minor. What each shipped release contained
 is `CHANGELOG.md`'s job to say, not this file's.
 

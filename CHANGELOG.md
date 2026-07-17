@@ -6,6 +6,88 @@ Open work lives in [`TODO.md`](TODO.md). Settled decisions-not-to-build are reco
 
 ---
 
+## v1.4.4 — 2026-07-17
+
+The four items `v1.4.2` left open, shipped under the number they were renumbered to when that tag
+was skipped for good. One branch, one PR *(feat/v1.4.4)*.
+
+Still a patch by the mechanical test: no migration, no `v1` contract broken, and no new capability
+— every item here makes something the app already did work properly, or stops it working badly.
+
+### PDFs are named after the application they belong to
+
+The download endpoint sent `resume.pdf` for every application, so a folder of ten downloads was ten
+files called `resume.pdf`, `resume(1).pdf`, and so on — the id was in the URL and nowhere in the
+name. The archive was worse in a specific way: it built its own name with `parameterize`, which
+strips non-ASCII, so 「株式会社メルカリ」 emptied out to nothing.
+
+- **One method names every PDF the API hands out**: `Application#download_basename(kind:)`, used by
+  both per-application downloads and the account archive, so a file means the same thing whichever
+  door it left by. The slugger **preserves Unicode** rather than transliterating it — a Japanese
+  company name stays Japanese in the filename, which is what a Japanese job search wants and what
+  `parameterize` cannot do.
+- **The disposition changed from `attachment` to `inline`.** A resume is a document you read; the
+  browser's PDF viewer is the right answer to clicking it. The exports keep `attachment` — those
+  are files you are taking away, not documents you are reading.
+- Non-ASCII names ride the standard two-field `Content-Disposition` (a transliterated ASCII
+  `filename=` plus an RFC 5987 `filename*=UTF-8''…`); browsers prefer the second. No gem needed.
+
+### A ceiling on applications, and a throttle on the writes that carry files
+
+`TODO.md` scoped this as "a config change, not a design", and half of that was wrong — recorded
+here because the correction is the interesting part. **A Rack::Attack throttle bounds a rate over a
+window, and every window resets, so any positive rate integrates to unbounded total.** A throttle
+cannot express "a ceiling on applications per account" at all. It was never a config change; it was
+two different mechanisms wearing one sentence.
+
+- **The throttle shipped as config, as promised**: `applications/write`, 30/min and 300/hour, per
+  account, on the two requests that can carry a PDF. It bounds CPU and write I/O. It does not bound
+  storage and cannot.
+- **The ceiling shipped as `Application::MAX_PER_USER` (200)**, a model validation on create — the
+  thing that actually bounds storage, on a database whose entire backup story is a nightly
+  `pg_dump`. It needs no new error code: it reports through the existing `validation_failed`
+  envelope with detail code `too_many_applications` on field `base`, the same shape the 1 MB upload
+  cap already uses, so no controller and no frontend branch changed.
+- **It is a bound, not an invariant**, and SPEC.md says so: the count takes no lock, so concurrent
+  creates at the ceiling can overshoot by the number in flight. A real guarantee costs a counter
+  column and an advisory lock to defend a number chosen by judgement.
+- `DELETE` is deliberately outside the throttle — it is the one write that gives storage back.
+
+### en/ja catalog parity is now a check, not a convention
+
+next-intl resolves a missing key through `t.has()`, so a key that landed in `en.json` alone
+degraded to fallback copy: the page rendered, lint and typecheck and the build all passed, and only
+a Japanese reader ever saw it. Review cannot reliably catch a bug that is invisible in the locale
+the reviewer reads — which is why "both catalogs move together" being written down was never
+enough.
+
+`web/scripts/check-i18n-parity.mjs` (`npm run lint:i18n`) now diffs the catalogs in the web CI job,
+ahead of the build. It counts **every leaf path, with array elements counted individually**, so an
+FSM reason chip present in English and missing in Japanese reports its missing index instead of
+hiding inside an opaque array — dict-only counting is what once made a docs audit report a false
+drift here. The catalogs were already at parity when it landed, so it went green: a ratchet, not a
+repair. It caught its first real change one commit later, which is the item below.
+
+### "Your data" and the profile block are one card
+
+The dashboard rendered the same card twice — profile (email, member since) and exports (the CSV and
+archive links) — with the average-days line wedged between. They are one thought: who you are, and
+what you can take with you. They were two cards because of render order and nothing else. Now one
+`ProfileCard` component, so an account or settings page can import it rather than copy it.
+
+- **The export links render outside the card's `{user && …}` gate**, deliberately. `/privacy`
+  promises the user can get their data out and these two links are the only surface honouring it;
+  gating them on a successful `/dashboard` fetch would remove that surface exactly when the data
+  looks least safe, and remove it silently.
+- **The card takes the user as a prop and does not fetch one.** `/dashboard`'s payload already
+  carries it — that fold is what `v1.3.0` shipped, and a component fetching its own user would put
+  the second `/me` request back on every page importing it.
+- The heading was a copy decision, not a mechanical move, and neither old eyebrow survived
+  unchanged: the card is "Your data" / 「あなたのデータ」, the English export eyebrow promoted to
+  name the whole card plus a *new* Japanese string, because 「データの書き出し」 means *exporting
+  data* and cannot head a card that opens with an email address. `dashboard.profile` and
+  `dashboard.exports.eyebrow` are gone; both catalogs moved together, 346 → 345 keys.
+
 ## v1.4.3 — 2026-07-17
 
 **There is no `v1.4.2` tag, and there never will be.** The number was scoped as a code-quality
