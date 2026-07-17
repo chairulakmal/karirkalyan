@@ -51,10 +51,19 @@ module Applications
       filter_by_cursor(relation)
     end
 
+    # `status` is a comma-separated list — any member matches, and the list still
+    # ANDs against the other filters. One element behaves as the scalar always did.
+    #
+    # Nothing left after the intersection means unfiltered, never empty: `where(status: [])`
+    # matches zero rows *silently*, so a hand-edited `?status=junk` would return a blank
+    # page dressed as a real answer, against this class's bad-input contract above. A list
+    # the server understands none of has told it nothing. There is deliberately no query
+    # that means "show nothing" — that is a client-side state.
     def filter_by_status(relation)
-      return relation if status.blank? || ApplicationFSM::VALID_STATES.exclude?(status)
+      states = status.to_s.split(",").map(&:strip) & ApplicationFSM::VALID_STATES
+      return relation if states.empty?
 
-      relation.where(status: status)
+      relation.where(status: states)
     end
 
     def filter_by_company(relation)

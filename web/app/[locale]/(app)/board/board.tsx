@@ -4,7 +4,7 @@ import { useOptimistic, useState, useTransition } from "react";
 import { useTranslations } from "next-intl";
 import { Link, useRouter } from "@/i18n/navigation";
 import { transitionStatus } from "@/app/lib/actions";
-import { ACTIVE_STATUSES, statusBadgeClass } from "@/app/lib/format";
+import { statusBadgeClass } from "@/app/lib/format";
 import {
   CONFIRM_REQUIRED,
   HARD_TERMINAL,
@@ -27,8 +27,8 @@ type Move = { id: number; to: Status };
 // Board-only display order. The grid wraps at four, so this groups row one as
 // the interview loop and row two as everything outside it (not yet applied,
 // or done interviewing) instead of funnel order. Membership still comes from
-// ACTIVE_STATUSES; a status missing here sorts after the ranked ones instead
-// of disappearing.
+// the fetched `active_states`; a status missing here sorts after the ranked
+// ones instead of disappearing.
 const COLUMN_ORDER: readonly Status[] = [
   "applied",
   "phone_screen",
@@ -94,10 +94,10 @@ export function Board({
     else byStatus.set(app.status, [app]);
   }
 
-  const columns = [...ACTIVE_STATUSES].sort((a, b) => columnRank(a) - columnRank(b));
+  const columns = [...table.active_states].sort((a, b) => columnRank(a) - columnRank(b));
   // Everything the API knows that isn't an active column — derived from the
   // fetched state list, so nothing here enumerates the FSM's vocabulary.
-  const closed = table.states.filter((s) => !ACTIVE_STATUSES.has(s));
+  const closed = table.states.filter((s) => !table.active_states.includes(s));
   const closedWithCards = closed.filter((s) => (byStatus.get(s) ?? []).length > 0);
 
   function isLegalTarget(column: Status): boolean {

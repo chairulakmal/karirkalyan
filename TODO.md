@@ -175,7 +175,7 @@ of thirteen states selected is an unfiltered list — identical to the current "
 inversion is a *mental-model and affordance* change, not a new result set, and it costs nothing
 on the wire.
 
-- [ ] **`status` accepts a list, server-side** — `Applications::ListQuery`
+- [x] **`status` accepts a list, server-side** — `Applications::ListQuery`
       (`api/app/queries/applications/list_query.rb`) widens `filter_by_status` from
       `where(status: status)` to a comma-separated list intersected with
       `ApplicationFSM::VALID_STATES`. **Backward-compatible on the wire**: `status=applied`
@@ -188,13 +188,13 @@ on the wire.
       the survey — NN/g, Baymard, GOV.UK, Material, HIG, Polaris, Atlassian — documents an
       include/exclude mode toggle for filters.** Filtering is inclusion everywhere it is
       specified.
-- [ ] **The empty-list trap** — `where(status: [])` matches **zero rows, silently**. That is a
+- [x] **The empty-list trap** — `where(status: [])` matches **zero rows, silently**. That is a
       real hazard the moment a list can be empty, and it contradicts `ListQuery`'s stated
       contract: every param is nil-tolerant, junk falls back to the *unfiltered first page*
       because these arrive from navigation, not a form. So: an empty or all-unknown list is
       **unfiltered**, same as `nil`. The client must never rely on that — it is the defence for
       a hand-edited URL. Which forces the UI rule below.
-- [ ] **Zero chips selected is a UI state, not a query.** All thirteen selected → send **no
+- [x] **Zero chips selected is a UI state, not a query.** All thirteen selected → send **no
       `status` param at all** (byte-identical to today's "All"). Zero selected → **do not
       fetch**; render an empty state locally that says every stage is hidden and offers one
       click back. Otherwise "hide all" either shows everything (server's nil-tolerance) or an
@@ -203,14 +203,14 @@ on the wire.
       calls out that *"totally empty states cause confusion about how and whether the system is
       working"*, and wants a reason given, not a blank panel. The existing `noMatches` copy is
       the wrong message here: nothing failed to match, the user hid it.
-- [ ] **Presets: "All", "Active", "None"** — the bulk actions the chips are tedious without.
+- [x] **Presets: "All", "Active", "None"** — the bulk actions the chips are tedious without.
       **The wire format is explicit chips, not a macro**: "Active" expands client-side to
       `status=wishlist,draft,applied,phone_screen,technical,final_round,offer` and lights those
       seven. A `status=active` macro would make the param polymorphic — a state *or* a group —
       the same near-miss naming the `API_BASE` / `API_BASE_URL` rename (`v1.4.3`) was done to
       remove. A preset is a **shortcut to a chip selection**, and stays visibly so: after
       clicking it the user sees which seven, and can toggle one off.
-- [ ] **`active_states` on `/transitions`, and delete `ACTIVE_STATUSES`** — *the invariant this
+- [x] **`active_states` on `/transitions`, and delete `ACTIVE_STATUSES`** — *the invariant this
       item would otherwise damage*. "Active" is currently a hardcoded TypeScript set
       (`web/app/lib/format.ts:45`) and **is not derivable from what the server sends**: it
       excludes the three `TERMINAL_STATES` *plus* `rejected`, `ghosted` and `withdrawn`. It
@@ -221,7 +221,7 @@ on the wire.
       `active_states`, own the definition in `ApplicationFSM`, and delete the TS copy. Four call
       sites: `format.ts:45`, `details-editor.tsx:78`, `applications-list.tsx:260`, `board.tsx:97`
       and `:100`. **Do this first** — the preset is downstream of it.
-- [ ] **Chips become checkboxes, semantically** — they are `<button>`s with radio behaviour
+- [x] **Chips become checkboxes, semantically** — they are `<button>`s with radio behaviour
       today and must become independently-toggleable. **The APG has no chip pattern**; chips map
       onto an existing one, and the choice is real — Material's own MDC gives filter chips
       `role="checkbox"` while Angular Material chose `role="option"` in a `listbox`. **Go
@@ -239,7 +239,7 @@ on the wire.
       not used as the only visual means of conveying information"* — a dimmed brand colour is
       still colour) and drags the label toward failing contrast. Needs a structural mark: a
       check, a filled box.
-- [ ] **Keep the counts on the chips, and keep them global — this is mostly *right*, not a
+- [x] **Keep the counts on the chips, and keep them global — this is mostly *right*, not a
       compromise.** Counts matter: NN/g ties them directly to the failure mode this item
       creates — *"facets also show the number of elements available under each filter, and thus
       help users avoid zero-search results"*
@@ -258,7 +258,7 @@ on the wire.
       (`buckets(pick, constrainTo)`) while the chips answer a different question. That is a
       dashboard-payload change and belongs with `v1.9.0`'s stat cards, which reopen the payload
       anyway.
-- [ ] **`SPEC.md` in the same PR** — `SPEC.md:758` currently reads *"`status` (exact)"* and
+- [x] **`SPEC.md` in the same PR** — `SPEC.md:758` currently reads *"`status` (exact)"* and
       becomes a list. Check `SPEC.md:1917` while there: the board section rejects per-column
       pagination partly because *"it needs a new `status` filter parameter on the API"* — that
       argument's premise changes when this ships, so either the reasoning is restated or the

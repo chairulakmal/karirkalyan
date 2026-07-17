@@ -579,11 +579,15 @@ RSpec.describe "Applications", type: :request do
     let(:headers) { { "Authorization" => jwt_for(user) } }
 
     before do
-      create(:application, user: user, status: "applied",      created_at: 3.hours.ago)
-      create(:application, user: user, status: "applied",      created_at: 2.hours.ago)
-      create(:application, user: user, status: "phone_screen", created_at: 1.hour.ago)
+      create(:application, user: user, status: "applied",      company: "Mercari", created_at: 4.hours.ago)
+      create(:application, user: user, status: "applied",      company: "DeNA",    created_at: 3.hours.ago)
+      create(:application, user: user, status: "phone_screen", company: "DeNA",    created_at: 2.hours.ago)
+      create(:application, user: user, status: "offer",        company: "DeNA",    created_at: 1.hour.ago)
+      create(:application, user: user, status: "rejected",     company: "DeNA",    created_at: 30.minutes.ago)
     end
 
+    # Also the backward-compatibility case: `status=applied` is a one-element list now,
+    # and the wire is unchanged for a client that only ever sends one.
     it "returns only applications matching the requested status" do
       get "/api/v1/applications?status=applied", headers: headers
       body = JSON.parse(response.body)
@@ -592,11 +596,54 @@ RSpec.describe "Applications", type: :request do
       expect(body["data"].map { |a| a["status"] }.uniq).to eq([ "applied" ])
     end
 
+    it "matches a row in any state in the list" do
+      get "/api/v1/applications?status=applied,offer", headers: headers
+      body = JSON.parse(response.body)
+      expect(response).to have_http_status(:ok)
+      expect(body["data"].length).to eq(3)
+      expect(body["data"].map { |a| a["status"] }.uniq).to match_array(%w[applied offer])
+    end
+
+    it "drops unknown members and filters by the ones it recognises" do
+      get "/api/v1/applications?status=applied,teleported", headers: headers
+      body = JSON.parse(response.body)
+      expect(response).to have_http_status(:ok)
+      expect(body["data"].map { |a| a["status"] }.uniq).to eq([ "applied" ])
+    end
+
+    # The list ORs within itself; it still ANDs against everything else.
+    it "combines the list with the company filter" do
+      get "/api/v1/applications?status=applied,offer&company=DeNA", headers: headers
+      body = JSON.parse(response.body)
+      expect(body["data"].length).to eq(2)
+      expect(body["data"].map { |a| a["company"] }.uniq).to eq([ "DeNA" ])
+      expect(body["data"].map { |a| a["status"] }.uniq).to match_array(%w[applied offer])
+    end
+
     it "ignores unrecognised status values and returns all applications" do
       get "/api/v1/applications?status=invalid", headers: headers
       body = JSON.parse(response.body)
       expect(response).to have_http_status(:ok)
-      expect(body["data"].length).to eq(3)
+      expect(body["data"].length).to eq(5)
+    end
+
+    # `where(status: [])` matches zero rows silently, so every way of arriving at an empty
+    # list has to land on the unfiltered page instead of a blank one that looks like an answer.
+    context "when the list intersects VALID_STATES to nothing" do
+      {
+        "an empty param"         => "status=",
+        "a single junk member"   => "status=junk",
+        "all-junk members"       => "status=junk1,junk2",
+        "nothing but separators" => "status=,,"
+      }.each do |description, query|
+        it "returns every application unfiltered for #{description}" do
+          get "/api/v1/applications?#{query}", headers: headers
+          body = JSON.parse(response.body)
+          expect(response).to have_http_status(:ok)
+          expect(body["data"]).not_to be_empty
+          expect(body["data"].length).to eq(5)
+        end
+      end
     end
 
     it "combines status filter with cursor pagination" do

@@ -3,7 +3,7 @@ import { Link } from "@/i18n/navigation";
 import { notFound } from "next/navigation";
 import { apiFetch } from "@/app/lib/api";
 import { formatDate, prettyUrl, statusBadgeClass, timeAgo } from "@/app/lib/format";
-import type { ApplicationWithDetail } from "@/app/lib/types";
+import type { ApplicationWithDetail, TransitionTable } from "@/app/lib/types";
 import { StatusHelp } from "@/app/components/status-help";
 import { TransitionButtons } from "./transition-buttons";
 import { FileUpload } from "./file-upload";
@@ -16,10 +16,11 @@ export default async function ApplicationDetailPage({
   params: Promise<{ id: string }>;
 }) {
   const { id } = await params;
-  const [t, ts, locale] = await Promise.all([
+  const [t, ts, locale, tableRes] = await Promise.all([
     getTranslations("detail"),
     getTranslations("status"),
     getLocale(),
+    apiFetch<TransitionTable>("/transitions"),
   ]);
   const res = await apiFetch<ApplicationWithDetail>(`/applications/${id}`);
 
@@ -99,10 +100,14 @@ export default async function ApplicationDetailPage({
       </section>
 
       <section className="grid grid-cols-1 gap-6 md:grid-cols-2">
+        {/* `active_states` only decides whether an overdue follow-up shouts, so
+            a failed table costs that one emphasis rather than the page — the
+            record itself is what the reader came for. */}
         <DetailsEditor
           id={numId}
           lockVersion={app.lock_version}
           status={app.status}
+          activeStates={tableRes.ok ? (tableRes.data?.active_states ?? []) : []}
           company={app.company}
           role={app.role}
           url={app.url}

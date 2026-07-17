@@ -285,7 +285,8 @@
     "empty": "Nothing on the board yet.",
     "addFirst": "Add your first one →",
     "moveMenu": "Move {company}",
-    "menuTitle": "Move to"
+    "menuTitle": "Move to",
+    "staleTable": "The server sent a transition table this version doesn't recognise — a deploy may be in progress. Try again in a moment."
   },
   "list": {
     "company": "Company",
@@ -295,6 +296,12 @@
     "noBoard": "No link",
     "clearFilters": "Clear filters",
     "all": "All",
+    "stages": "Stages",
+    "stagePresets": "Stage presets",
+    "activeStages": "Active",
+    "noStages": "None",
+    "allStagesHidden": "Every stage is hidden, so there is nothing to list.",
+    "showAllStages": "Show every stage",
     "option": "{label} ({count})",
     "noMatches": "No applications match these filters.",
     "empty": "No applications yet.",
@@ -304,7 +311,8 @@
     "followUpOverdue": "Follow up overdue · {date}",
     "followUp": "Follow up {date}",
     "loading": "Loading…",
-    "loadMore": "Load more"
+    "loadMore": "Load more",
+    "resultCount": "{count, plural, =0 {No applications shown} one {# application shown} other {# applications shown}}"
   },
   "detail": {
     "eyebrow": "Application",
