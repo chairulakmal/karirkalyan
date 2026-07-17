@@ -19,6 +19,8 @@ This pattern requires a server component — it's one reason Next.js was chosen 
 
 Every page lives under a `[locale]` segment — `en` and `ja` (`i18n/routing.ts`, messages in `messages/en.json` and `messages/ja.json`). Import `Link`, `redirect`, `useRouter` and friends from **`i18n/navigation.ts`**, never from `next/link` / `next/navigation` directly: the wrapped versions carry the active locale through, the originals silently drop it.
 
+**The two catalogs move together, and CI checks it.** `npm run lint:i18n` (`scripts/check-i18n-parity.mjs`) diffs their paths and fails on any path present in one and missing from the other, or whose value type differs. It runs in the web CI job ahead of the build, because a missing `ja` key builds clean — nothing about it is a type error. `i18n/request.ts` loads one catalog and sets no fallback locale, so there is no English to fall back to: next-intl renders the key path itself (`dashboard.yourData`) and console.errors into a server log nobody reads. Run it before pushing a copy change.
+
 ## Screens
 
 `localePrefix` is `"as-needed"` (`i18n/routing.ts`): Japanese is prefixed (`/ja/dashboard`),

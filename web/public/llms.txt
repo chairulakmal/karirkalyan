@@ -20,7 +20,12 @@ pipeline. Built as a portfolio project by Chairul Akmal.
 - Exports your data two ways: a CSV of your applications, and a full-account zip containing
   account.json plus every resume and cover letter you uploaded. Both are downloads from the
   dashboard; the zip is the one that can actually restore an account.
-- Stores resume and cover letter as PostgreSQL bytea per application
+- Stores resume and cover letter as PostgreSQL bytea per application: 1 MB each, and at most 200
+  applications per account, which is what bounds total storage — a rate limit cannot, since every
+  window resets. Downloaded PDFs are named after the application they belong to
+  (company-role-MMDD-id-kind.pdf), by one method shared with the archive, so a file has the same
+  name whether it was downloaded on its own or unzipped out of the account export. Japanese and
+  other non-ASCII names are preserved rather than transliterated.
 - Exposes a stats dashboard via pure SQL aggregation (no N+1)
 - Predicts which applications have been ghosted: the dashboard flags any application sitting in
   applied or phone_screen that has been silent longer than the 90th percentile of that user's own
@@ -51,7 +56,8 @@ is no self-service delete button, and the app does not claim one.
 - Frontend: Next.js 16 App Router, TypeScript, Tailwind CSS
 - Auth: JWT issued by Rails, stored in httpOnly cookie by Next.js — never reaches client JS
 - Deploy: Railway (API service + web service + managed PostgreSQL)
-- Tests: RSpec (unit + request specs against real DB), Playwright E2E
+- Tests: RSpec (unit + request specs against real DB), Playwright E2E, and a CI script that fails
+  the build when the en and ja message catalogs disagree about which keys exist
 
 ## Live
 

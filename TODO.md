@@ -10,12 +10,16 @@ cards joined `v1.9.0`; `v1.4.3` and the prefill paste fallback were added out of
 section left too. On 2026-07-17 `v1.4.3` was tagged and `v1.4.2` was skipped for good, which
 renumbered that section's four survivors to `v1.4.4`.
 
-**Current release: `v1.4.3`** (2026-07-17). **Nothing in flight.** `v1.4.2` was **never tagged
+**Current release: `v1.4.3`** (2026-07-17). **`v1.4.4` is in flight** — all four of its items are
+written and sitting on `feat/v1.4.4`, ticked below with what each one learned in the building;
+`CHANGELOG.md` § v1.4.4 has the account. The section stays here, ticked rather than deleted, until
+the tag exists — the items leave this file on tagging day, the way `v1.4.2`'s first two did.
+`v1.4.2` was **never tagged
 and never will be**: the prefill fix landed on `main` above its four unwritten items, which put
 two patches at one commit, and `v1.4.3` took the tag rather than make a production fix wait.
 `CHANGELOG.md` § v1.4.3 carries the full account. Those four items are now **`v1.4.4`** — same
-work, same patch level, one number further along; the gap at `v1.4.2` is permanent. The nearest
-open work is that `v1.4.4`, then `v1.5.0` — **the stage filter, scoped 2026-07-17**, which took
+work, same patch level, one number further along; the gap at `v1.4.2` is permanent. With `v1.4.4`
+written, the nearest genuinely open work is `v1.5.0` — **the stage filter, scoped 2026-07-17**, which took
 the `v1.5.0` slot and slid every release below it one minor. What each shipped release contained
 is `CHANGELOG.md`'s job to say, not this file's.
 
@@ -130,7 +134,7 @@ the code-quality patch that "Close the door" displaced, still sequenced ahead of
 the stage filter reads better on top of it. Each stays a patch the same way: no new capability, no
 migration, and the previous image boots against an unchanged database.
 
-- [ ] **Name downloaded resumes and cover letters after the application, not after nothing** —
+- [x] **Name downloaded resumes and cover letters after the application, not after nothing** —
       the v1.4.0 fallout: shipping the account archive is what made it visible that neither
       download surface names a file usefully. The same disease on two surfaces. In the archive,
       `Exports::AccountArchive#blob_path` (`api/app/services/exports/account_archive.rb:85`)
@@ -187,7 +191,7 @@ migration, and the previous image boots against an unchanged database.
       Rails owns the fix on both surfaces — the Next proxy passes `Content-Disposition` straight
       through, and SPEC.md § Exports already commits to the server being the one place that names
       a file.
-- [ ] **Throttle uploads, and cap applications per account** — operations, not a feature; the
+- [x] **Throttle uploads, and cap applications per account** — operations, not a feature; the
       field admission test deliberately does not apply. Nothing else in the repo defends the
       data: the real job-search history — applications, timeline, resumes stored as bytea —
       lives in one Railway Postgres, and **the Railway Hobby plan has no managed backups**
@@ -207,7 +211,16 @@ migration, and the previous image boots against an unchanged database.
       it is, not where the request came from — same reasoning as the export throttle, `CHANGELOG.md`
       § v1.4.0): a write/upload cap, and a ceiling on applications per account. The per-account
       pattern and the `429` responder already exist; this is a config change, not a design.
-- [ ] **Make en/ja key parity a check, not a convention** *(added 2026-07-16 — `v1.4.3` found the
+
+      **Corrected 2026-07-17, in the building: half of that last sentence was wrong.** A
+      Rack::Attack throttle bounds a *rate over a window*, and every window resets — so any
+      positive rate integrates to unbounded total, and a throttle cannot express "a ceiling on
+      applications per account" at all. The upload cap was config as promised
+      (`applications/write`, 30/min + 300/hour per account). The ceiling was not: it shipped as
+      `Application::MAX_PER_USER` (200), a model validation on create, reporting through the
+      existing `validation_failed` envelope with detail code `too_many_applications` on field
+      `base` — the same shape the 1 MB upload cap uses. See `SPEC.md` § Security.
+- [x] **Make en/ja key parity a check, not a convention** *(added 2026-07-16 — `v1.4.3` found the
       gap while adding four catalog keys)*. `CLAUDE.md` and this file both say parity must hold,
       and **nothing enforces it**: no test, no CI step, and next-intl's type augmentation is not
       wired up, so a key landing in `en.json` alone compiles, lints and builds clean. The
@@ -219,7 +232,16 @@ migration, and the previous image boots against an unchanged database.
       (`en.json` § `board`) are arrays, and dict-only counting versus counting array elements is
       what made a docs audit report a false drift here. Whatever the check counts, it must count
       the same thing on both sides — which is also why the hardcoded counts are gone from the docs.
-- [ ] **Fold "Your data" into the profile card, and make the card a component** (`web/`-only).
+
+      **Corrected 2026-07-17, in the building:** the reason chips are `transitions.reasons.*`, not
+      `board` — `board` holds no arrays at all. Built as `web/scripts/check-i18n-parity.mjs`
+      (`npm run lint:i18n`), in the `verify` job ahead of the build. The convention it settled on:
+      **every leaf path, array elements counted individually** (`transitions.reasons.ghosted[0]`),
+      which makes a short array report its missing index rather than hiding inside an opaque leaf.
+      A script rather than a test because `web/` has no unit-test runner. The catalogs were already
+      at parity when it was written — 346 keys, both sides — so it landed green; it is a ratchet,
+      not a repair. See `SPEC.md` § i18n → Catalog parity is checked in CI.
+- [x] **Fold "Your data" into the profile card, and make the card a component** (`web/`-only).
       The dashboard renders the same
       `<section className="border border-dune bg-linen p-5">` twice: the **profile** block
       (`web/app/[locale]/(app)/dashboard/page.tsx:54–76` — email, member since) and the **exports**
@@ -249,6 +271,17 @@ migration, and the previous image boots against an unchanged database.
       other, and only the EN one reads as a card title. Merging under a single heading is a copy
       decision in both locales, and whichever eyebrow loses becomes a dead catalog key to delete
       (en/ja key parity holds and should stay that way).
+
+      **Built 2026-07-17. The heading decision: neither eyebrow survived as-is.** The card is
+      `dashboard.yourData` — "Your data" / 「あなたのデータ」 — which is the EN export eyebrow
+      promoted to name the whole card, and a *new* JA string, because 「データの書き出し」 means
+      *exporting data* and cannot head a card that opens with an email address. `dashboard.profile`
+      ("Profile" / 「プロフィール」) and `dashboard.exports.eyebrow` are both gone; `exports.blurb`,
+      `.csv` and `.archive` stay where they are. Catalogs went 346 → 345 keys, still at parity —
+      the check from the item above ran on this change, which is what it is for. The export half
+      renders outside the `{user && …}` gate as the trap above demands, and `ProfileCard` takes
+      `user` as a prop. `SPEC.md` § Exports → The download surface now carries both rules, so the
+      next person to touch this finds them in the spec rather than in this file.
 
       Carry the two comments at `:93–96` and the `eslint-disable no-html-link-for-pages` lines with
       the move — the export anchors are plain `<a>`s to `/api/exports/*` because those are API

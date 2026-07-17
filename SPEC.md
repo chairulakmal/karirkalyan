@@ -32,7 +32,21 @@ Two consequences worth stating plainly:
   [`CHANGELOG.md`](CHANGELOG.md), including the pre-1.0.0 build phases that used to sit at the
   top of this file.
 
-Last synced against the code: **2026-07-17**, `v1.4.3` — § Query layer gained
+Last synced against the code: **2026-07-17**, `v1.4.4` (in flight) — § i18n gained
+§ Catalog parity is checked in CI: `en`/`ja` key parity was a convention held by review, and this
+document said so; it is now a script in the `web` job, counting every path with array elements
+counted individually so a missing FSM reason chip cannot hide inside an array. § Security gained a
+per-account write throttle on the application endpoints and `Application::MAX_PER_USER`, a hard
+ceiling of 200 applications per account: the throttle bounds the rate of the upload path, and the
+ceiling is what bounds total storage, which no throttle can — and every path guard in
+`rack_attack.rb` now keys off `Rack::Attack.normalized_path` rather than raw `req.path`, because
+Rails routes `/api/v1/auth/sign_in.json` to the same action while an `==` guard misses it and
+fails open. § API contract gained
+§ Download filenames, and § Exports now defers to it: both download surfaces name their PDFs
+through one `Application#download_basename`, where the controller previously sent a hardcoded
+`resume.pdf` for every application and the archive built a different name from `parameterize`
+that emptied out on Japanese company names. The slugger preserves Unicode rather than
+transliterating it. Before that, `v1.4.3` — § Query layer gained
 `Applications::ListQuery`, an extraction rather than a behaviour change: it moves
 `GET /api/v1/applications`'s filtering and cursor decoding out of the controller and writes down
 the contract that action already had. § Error codes split pre-fill failure into `invalid_url` /
@@ -162,8 +176,10 @@ visitor could make "Try demo account" 401 for the next fifty-nine minutes.
 
 Reopening registration is a product decision, not a config change: it would owe users a privacy
 policy that promises more than "the operator's own data" (§ Legal pages), a self-service delete
-button, an upload throttle, a per-account application cap, and a backup story that is not one
-`pg_dump`.
+button, and a backup story that is not one `pg_dump`. The upload throttle and the per-account
+application cap this list used to name are no longer owed — `v1.4.4` built both (§ Security),
+because the shared demo login is a multi-tenant abuse surface whether or not registration is
+open.
 
 ---
 
@@ -213,7 +229,8 @@ users
 The core entity. `status` is FSM-controlled: it changes only through
 `Applications::TransitionService`, never a direct attribute write, and it is never
 mass-assignable. `resume` and `cover_letter` are `bytea` columns capped at 1 MB in the model and
-excluded from JSON serialisation — dedicated download endpoints serve them via `send_data`.
+excluded from JSON serialisation — dedicated download endpoints serve them via `send_data`, under
+the name `#download_basename` gives them (§ Download filenames).
 
 ```
 applications
@@ -228,8 +245,8 @@ applications
   notes                   text
   resume                  bytea              ← raw bytes, ≤ 1 MB, PDF magic-byte checked
   cover_letter            bytea              ← raw bytes, ≤ 1 MB, PDF magic-byte checked
-  resume_updated_at       datetime
-  cover_letter_updated_at datetime
+  resume_updated_at       datetime           ← set by a before_save; also the MMDD in the download name
+  cover_letter_updated_at datetime           ← same
   lock_version            integer, default: 0   ← optimistic locking
   created_at, updated_at
 
@@ -747,7 +764,7 @@ its own (a `409` is retryable, a `422` is not), but the code is what clients sho
 | `not_found` | `404` | No such record — including another user's record |
 | `stale_record` | `409` | `ActiveRecord::StaleObjectError` — optimistic-locking conflict |
 | `invalid_transition` | `422` | FSM `InvalidTransitionError` |
-| `validation_failed` | `422` | Model validation failure (create/update, file upload); carries `details` |
+| `validation_failed` | `422` | Model validation failure (create/update, file upload, or the `MAX_PER_USER` ceiling — detail code `too_many_applications` on field `base`); carries `details` |
 | `invalid_url` | `422` | The pre-fill URL itself is the problem — malformed, a port other than 80/443, or a private/internal address. Never fetched (`InvalidUrlError`) |
 | `prefill_blocked` | `422` | The site refused an automated reader — `401`/`403`, or a `cf-mitigated` header on any status. The URL is fine and retrying will not help (`BlockedError`). An upstream `429` is deliberately *not* this: it is the one refusal that lifts, so it resolves to `prefill_unreachable` and the user is told to retry |
 | `rate_limited` | `429` | Rack::Attack throttle; `Retry-After` header set |
@@ -884,21 +901,35 @@ job-search history lives in one Railway Postgres, and the Hobby plan has no mana
 Scheduled `pg_dump`s cover that from the outside (§ Deployment); this covers it from the inside,
 and is the leg the user can pull without a provider, a cron runner, or a shell. It contains
 `account.json` — user, every application with every column, every timeline entry — plus the PDFs
-under `resumes/` and `cover-letters/`, named `{application_id}-{slug}.pdf`. `account.json` carries
-a `schema_version` so a future importer can tell what it is reading, and each application row
-names its own files, so the mapping survives even if the slug is unhelpful (company names in
-Japanese `parameterize` to an empty string — the id is what makes the name unique, the slug is
-only there to be readable).
+under `resumes/` and `cover-letters/`, named by `Application#download_basename` (§ Download
+filenames) — the same method the per-application download endpoints use, so a file means the same
+thing whichever door it left by. `account.json` carries a `schema_version` so a future importer
+can tell what it is reading, and each application row names its own files, so the mapping survives
+even when a segment is unhelpful — the id in the name is what makes it unique, the company and
+role are only there to be readable.
+
+**One archive-only detail:** rubyzip writes UTF-8 entry names but leaves the EFS flag
+(general-purpose bit 11) unset by default, which is mojibake in strict extractors the moment a
+name is Japanese. `config/initializers/zip.rb` sets `Zip.unicode_names = true` once at boot.
 
 **The archive is built in memory** (`Zip::OutputStream.write_buffer`), which is a deliberate cap,
-not an oversight: blobs are capped at 1 MB each and this is a single-user app, so the peak is
-bounded by `applications × 2 MB` and a few dozen applications is a few dozen megabytes. If that
-ever stops being true the fix is streaming, and the throttle below is what buys the time to notice.
+not an oversight: blobs are capped at 1 MB each, so the peak is bounded by `applications × 2 MB`
+— and since `v1.4.4` that multiplicand has a ceiling of its own, `Application::MAX_PER_USER`
+(§ Security), which puts the worst case at 400 MB. That is the honest number, not the expected
+one: a real account of a few dozen applications is a few dozen megabytes. A worst-case account is
+where this stops fitting in memory, and the fix then is streaming — the throttle below is what
+buys the time to notice.
 
-**The download surface** is a section on `/dashboard` with two links, proxied to Rails by
-`app/api/exports/{applications,account}/route.ts` — the same `apiProxy` the resume and cover-letter
-downloads use, so the JWT stays server-side (§ Auth flow). Two rules that look like slips and are
-not:
+**The download surface** is the export half of `app/components/profile-card.tsx`, rendered on
+`/dashboard`, its two links proxied to Rails by `app/api/exports/{applications,account}/route.ts`
+— the same `apiProxy` the resume and cover-letter downloads use, so the JWT stays server-side
+(§ Auth flow). Three rules that look like slips and are not:
+
+- **The links render even when the card has no user to show.** The card's profile half is
+  conditional on `stats.user`; its export half is not, and the gate must never be lifted to wrap
+  the whole card. `/privacy` promises the user can get their data out, and this is the only
+  surface in the app that honours it — gating it on a successful `/dashboard` fetch would remove
+  it precisely when the data looks like it is in trouble, and remove it silently.
 
 - They are **plain `<a>` tags**, not the `Link` from `i18n/navigation.ts`. These are API routes,
   not localized pages: a client-side navigation would fetch the route and do nothing visible. The
@@ -906,7 +937,58 @@ not:
   those two lines.
 - There is **no `download` attribute**. Rails already sends `Content-Disposition: attachment` with
   the filename it chose (`karirkalyan-applications-2026-07-12.csv`), so the browser downloads
-  rather than navigates, and the server stays the one place that names the file.
+  rather than navigates, and the server stays the one place that names the file. Note this is the
+  one disposition § Download filenames did **not** move to `inline`: an export is a file you are
+  taking away, not a document you are reading.
+
+`ProfileCard` **takes the user as a prop and never fetches one.** `/dashboard`'s own payload
+carries `user`, which is why the page makes no second `/me` request — that fold is what `v1.3.0`
+shipped, and a component that fetched its own user would quietly re-introduce the request on
+every page that imported it. It is a component rather than markup inlined in the page so an
+account or settings page can import it instead of copying it.
+
+#### Download filenames
+
+Every PDF this API hands out is named by **`Application#download_basename(kind:)`**, where `kind`
+is `:resume` or `:cover_letter`:
+
+```
+{company}-{role}-{MMDD}-{id}-{kind}.pdf     株式会社メルカリ-バックエンドエンジニア-0712-12-resume.pdf
+```
+
+Two callers, one method: `Api::V1::ApplicationsController#resume` / `#cover_letter`, and
+`Exports::AccountArchive#blob_path`. It lives on the model because the alternative is two
+implementations that drift — which is exactly the state `v1.4.4` found it in, the controller
+sending a hardcoded `resume.pdf` for every application while the archive built a different name
+from `parameterize`.
+
+**Why each part is there.** The **id** is the uniqueness guarantee: same company, same role, same
+day is a real collision, and `company`/`role` are readable rather than load-bearing. The **`MMDD`
+stamp is the upload date** — `resume_updated_at` / `cover_letter_updated_at`, falling back to
+`created_at` for a legacy row with a blob but no stamp — and it earns its place *in the user's
+downloads folder*, not in the app: the app stores exactly one resume per application
+(`applications.resume` is a single `bytea`, and an upload overwrites it), so the stamp is what
+stops a re-uploaded resume's download from silently overwriting the copy of the old one already
+saved. It **disambiguates rather than guarantees**.
+
+**The slugger preserves Unicode; it does not transliterate.** `parameterize` sends a Japanese
+company name to the empty string, but transliteration is the wrong cure: kanji→reading needs a
+morphological analyzer (日本 is *nihon* or *nippon* by context, and a wrong reading is worse than
+the kanji), a kana-only romaji gem strips kanji straight back to empty, and the ASCII fold is a
+constraint nothing here imposes. So the slugger **sanitizes and keeps**: Unicode letters and
+digits survive, display case is preserved (「Google」 beats 「google」, and case is a no-op for
+Japanese), everything else collapses to a single `-`, edges are trimmed, and each segment is
+capped at **20 codepoints** — per segment, with the stamp, id and suffix outside the count, since
+a single 20-char budget for the whole name does not close (`-cover-letter.pdf` alone is 17).
+
+This needs **no gem and no encoding work in the controller**: `send_data` with a UTF-8 filename
+makes Rails emit both a legacy `filename="%3F%3F…"` (`I18n.transliterate`d, ignored by every
+browser since ~2011) and `filename*=UTF-8''…` (RFC 5987), which is what browsers actually read.
+
+**A segment that sanitizes to empty is dropped, not placeheld** — `unknown`/`untitled` adds fake
+meaning where the id already carries the truth. Since `company` and `role` are both `null: false`,
+a segment only empties on an all-punctuation or emoji-only name, whose degenerate worst case is
+`0712-12-resume.pdf`. Still unique, still honest.
 
 ### Background jobs
 
@@ -1051,7 +1133,8 @@ STARTTLS port `2587`. The `From:` domain must be verified in Resend first.
 ### Security
 
 > **At a glance** · JWT auth with one JTI per user (sign-out revokes all devices). Rack::Attack
-> throttles keyed per-IP *and* per-account/email through Solid Cache. Optimistic locking on writes,
+> throttles keyed per-IP *and* per-account/email through Solid Cache, plus a hard 200-application
+> ceiling per account, which is the only thing that bounds storage. Optimistic locking on writes,
 > magic-byte-checked uploads, `nosniff` downloads, credentials filtered from logs.
 
 - **Auth** — Devise + devise-jwt. The JWT is issued in the `Authorization` response header. **One
@@ -1059,6 +1142,19 @@ STARTTLS port `2587`. The `From:` domain must be verified in Resend first.
   1-day expiry, no refresh flow. This is intended, not a bug.
 - **Rack::Attack** — throttle counters go through `Rails.cache` (Solid Cache), so they are shared
   across Puma workers rather than counted per worker.
+  - **Every path guard keys off `Rack::Attack.normalized_path`, never `req.path`.** This is the
+    one rule in this section that is load-bearing rather than descriptive. Rack::Attack runs
+    *above* the router, so `req.path` is the raw `PATH_INFO` — the string the client typed. Rails
+    normalises it afterwards, and routes far more strings to a controller than a naive `==` will
+    match: `resources :applications` generates `(.:format)`, and Journey tolerates trailing and
+    duplicate slashes. `POST /api/v1/auth/sign_in.json`, `.../sign_in/`, and
+    `/api/v1/applications//12` all reach their action. A guard written as
+    `req.path == "/api/v1/auth/sign_in"` returns `nil` for all three, and a `nil` key means *no
+    counter and no limit* — so the guard fails **open**, and the throttle becomes opt-out by
+    suffix. `normalized_path` collapses duplicate slashes, strips a format extension and a
+    trailing slash, and memoises on the Rack env like `account_id`. **The general rule, which
+    outlives this file: anything above the router sees the string the client sent; anything below
+    sees the string the framework decided it meant. Never key a security control off the former.**
   - `sign_in`: per-IP, plus **email-keyed** throttles (`10/5min`, `50/hour`) capping guesses
     against a single account across all IPs. IP-only throttling is defeated by a botnet or a
     shared NAT egress.
@@ -1073,6 +1169,35 @@ STARTTLS port `2587`. The `From:` domain must be verified in Resend first.
     owns and assembles the zip in memory, so a signed-in client looping it is the cheapest way to
     push this app over its memory ceiling. The cap is per-account rather than per-IP because the
     cost is a function of whose data is being assembled, not of where the request came from.
+  - `applications/write`: **per-account** caps (30/min, 300/hour) on `POST /applications` and
+    `PATCH|PUT /applications/:id` — the two requests that carry a blob. Per-account for the same
+    reason as exports. The throttle covers every write to those paths rather than only the ones
+    with a file attached, because deciding *inside Rack middleware* whether a multipart body
+    contains a PDF means parsing the body Rails has not parsed yet, to save a counter increment
+    on a request that is cheap either way. `DELETE` is deliberately not throttled: it is the one
+    write that gives storage back. `POST /applications/prefill` and `.../transition` do not match
+    these patterns — prefill has its own caps above, and the path regex is anchored on `/\d+\z`.
+- **The application ceiling** — `Application::MAX_PER_USER` (200), validated on create, is what
+  actually bounds storage. **A throttle cannot do this job**: it bounds a rate over a window and
+  every window resets, so any positive rate integrates to unbounded total. The exposure is real
+  because an upload *overwrites* — `applications.resume` is a single `bytea` with no version
+  history and a 1 MB cap — so a client looping `PATCH` holds its storage footprint flat at 2 MB
+  per application, while `POST` buys another 2 MB of allowance each time, on a database whose
+  whole backup story is a nightly `pg_dump` (§ Backups). 200 × 2 MB bounds the worst case at
+  ~400 MB. It sits well above a real job search (100–300 applications is a long one) and the
+  breach is recoverable by deleting a row, which is why the number is allowed to be this close to
+  real use.
+  - It reports through the **existing** envelope, not a new code: the validation adds to `:base`,
+    so `create` renders `validation_failed` with `details: [{ field: "base", code:
+    "too_many_applications" }]` — the same shape the 1 MB upload cap uses for `too_long`.
+  - The **shared demo** is the account most likely to reach it, and it heals itself: `DemoReset`
+    destroys the demo *user* before re-running the seed (§ `Demo::ResetService`), so the ceiling
+    cannot deadlock the reset that clears it — worst case the demo is full until the top of the
+    hour.
+  - **It is a bound, not an invariant.** The check is a `count` in the same transaction as the
+    insert with no lock, so N concurrent creates at 199 can all pass and overshoot by N-1. That
+    is accepted: the cap exists to stop unbounded growth, not to make 200 exact, and a real
+    guarantee costs a counter column and an advisory lock to defend a number chosen by judgement.
 - **Optimistic locking** — a `lock_version` column activates Rails' built-in optimistic locking.
   Two concurrent writers: the second gets `StaleObjectError` → `409`. One column, one
   `rescue_from`, no library.
@@ -1445,7 +1570,8 @@ definition. `revalidateApplication()` in `actions.ts` revalidates `/board` along
 > **At a glance** · `next-intl`, `en` (default, unprefixed) and `ja` (prefixed;
 > `localePrefix: "as-needed"`). Copy lives in ICU catalogs at `web/messages/{en,ja}.json`. Rails
 > stays English-only; `web/` localizes failures on the machine-readable error `code`. All
-> navigation goes through `i18n/navigation.ts`, never the `next/*` originals.
+> navigation goes through `i18n/navigation.ts`, never the `next/*` originals. `en`/`ja` key
+> parity is enforced by a CI script, not by review.
 
 Locales are `en` (default) and `ja`. Copy lives in ICU message catalogs at `web/messages/{en,ja}.json`.
 
@@ -1575,6 +1701,15 @@ An upstream failure resolves to localized copy in this order — first hit wins:
    (`errors.field.email_taken`, `errors.field.resume_too_long`); every entry with catalog
    copy is rendered, joined into one message. Fields or inner codes without an entry are
    skipped rather than guessed at.
+
+   `errors.field.base_too_many_applications` is the one whose *field* is `base` rather than a
+   real column — the `MAX_PER_USER` ceiling (§ Security), where no field is wrong and the
+   account is simply full. It reads as a lookup like any other because `base` is what Rails
+   calls a record-level error, and the resolution above never assumed the field was a form
+   input. **Its copy does not name the number**, deliberately: the ceiling is a constant in
+   Ruby, and a catalog that repeated it would be a second copy free to drift the day it moves.
+   The API's English sentence names it; the localized copy says the account is full and to
+   delete something.
 2. **The code.** `errors.code.<code>` — `invalid_credentials`, `stale_record`,
    `invalid_transition`, `invalid_url`, `prefill_failed`, and the rest of the § Error codes
    taxonomy each have an entry.
@@ -1605,16 +1740,65 @@ Two places do this resolution, because a failure reaches the UI by two paths:
   with § Registration is closed.)
 
 Catalog presence is tested with next-intl's `t.has()`, so steps 1–2 need no hardcoded list of
-known codes in TypeScript — the catalogs themselves are the list. `en`/`ja` key parity is a
-convention held by review, not a check: nothing in `web/`'s tests or CI fails when a key lands
-in one catalog and not the other. `t.has()` means the consequence is a fallback rather than a
-crash — a `ja` reader gets the status-keyed copy of step 3 — but that is degradation nobody is
-alerted to, which is why the rule that both catalogs move together is written down in
-`CLAUDE.md` rather than left to memory.
+known codes in TypeScript — the catalogs themselves are the list. That is also why a key present
+in `en` and missing in `ja` fails quietly rather than loudly: `t.has()` turns the gap into a
+fallback, so a `ja` reader silently gets the status-keyed copy of step 3 instead of the sentence
+written for them. Nothing about the page looks broken. § Catalog parity is checked in CI is what
+catches it.
 
 Localizing *in Rails* was rejected for the original reason: it would mean an i18n dependency,
 locale negotiation on every request, and a second message catalog to keep in sync, for strings
 only the frontend ever displays.
+
+#### Catalog parity is checked in CI
+
+`web/scripts/check-i18n-parity.mjs` diffs the two catalogs and exits non-zero on any asymmetry.
+It runs as `npm run lint:i18n`, wired into the `verify` job of `web-ci` ahead of the build, so a
+key landing in one catalog and not the other fails the `Lint, typecheck & build` check that
+`conserve-main` requires. Before `v1.4.4` this rule was held by review alone, and a `ja` key
+could go missing through lint, typecheck and build without a word (above).
+
+**What it counts is every path, with array elements counted individually and containers counted
+as well as descended into.** A path is the dotted route to a node, with array indices as `[n]`
+segments — so `transitions.reasons.ghosted` contributes four paths, not one: the array itself,
+plus `[0..2]`, one per FSM reason chip. Two rules follow, and the script reports each
+separately:
+
+- **A path in one catalog and not the other is drift.** This one rule does most of the work,
+  because walking the whole tree collapses the other shapes of drift into it. An array of a
+  different **length** is caught for free — a `ghosted` with two chips in `ja` has no `[2]`, so
+  `[2]` reports missing. That is the whole reason elements are counted rather than the array
+  being treated as one opaque leaf: a reason chip that exists in English and not in Japanese is
+  exactly the bug this check is for, and dict-only counting cannot see it — that blindness is
+  what made an earlier docs audit report a *false* drift here.
+- **A path whose type differs is drift too** — most usefully a `string` in one catalog against
+  an `object` in the other, meaning the two disagree about the shape of the copy and `t()` finds
+  out at runtime instead of here. This rule only works because the walker records containers
+  rather than only leaves: on a leaves-only walk a key that became an object would never appear
+  as a path at all — only its children would — so the comparison would find `undefined` on one
+  side and short-circuit, and the check would be dead code with a comment vouching for coverage
+  it did not have. That is exactly what it was when first written in this release, and a review
+  caught it. Recording containers also makes an empty `{}` visible, which a leaves-only walk
+  drops silently. The rule additionally covers a `5` against a `"5"`; nothing in the catalogs is
+  a non-string scalar today, so that half is a guard rather than a working part.
+
+The convention matters more than which convention it is: whatever the script counts, it must
+count the same thing on both sides. It walks both catalogs with one function for precisely that
+reason.
+
+It is a script rather than a test because `web/` has no unit-test runner — Playwright E2E is the
+only suite, and booting a browser to compare two JSON files would be absurd. It has no
+dependencies and reads nothing but the two catalogs, so it costs the CI job well under a second.
+
+**It checks symmetry, not completeness, and the difference is not academic.** A key the API needs
+and *neither* catalog has is perfectly symmetric, so the check passes — which is exactly what
+happened to `errors.field.base_too_many_applications` in this release: the ceiling shipped with
+SPEC, TODO and CHANGELOG all naming the detail code, and both catalogs missing it, so the one user
+who hit the ceiling would have been told to check the form. The parity check ran green over that
+the whole time and was right to. The gap it closes is a key in one catalog and not the other; the
+gap it cannot close is a code the API emits that the catalogs have never heard of, which is
+step 1's `t.has()` filter degrading exactly as designed. Adding an error code is not done when the
+API renders it — it is done when both catalogs can say it.
 
 #### Locale-sensitive formatting
 

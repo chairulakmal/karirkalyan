@@ -11,7 +11,7 @@ RSpec.describe "Applications", type: :request do
 
       response "200", "paginated envelope with data + meta" do
         let(:Authorization) { jwt_for(user) }
-        before { create_list(:application, 2, :applied, user: user) }
+        before { without_n_plus_one_scanning { create_list(:application, 2, :applied, user: user) } }
 
         run_test! do |response|
           body = JSON.parse(response.body)
@@ -475,12 +475,14 @@ RSpec.describe "Applications", type: :request do
       security [ bearerAuth: [] ]
       produces "application/pdf"
 
-      response "200", "resume binary (Content-Disposition: attachment)" do
+      response "200", "resume binary (Content-Disposition: inline, named after the application)" do
         let(:Authorization) { jwt_for(user) }
-        let(:record)           { create(:application, :with_resume, user: user) }
+        let(:record)        { create(:application, :with_resume, user: user, company: "Mercari", role: "Backend Engineer") }
         let(:id)            { record.id }
         run_test! do |response|
           expect(response.content_type).to include("application/pdf")
+          expect(response.headers["Content-Disposition"])
+            .to match(/\Ainline; filename="Mercari-Backend-Engineer-\d{4}-#{record.id}-resume\.pdf"/)
         end
       end
 
@@ -508,12 +510,14 @@ RSpec.describe "Applications", type: :request do
       security [ bearerAuth: [] ]
       produces "application/pdf"
 
-      response "200", "cover letter binary (Content-Disposition: attachment)" do
+      response "200", "cover letter binary (Content-Disposition: inline, named after the application)" do
         let(:Authorization) { jwt_for(user) }
-        let(:record)           { create(:application, :with_cover_letter, user: user) }
+        let(:record)        { create(:application, :with_cover_letter, user: user, company: "Mercari", role: "Backend Engineer") }
         let(:id)            { record.id }
         run_test! do |response|
           expect(response.content_type).to include("application/pdf")
+          expect(response.headers["Content-Disposition"])
+            .to match(/\Ainline; filename="Mercari-Backend-Engineer-\d{4}-#{record.id}-cover-letter\.pdf"/)
         end
       end
 
@@ -538,7 +542,9 @@ RSpec.describe "Applications", type: :request do
     let(:headers) { { "Authorization" => jwt_for(user) } }
 
     before do
-      3.times { |i| create(:application, user: user, created_at: (3 - i).hours.ago) }
+      without_n_plus_one_scanning do
+        3.times { |i| create(:application, user: user, created_at: (3 - i).hours.ago) }
+      end
     end
 
     it "returns data envelope and meta.has_more false when records fit in one page" do
@@ -603,6 +609,45 @@ RSpec.describe "Applications", type: :request do
       body2 = JSON.parse(response.body)
       expect(body2["data"].length).to eq(1)
       expect(body2["meta"]["has_more"]).to be false
+    end
+  end
+
+  # The ceiling reports through the existing envelope rather than a new top-level code — the same
+  # shape the 1 MB upload cap uses for `too_long`, so web/ needs no new branch to render it.
+  describe "POST /api/v1/applications (the per-account ceiling)" do
+    before { stub_const("Application::MAX_PER_USER", 1) }
+
+    it "returns 422 validation_failed with a too_many_applications detail" do
+      create(:application, user: user)
+
+      post "/api/v1/applications",
+        params: { application: { company: "Mercari", role: "Backend Engineer" } }, as: :json,
+        headers: { "Authorization" => jwt_for(user) }
+
+      expect(response).to have_http_status(:unprocessable_entity)
+      payload = JSON.parse(response.body)
+      expect(payload["code"]).to eq("validation_failed")
+      expect(payload["details"]).to eq([ { "field" => "base", "code" => "too_many_applications" } ])
+      expect(payload["error"]).to match(/limit of 1 applications/)
+    end
+  end
+
+  # Header encoding — tested directly rather than through rswag, which keys a response by its
+  # status code and so has room for exactly one 200 per path.
+  describe "GET /api/v1/applications/:id/resume (a Japanese name in the header)" do
+    # Rails emits both filenames without a gem: the legacy ASCII one transliterates, turning
+    # every kanji into "?", and the RFC 5987 filename* carries the real name. Browsers prefer
+    # filename*, which is what makes the model's decision not to transliterate reach the user.
+    it "carries the unromanized name in filename*" do
+      record = create(:application, :with_resume, user: user, company: "株式会社メルカリ", role: "エンジニア")
+
+      get "/api/v1/applications/#{record.id}/resume", headers: { "Authorization" => jwt_for(user) }
+
+      disposition = response.headers["Content-Disposition"]
+      expect(disposition).to include("filename*=UTF-8''#{ERB::Util.url_encode('株式会社メルカリ-エンジニア')}-")
+      # The transliterated "?" arrives percent-encoded, so the legacy name is unreadable —
+      # which is fine, and exactly why filename* above is the one that matters.
+      expect(disposition).to match(/filename="(?:%3F)+-(?:%3F)+-\d{4}-#{record.id}-resume\.pdf"/)
     end
   end
 

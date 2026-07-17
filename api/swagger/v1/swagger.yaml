@@ -253,7 +253,8 @@ paths:
       - bearerAuth: []
       responses:
         '200':
-          description: 'resume binary (Content-Disposition: attachment)'
+          description: 'resume binary (Content-Disposition: inline, named after the
+            application)'
         '404':
           description: no resume uploaded for this application
         '401':
@@ -273,7 +274,8 @@ paths:
       - bearerAuth: []
       responses:
         '200':
-          description: 'cover letter binary (Content-Disposition: attachment)'
+          description: 'cover letter binary (Content-Disposition: inline, named after
+            the application)'
         '404':
           description: no cover letter uploaded
         '401':

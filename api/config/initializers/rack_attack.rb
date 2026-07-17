@@ -18,11 +18,35 @@ class Rack::Attack
   # Off by default in test; specific throttling specs flip this back on.
   Rack::Attack.enabled = !Rails.env.test?
 
+  # The request path as *Rails* will route it, not as the client typed it.
+  #
+  # Rack::Attack runs above the router, so req.path is the raw PATH_INFO. Rails normalises
+  # afterwards and routes far more strings than a naive == will match: `resources` generates
+  # (.:format), and Journey tolerates trailing and duplicate slashes. All of these reach an
+  # action — verified with recognize_path, not assumed:
+  #
+  #   POST  /api/v1/auth/sign_in.json      => auth/sessions#create
+  #   POST  /api/v1/applications/          => applications#create
+  #   PATCH /api/v1/applications/12.json   => applications#update
+  #   PATCH /api/v1/applications//12       => applications#update
+  #
+  # A guard keyed on req.path returns nil for every one of them, and a nil key means no
+  # counter and no limit — the guard fails *open*, so the throttle is opt-out by suffix.
+  # squeeze first, so //applications/12.json collapses before the extension is stripped; the
+  # (?<=.) lookbehind keeps a bare "/" from normalising to "". Memoised on the env like
+  # account_id, since several throttles share a request. See SPEC.md § Security.
+  def self.normalized_path(req)
+    req.env.fetch("rack_attack.normalized_path") do
+      req.env["rack_attack.normalized_path"] =
+        req.path.squeeze("/").sub(/\.[A-Za-z0-9]+\z/, "").sub(%r{(?<=.)/\z}, "")
+    end
+  end
+
   # Normalised target email from a sign-in request's JSON body, or nil. Reads
   # rack.input directly (form parsing doesn't cover JSON) and rewinds it so
   # Rails can re-read the body downstream.
   def self.sign_in_email(req)
-    return unless req.path == "/api/v1/auth/sign_in" && req.post?
+    return unless normalized_path(req) == "/api/v1/auth/sign_in" && req.post?
 
     body = req.body.read
     req.body.rewind
@@ -47,19 +71,34 @@ class Rack::Attack
   end
 
   def self.prefill_user_id(req)
-    return unless req.path == "/api/v1/applications/prefill" && req.post?
+    return unless normalized_path(req) == "/api/v1/applications/prefill" && req.post?
 
     account_id(req)
   end
 
   def self.export_user_id(req)
-    return unless req.path.start_with?("/api/v1/exports/") && req.get?
+    return unless normalized_path(req).start_with?("/api/v1/exports/") && req.get?
+
+    account_id(req)
+  end
+
+  # The two requests that can carry a PDF: creating an application, and updating one. Anchored
+  # tightly so the neighbours keep their own treatment — POST /applications/prefill is not the
+  # collection path and has its own caps above, and .../:id/transition fails the /\d+\z anchor.
+  # DELETE is absent on purpose: it is the one write that gives storage back.
+  APPLICATION_MEMBER_PATH = %r{\A/api/v1/applications/\d+\z}
+
+  def self.application_write_user_id(req)
+    path = normalized_path(req)
+    write = (req.post? && path == "/api/v1/applications") ||
+            ((req.patch? || req.put?) && path.match?(APPLICATION_MEMBER_PATH))
+    return unless write
 
     account_id(req)
   end
 
   throttle("auth/sign_in", limit: 5, period: 1.minute) do |req|
-    req.ip if req.path == "/api/v1/auth/sign_in" && req.post?
+    req.ip if normalized_path(req) == "/api/v1/auth/sign_in" && req.post?
   end
 
   # Account-level brute-force backstop: caps guesses against a *single* email
@@ -74,7 +113,7 @@ class Rack::Attack
   # AI URL pre-fill fans out to a paid Claude call + an outbound HTTP fetch.
   # Per-IP cap (coarse, also covers multi-account abuse from one IP)...
   throttle("ai/prefill", limit: 10, period: 1.minute) do |req|
-    req.ip if req.path == "/api/v1/applications/prefill" && req.post?
+    req.ip if normalized_path(req) == "/api/v1/applications/prefill" && req.post?
   end
 
   # ...plus per-account caps so every user (demo included) has a bounded spend:
@@ -91,6 +130,17 @@ class Rack::Attack
   # being assembled, not of where the request came from.
   throttle("exports/account/minute", limit: 10, period: 1.minute) { |req| export_user_id(req) }
   throttle("exports/account/hour", limit: 60, period: 1.hour) { |req| export_user_id(req) }
+
+  # The upload path. An upload overwrites (one bytea per application, no version history, 1 MB
+  # cap), so a PATCH loop's storage stays flat — what it burns is CPU and write I/O, which is
+  # what these bound. They do not bound *storage*: no throttle can, because every window resets.
+  # Application::MAX_PER_USER is what does that job — see SPEC.md § Security.
+  #
+  # Every write to these paths counts, not only the ones carrying a file: telling them apart in
+  # Rack means parsing a multipart body Rails has not parsed yet, to skip a counter increment on
+  # a request that is cheap either way. 30/min is far above a human editing their applications.
+  throttle("applications/write/minute", limit: 30, period: 1.minute) { |req| application_write_user_id(req) }
+  throttle("applications/write/hour", limit: 300, period: 1.hour) { |req| application_write_user_id(req) }
 
   self.throttled_responder = lambda do |request|
     match_data  = request.env["rack.attack.match_data"] || {}

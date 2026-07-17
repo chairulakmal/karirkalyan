@@ -6,6 +6,143 @@ Open work lives in [`TODO.md`](TODO.md). Settled decisions-not-to-build are reco
 
 ---
 
+## v1.4.4 — 2026-07-17
+
+The four items `v1.4.2` left open, shipped under the number they were renumbered to when that tag
+was skipped for good — plus a fifth the review of those four turned up: **every Rack::Attack rate
+limit could be skipped by appending `.json` to the URL**, and had been able to since the throttles
+landed. That one leads, because it is the only item here that was already hurting production.
+One branch, one PR *(feat/v1.4.4)*.
+
+Still a patch by the mechanical test: no migration, no `v1` contract broken, and no new capability
+— every item here makes something the app already did work properly, or stops it working badly.
+
+### Security: every rate limit was opt-out by typing `.json`
+
+Found by a code review of this release's diff, but **not introduced by it** — it had been live in
+production since Rack::Attack landed. Confirmed with `Rails.application.routes.recognize_path`
+before a line was changed, not reasoned about:
+
+- **`POST /api/v1/auth/sign_in.json` routed to `auth/sessions#create` and matched neither the
+  per-IP cap nor the per-email cap.** The app's only unauthenticated write had *no rate limit at
+  all* for a client that typed four extra characters. `POST /api/v1/applications/prefill.json`
+  went the same way, and that one bills a vendor per call.
+- **The cause is a layering mistake, and it fails open.** Rack::Attack runs *above* the router, so
+  `req.path` is the raw `PATH_INFO` — the string the client typed. Rails normalises afterwards and
+  routes far more strings than a naive `==` matches: `resources` generates `(.:format)`, and
+  Journey tolerates trailing and duplicate slashes. `/api/v1/applications/`,
+  `/api/v1/applications/12.json` and `/api/v1/applications//12` all reach an action. A guard keyed
+  on `req.path` returns `nil` for each, and **a `nil` key means no counter and no limit** — so the
+  guard does not merely mis-key, it disappears.
+- **Fixed with `Rack::Attack.normalized_path`**, memoised on the env; all six guards now key off
+  it. The general rule is now in SPEC.md § Security, because it outlives this file: *anything above
+  the router sees the string the client sent; anything below sees the string the framework decided
+  it meant. Never key a security control off the former.*
+- **Three of the regression specs passed against the broken code, so they were deleted.**
+  Rack::Test rewrites the URI before it builds the env, so a request spec asking for
+  `/api/v1/applications//12` hands the middleware `/api/v1/applications/12` and is green whether or
+  not the fix exists. Only the `.json` form survives to `PATH_INFO` intact. The slash cases moved
+  to `spec/lib/rack_attack_normalized_path_spec.rb`, which builds the env by hand — the only level
+  at which the assertion can fail. Both halves were negative-tested against a stashed fix, and the
+  unit spec mutation-tested by removing `.squeeze("/")`.
+
+### PDFs are named after the application they belong to
+
+The download endpoint sent `resume.pdf` for every application, so a folder of ten downloads was ten
+files called `resume.pdf`, `resume(1).pdf`, and so on — the id was in the URL and nowhere in the
+name. The archive was worse in a specific way: it built its own name with `parameterize`, which
+strips non-ASCII, so 「株式会社メルカリ」 emptied out to nothing.
+
+- **One method names every PDF the API hands out**: `Application#download_basename(kind:)`, used by
+  both per-application downloads and the account archive, so a file means the same thing whichever
+  door it left by. The slugger **preserves Unicode** rather than transliterating it — a Japanese
+  company name stays Japanese in the filename, which is what a Japanese job search wants and what
+  `parameterize` cannot do.
+- **The disposition changed from `attachment` to `inline`.** A resume is a document you read; the
+  browser's PDF viewer is the right answer to clicking it. The exports keep `attachment` — those
+  are files you are taking away, not documents you are reading.
+- Non-ASCII names ride the standard two-field `Content-Disposition` (a transliterated ASCII
+  `filename=` plus an RFC 5987 `filename*=UTF-8''…`); browsers prefer the second. No gem needed.
+
+### A ceiling on applications, and a throttle on the writes that carry files
+
+`TODO.md` scoped this as "a config change, not a design", and half of that was wrong — recorded
+here because the correction is the interesting part. **A Rack::Attack throttle bounds a rate over a
+window, and every window resets, so any positive rate integrates to unbounded total.** A throttle
+cannot express "a ceiling on applications per account" at all. It was never a config change; it was
+two different mechanisms wearing one sentence.
+
+- **The throttle shipped as config, as promised**: `applications/write`, 30/min and 300/hour, per
+  account, on the two requests that can carry a PDF. It bounds CPU and write I/O. It does not bound
+  storage and cannot.
+- **The ceiling shipped as `Application::MAX_PER_USER` (200)**, a model validation on create — the
+  thing that actually bounds storage, on a database whose entire backup story is a nightly
+  `pg_dump`. It needs no new error code: it reports through the existing `validation_failed`
+  envelope with detail code `too_many_applications` on field `base`, the same shape the 1 MB upload
+  cap already uses, so no controller and no frontend branch changed.
+- **The copy for it was missed the first time, and the docs audit at the end of this release is
+  what caught it.** The ceiling landed with SPEC, TODO and this changelog all naming
+  `too_many_applications`, and *neither* catalog carrying a string for it — so the resolution
+  chain's `t.has()` filter dropped it and a user who filled their account would have been told
+  "Those details couldn't be saved. Check the form and try again." Nothing was wrong with the
+  form. `errors.field.base_too_many_applications` now exists in both locales and says the account
+  is full. It names no number: the ceiling is a constant in Ruby, and copy repeating it would be a
+  second copy free to drift. **The parity check one item down could not have caught this** — the
+  key was missing from both catalogs, which is perfectly symmetric. It checks symmetry, not
+  completeness, and SPEC.md now says so where someone will read it.
+- **It is a bound, not an invariant**, and SPEC.md says so: the count takes no lock, so concurrent
+  creates at the ceiling can overshoot by the number in flight. A real guarantee costs a counter
+  column and an advisory lock to defend a number chosen by judgement.
+- `DELETE` is deliberately outside the throttle — it is the one write that gives storage back.
+
+### en/ja catalog parity is now a check, not a convention
+
+A key that lands in `en.json` alone does **not** fall back to English — there is no English to fall
+back to. `i18n/request.ts` loads exactly one catalog and configures no fallback locale and no
+`getMessageFallback`, so next-intl's default takes over and renders the key path itself: a Japanese
+reader gets the literal string `dashboard.yourData` where a sentence belongs, and the only alarm is
+a `console.error` in a server log nobody reads. Lint, typecheck and the build all stay green,
+because nothing about a missing key is a type error. The page is loudly broken and CI called it
+fine. Review cannot reliably catch a bug that is invisible in the locale the reviewer reads —
+which is why "both catalogs move together" being written down was never enough.
+
+*(An earlier draft of this entry said the missing key "degraded to fallback copy". That was wrong,
+and it had been copied into SPEC, both READMEs and the script's own header before a review caught
+it. The silent-degradation story is real but belongs to a different path — `apiFailure()`'s
+`t.has()` filter, which drops a missing **error** key and falls through to generic copy. That is
+the mechanism that hid the ceiling's missing string, one item up.)*
+
+`web/scripts/check-i18n-parity.mjs` (`npm run lint:i18n`) now diffs the catalogs in the web CI job,
+ahead of the build. It counts **every path — containers as well as leaves, with array elements
+counted individually**, so an FSM reason chip present in English and missing in Japanese reports
+its missing index instead of hiding inside an opaque array (dict-only counting is what once made a
+docs audit report a false drift here), and a path that is a string in one catalog and an object in
+the other is reported as the shape drift it is. Recording containers is what makes that second
+rule work at all: without it the check was dead code with a comment vouching for coverage it did
+not have — which is exactly what it was when first written here, until a review caught it. The
+catalogs were already at parity when it landed, so it went green: a ratchet, not a repair. It
+caught its first real change one commit later, which is the item below.
+
+### "Your data" and the profile block are one card
+
+The dashboard rendered the same card twice — profile (email, member since) and exports (the CSV and
+archive links) — with the average-days line wedged between. They are one thought: who you are, and
+what you can take with you. They were two cards because of render order and nothing else. Now one
+`ProfileCard` component, so an account or settings page can import it rather than copy it.
+
+- **The export links render outside the card's `{user && …}` gate**, deliberately. `/privacy`
+  promises the user can get their data out and these two links are the only surface honouring it;
+  gating them on a successful `/dashboard` fetch would remove that surface exactly when the data
+  looks least safe, and remove it silently.
+- **The card takes the user as a prop and does not fetch one.** `/dashboard`'s payload already
+  carries it — that fold is what `v1.3.0` shipped, and a component fetching its own user would put
+  the second `/me` request back on every page importing it.
+- The heading was a copy decision, not a mechanical move, and neither old eyebrow survived
+  unchanged: the card is "Your data" / 「あなたのデータ」, the English export eyebrow promoted to
+  name the whole card plus a *new* Japanese string, because 「データの書き出し」 means *exporting
+  data* and cannot head a card that opens with an email address. `dashboard.profile` and
+  `dashboard.exports.eyebrow` are gone; both catalogs moved together, 346 → 345 keys.
+
 ## v1.4.3 — 2026-07-17
 
 **There is no `v1.4.2` tag, and there never will be.** The number was scoped as a code-quality
