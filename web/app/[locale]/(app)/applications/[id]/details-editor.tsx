@@ -4,7 +4,7 @@ import { useState, useTransition } from "react";
 import { useLocale, useTranslations } from "next-intl";
 import { useRouter } from "@/i18n/navigation";
 import { updateApplication } from "@/app/lib/actions";
-import { ACTIVE_STATUSES, formatDate, isOverdue } from "@/app/lib/format";
+import { formatDate, isOverdue } from "@/app/lib/format";
 import { Field } from "@/app/components/field";
 import type { Status } from "@/app/lib/types";
 
@@ -12,6 +12,7 @@ type Props = {
   id: number;
   lockVersion: number;
   status: Status;
+  activeStates: Status[];
   company: string;
   role: string;
   url: string | null;
@@ -75,7 +76,7 @@ export function DetailsEditor(props: Props) {
             label={t("followUp")}
             value={
               props.followUpAt ? (
-                ACTIVE_STATUSES.has(props.status) && isOverdue(props.followUpAt) ? (
+                props.activeStates.includes(props.status) && isOverdue(props.followUpAt) ? (
                   <span className="font-medium text-danger">
                     {t("overdue", { date: formatDate(props.followUpAt, locale) })}
                   </span>

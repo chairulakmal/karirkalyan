@@ -12,6 +12,7 @@ module Api
           states:          ApplicationFSM::VALID_STATES,
           entry_states:    ApplicationFSM::ENTRY_STATES,
           terminal_states: ApplicationFSM::TERMINAL_STATES,
+          active_states:   ApplicationFSM::ACTIVE_STATES,
           transitions:     ApplicationFSM::VALID_STATES.index_with { |state| ApplicationFSM.valid_next_states(state) }
         }
       end

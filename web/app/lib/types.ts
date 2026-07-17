@@ -72,6 +72,12 @@ export type TransitionTable = {
   states: Status[];
   entry_states: Status[];
   terminal_states: Status[];
+  // The stages still in play — where a pending follow-up is actionable and
+  // chasing it can still change the outcome. Not derivable from the rest of
+  // this payload: it drops `terminal_states` *and* rejected/ghosted/withdrawn,
+  // which are non-terminal yet are nobody's turn. Only ApplicationFSM knows the
+  // difference, so it is fetched rather than re-typed here.
+  active_states: Status[];
   transitions: Record<Status, Status[]>;
 };
 

@@ -40,18 +40,6 @@ export const PERMANENT_STATUSES: ReadonlySet<Status> = new Set([
   "archived",
 ]);
 
-// Statuses where a pending follow-up is actionable — a stale follow-up date on
-// a closed application shouldn't shout "overdue".
-export const ACTIVE_STATUSES: ReadonlySet<Status> = new Set([
-  "wishlist",
-  "draft",
-  "applied",
-  "phone_screen",
-  "technical",
-  "final_round",
-  "offer",
-]);
-
 export function statusBadgeClass(s: Status): string {
   return STATUS_CLASS[s];
 }

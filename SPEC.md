@@ -32,7 +32,18 @@ Two consequences worth stating plainly:
   [`CHANGELOG.md`](CHANGELOG.md), including the pre-1.0.0 build phases that used to sit at the
   top of this file.
 
-Last synced against the code: **2026-07-17**, `v1.4.4` (in flight) — § i18n gained
+Last synced against the code: **2026-07-17**, `v1.5.0` (in flight) — § API contract's `status`
+filter became a **list**: `GET /applications?status=applied,offer` ORs within the filter and
+still ANDs against `company` / `source`, with an empty or all-unknown list treated as unfiltered
+rather than as `where(status: [])`'s silent zero rows — the reading that would have contradicted
+§ `Applications::ListQuery`'s promise that junk falls back to the unfiltered first page.
+`status=applied` still parses as a one-element list, so the wire is backward-compatible.
+§ The transition table gained `active_states`, and `ApplicationFSM::ACTIVE_STATES` now owns the
+definition the frontend used to hardcode: promoting "active" from a display detail to a
+user-facing filter contract would otherwise have left FSM vocabulary living in two languages.
+§ Board data re-argued its rejection of per-column pagination, which had leaned partly on the
+`status` parameter not existing — the parameter exists now, and the surviving reasons carry it
+alone. Before that, `v1.4.4` — § i18n gained
 § Catalog parity is checked in CI: `en`/`ja` key parity was a convention held by review, and this
 document said so; it is now a script in the `web` job, counting every path with array elements
 counted individually so a missing FSM reason chip cannot hide inside an array. § Security gained a
@@ -369,6 +380,8 @@ ApplicationFSM::VALID_STATES                 # 13 states — TRANSITIONS ∪ TER
                                              #   (archived appears in no TRANSITIONS row)
 ApplicationFSM::TERMINAL_STATES              # accepted, declined, archived
 ApplicationFSM::ENTRY_STATES                 # wishlist, draft, applied
+ApplicationFSM::ACTIVE_STATES                # the 7 still in play — VALID_STATES minus
+                                             #   TERMINAL_STATES, rejected, ghosted, withdrawn
 ```
 
 `valid_next_states` is serialised by `show` and `transition` only — **not by `index`**, which
@@ -791,9 +804,26 @@ So the API serves the table read-only:
   "states":          ["wishlist", "draft", "applied", "…all 13, pipeline order first"],
   "entry_states":    ["wishlist", "draft", "applied"],
   "terminal_states": ["accepted", "declined", "archived"],
+  "active_states":   ["wishlist", "draft", "applied", "phone_screen", "technical",
+                      "final_round", "offer"],
   "transitions":     { "wishlist": ["draft", "withdrawn", "archived"], "…": ["…"], "accepted": [] }
 }
 ```
+
+`active_states` is the seven stages where the application is **still in play** — where a pending
+follow-up is actionable, and chasing it could still change the outcome. It is **not derivable
+from the rest of the payload**: it is the thirteen states minus `TERMINAL_STATES` *and* minus
+`rejected`, `ghosted`, `withdrawn`, which are non-terminal (each revives to `applied` — see
+§ State machine) yet are not stages you are waiting on anyone in. Only `ApplicationFSM` knows
+that distinction, so `ApplicationFSM::ACTIVE_STATES` owns it and this endpoint serves it.
+
+It is **served rather than mirrored in TypeScript** because it is now a filter contract. As a
+display detail — dimming an overdue-follow-up warning on a dead row — a hardcoded frontend set
+was survivable. As the definition of what the stage filter's "Active" preset selects and what
+the board gives columns to, it is FSM vocabulary that the user acts on, and a re-typed copy in
+a second language is the one thing this codebase does not permit (§ State machine). The rule
+here is the same one that governs `transitions` itself: a fetched copy cannot drift, a re-typed
+copy can.
 
 `transitions` maps **every** state through `ApplicationFSM.valid_next_states`, so the archived
 rule (any non-terminal state → `archived`, an early return in `assert_transition!`, not a row
@@ -813,10 +843,24 @@ in ISO-8601 with microseconds; a malformed cursor is ignored and returns the fir
 than erroring. Manual implementation, no gem — roughly 20 lines, and it shows understanding rather
 than gem reach.
 
-Filters compose with pagination server-side: `status` (exact), `company` (exact), `source` (host
-substring, `ILIKE`). The mechanism — filters, cursor decoding, the `limit + 1` lookahead behind
-`has_more`, and the rule that bad input is ignored rather than rejected — lives in
-§ `Applications::ListQuery`; the controller only renders what it returns.
+Filters compose with pagination server-side: `status` (comma-separated list of states),
+`company` (exact), `source` (host substring, `ILIKE`). The mechanism — filters, cursor decoding,
+the `limit + 1` lookahead behind `has_more`, and the rule that bad input is ignored rather than
+rejected — lives in § `Applications::ListQuery`; the controller only renders what it returns.
+
+`status` takes a **list**: `status=applied,phone_screen,offer` matches a row in *any* of them.
+The list ORs within itself and still ANDs against `company` and `source`. It is intersected with
+`ApplicationFSM::VALID_STATES` and unknown members are dropped, which is what keeps the change
+invisible on the wire to a client that only ever sends one: `status=applied` is a one-element
+list and behaves exactly as it always has.
+
+**An empty or all-unknown list is `UNFILTERED`, the same as `nil`** — not an empty result.
+`where(status: [])` matches zero rows *silently*, so the literal reading would make junk input
+return a blank page, contradicting § `Applications::ListQuery`'s contract that bad input falls
+back to the unfiltered first page. A list with nothing left after the intersection has therefore
+told the server nothing, and is treated as nothing. This is the defence for a hand-edited URL,
+not an interface: a client that wants to show no rows must not ask the server for them —
+"show nothing" is a client-side state, because there is no query that means it.
 
 #### The dashboard payload — `GET /api/v1/dashboard`
 
@@ -880,6 +924,16 @@ The tradeoff is honest: host-substring matching is approximate (a job added with
 under "No link"), and one facet pair per row does not scale forever. At personal-tracker volume it
 is the right amount of effort, and deriving from data already stored beats asking the user to tag
 every row.
+
+The **stage chips** are a third filter type beside these two dropdowns, and the boundary between
+them is load-bearing. Chips OR within themselves and AND against company and board, so the presets
+above them ("All", "Active", "None") rewrite only the chip selection — clicking "All" restores every
+stage and **keeps** the chosen company. Resetting all three is what "Clear filters" is for; a
+control inside the stage group that also cleared a dropdown would drop a filter the user never
+asked to lose. One chip renders per status that *has* rows (`by_status` is `group(:status).count`),
+so the row is however many stages the user has actually used, not all thirteen — and it is sorted
+against `states` from the transition table, because `GROUP BY` without `ORDER BY` returns plan
+order and the chips would otherwise reshuffle between reloads.
 
 #### Exports — two endpoints, two different jobs
 
@@ -1523,13 +1577,13 @@ The server page makes two fetches in parallel:
 
 #### Columns — seven active, one closed rail
 
-The seven columns are exactly `ACTIVE_STATUSES` (`format.ts`), laid out as a wrapping grid rather
-than a horizontal scroller — four columns per row on large screens, two per row on small screens,
+The seven columns are exactly the fetched `active_states` (§ API contract), laid out as a wrapping
+grid rather than a horizontal scroller — four per row on large screens, two per row on small screens,
 one on the narrowest — keeping every column on screen without sideways scrolling. Display order is
 board-local and grouped by engagement, not funnel order: the four-column row break puts the
 interview loop (applied, phone_screen, technical, final_round) on the first row and everything
 outside it (wishlist, draft, offer) on the second. Membership still derives from
-`ACTIVE_STATUSES`, so the order list can never hide a column. The six closed
+`active_states`, so the board-local order list can never hide a column. The six closed
 states — accepted, declined, rejected, ghosted, withdrawn, archived — do not get columns; thirteen
 columns is unreadable at any width. They collapse into a **closed rail** below the board, one
 toggleable group per status showing a count, expanding to the same cards.
@@ -2139,10 +2193,19 @@ verified is a bug in the spec, not a requirement on the code.
 
 The board follows the existing cursor-paginated index to exhaustion (`limit=100`, capped at 10
 pages) rather than giving each column its own cursor with a "load more". Per-column pagination
-looks more scalable but is fake precision here: it needs a new `status` filter parameter on the
-API, seven initial requests instead of a handful, and it breaks the board's one job — showing the
-whole pipeline at a glance. The cap keeps the pathological case (thousands of rows) from hanging
-the page; a personal tracker that hits it has outgrown a personal tracker. The truncation is
+looks more scalable but is fake precision here: it costs seven initial requests instead of a
+handful, and it breaks the board's one job — showing the whole pipeline at a glance. A column
+that says "load more" is a column whose depth you cannot read at a glance, and glancing is the
+only reason to open a board instead of the list.
+
+The `status` list filter (§ API contract) makes the per-column fetch **possible** — seven
+requests, `status=<one>` each — and it is still not worth making. Nothing above depended on that
+parameter's absence: one reason is a cost the parameter does not remove, the other is a fact
+about what a board is for, which no API shape can move. This is an option that is now cheap and
+still wrong, not an objection that was answered.
+
+The cap keeps the pathological case (thousands of rows) from hanging the page; a personal tracker
+that hits it has outgrown a personal tracker. The truncation is
 stated on screen, not silent.
 
 ### Board drag-and-drop — native HTML5, no library

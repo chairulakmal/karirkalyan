@@ -187,4 +187,34 @@ RSpec.describe ApplicationFSM do
       )
     end
   end
+
+  describe "ACTIVE_STATES" do
+    # Spelled out, not derived the way the constant is: a spec that re-runs the
+    # implementation's own subtraction would agree with any bug in it, and would
+    # still pass if the set came out empty.
+    it "is exactly the seven stages still in play" do
+      expect(described_class::ACTIVE_STATES).to contain_exactly(
+        "wishlist", "draft", "applied", "phone_screen",
+        "technical", "final_round", "offer"
+      )
+    end
+
+    it "excludes every terminal state" do
+      expect(described_class::ACTIVE_STATES & described_class::TERMINAL_STATES).to be_empty
+    end
+
+    # The half TERMINAL_STATES cannot express: these three are revivable, so
+    # excluding them is a decision about what "in play" means, not a restatement.
+    it "excludes the revivable dead ends, which are not terminal" do
+      %w[rejected ghosted withdrawn].each do |state|
+        expect(described_class::ACTIVE_STATES).not_to include(state)
+        expect(described_class::TERMINAL_STATES).not_to include(state)
+        expect(described_class.valid_next_states(state)).to include("applied")
+      end
+    end
+
+    it "is a subset of VALID_STATES" do
+      expect(described_class::VALID_STATES).to include(*described_class::ACTIVE_STATES)
+    end
+  end
 end

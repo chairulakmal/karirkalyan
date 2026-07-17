@@ -45,6 +45,18 @@ module ApplicationFSM
   # only by transitioning, which keeps the audit trail honest.
   ENTRY_STATES = %w[wishlist draft applied].freeze
 
+  # The stages where an application is still *in play* — someone owes someone a
+  # reply, and chasing it could still change the outcome. This is the definition
+  # behind the stage filter's "Active" preset and the board's columns, so it is
+  # FSM vocabulary and lives only here; /transitions serves it.
+  #
+  # Subtracted rather than listed: a stage added to TRANSITIONS is in play the
+  # day it lands, and nobody should have to remember a second list. Only the
+  # subtraction is a judgement. rejected, ghosted and withdrawn are *not*
+  # terminal — each revives to applied — yet nothing is pending in them, which
+  # is why TERMINAL_STATES alone cannot express this.
+  ACTIVE_STATES = (VALID_STATES - TERMINAL_STATES - %w[rejected ghosted withdrawn]).freeze
+
   def self.assert_transition!(from, to)
     return if to == "archived" && !TERMINAL_STATES.include?(from)
     unless TRANSITIONS.any? { |t| t[:from] == from && t[:to] == to }

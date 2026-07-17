@@ -42,8 +42,16 @@ export default async function BoardPage() {
     apiFetch<TransitionTable>("/transitions"),
   ]);
 
-  if (!appsRes.ok || !tableRes.ok) {
-    const message = !appsRes.ok ? appsRes.error : !tableRes.ok ? tableRes.error : "";
+  // A 200 is not a promise about shape. `apiFetch` casts rather than parses, and
+  // web/api are separate Railway services — so mid-deploy this can be the payload
+  // from before `active_states` existed, with `ok: true` over the top of it. The
+  // dashboard can shrug that off; the board cannot, because `active_states` *is*
+  // its columns. An unusable table is a failed table.
+  const table =
+    tableRes.ok && Array.isArray(tableRes.data?.active_states) ? tableRes.data : null;
+
+  if (!appsRes.ok || !table) {
+    const message = !appsRes.ok ? appsRes.error : !tableRes.ok ? tableRes.error : t("staleTable");
     return (
       <div className="border border-danger/40 bg-danger/10 p-5 text-sm text-danger">
         {t("failedToLoad", { message })}
@@ -67,7 +75,7 @@ export default async function BoardPage() {
         </p>
       )}
 
-      <Board applications={appsRes.applications} table={tableRes.data} />
+      <Board applications={appsRes.applications} table={table} />
     </div>
   );
 }

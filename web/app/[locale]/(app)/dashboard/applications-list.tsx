@@ -4,7 +4,6 @@ import { useState } from "react";
 import { useLocale, useTranslations } from "next-intl";
 import { Link } from "@/i18n/navigation";
 import {
-  ACTIVE_STATUSES,
   formatDate,
   isOverdue,
   jobBoardLabel,
@@ -13,7 +12,10 @@ import {
 } from "@/app/lib/format";
 import type { Application, PageMeta, Status } from "@/app/lib/types";
 
-type Filters = { status: Status | null; company: string | null; source: string | null };
+// `statuses` is a subset of the *rendered* chips, held in chip order. Baymard:
+// values within one filter type OR together, and still AND against company /
+// source — which is what a list means to the server.
+type Filters = { statuses: Status[]; company: string | null; source: string | null };
 
 const STATUS_PRIORITY: Record<Status, number> = {
   phone_screen: 0,
@@ -40,12 +42,15 @@ function sortByImportance(apps: Application[]): Application[] {
   return [...apps].sort((a, b) => STATUS_PRIORITY[a.status] - STATUS_PRIORITY[b.status]);
 }
 
-const NO_FILTERS: Filters = { status: null, company: null, source: null };
-
 interface Props {
   initialItems: Application[];
   initialMeta: PageMeta;
+  // Only statuses that have rows — this is `group(:status).count`, so the chip
+  // row is however many stages the user has actually used, not all thirteen.
   statusBuckets: [Status, number][];
+  // ApplicationFSM::ACTIVE_STATES, fetched from /transitions. Empty when that
+  // fetch failed, which drops the "Active" preset.
+  activeStates: Status[];
   facets: [string, string][]; // [company, board-host] per application
   total: number;
   // Every at-risk id, not just the ones on the first page — the ghost-risk query
@@ -57,6 +62,7 @@ export function ApplicationsList({
   initialItems,
   initialMeta,
   statusBuckets,
+  activeStates,
   facets,
   total,
   atRiskIds,
@@ -66,15 +72,31 @@ export function ApplicationsList({
   const tg = useTranslations("dashboard.ghostRisk");
   const locale = useLocale();
   const atRisk = new Set(atRiskIds);
+  const rendered = statusBuckets.map(([status]) => status);
   const [items, setItems] = useState(() => sortByImportance(initialItems));
   const [meta, setMeta] = useState(initialMeta);
-  const [filters, setFilters] = useState<Filters>(NO_FILTERS);
+  // Every chip starts lit: the user subtracts stages from a closed set they
+  // already have a mental model of, rather than opting in one at a time. The
+  // list still first appears unfiltered — all of them selected *is* unfiltered.
+  const [filters, setFilters] = useState<Filters>(() => ({
+    statuses: rendered,
+    company: null,
+    source: null,
+  }));
   const [loading, setLoading] = useState(false);
+
+  const allStages = filters.statuses.length === rendered.length;
+  // Zero chips is a UI state, not a query — see applyFilters. An account with no
+  // applications renders no chips either, and that is `empty`, not hidden.
+  const noStages = rendered.length > 0 && filters.statuses.length === 0;
+  const activeRendered = rendered.filter((s) => activeStates.includes(s));
 
   async function fetchPage(f: Filters, after?: string) {
     const qs = new URLSearchParams({ limit: "10" });
     if (after) qs.set("after", after);
-    if (f.status) qs.set("status", f.status);
+    // Every rendered chip lit is the unfiltered list, so send nothing at all —
+    // byte-identical to the request this list has always made for "All".
+    if (f.statuses.length < rendered.length) qs.set("status", f.statuses.join(","));
     if (f.company) qs.set("company", f.company);
     if (f.source) qs.set("source", f.source);
     const res = await fetch(`/api/applications?${qs}`);
@@ -84,6 +106,14 @@ export function ApplicationsList({
 
   async function applyFilters(next: Filters) {
     if (loading) return;
+    // "Show nothing" is not a query the server can be asked: an empty status
+    // list reads as unfiltered there (`where(status: [])` would match zero rows
+    // silently, so ListQuery deliberately ignores it), and asking would hand
+    // back everything. Hold it client-side and render the reason instead.
+    if (next.statuses.length === 0) {
+      setFilters(next);
+      return;
+    }
     setLoading(true);
     try {
       const body = await fetchPage(next);
@@ -94,6 +124,15 @@ export function ApplicationsList({
     } finally {
       setLoading(false);
     }
+  }
+
+  function toggleStatus(status: Status) {
+    const statuses = filters.statuses.includes(status)
+      ? filters.statuses.filter((s) => s !== status)
+      : // Rebuilt from `rendered` rather than appended, so the selection keeps
+        // chip order and the query string does not depend on click order.
+        rendered.filter((s) => filters.statuses.includes(s) || s === status);
+    applyFilters({ ...filters, statuses });
   }
 
   async function loadMore() {
@@ -110,7 +149,8 @@ export function ApplicationsList({
     }
   }
 
-  const hasActiveFilter = filters.status !== null || filters.company !== null || filters.source !== null;
+  const hasActiveFilter = !allStages || filters.company !== null || filters.source !== null;
+  const noFilters: Filters = { statuses: rendered, company: null, source: null };
 
   // Each dropdown's options reflect the OTHER active filter, so picking a board
   // narrows the company list and vice versa; counts reflect the narrowed set.
@@ -167,7 +207,7 @@ export function ApplicationsList({
           />
           {hasActiveFilter && (
             <button
-              onClick={() => applyFilters(NO_FILTERS)}
+              onClick={() => applyFilters(noFilters)}
               disabled={loading}
               className="px-2 py-1.5 text-xs text-ink-soft underline underline-offset-4 transition hover:text-midnight disabled:opacity-50"
             >
@@ -178,31 +218,99 @@ export function ApplicationsList({
       )}
 
       {statusBuckets.length > 0 && (
-        <div className="flex flex-wrap gap-2">
-          <button
-            onClick={() => applyFilters({ ...filters, status: null })}
-            disabled={loading}
-            className={`inline-flex min-h-10 items-center gap-2 px-3 py-1 text-xs font-medium ring-1 ring-inset ring-midnight/20 transition disabled:cursor-wait ${filters.status === null ? "bg-sand text-midnight" : "bg-sand/40 text-ink-soft hover:text-midnight"
-              }`}
-          >
-            {t("all")} <span className="font-mono">{total}</span>
-          </button>
-          {statusBuckets.map(([status, count]) => (
-            <button
-              key={status}
-              onClick={() => applyFilters({ ...filters, status })}
-              disabled={loading}
-              title={ts(`description.${status}`)}
-              className={`inline-flex min-h-10 items-center gap-2 px-3 py-1 text-xs font-medium ring-1 ring-inset transition disabled:cursor-wait ${statusBadgeClass(status)} ${filters.status === status ? "" : "opacity-40 hover:opacity-70"
-                }`}
-            >
-              {ts(`label.${status}`)} <span className="font-mono">{count}</span>
-            </button>
-          ))}
-        </div>
+        // A <fieldset> with a <legend>, per GOV.UK: the chips are independent
+        // checkboxes, and the legend is what names the group they belong to.
+        //
+        // Deliberately not `disabled` while a page is in flight: that reaches
+        // every control inside — including the checkbox the user just toggled,
+        // and a disabled element cannot hold focus, so every toggle would drop
+        // the caret to <body> and cost a keyboard user a full tab back. Block
+        // the handler, not the control: applyFilters already early-returns on
+        // `loading`, so a second click is a no-op with focus intact.
+        <fieldset
+          aria-busy={loading}
+          className={`border-0 p-0 transition ${loading ? "opacity-60" : ""}`}
+        >
+          <legend className="kk-label">{t("stages")}</legend>
+          <div className="mt-2 flex flex-wrap items-center gap-2">
+            {/* Shortcuts to a chip selection, and visibly nothing more: after a
+                click the lit chips say what was selected, and any one of them
+                can still be toggled back off. Never a status=active macro on
+                the wire — the param takes states, and a group that parsed in the
+                same slot would make it mean two things. */}
+            <div role="group" aria-label={t("stagePresets")} className="flex flex-wrap gap-2">
+              {/* Stages only — company and source are a different filter type and
+                  survive. "Clear filters" is the control that resets everything,
+                  and a preset inside this fieldset silently doing its job too
+                  would drop a company the user never asked to lose. */}
+              <Preset
+                label={t("all")}
+                count={total}
+                onClick={() => applyFilters({ ...filters, statuses: rendered })}
+              />
+              {activeRendered.length > 0 && (
+                <Preset
+                  label={t("activeStages")}
+                  count={statusBuckets.reduce(
+                    (n, [status, count]) => (activeStates.includes(status) ? n + count : n),
+                    0,
+                  )}
+                  onClick={() => applyFilters({ ...filters, statuses: activeRendered })}
+                />
+              )}
+              <Preset label={t("noStages")} onClick={() => applyFilters({ ...filters, statuses: [] })} />
+            </div>
+
+            {statusBuckets.map(([status, count]) => {
+              const on = filters.statuses.includes(status);
+              return (
+                <label
+                  key={status}
+                  title={ts(`description.${status}`)}
+                  // Selection is carried by the checkbox — a real one, so the
+                  // mark is structural rather than a dimmed brand colour, which
+                  // would be colour alone (WCAG 1.4.1) and drag the label toward
+                  // failing contrast besides. Dropping the status tint when
+                  // unselected is a redundant scan aid on a thirteen-wide row,
+                  // not the signal.
+                  className={`inline-flex min-h-10 cursor-pointer items-center gap-2 px-3 py-1 text-xs font-medium ring-1 ring-inset transition ${on ? statusBadgeClass(status) : "bg-sand/40 text-ink-soft ring-midnight/20 hover:text-midnight"
+                    }`}
+                >
+                  <input
+                    type="checkbox"
+                    checked={on}
+                    onChange={() => toggleStatus(status)}
+                    className="size-3.5 accent-current"
+                  />
+                  {ts(`label.${status}`)} <span className="font-mono">{count}</span>
+                </label>
+              );
+            })}
+          </div>
+        </fieldset>
       )}
 
-      {items.length === 0 ? (
+      {/* Toggling a chip rewrites the list below without moving focus, so a
+          screen reader would otherwise get no signal that anything happened.
+          Polite, not assertive: it is a result of the user's own action, and
+          should wait for them to stop typing/clicking rather than cut in. */}
+      <p aria-live="polite" className="sr-only">
+        {noStages ? t("allStagesHidden") : t("resultCount", { count: items.length })}
+      </p>
+
+      {noStages ? (
+        // Not `noMatches`: nothing failed to match, the user hid it. A blank
+        // panel here would read as the system being broken, so say which.
+        <div className="border border-dashed border-dune bg-linen p-12 text-center">
+          <p className="text-ink-soft">{t("allStagesHidden")}</p>
+          <button
+            onClick={() => applyFilters({ ...filters, statuses: rendered })}
+            className="mt-3 inline-block text-sm font-medium text-cobalt underline underline-offset-4 hover:text-cobalt-2"
+          >
+            {t("showAllStages")}
+          </button>
+        </div>
+      ) : items.length === 0 ? (
         <div className="border border-dashed border-dune bg-linen p-12 text-center">
           {hasActiveFilter ? (
             <p className="text-ink-soft">{t("noMatches")}</p>
@@ -257,7 +365,7 @@ export function ApplicationsList({
                   {app.follow_up_at ? (
                     // Overdue only shouts on applications still in play — a
                     // stale date on a rejected/closed one isn't actionable.
-                    ACTIVE_STATUSES.has(app.status) && isOverdue(app.follow_up_at) ? (
+                    activeStates.includes(app.status) && isOverdue(app.follow_up_at) ? (
                       <p className="mt-0.5 font-medium text-danger">
                         {t("followUpOverdue", { date: formatDate(app.follow_up_at, locale) })}
                       </p>
@@ -274,7 +382,10 @@ export function ApplicationsList({
         </ul>
       )}
 
-      {meta.has_more && (
+      {/* `meta` is whatever the last fetch left behind, and hiding every stage
+          does not fetch — so it can still claim another page of a list that is
+          not on screen. */}
+      {!noStages && meta.has_more && (
         <div className="text-center">
           <button
             onClick={loadMore}
@@ -286,6 +397,27 @@ export function ApplicationsList({
         </div>
       )}
     </div>
+  );
+}
+
+function Preset({
+  label,
+  count,
+  onClick,
+}: {
+  label: string;
+  count?: number;
+  onClick: () => void;
+}) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      className="inline-flex min-h-10 items-center gap-2 border border-dune bg-linen px-3 py-1 text-xs font-medium text-ink-soft transition hover:bg-sand hover:text-midnight disabled:cursor-wait disabled:opacity-50"
+    >
+      {label}
+      {count !== undefined && <span className="font-mono">{count}</span>}
+    </button>
   );
 }
 

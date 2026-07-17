@@ -11,6 +11,9 @@ RSpec.describe "Transitions", type: :request do
       description "The legal status transitions, derived server-side from the FSM. " \
                   "`transitions` maps every state to its valid next states with the " \
                   "archived rule folded in; terminal states map to an empty array. " \
+                  "`active_states` is the stages an application is still in play in — " \
+                  "not derivable from the rest of the payload, since rejected, ghosted " \
+                  "and withdrawn are non-terminal yet inactive. " \
                   "Clients consume this at runtime instead of hardcoding the table."
 
       response "200", "the effective transition table" do
@@ -24,6 +27,11 @@ RSpec.describe "Transitions", type: :request do
           expect(body["states"]).to          eq(ApplicationFSM::VALID_STATES)
           expect(body["entry_states"]).to    eq(ApplicationFSM::ENTRY_STATES)
           expect(body["terminal_states"]).to eq(ApplicationFSM::TERMINAL_STATES)
+
+          # Derived like the rest, so `eq` alone would also hold for an empty set —
+          # and an empty active_states would silently give the board no columns.
+          expect(body["active_states"]).to eq(ApplicationFSM::ACTIVE_STATES)
+          expect(body["active_states"]).not_to be_empty
 
           expect(body["transitions"]).to eq(
             ApplicationFSM::VALID_STATES.index_with { |state| ApplicationFSM.valid_next_states(state) }

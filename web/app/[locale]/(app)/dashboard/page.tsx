@@ -1,7 +1,13 @@
 import { getTranslations } from "next-intl/server";
 import { Link } from "@/i18n/navigation";
 import { apiFetch } from "@/app/lib/api";
-import type { Application, DashboardStats, Paginated, Status } from "@/app/lib/types";
+import type {
+  Application,
+  DashboardStats,
+  Paginated,
+  Status,
+  TransitionTable,
+} from "@/app/lib/types";
 import { InfoPopover } from "@/app/components/info-popover";
 import { ProfileCard } from "@/app/components/profile-card";
 import { ApplicationsList } from "./applications-list";
@@ -11,9 +17,10 @@ export default async function Dashboard() {
   const t = await getTranslations("dashboard");
   // /dashboard carries the user, so there is no second /me request: <ProfileCard>
   // takes `stats.user` as a prop rather than fetching one.
-  const [appsRes, statsRes] = await Promise.all([
+  const [appsRes, statsRes, tableRes] = await Promise.all([
     apiFetch<Paginated<Application>>("/applications?limit=10"),
     apiFetch<DashboardStats>("/dashboard"),
+    apiFetch<TransitionTable>("/transitions"),
   ]);
 
   if (!appsRes.ok) {
@@ -27,9 +34,30 @@ export default async function Dashboard() {
   const { data: applications, meta } = appsRes.data;
   const stats = statsRes.ok ? statsRes.data : null;
   const me = stats?.user ?? null;
-  const statusBuckets = stats ? (Object.entries(stats.by_status) as [Status, number][]) : [];
   const facets = stats?.facets ?? [];
   const total = stats?.total ?? applications.length;
+  // Powers the "Active" preset and the overdue marker only, so a failed table
+  // drops the preset rather than the list — the same tolerance this page
+  // already extends to /dashboard itself.
+  //
+  // `ok` does not imply a populated `data` (apiFetch returns `null as T` for a
+  // 204 or a non-JSON 200), and a 200 does not imply *this* payload: web and api
+  // are separate Railway services, so during a deploy window /transitions can
+  // answer from the release before active_states existed. Missing reads as
+  // absent, which is already the failure path.
+  const activeStates = tableRes.ok ? (tableRes.data?.active_states ?? []) : [];
+  const states = tableRes.ok ? (tableRes.data?.states ?? []) : [];
+
+  const statusBuckets = stats ? (Object.entries(stats.by_status) as [Status, number][]) : [];
+  // `by_status` is `group(:status).count` — GROUP BY with no ORDER BY, so its
+  // order is the query plan's, not a promise. Sorted against the FSM's own state
+  // list so the chip row reads wishlist→archived and, more to the point, sits
+  // still between reloads. A state the table doesn't know sorts last rather than
+  // vanishing; a failed table leaves the order alone rather than emptying it.
+  const stateRank = new Map(states.map((s, i) => [s, i]));
+  statusBuckets.sort(
+    ([a], [b]) => (stateRank.get(a) ?? states.length) - (stateRank.get(b) ?? states.length),
+  );
 
   return (
     <div className="space-y-10">
@@ -73,6 +101,7 @@ export default async function Dashboard() {
         initialItems={applications}
         initialMeta={meta}
         statusBuckets={statusBuckets}
+        activeStates={activeStates}
         facets={facets}
         total={total}
         atRiskIds={stats?.ghost_risk.at_risk.map((a) => a.id) ?? []}
