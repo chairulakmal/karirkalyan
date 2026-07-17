@@ -910,14 +910,23 @@ role are only there to be readable.
 name is Japanese. `config/initializers/zip.rb` sets `Zip.unicode_names = true` once at boot.
 
 **The archive is built in memory** (`Zip::OutputStream.write_buffer`), which is a deliberate cap,
-not an oversight: blobs are capped at 1 MB each and this is a single-user app, so the peak is
-bounded by `applications × 2 MB` and a few dozen applications is a few dozen megabytes. If that
-ever stops being true the fix is streaming, and the throttle below is what buys the time to notice.
+not an oversight: blobs are capped at 1 MB each, so the peak is bounded by `applications × 2 MB`
+— and since `v1.4.4` that multiplicand has a ceiling of its own, `Application::MAX_PER_USER`
+(§ Security), which puts the worst case at 400 MB. That is the honest number, not the expected
+one: a real account of a few dozen applications is a few dozen megabytes. A worst-case account is
+where this stops fitting in memory, and the fix then is streaming — the throttle below is what
+buys the time to notice.
 
-**The download surface** is a section on `/dashboard` with two links, proxied to Rails by
-`app/api/exports/{applications,account}/route.ts` — the same `apiProxy` the resume and cover-letter
-downloads use, so the JWT stays server-side (§ Auth flow). Two rules that look like slips and are
-not:
+**The download surface** is the export half of `app/components/profile-card.tsx`, rendered on
+`/dashboard`, its two links proxied to Rails by `app/api/exports/{applications,account}/route.ts`
+— the same `apiProxy` the resume and cover-letter downloads use, so the JWT stays server-side
+(§ Auth flow). Three rules that look like slips and are not:
+
+- **The links render even when the card has no user to show.** The card's profile half is
+  conditional on `stats.user`; its export half is not, and the gate must never be lifted to wrap
+  the whole card. `/privacy` promises the user can get their data out, and this is the only
+  surface in the app that honours it — gating it on a successful `/dashboard` fetch would remove
+  it precisely when the data looks like it is in trouble, and remove it silently.
 
 - They are **plain `<a>` tags**, not the `Link` from `i18n/navigation.ts`. These are API routes,
   not localized pages: a client-side navigation would fetch the route and do nothing visible. The
@@ -925,7 +934,15 @@ not:
   those two lines.
 - There is **no `download` attribute**. Rails already sends `Content-Disposition: attachment` with
   the filename it chose (`karirkalyan-applications-2026-07-12.csv`), so the browser downloads
-  rather than navigates, and the server stays the one place that names the file.
+  rather than navigates, and the server stays the one place that names the file. Note this is the
+  one disposition § Download filenames did **not** move to `inline`: an export is a file you are
+  taking away, not a document you are reading.
+
+`ProfileCard` **takes the user as a prop and never fetches one.** `/dashboard`'s own payload
+carries `user`, which is why the page makes no second `/me` request — that fold is what `v1.3.0`
+shipped, and a component that fetched its own user would quietly re-introduce the request on
+every page that imported it. It is a component rather than markup inlined in the page so an
+account or settings page can import it instead of copying it.
 
 #### Download filenames
 

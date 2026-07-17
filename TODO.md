@@ -237,7 +237,7 @@ migration, and the previous image boots against an unchanged database.
       A script rather than a test because `web/` has no unit-test runner. The catalogs were already
       at parity when it was written — 346 keys, both sides — so it landed green; it is a ratchet,
       not a repair. See `SPEC.md` § i18n → Catalog parity is checked in CI.
-- [ ] **Fold "Your data" into the profile card, and make the card a component** (`web/`-only).
+- [x] **Fold "Your data" into the profile card, and make the card a component** (`web/`-only).
       The dashboard renders the same
       `<section className="border border-dune bg-linen p-5">` twice: the **profile** block
       (`web/app/[locale]/(app)/dashboard/page.tsx:54–76` — email, member since) and the **exports**
@@ -267,6 +267,17 @@ migration, and the previous image boots against an unchanged database.
       other, and only the EN one reads as a card title. Merging under a single heading is a copy
       decision in both locales, and whichever eyebrow loses becomes a dead catalog key to delete
       (en/ja key parity holds and should stay that way).
+
+      **Built 2026-07-17. The heading decision: neither eyebrow survived as-is.** The card is
+      `dashboard.yourData` — "Your data" / 「あなたのデータ」 — which is the EN export eyebrow
+      promoted to name the whole card, and a *new* JA string, because 「データの書き出し」 means
+      *exporting data* and cannot head a card that opens with an email address. `dashboard.profile`
+      ("Profile" / 「プロフィール」) and `dashboard.exports.eyebrow` are both gone; `exports.blurb`,
+      `.csv` and `.archive` stay where they are. Catalogs went 346 → 345 keys, still at parity —
+      the check from the item above ran on this change, which is what it is for. The export half
+      renders outside the `{user && …}` gate as the trap above demands, and `ProfileCard` takes
+      `user` as a prop. `SPEC.md` § Exports → The download surface now carries both rules, so the
+      next person to touch this finds them in the spec rather than in this file.
 
       Carry the two comments at `:93–96` and the `eslint-disable no-html-link-for-pages` lines with
       the move — the export anchors are plain `<a>`s to `/api/exports/*` because those are API

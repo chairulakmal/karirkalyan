@@ -246,7 +246,7 @@
     "title": "Dashboard",
     "tracked": "{count, plural, =0 {no applications tracked} one {# application tracked} other {# applications tracked}}",
     "newApplication": "New application",
-    "profile": "Profile",
+    "yourData": "Your data",
     "email": "Email",
     "memberSince": "Member since",
     "avgDays": "Average days from apply → offer:",
@@ -254,7 +254,6 @@
     "avgDaysTooltip": "Counts applications that reached offer, accepted, or declined. Measured from your applied date to when the offer status was recorded in the audit log.",
     "failedToLoad": "Failed to load: {message}",
     "exports": {
-      "eyebrow": "Your data",
       "blurb": "Take your history with you. The spreadsheet is a convenience view of your applications; the archive is everything — applications, timeline, and the resumes and cover letters you uploaded.",
       "csv": "Applications (.csv)",
       "archive": "Full account (.zip)"

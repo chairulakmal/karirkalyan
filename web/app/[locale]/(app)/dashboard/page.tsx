@@ -1,15 +1,16 @@
-import { getLocale, getTranslations } from "next-intl/server";
+import { getTranslations } from "next-intl/server";
 import { Link } from "@/i18n/navigation";
 import { apiFetch } from "@/app/lib/api";
 import type { Application, DashboardStats, Paginated, Status } from "@/app/lib/types";
 import { InfoPopover } from "@/app/components/info-popover";
+import { ProfileCard } from "@/app/components/profile-card";
 import { ApplicationsList } from "./applications-list";
 import { GhostRiskCard } from "./ghost-risk-card";
 
 export default async function Dashboard() {
-  const [t, locale] = await Promise.all([getTranslations("dashboard"), getLocale()]);
-  // /dashboard carries the user, so there is no second /me request: the profile
-  // block below reads `stats.user`.
+  const t = await getTranslations("dashboard");
+  // /dashboard carries the user, so there is no second /me request: <ProfileCard>
+  // takes `stats.user` as a prop rather than fetching one.
   const [appsRes, statsRes] = await Promise.all([
     apiFetch<Paginated<Application>>("/applications?limit=10"),
     apiFetch<DashboardStats>("/dashboard"),
@@ -51,29 +52,7 @@ export default async function Dashboard() {
           is nothing to act on. */}
       {stats && <GhostRiskCard risk={stats.ghost_risk} />}
 
-      {me && (
-        <section className="border border-dune bg-linen p-5">
-          <p className="kk-label">{t("profile")}</p>
-          <dl className="mt-3 flex flex-wrap gap-x-10 gap-y-2 text-sm">
-            <div>
-              <dt className="font-mono text-xs text-ink-soft">{t("email")}</dt>
-              <dd className="mt-0.5 text-midnight">{me.email}</dd>
-            </div>
-            <div>
-              <dt className="font-mono text-xs text-ink-soft">{t("memberSince")}</dt>
-              <dd className="mt-0.5 text-midnight">
-                {new Date(me.created_at).toLocaleDateString(locale, {
-                  year: "numeric",
-                  month: "long",
-                  day: "numeric",
-                  // Pinned like formatDate() — the API serialises in app time.
-                  timeZone: "Asia/Tokyo",
-                })}
-              </dd>
-            </div>
-          </dl>
-        </section>
-      )}
+      <ProfileCard user={me} />
 
       {stats?.avg_days_to_offer != null && (
         // <div>, not <p>: InfoPopover renders a <details>, which is flow
@@ -89,31 +68,6 @@ export default async function Dashboard() {
           </span>
         </div>
       )}
-
-      {/* Plain anchors, not next-intl <Link>: these are API routes, not localized
-          pages. The API sends Content-Disposition: attachment, so the browser
-          downloads rather than navigating — no `download` attribute needed, and the
-          server keeps naming the file. */}
-      <section className="border border-dune bg-linen p-5">
-        <p className="kk-label">{t("exports.eyebrow")}</p>
-        <p className="mt-2 text-sm leading-relaxed text-ink-soft">{t("exports.blurb")}</p>
-        <div className="mt-4 flex flex-wrap gap-3">
-          {/* eslint-disable-next-line @next/next/no-html-link-for-pages */}
-          <a
-            href="/api/exports/applications"
-            className="border border-dune px-4 py-2 text-sm font-medium text-midnight transition hover:border-cobalt hover:text-cobalt"
-          >
-            {t("exports.csv")}
-          </a>
-          {/* eslint-disable-next-line @next/next/no-html-link-for-pages */}
-          <a
-            href="/api/exports/account"
-            className="border border-dune px-4 py-2 text-sm font-medium text-midnight transition hover:border-cobalt hover:text-cobalt"
-          >
-            {t("exports.archive")}
-          </a>
-        </div>
-      </section>
 
       <ApplicationsList
         initialItems={applications}
