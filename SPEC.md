@@ -38,7 +38,10 @@ failed, and `extract` never knew where its text came from, so the paste enters t
 `to_text → extract` tail rather than forking a second pipeline. The failure codes `v1.4.3` typed
 are what make it targetable — `prefill_blocked` and `prefill_failed` are the two the paste box
 cures, and § Server-side error messages now records that `web/` reads the `code` rather than
-inferring recoverability from prose.
+inferring recoverability from prose. § Installable app is new, and describes the manifest for the
+first time: `start_url` stops launching the app onto the marketing page, `id` is pinned before a
+WebAPK exists to be orphaned by it, and the icon purposes split because `any` wants the drawn
+rounded corners and `maskable` wants none.
 Every **FSM rule the UI applies** is now fetched. The sets `web/` still names for itself decide
 presentation and affordance rather than what the FSM permits — `COLUMN_ORDER` ranks the board's
 columns whose *membership* is fetched, `CONFIRM_REQUIRED` and `REVIVAL_STATES` choose which moves
@@ -2008,6 +2011,56 @@ Job-board brand names (`BOARD_LABELS`), schema.org enum values in the `jsonLd` b
 `KarirKalyan` wordmark, and the HTTP methods and paths in the `/docs` endpoint table.
 
 See `TODO.md` for remaining scope.
+
+---
+
+### Installable app
+
+`web/public/manifest.webmanifest` is a static file, served outside the locale tree and excluded
+from the proxy matcher (§ Routing internals). It declares `display: standalone`, so the app is
+installable today; what it is *not* yet is an app once installed — that is the rest of `v1.6.0`.
+
+**`id` is `/`, and is the one field here that can never be corrected.** An absent `id` defaults to
+`start_url`, which means changing `start_url` silently re-identifies the app: the browser sees a
+different app, and an already-installed one is orphaned rather than updated. `/` is what the id
+defaulted to while `start_url` was `/`, so pinning it preserves the identity this app has always
+had. It is written down before the first WebAPK exists, because that is the last moment the choice
+is free.
+
+**`start_url` is `/dashboard`, not `/`.** `/` is a `PUBLIC_PATH`, so launching the installed app
+bounced a signed-in user off the marketing page — the launch spent a redirect to reach the app.
+`/dashboard` costs an English user none. A Japanese user spends exactly one, because `/dashboard`
+is the *English* canonical under `localePrefix: "as-needed"` and next-intl resolves the unprefixed
+path from the `NEXT_LOCALE` cookie and redirects to `/ja/dashboard`. That is still an improvement:
+from `/` the same user paid two, the proxy's and next-intl's. A locale-pinned `start_url` is not
+the fix — it would freeze the installed app to whichever language was current on install day.
+
+`scope` is `/` explicitly. It would default to `start_url`'s parent directory, which is already
+`/`, so this changes nothing today — it is written so that a later `start_url` cannot narrow the
+scope as a side effect and drop `/applications` out of the installed app.
+
+#### Icon purposes are split, because one icon cannot serve both
+
+`any` and `maskable` are contradictory requirements, and `purpose: "any maskable"` on a single
+icon satisfies whichever one it was drawn for:
+
+- **`any`** is drawn as-is. `icon-primary-{192,512}.png` is a rounded-square plate with
+  **transparent corners** (111px radius at 512, 4.45% of the canvas), which is exactly right here.
+- **`maskable`** is full-bleed by contract: the launcher supplies the shape and crops to it, so
+  transparency is not a rounded corner, it is a hole. Under a circular mask the old icon's corners
+  were cropped anyway and nothing showed; under a squircle or rounded-square mask — Android's
+  default varies by launcher, and Nothing OS uses its own — the mask reaches past the baked radius
+  and the wallpaper shows through the corners.
+
+So `icon-maskable-512.png` is the same artwork flattened onto the plate colour (`#1A2F6B`, which
+is also `theme_color`): full bleed, zero transparent pixels, ink untouched.
+
+**The safe zone was measured, not assumed.** A maskable icon's guaranteed-visible area is a circle
+of 80% diameter — radius 204.8px at 512. The wordmark's bounding box is x 126–391, y 133–340, and
+its furthest corner is **182.6px** from centre, so it clears the safe zone with ~22px to spare and
+no launcher mask can clip it. That margin is real but not generous: the logo nearly fills the safe
+circle, which reads as a large icon rather than a clipped one. Shrinking it is a brand decision,
+not a correctness one, and is deliberately not made here.
 
 ---
 
