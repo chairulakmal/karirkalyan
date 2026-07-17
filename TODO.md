@@ -216,7 +216,7 @@ migration, and the previous image boots against an unchanged database.
       `Application::MAX_PER_USER` (200), a model validation on create, reporting through the
       existing `validation_failed` envelope with detail code `too_many_applications` on field
       `base` — the same shape the 1 MB upload cap uses. See `SPEC.md` § Security.
-- [ ] **Make en/ja key parity a check, not a convention** *(added 2026-07-16 — `v1.4.3` found the
+- [x] **Make en/ja key parity a check, not a convention** *(added 2026-07-16 — `v1.4.3` found the
       gap while adding four catalog keys)*. `CLAUDE.md` and this file both say parity must hold,
       and **nothing enforces it**: no test, no CI step, and next-intl's type augmentation is not
       wired up, so a key landing in `en.json` alone compiles, lints and builds clean. The
@@ -228,6 +228,15 @@ migration, and the previous image boots against an unchanged database.
       (`en.json` § `board`) are arrays, and dict-only counting versus counting array elements is
       what made a docs audit report a false drift here. Whatever the check counts, it must count
       the same thing on both sides — which is also why the hardcoded counts are gone from the docs.
+
+      **Corrected 2026-07-17, in the building:** the reason chips are `transitions.reasons.*`, not
+      `board` — `board` holds no arrays at all. Built as `web/scripts/check-i18n-parity.mjs`
+      (`npm run lint:i18n`), in the `verify` job ahead of the build. The convention it settled on:
+      **every leaf path, array elements counted individually** (`transitions.reasons.ghosted[0]`),
+      which makes a short array report its missing index rather than hiding inside an opaque leaf.
+      A script rather than a test because `web/` has no unit-test runner. The catalogs were already
+      at parity when it was written — 346 keys, both sides — so it landed green; it is a ratchet,
+      not a repair. See `SPEC.md` § i18n → Catalog parity is checked in CI.
 - [ ] **Fold "Your data" into the profile card, and make the card a component** (`web/`-only).
       The dashboard renders the same
       `<section className="border border-dune bg-linen p-5">` twice: the **profile** block

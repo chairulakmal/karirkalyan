@@ -83,6 +83,10 @@ jobs:
       - name: ESLint
         run: npm run lint
 
+      # Ahead of the build, because a missing ja key builds clean — the whole point.
+      - name: i18n catalog parity
+        run: npm run lint:i18n
+
       - name: TypeScript
         run: npx tsc --noEmit
 

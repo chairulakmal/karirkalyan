@@ -32,7 +32,10 @@ Two consequences worth stating plainly:
   [`CHANGELOG.md`](CHANGELOG.md), including the pre-1.0.0 build phases that used to sit at the
   top of this file.
 
-Last synced against the code: **2026-07-17**, `v1.4.4` (in flight) — § Security gained a
+Last synced against the code: **2026-07-17**, `v1.4.4` (in flight) — § i18n gained
+§ Catalog parity is checked in CI: `en`/`ja` key parity was a convention held by review, and this
+document said so; it is now a script in the `web` job, counting leaf paths with array elements
+counted individually so a missing FSM reason chip cannot hide inside an array. § Security gained a
 per-account write throttle on the application endpoints and `Application::MAX_PER_USER`, a hard
 ceiling of 200 applications per account: the throttle bounds the rate of the upload path, and the
 ceiling is what bounds total storage, which no throttle can. § API contract gained
@@ -1534,7 +1537,8 @@ definition. `revalidateApplication()` in `actions.ts` revalidates `/board` along
 > **At a glance** · `next-intl`, `en` (default, unprefixed) and `ja` (prefixed;
 > `localePrefix: "as-needed"`). Copy lives in ICU catalogs at `web/messages/{en,ja}.json`. Rails
 > stays English-only; `web/` localizes failures on the machine-readable error `code`. All
-> navigation goes through `i18n/navigation.ts`, never the `next/*` originals.
+> navigation goes through `i18n/navigation.ts`, never the `next/*` originals. `en`/`ja` key
+> parity is enforced by a CI script, not by review.
 
 Locales are `en` (default) and `ja`. Copy lives in ICU message catalogs at `web/messages/{en,ja}.json`.
 
@@ -1694,16 +1698,50 @@ Two places do this resolution, because a failure reaches the UI by two paths:
   with § Registration is closed.)
 
 Catalog presence is tested with next-intl's `t.has()`, so steps 1–2 need no hardcoded list of
-known codes in TypeScript — the catalogs themselves are the list. `en`/`ja` key parity is a
-convention held by review, not a check: nothing in `web/`'s tests or CI fails when a key lands
-in one catalog and not the other. `t.has()` means the consequence is a fallback rather than a
-crash — a `ja` reader gets the status-keyed copy of step 3 — but that is degradation nobody is
-alerted to, which is why the rule that both catalogs move together is written down in
-`CLAUDE.md` rather than left to memory.
+known codes in TypeScript — the catalogs themselves are the list. That is also why a key present
+in `en` and missing in `ja` fails quietly rather than loudly: `t.has()` turns the gap into a
+fallback, so a `ja` reader silently gets the status-keyed copy of step 3 instead of the sentence
+written for them. Nothing about the page looks broken. § Catalog parity is checked in CI is what
+catches it.
 
 Localizing *in Rails* was rejected for the original reason: it would mean an i18n dependency,
 locale negotiation on every request, and a second message catalog to keep in sync, for strings
 only the frontend ever displays.
+
+#### Catalog parity is checked in CI
+
+`web/scripts/check-i18n-parity.mjs` diffs the two catalogs and exits non-zero on any asymmetry.
+It runs as `npm run lint:i18n`, wired into the `verify` job of `web-ci` ahead of the build, so a
+key landing in one catalog and not the other fails the `Lint, typecheck & build` check that
+`conserve-main` requires. Before `v1.4.4` this rule was held by review alone, and a `ja` key
+could go missing through lint, typecheck and build without a word (above).
+
+**What it counts is every leaf path, with array elements counted individually.** A leaf is a
+string; a path is the dotted route to it, with array indices as `[n]` segments — so
+`transitions.reasons.ghosted` is not one key but three
+(`transitions.reasons.ghosted[0..2]`), one per FSM reason chip. Three rules follow, and the
+script reports each separately:
+
+- **A path in one catalog and not the other is drift.** This one rule does most of the work,
+  because walking to the leaves collapses the other shapes of drift into it. An array of a
+  different **length** is caught for free — a `ghosted` with two chips in `ja` has no `[2]`, so
+  `[2]` reports missing. That is the whole reason elements are counted rather than the array
+  being treated as one opaque leaf: a reason chip that exists in English and not in Japanese is
+  exactly the bug this check is for, and dict-only counting cannot see it — that blindness is
+  what made an earlier docs audit report a *false* drift here. A key that turns from a string
+  into a nested object on one side collapses in too, reported as the old path going missing and
+  the new one appearing unmatched.
+- **A leaf whose type differs is drift too** — a `5` in one catalog against a `"5"` in the other.
+  Nothing in the catalogs is a non-string today, so this rule is a guard rather than a working
+  part; it is five lines, and the alternative is that the one day it matters, nothing says so.
+
+The convention matters more than which convention it is: whatever the script counts, it must
+count the same thing on both sides. It walks both catalogs with one function for precisely that
+reason.
+
+It is a script rather than a test because `web/` has no unit-test runner — Playwright E2E is the
+only suite, and booting a browser to compare two JSON files would be absurd. It has no
+dependencies and reads nothing but the two catalogs, so it costs the CI job well under a second.
 
 #### Locale-sensitive formatting
 
