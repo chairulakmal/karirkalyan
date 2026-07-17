@@ -1,6 +1,49 @@
 require "rails_helper"
 
 RSpec.describe Application do
+  # The ceiling that bounds storage, since no throttle can. Stubbed low rather than creating 200
+  # rows: the number is a judgement call, the behaviour at the boundary is what has to hold.
+  describe "the per-account ceiling" do
+    let(:user) { create(:user) }
+
+    before { stub_const("Application::MAX_PER_USER", 2) }
+
+    it "allows creates up to the ceiling" do
+      2.times { expect(build(:application, user: user).save).to be(true) }
+    end
+
+    it "refuses the create that would cross it" do
+      2.times { create(:application, user: user) }
+
+      record = build(:application, user: user)
+      expect(record.save).to be(false)
+      expect(record.errors.details[:base]).to include(a_hash_including(error: :too_many_applications))
+    end
+
+    it "counts each account's own applications, not every application there is" do
+      2.times { create(:application, user: create(:user)) }
+
+      expect(build(:application, user: user)).to be_valid
+    end
+
+    # on: :create — an account at the ceiling must still be able to edit and re-upload, or the
+    # cap would quietly freeze the data it exists to protect.
+    it "does not block an update to an account already at the ceiling" do
+      2.times { create(:application, user: user) }
+      record = user.applications.first
+
+      expect(record.update(notes: "still editable")).to be(true)
+    end
+
+    # Deleting is the way out, which is what lets the ceiling sit close to real use.
+    it "lets a create through again after a delete frees a slot" do
+      2.times { create(:application, user: user) }
+      user.applications.first.destroy
+
+      expect(build(:application, user: user)).to be_valid
+    end
+  end
+
   describe "#download_basename" do
     # build_stubbed gives the record an id without a round trip — the format is pure.
     def basename(kind: :resume, **attrs)

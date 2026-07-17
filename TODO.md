@@ -187,7 +187,7 @@ migration, and the previous image boots against an unchanged database.
       Rails owns the fix on both surfaces — the Next proxy passes `Content-Disposition` straight
       through, and SPEC.md § Exports already commits to the server being the one place that names
       a file.
-- [ ] **Throttle uploads, and cap applications per account** — operations, not a feature; the
+- [x] **Throttle uploads, and cap applications per account** — operations, not a feature; the
       field admission test deliberately does not apply. Nothing else in the repo defends the
       data: the real job-search history — applications, timeline, resumes stored as bytea —
       lives in one Railway Postgres, and **the Railway Hobby plan has no managed backups**
@@ -207,6 +207,15 @@ migration, and the previous image boots against an unchanged database.
       it is, not where the request came from — same reasoning as the export throttle, `CHANGELOG.md`
       § v1.4.0): a write/upload cap, and a ceiling on applications per account. The per-account
       pattern and the `429` responder already exist; this is a config change, not a design.
+
+      **Corrected 2026-07-17, in the building: half of that last sentence was wrong.** A
+      Rack::Attack throttle bounds a *rate over a window*, and every window resets — so any
+      positive rate integrates to unbounded total, and a throttle cannot express "a ceiling on
+      applications per account" at all. The upload cap was config as promised
+      (`applications/write`, 30/min + 300/hour per account). The ceiling was not: it shipped as
+      `Application::MAX_PER_USER` (200), a model validation on create, reporting through the
+      existing `validation_failed` envelope with detail code `too_many_applications` on field
+      `base` — the same shape the 1 MB upload cap uses. See `SPEC.md` § Security.
 - [ ] **Make en/ja key parity a check, not a convention** *(added 2026-07-16 — `v1.4.3` found the
       gap while adding four catalog keys)*. `CLAUDE.md` and this file both say parity must hold,
       and **nothing enforces it**: no test, no CI step, and next-intl's type augmentation is not

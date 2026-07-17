@@ -58,6 +58,20 @@ class Rack::Attack
     account_id(req)
   end
 
+  # The two requests that can carry a PDF: creating an application, and updating one. Anchored
+  # tightly so the neighbours keep their own treatment — POST /applications/prefill is not the
+  # collection path and has its own caps above, and .../:id/transition fails the /\d+\z anchor.
+  # DELETE is absent on purpose: it is the one write that gives storage back.
+  APPLICATION_MEMBER_PATH = %r{\A/api/v1/applications/\d+\z}
+
+  def self.application_write_user_id(req)
+    write = (req.post? && req.path == "/api/v1/applications") ||
+            ((req.patch? || req.put?) && req.path.match?(APPLICATION_MEMBER_PATH))
+    return unless write
+
+    account_id(req)
+  end
+
   throttle("auth/sign_in", limit: 5, period: 1.minute) do |req|
     req.ip if req.path == "/api/v1/auth/sign_in" && req.post?
   end
@@ -91,6 +105,17 @@ class Rack::Attack
   # being assembled, not of where the request came from.
   throttle("exports/account/minute", limit: 10, period: 1.minute) { |req| export_user_id(req) }
   throttle("exports/account/hour", limit: 60, period: 1.hour) { |req| export_user_id(req) }
+
+  # The upload path. An upload overwrites (one bytea per application, no version history, 1 MB
+  # cap), so a PATCH loop's storage stays flat — what it burns is CPU and write I/O, which is
+  # what these bound. They do not bound *storage*: no throttle can, because every window resets.
+  # Application::MAX_PER_USER is what does that job — see SPEC.md § Security.
+  #
+  # Every write to these paths counts, not only the ones carrying a file: telling them apart in
+  # Rack means parsing a multipart body Rails has not parsed yet, to skip a counter increment on
+  # a request that is cheap either way. 30/min is far above a human editing their applications.
+  throttle("applications/write/minute", limit: 30, period: 1.minute) { |req| application_write_user_id(req) }
+  throttle("applications/write/hour", limit: 300, period: 1.hour) { |req| application_write_user_id(req) }
 
   self.throttled_responder = lambda do |request|
     match_data  = request.env["rack.attack.match_data"] || {}

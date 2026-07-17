@@ -6,6 +6,12 @@ class Application < ApplicationRecord
 
   MAX_FILE_SIZE = 1.megabyte
 
+  # The ceiling that bounds storage. A Rack::Attack throttle cannot do this job — it bounds a
+  # rate over a window, and every window resets, so any positive rate integrates to unbounded
+  # total. 200 x 2 MB of blobs caps the worst case around 400 MB, on a database whose whole
+  # backup story is a nightly pg_dump. See SPEC.md § Security.
+  MAX_PER_USER = 200
+
   DOWNLOAD_KINDS = %i[resume cover_letter].freeze
 
   # Readable, not load-bearing: the id is what makes a download name unique, so a segment is
@@ -18,6 +24,7 @@ class Application < ApplicationRecord
   validates :cover_letter, length: { maximum: MAX_FILE_SIZE, message: "must be under 1 MB" }, allow_nil: true
   validate :resume_must_be_pdf,       if: -> { resume.present? && will_save_change_to_resume? }
   validate :cover_letter_must_be_pdf, if: -> { cover_letter.present? && will_save_change_to_cover_letter? }
+  validate :user_within_application_limit, on: :create
 
   before_save :touch_resume_timestamp,       if: :will_save_change_to_resume?
   before_save :touch_cover_letter_timestamp, if: :will_save_change_to_cover_letter?
@@ -87,5 +94,20 @@ class Application < ApplicationRecord
 
   def cover_letter_must_be_pdf
     errors.add(:cover_letter, :not_a_pdf, message: "must be a PDF") unless cover_letter.b.start_with?(PDF_MAGIC_BYTES)
+  end
+
+  # A bound, not an invariant: this counts in the same transaction as the insert without taking a
+  # lock, so concurrent creates at the ceiling can overshoot by the number of them in flight. That
+  # is accepted — the cap exists to stop unbounded growth, not to make 200 exact, and a real
+  # guarantee costs a counter column and an advisory lock to defend a number chosen by judgement.
+  #
+  # :base, not a field, because no field is wrong — the account is full. ErrorRendering turns the
+  # symbol into the validation_failed detail code, so clients read `too_many_applications`.
+  def user_within_application_limit
+    return if user.blank?
+    return if user.applications.count < MAX_PER_USER
+
+    errors.add(:base, :too_many_applications,
+      message: "You have reached the limit of #{MAX_PER_USER} applications. Delete one to add another.")
   end
 end

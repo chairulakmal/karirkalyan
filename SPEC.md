@@ -32,7 +32,10 @@ Two consequences worth stating plainly:
   [`CHANGELOG.md`](CHANGELOG.md), including the pre-1.0.0 build phases that used to sit at the
   top of this file.
 
-Last synced against the code: **2026-07-17**, `v1.4.4` (in flight) — § API contract gained
+Last synced against the code: **2026-07-17**, `v1.4.4` (in flight) — § Security gained a
+per-account write throttle on the application endpoints and `Application::MAX_PER_USER`, a hard
+ceiling of 200 applications per account: the throttle bounds the rate of the upload path, and the
+ceiling is what bounds total storage, which no throttle can. § API contract gained
 § Download filenames, and § Exports now defers to it: both download surfaces name their PDFs
 through one `Application#download_basename`, where the controller previously sent a hardcoded
 `resume.pdf` for every application and the archive built a different name from `parameterize`
@@ -167,8 +170,10 @@ visitor could make "Try demo account" 401 for the next fifty-nine minutes.
 
 Reopening registration is a product decision, not a config change: it would owe users a privacy
 policy that promises more than "the operator's own data" (§ Legal pages), a self-service delete
-button, an upload throttle, a per-account application cap, and a backup story that is not one
-`pg_dump`.
+button, and a backup story that is not one `pg_dump`. The upload throttle and the per-account
+application cap this list used to name are no longer owed — `v1.4.4` built both (§ Security),
+because the shared demo login is a multi-tenant abuse surface whether or not registration is
+open.
 
 ---
 
@@ -753,7 +758,7 @@ its own (a `409` is retryable, a `422` is not), but the code is what clients sho
 | `not_found` | `404` | No such record — including another user's record |
 | `stale_record` | `409` | `ActiveRecord::StaleObjectError` — optimistic-locking conflict |
 | `invalid_transition` | `422` | FSM `InvalidTransitionError` |
-| `validation_failed` | `422` | Model validation failure (create/update, file upload); carries `details` |
+| `validation_failed` | `422` | Model validation failure (create/update, file upload, or the `MAX_PER_USER` ceiling — detail code `too_many_applications` on field `base`); carries `details` |
 | `invalid_url` | `422` | The pre-fill URL itself is the problem — malformed, a port other than 80/443, or a private/internal address. Never fetched (`InvalidUrlError`) |
 | `prefill_blocked` | `422` | The site refused an automated reader — `401`/`403`, or a `cf-mitigated` header on any status. The URL is fine and retrying will not help (`BlockedError`). An upstream `429` is deliberately *not* this: it is the one refusal that lifts, so it resolves to `prefill_unreachable` and the user is told to retry |
 | `rate_limited` | `429` | Rack::Attack throttle; `Retry-After` header set |
@@ -1105,7 +1110,8 @@ STARTTLS port `2587`. The `From:` domain must be verified in Resend first.
 ### Security
 
 > **At a glance** · JWT auth with one JTI per user (sign-out revokes all devices). Rack::Attack
-> throttles keyed per-IP *and* per-account/email through Solid Cache. Optimistic locking on writes,
+> throttles keyed per-IP *and* per-account/email through Solid Cache, plus a hard 200-application
+> ceiling per account, which is the only thing that bounds storage. Optimistic locking on writes,
 > magic-byte-checked uploads, `nosniff` downloads, credentials filtered from logs.
 
 - **Auth** — Devise + devise-jwt. The JWT is issued in the `Authorization` response header. **One
@@ -1127,6 +1133,35 @@ STARTTLS port `2587`. The `From:` domain must be verified in Resend first.
     owns and assembles the zip in memory, so a signed-in client looping it is the cheapest way to
     push this app over its memory ceiling. The cap is per-account rather than per-IP because the
     cost is a function of whose data is being assembled, not of where the request came from.
+  - `applications/write`: **per-account** caps (30/min, 300/hour) on `POST /applications` and
+    `PATCH|PUT /applications/:id` — the two requests that carry a blob. Per-account for the same
+    reason as exports. The throttle covers every write to those paths rather than only the ones
+    with a file attached, because deciding *inside Rack middleware* whether a multipart body
+    contains a PDF means parsing the body Rails has not parsed yet, to save a counter increment
+    on a request that is cheap either way. `DELETE` is deliberately not throttled: it is the one
+    write that gives storage back. `POST /applications/prefill` and `.../transition` do not match
+    these patterns — prefill has its own caps above, and the path regex is anchored on `/\d+\z`.
+- **The application ceiling** — `Application::MAX_PER_USER` (200), validated on create, is what
+  actually bounds storage. **A throttle cannot do this job**: it bounds a rate over a window and
+  every window resets, so any positive rate integrates to unbounded total. The exposure is real
+  because an upload *overwrites* — `applications.resume` is a single `bytea` with no version
+  history and a 1 MB cap — so a client looping `PATCH` holds its storage footprint flat at 2 MB
+  per application, while `POST` buys another 2 MB of allowance each time, on a database whose
+  whole backup story is a nightly `pg_dump` (§ Backups). 200 × 2 MB bounds the worst case at
+  ~400 MB. It sits well above a real job search (100–300 applications is a long one) and the
+  breach is recoverable by deleting a row, which is why the number is allowed to be this close to
+  real use.
+  - It reports through the **existing** envelope, not a new code: the validation adds to `:base`,
+    so `create` renders `validation_failed` with `details: [{ field: "base", code:
+    "too_many_applications" }]` — the same shape the 1 MB upload cap uses for `too_long`.
+  - The **shared demo** is the account most likely to reach it, and it heals itself: `DemoReset`
+    destroys the demo *user* before re-running the seed (§ `Demo::ResetService`), so the ceiling
+    cannot deadlock the reset that clears it — worst case the demo is full until the top of the
+    hour.
+  - **It is a bound, not an invariant.** The check is a `count` in the same transaction as the
+    insert with no lock, so N concurrent creates at 199 can all pass and overshoot by N-1. That
+    is accepted: the cap exists to stop unbounded growth, not to make 200 exact, and a real
+    guarantee costs a counter column and an advisory lock to defend a number chosen by judgement.
 - **Optimistic locking** — a `lock_version` column activates Rails' built-in optimistic locking.
   Two concurrent writers: the second gets `StaleObjectError` → `409`. One column, one
   `rescue_from`, no library.
