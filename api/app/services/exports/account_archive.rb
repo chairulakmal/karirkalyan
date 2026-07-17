@@ -8,8 +8,8 @@ module Exports
   #
   # Contents:
   #   account.json           user, every application with every column, every timeline entry
-  #   resumes/              {application_id}-{slug}.pdf
-  #   cover-letters/        {application_id}-{slug}.pdf
+  #   resumes/              {company}-{role}-{MMDD}-{id}-resume.pdf
+  #   cover-letters/        {company}-{role}-{MMDD}-{id}-cover-letter.pdf
   #
   # Built in memory, which is a deliberate cap rather than an oversight: blobs are capped
   # at 1 MB each and this is a single-user app, so the peak is bounded by
@@ -19,6 +19,8 @@ module Exports
     # Bumped when the shape of account.json changes, so a future importer can tell what
     # it is reading rather than guessing from the keys present.
     SCHEMA_VERSION = 1
+
+    DIRECTORIES = { resume: "resumes", cover_letter: "cover-letters" }.freeze
 
     def initialize(user)
       @user = user
@@ -30,8 +32,7 @@ module Exports
         zip.write(JSON.pretty_generate(manifest))
 
         applications.each do |application|
-          write_blob(zip, "resumes", application, application.resume)
-          write_blob(zip, "cover-letters", application, application.cover_letter)
+          Application::DOWNLOAD_KINDS.each { |kind| write_blob(zip, application, kind) }
         end
       end
 
@@ -67,24 +68,29 @@ module Exports
     # survives even when the slug is unhelpful.
     def application_json(application)
       application.as_json.merge(
-        resume_file:       application.resume.present? ? blob_path("resumes", application) : nil,
-        cover_letter_file: application.cover_letter.present? ? blob_path("cover-letters", application) : nil,
+        resume_file:       blob_path_if_present(application, :resume),
+        cover_letter_file: blob_path_if_present(application, :cover_letter),
         timeline_entries:  application.timeline_entries.sort_by(&:created_at).as_json
       )
     end
 
-    def write_blob(zip, directory, application, blob)
+    def blob_path_if_present(application, kind)
+      application.public_send(kind).present? ? blob_path(application, kind) : nil
+    end
+
+    def write_blob(zip, application, kind)
+      blob = application.public_send(kind)
       return if blob.blank?
 
-      zip.put_next_entry(blob_path(directory, application))
+      zip.put_next_entry(blob_path(application, kind))
       zip.write(blob)
     end
 
-    # The id is what makes the name unique; the slug is only there to be readable, and is
-    # allowed to come out empty — a Japanese company name parameterizes to "".
-    def blob_path(directory, application)
-      slug = application.company.to_s.parameterize.presence
-      "#{directory}/#{[ application.id, slug ].compact.join('-')}.pdf"
+    # Application#download_basename is the one place a PDF gets named, so an archived file and
+    # the same file downloaded singly agree — see SPEC.md § Download filenames. The directory
+    # is the only thing the archive adds.
+    def blob_path(application, kind)
+      "#{DIRECTORIES.fetch(kind)}/#{application.download_basename(kind: kind)}"
     end
   end
 end

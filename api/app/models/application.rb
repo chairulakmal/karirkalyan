@@ -6,6 +6,12 @@ class Application < ApplicationRecord
 
   MAX_FILE_SIZE = 1.megabyte
 
+  DOWNLOAD_KINDS = %i[resume cover_letter].freeze
+
+  # Readable, not load-bearing: the id is what makes a download name unique, so a segment is
+  # allowed to be short or to vanish entirely. Counted in codepoints — one per kanji.
+  SLUG_MAX_LENGTH = 20
+
   validates :company, :role, :status, presence: true
   validates :status, inclusion: { in: ->(_) { ApplicationFSM::VALID_STATES } }
   validates :resume,       length: { maximum: MAX_FILE_SIZE, message: "must be under 1 MB" }, allow_nil: true
@@ -18,6 +24,47 @@ class Application < ApplicationRecord
 
   def as_json(options = {})
     super(options.merge(except: %i[resume cover_letter]))
+  end
+
+  # The one place a downloaded PDF gets its name — both the per-application endpoints and the
+  # account archive call this, so a file means the same thing whichever door it left by.
+  # See SPEC.md § Download filenames for why each segment is here.
+  #
+  #   {company}-{role}-{MMDD}-{id}-{kind}.pdf
+  #
+  # MMDD is the *upload* date, not the application date: the app keeps exactly one resume per
+  # application and an upload overwrites it, so the stamp is what stops a re-uploaded resume's
+  # download from silently overwriting the copy of the old one already in the downloads folder.
+  # It disambiguates rather than guarantees, which is why the id stays.
+  def download_basename(kind:)
+    raise ArgumentError, "unknown download kind: #{kind.inspect}" unless DOWNLOAD_KINDS.include?(kind)
+
+    stamp = public_send(:"#{kind}_updated_at") || created_at
+    segments = [
+      self.class.download_slug(company),
+      self.class.download_slug(role),
+      stamp.strftime("%m%d"),
+      id,
+      kind.to_s.dasherize
+    ]
+
+    # An empty segment is dropped, not placeheld: "unknown" would add fake meaning where the id
+    # already carries the truth. company and role are both null: false, so this only fires on an
+    # all-punctuation or emoji-only name — worst case "0712-12-resume.pdf", still unique.
+    "#{segments.compact_blank.join('-')}.pdf"
+  end
+
+  # Sanitize and keep, do not transliterate. parameterize sends a Japanese company name to "",
+  # and romanizing it needs a morphological analyzer to even be wrong slowly (日本 is nihon or
+  # nippon by context) — while a download filename has no reason to be ASCII in the first place.
+  # So: Unicode letters and digits survive with their case, everything else becomes a separator.
+  def self.download_slug(value)
+    value.to_s
+      .unicode_normalize(:nfc)
+      .gsub(/[^[[:alnum:]]]+/, "-")
+      .gsub(/\A-+|-+\z/, "")
+      .first(SLUG_MAX_LENGTH)
+      .gsub(/-+\z/, "") # the cap can land mid-separator
   end
 
   private

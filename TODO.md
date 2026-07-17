@@ -130,7 +130,7 @@ the code-quality patch that "Close the door" displaced, still sequenced ahead of
 the stage filter reads better on top of it. Each stays a patch the same way: no new capability, no
 migration, and the previous image boots against an unchanged database.
 
-- [ ] **Name downloaded resumes and cover letters after the application, not after nothing** —
+- [x] **Name downloaded resumes and cover letters after the application, not after nothing** —
       the v1.4.0 fallout: shipping the account archive is what made it visible that neither
       download surface names a file usefully. The same disease on two surfaces. In the archive,
       `Exports::AccountArchive#blob_path` (`api/app/services/exports/account_archive.rb:85`)

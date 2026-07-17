@@ -110,7 +110,7 @@ module Api
         return head :not_found unless @application.resume.present?
 
         send_data @application.resume,
-          filename:    "resume.pdf",
+          filename:    @application.download_basename(kind: :resume),
           type:        "application/pdf",
           disposition: "inline"
       end
@@ -119,7 +119,7 @@ module Api
         return head :not_found unless @application.cover_letter.present?
 
         send_data @application.cover_letter,
-          filename:    "cover_letter.pdf",
+          filename:    @application.download_basename(kind: :cover_letter),
           type:        "application/pdf",
           disposition: "inline"
       end

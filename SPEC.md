@@ -32,7 +32,12 @@ Two consequences worth stating plainly:
   [`CHANGELOG.md`](CHANGELOG.md), including the pre-1.0.0 build phases that used to sit at the
   top of this file.
 
-Last synced against the code: **2026-07-17**, `v1.4.3` — § Query layer gained
+Last synced against the code: **2026-07-17**, `v1.4.4` (in flight) — § API contract gained
+§ Download filenames, and § Exports now defers to it: both download surfaces name their PDFs
+through one `Application#download_basename`, where the controller previously sent a hardcoded
+`resume.pdf` for every application and the archive built a different name from `parameterize`
+that emptied out on Japanese company names. The slugger preserves Unicode rather than
+transliterating it. Before that, `v1.4.3` — § Query layer gained
 `Applications::ListQuery`, an extraction rather than a behaviour change: it moves
 `GET /api/v1/applications`'s filtering and cursor decoding out of the controller and writes down
 the contract that action already had. § Error codes split pre-fill failure into `invalid_url` /
@@ -213,7 +218,8 @@ users
 The core entity. `status` is FSM-controlled: it changes only through
 `Applications::TransitionService`, never a direct attribute write, and it is never
 mass-assignable. `resume` and `cover_letter` are `bytea` columns capped at 1 MB in the model and
-excluded from JSON serialisation — dedicated download endpoints serve them via `send_data`.
+excluded from JSON serialisation — dedicated download endpoints serve them via `send_data`, under
+the name `#download_basename` gives them (§ Download filenames).
 
 ```
 applications
@@ -228,8 +234,8 @@ applications
   notes                   text
   resume                  bytea              ← raw bytes, ≤ 1 MB, PDF magic-byte checked
   cover_letter            bytea              ← raw bytes, ≤ 1 MB, PDF magic-byte checked
-  resume_updated_at       datetime
-  cover_letter_updated_at datetime
+  resume_updated_at       datetime           ← set by a before_save; also the MMDD in the download name
+  cover_letter_updated_at datetime           ← same
   lock_version            integer, default: 0   ← optimistic locking
   created_at, updated_at
 
@@ -884,11 +890,16 @@ job-search history lives in one Railway Postgres, and the Hobby plan has no mana
 Scheduled `pg_dump`s cover that from the outside (§ Deployment); this covers it from the inside,
 and is the leg the user can pull without a provider, a cron runner, or a shell. It contains
 `account.json` — user, every application with every column, every timeline entry — plus the PDFs
-under `resumes/` and `cover-letters/`, named `{application_id}-{slug}.pdf`. `account.json` carries
-a `schema_version` so a future importer can tell what it is reading, and each application row
-names its own files, so the mapping survives even if the slug is unhelpful (company names in
-Japanese `parameterize` to an empty string — the id is what makes the name unique, the slug is
-only there to be readable).
+under `resumes/` and `cover-letters/`, named by `Application#download_basename` (§ Download
+filenames) — the same method the per-application download endpoints use, so a file means the same
+thing whichever door it left by. `account.json` carries a `schema_version` so a future importer
+can tell what it is reading, and each application row names its own files, so the mapping survives
+even when a segment is unhelpful — the id in the name is what makes it unique, the company and
+role are only there to be readable.
+
+**One archive-only detail:** rubyzip writes UTF-8 entry names but leaves the EFS flag
+(general-purpose bit 11) unset by default, which is mojibake in strict extractors the moment a
+name is Japanese. `config/initializers/zip.rb` sets `Zip.unicode_names = true` once at boot.
 
 **The archive is built in memory** (`Zip::OutputStream.write_buffer`), which is a deliberate cap,
 not an oversight: blobs are capped at 1 MB each and this is a single-user app, so the peak is
@@ -907,6 +918,49 @@ not:
 - There is **no `download` attribute**. Rails already sends `Content-Disposition: attachment` with
   the filename it chose (`karirkalyan-applications-2026-07-12.csv`), so the browser downloads
   rather than navigates, and the server stays the one place that names the file.
+
+#### Download filenames
+
+Every PDF this API hands out is named by **`Application#download_basename(kind:)`**, where `kind`
+is `:resume` or `:cover_letter`:
+
+```
+{company}-{role}-{MMDD}-{id}-{kind}.pdf     株式会社メルカリ-バックエンドエンジニア-0712-12-resume.pdf
+```
+
+Two callers, one method: `Api::V1::ApplicationsController#resume` / `#cover_letter`, and
+`Exports::AccountArchive#blob_path`. It lives on the model because the alternative is two
+implementations that drift — which is exactly the state `v1.4.4` found it in, the controller
+sending a hardcoded `resume.pdf` for every application while the archive built a different name
+from `parameterize`.
+
+**Why each part is there.** The **id** is the uniqueness guarantee: same company, same role, same
+day is a real collision, and `company`/`role` are readable rather than load-bearing. The **`MMDD`
+stamp is the upload date** — `resume_updated_at` / `cover_letter_updated_at`, falling back to
+`created_at` for a legacy row with a blob but no stamp — and it earns its place *in the user's
+downloads folder*, not in the app: the app stores exactly one resume per application
+(`applications.resume` is a single `bytea`, and an upload overwrites it), so the stamp is what
+stops a re-uploaded resume's download from silently overwriting the copy of the old one already
+saved. It **disambiguates rather than guarantees**.
+
+**The slugger preserves Unicode; it does not transliterate.** `parameterize` sends a Japanese
+company name to the empty string, but transliteration is the wrong cure: kanji→reading needs a
+morphological analyzer (日本 is *nihon* or *nippon* by context, and a wrong reading is worse than
+the kanji), a kana-only romaji gem strips kanji straight back to empty, and the ASCII fold is a
+constraint nothing here imposes. So the slugger **sanitizes and keeps**: Unicode letters and
+digits survive, display case is preserved (「Google」 beats 「google」, and case is a no-op for
+Japanese), everything else collapses to a single `-`, edges are trimmed, and each segment is
+capped at **20 codepoints** — per segment, with the stamp, id and suffix outside the count, since
+a single 20-char budget for the whole name does not close (`-cover-letter.pdf` alone is 17).
+
+This needs **no gem and no encoding work in the controller**: `send_data` with a UTF-8 filename
+makes Rails emit both a legacy `filename="%3F%3F…"` (`I18n.transliterate`d, ignored by every
+browser since ~2011) and `filename*=UTF-8''…` (RFC 5987), which is what browsers actually read.
+
+**A segment that sanitizes to empty is dropped, not placeheld** — `unknown`/`untitled` adds fake
+meaning where the id already carries the truth. Since `company` and `role` are both `null: false`,
+a segment only empties on an all-punctuation or emoji-only name, whose degenerate worst case is
+`0712-12-resume.pdf`. Still unique, still honest.
 
 ### Background jobs
 
