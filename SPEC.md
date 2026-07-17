@@ -464,8 +464,10 @@ text to be parsed.
 `text` wins if both arrive, because the user only pastes after the URL has already failed. Neither
 one present is still `invalid_url` ("Paste a job posting URL first") — the request supplied nothing
 to work with. **Pasted text goes through `to_text` rather than around it**: it inherits the same
-byte-cap-then-`scrub`, the same tag-strip (a paste from *view-source* works), the same whitespace
-collapse, and the same `MAX_TEXT_CHARS` ceiling — one text-conditioning rule, not one per source.
+byte-cap-then-`scrub`, the same tag-strip (a paste from *view-source* works), and the same
+whitespace collapse — one text-conditioning rule, not one per source. What it does not inherit is
+`MAX_TEXT_CHARS`, which `to_text` no longer applies: the fetch's truncation lives in `#capped`,
+and the paste refuses instead. That is the one divergence, and it is spelled out below.
 
 **The paste box is not offered on every failure, and that is the point of the taxonomy.** It is
 shown on exactly the two codes it cures — `prefill_blocked` (the site refuses automated readers)

@@ -1,5 +1,12 @@
 require "swagger_helper"
 
+# The published description for /applications/prefill's 422. It is a constant, and
+# every 422 block below uses it, because rswag collapses same-status blocks into one
+# description in swagger.yaml — see the comment at the first one.
+PREFILL_422 = "the URL is unusable (invalid_url), the site refused an automated reader " \
+              "(prefill_blocked), or the paste exceeds the cap once stripped " \
+              "(prefill_paste_too_long)".freeze
+
 RSpec.describe "Applications", type: :request do
   let(:user) { create(:user) }
 
@@ -282,7 +289,12 @@ RSpec.describe "Applications", type: :request do
         end
       end
 
-      response "422", "the URL is unusable (invalid_url), or the site refused an automated reader (prefill_blocked)" do
+      # rswag flattens every response block sharing a status code into ONE description
+      # in swagger.yaml, last one wins — so all four 422s here carry the same string,
+      # enumerating all three codes. Give one its own prose and the published contract
+      # silently documents only that case. Which case each block pins is what the
+      # comments and the `code` assertions say.
+      response "422", PREFILL_422 do
         let(:Authorization) { jwt_for(user) }
         let(:body)          { { url: "http://10.0.0.1/admin" } }
         before do
@@ -302,7 +314,7 @@ RSpec.describe "Applications", type: :request do
       # guard it would take the paste branch and be billed to us as a Claude call on
       # garbage. Deliberately *not* stubbed: the point is that the real thing
       # refuses, and it never reaches the network to do so.
-      response "422", "the URL is unusable (invalid_url), or the site refused an automated reader (prefill_blocked)" do
+      response "422", PREFILL_422 do
         let(:Authorization) { jwt_for(user) }
         let(:body)          { { text: { a: 1 } } }
 
@@ -314,7 +326,7 @@ RSpec.describe "Applications", type: :request do
       # BlockedError subclasses FetchError, which subclasses Error — so this also
       # pins the rescue order the controller depends on. Get it wrong and the code
       # silently regresses to `invalid_url`, which is the bug v1.4.3 fixes.
-      response "422", "the URL is unusable (invalid_url), or the site refused an automated reader (prefill_blocked)" do
+      response "422", PREFILL_422 do
         let(:Authorization) { jwt_for(user) }
         let(:body)          { { url: "https://www.tokyodev.com/companies/x/jobs/y" } }
         before do
@@ -331,7 +343,7 @@ RSpec.describe "Applications", type: :request do
 
       # The paste's own refusal. It is a 422 beside invalid_url and prefill_blocked
       # rather than a 502: nothing upstream failed, the input is simply too big.
-      response "422", "the paste exceeds the cap once stripped (prefill_paste_too_long)" do
+      response "422", PREFILL_422 do
         let(:Authorization) { jwt_for(user) }
         let(:body)          { { text: "あ" * 20_000 } }
         before do

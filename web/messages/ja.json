@@ -383,7 +383,7 @@
     "pasteHint": "このページはここからは読み取れませんが、あなたのブラウザなら開けます。求人ページを開いて本文を選択し、下に貼り付けてください。Claude はどちらの場合も同じようにテキストを読みます。",
     "pastePlaceholder": "求人ページの本文を貼り付けてください…",
     "pasteButton": "貼り付けた本文から自動入力",
-    "pasteCounter": "{count} 文字を貼り付けました",
+    "pasteCounter": "{count, plural, =0 {まだ貼り付けられていません} other {# 文字を貼り付けました}}",
     "company": "企業",
     "role": "職種",
     "status": "ステータス",

@@ -141,7 +141,8 @@ paths:
         '200':
           description: extracted fields returned for the user to review
         '422':
-          description: the paste exceeds the cap once stripped (prefill_paste_too_long)
+          description: the URL is unusable (invalid_url), the site refused an automated
+            reader (prefill_blocked), or the paste exceeds the cap once stripped (prefill_paste_too_long)
         '502':
           description: the page could not be fetched (prefill_unreachable), or it
             was fetched and yielded no posting (prefill_failed)

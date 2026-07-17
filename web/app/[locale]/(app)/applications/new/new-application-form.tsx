@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useTransition } from "react";
-import { useLocale, useTranslations } from "next-intl";
+import { useTranslations } from "next-intl";
 import { createApplication, prefillFromText, prefillFromUrl } from "@/app/lib/actions";
 import type { PrefillResult } from "@/app/lib/actions";
 import { fileSizeMb, MAX_FILE_BYTES } from "@/app/lib/files";
@@ -37,7 +37,6 @@ const PASTE_CURES: ReadonlySet<string> = new Set<PrefillCode>([
 
 export function NewApplicationForm({ entryStates }: { entryStates: Status[] }) {
   const t = useTranslations("newApplication");
-  const locale = useLocale();
   const [error, setError] = useState<string | null>(null);
   const [pending, startTransition] = useTransition();
 
@@ -162,28 +161,34 @@ export function NewApplicationForm({ entryStates }: { entryStates: Status[] }) {
           <div className="mt-4 border-t border-cobalt/30 pt-4">
             {/* A real <label>, not a styled <span>: it is what gives the textarea an
                 accessible name, and what lets a test reach it by getByLabel — the
-                same reasoning field.tsx's wrapper already carries. */}
-            <label className="block">
+                same reasoning field.tsx's wrapper already carries. Explicit
+                htmlFor rather than field.tsx's wrapping, because the hint sits
+                between the label and the box: an accessible name is the label's
+                whole text subtree, so wrapping all three would fold the hint into
+                the name and announce it twice — once in the name, once through
+                aria-describedby, which is what actually associates it. */}
+            <label htmlFor="paste-text" className="block">
               <span className="kk-label">{t("pasteLabel")}</span>
-              <p id="paste-hint" className="mt-1 text-xs font-normal text-ink-soft">
-                {t("pasteHint")}
-              </p>
-              {/* No maxLength, deliberately: it would truncate the paste on arrival
-                  and say nothing — the exact silent cut this box exists to avoid.
-                  Nothing is blocked here either; the server owns the cap, because
-                  it is the only side that can measure the stripped length. */}
-              <textarea
-                value={posting}
-                onChange={(e) => setPosting(e.target.value)}
-                rows={8}
-                placeholder={t("pastePlaceholder")}
-                aria-describedby="paste-hint paste-count"
-                className="mt-2 block w-full border border-dune bg-linen px-3 py-2 text-sm text-midnight placeholder:text-ink-soft"
-              />
             </label>
+            <p id="paste-hint" className="mt-1 text-xs font-normal text-ink-soft">
+              {t("pasteHint")}
+            </p>
+            {/* No maxLength, deliberately: it would truncate the paste on arrival
+                and say nothing — the exact silent cut this box exists to avoid.
+                Nothing is blocked here either; the server owns the cap, because
+                it is the only side that can measure the stripped length. */}
+            <textarea
+              id="paste-text"
+              value={posting}
+              onChange={(e) => setPosting(e.target.value)}
+              rows={8}
+              placeholder={t("pastePlaceholder")}
+              aria-describedby="paste-hint paste-count"
+              className="mt-2 block w-full border border-dune bg-linen px-3 py-2 text-sm text-midnight placeholder:text-ink-soft"
+            />
             <div className="mt-2 flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
               <span id="paste-count" aria-live="polite" className="text-xs text-ink-soft">
-                {t("pasteCounter", { count: pastedChars.toLocaleString(locale) })}
+                {t("pasteCounter", { count: pastedChars })}
               </span>
               <button
                 type="button"

@@ -383,7 +383,7 @@
     "pasteHint": "That page can't be read from here, but you can. Open it in your browser, select the posting, and paste it below — Claude reads the text the same way either way.",
     "pastePlaceholder": "Paste the job posting text…",
     "pasteButton": "Pre-fill from the paste",
-    "pasteCounter": "{count} characters pasted",
+    "pasteCounter": "{count, plural, =0 {Nothing pasted yet} one {# character pasted} other {# characters pasted}}",
     "company": "Company",
     "role": "Role",
     "status": "Status",
