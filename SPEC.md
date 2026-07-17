@@ -32,7 +32,7 @@ Two consequences worth stating plainly:
   [`CHANGELOG.md`](CHANGELOG.md), including the pre-1.0.0 build phases that used to sit at the
   top of this file.
 
-Last synced against the code: **2026-07-17**, `v1.5.1` (in flight) — § The transition table now
+Last synced against the code: **2026-07-17**, `v1.5.1` — § The transition table now
 records that `terminal_states` and `entry_states` are **consumed**, not just served: the status
 help's "permanent" badge and the irreversibility warning on both confirms read the former off the
 fetched table, where they used to read a TypeScript copy of `ApplicationFSM::TERMINAL_STATES`, and
