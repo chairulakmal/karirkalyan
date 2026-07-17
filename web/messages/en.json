@@ -380,9 +380,11 @@
     "company": "Company",
     "role": "Role",
     "status": "Status",
-    "statusWishlist": "Wishlist — saved, might apply",
-    "statusDraft": "Draft — preparing my application",
-    "statusApplied": "Applied — already submitted",
+    "entryStatus": {
+      "wishlist": "Wishlist — saved, might apply",
+      "draft": "Draft — preparing my application",
+      "applied": "Applied — already submitted"
+    },
     "statusHint": "You can advance the status later from the application page.",
     "appliedOn": "Applied on",
     "followUpDate": "Follow-up date",

@@ -5,23 +5,27 @@ import { useTranslations } from "next-intl";
 import { useRouter } from "@/i18n/navigation";
 import { transitionStatus } from "@/app/lib/actions";
 import { statusBadgeClass } from "@/app/lib/format";
-import {
-  CONFIRM_REQUIRED,
-  HARD_TERMINAL,
-  REVIVAL_STATES,
-} from "@/app/lib/transitions";
+import { CONFIRM_REQUIRED, REVIVAL_STATES } from "@/app/lib/transitions";
 import type { Status } from "@/app/lib/types";
 
+/**
+ * `terminalStates` is the fetched table's, not a copy of the FSM's (SPEC.md
+ * § The transition table). Empty means the table didn't arrive: the FSM always
+ * has terminal states, so empty is never a real answer, and the confirm then
+ * says neither "permanent" nor "reopenable" rather than guessing.
+ */
 export function TransitionButtons({
   id,
   lockVersion,
   validNextStates,
   currentStatus,
+  terminalStates,
 }: {
   id: number;
   lockVersion: number;
   validNextStates: Status[];
   currentStatus: Status;
+  terminalStates: Status[];
 }) {
   const t = useTranslations("transitions");
   const ts = useTranslations("status");
@@ -128,7 +132,7 @@ export function TransitionButtons({
           }
 
           if (confirming === status) {
-            const isTerminal = HARD_TERMINAL.has(status);
+            const permanence = terminalStates.length === 0 ? null : terminalStates.includes(status);
             return (
               <div key={status} className="space-y-2">
                 <p className="text-xs text-ink-soft">
@@ -138,11 +142,11 @@ export function TransitionButtons({
                     b: (chunks) => <span className="font-medium text-midnight">{chunks}</span>,
                     dim: (chunks) => <span className="text-ink-soft/80">{chunks}</span>,
                   })}{" "}
-                  {isTerminal ? (
+                  {permanence === true ? (
                     <span className="text-danger/80">{t("permanentWarning")}</span>
-                  ) : (
+                  ) : permanence === false ? (
                     <span className="text-ink-soft/70">{t("reopenable")}</span>
-                  )}
+                  ) : null}
                 </p>
                 <div className="flex gap-2">
                   <button

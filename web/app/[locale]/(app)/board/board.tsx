@@ -5,11 +5,7 @@ import { useTranslations } from "next-intl";
 import { Link, useRouter } from "@/i18n/navigation";
 import { transitionStatus } from "@/app/lib/actions";
 import { statusBadgeClass } from "@/app/lib/format";
-import {
-  CONFIRM_REQUIRED,
-  HARD_TERMINAL,
-  REVIVAL_STATES,
-} from "@/app/lib/transitions";
+import { CONFIRM_REQUIRED, REVIVAL_STATES } from "@/app/lib/transitions";
 import type { Application, Status, TransitionTable } from "@/app/lib/types";
 
 /*
@@ -164,6 +160,7 @@ export function Board({
                     key={app.id}
                     app={app}
                     targets={table.transitions[app.status] ?? []}
+                    terminalStates={table.terminal_states ?? []}
                     draggable
                     dragged={dragging?.id === app.id}
                     onDragStart={() => setDragging({ id: app.id, from: app.status })}
@@ -203,6 +200,7 @@ export function Board({
                         key={app.id}
                         app={app}
                         targets={table.transitions[app.status] ?? []}
+                        terminalStates={table.terminal_states ?? []}
                         onMove={(to, note) => move(app, to, note)}
                       />
                     ))}
@@ -220,6 +218,7 @@ export function Board({
 function Card({
   app,
   targets,
+  terminalStates,
   draggable = false,
   dragged = false,
   onDragStart,
@@ -228,6 +227,7 @@ function Card({
 }: {
   app: Application;
   targets: Status[];
+  terminalStates: Status[];
   draggable?: boolean;
   dragged?: boolean;
   onDragStart?: () => void;
@@ -251,7 +251,9 @@ function Card({
         <p className="truncate font-serif text-sm font-medium text-midnight">{app.company}</p>
         <p className="mt-0.5 truncate text-xs text-ink-soft">{app.role}</p>
       </Link>
-      {targets.length > 0 && <CardMenu app={app} targets={targets} onMove={onMove} />}
+      {targets.length > 0 && (
+        <CardMenu app={app} targets={targets} terminalStates={terminalStates} onMove={onMove} />
+      )}
     </li>
   );
 }
@@ -259,13 +261,17 @@ function Card({
 // The focusable move menu: lists every legal next state, with the same
 // confirm-before-closing and reason-before-reviving semantics as the detail
 // page's transition buttons (shared sets in app/lib/transitions.ts).
+// `terminalStates` is the fetched table's; empty means the table didn't arrive,
+// so the confirm claims neither permanence nor reopenability.
 function CardMenu({
   app,
   targets,
+  terminalStates,
   onMove,
 }: {
   app: Application;
   targets: Status[];
+  terminalStates: Status[];
   onMove: (to: Status, note?: string) => void;
 }) {
   const t = useTranslations("board");
@@ -391,7 +397,7 @@ function CardMenu({
                   b: (chunks) => <span className="font-medium text-midnight">{chunks}</span>,
                   dim: (chunks) => <span className="text-ink-soft/80">{chunks}</span>,
                 })}{" "}
-                {HARD_TERMINAL.has(confirming) ? (
+                {terminalStates.length === 0 ? null : terminalStates.includes(confirming) ? (
                   <span className="text-danger/80">{tt("permanentWarning")}</span>
                 ) : (
                   <span className="text-ink-soft/70">{tt("reopenable")}</span>

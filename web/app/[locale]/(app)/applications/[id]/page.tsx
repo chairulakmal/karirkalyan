@@ -35,6 +35,14 @@ export default async function ApplicationDetailPage({
   const app = res.data;
   const numId = Number(id);
 
+  /* The two FSM facts this page reads off the fetched table rather than a copy
+     (SPEC.md § The transition table). Both degrade to `[]` when the table fails
+     or predates the field, and each consumer reads that as *unknown* — see the
+     comments at their call sites for what silence costs. */
+  const table = tableRes.ok ? tableRes.data : null;
+  const activeStates = table?.active_states ?? [];
+  const terminalStates = table?.terminal_states ?? [];
+
   return (
     <div className="space-y-10">
       <header className="flex flex-wrap items-start justify-between gap-4 border-b border-dune pb-6">
@@ -79,7 +87,15 @@ export default async function ApplicationDetailPage({
       <section className="border border-dune bg-linen p-5">
         <div className="flex items-center gap-2">
           <p className="kk-label">{t("transition")}</p>
-          <StatusHelp current={app.status} nextStates={app.valid_next_states} />
+          {/* A failed table costs the "permanent" badge here and the
+              permanent/reopenable line in the confirm below — the help still
+              explains every status, it just stops making a claim it cannot
+              back. Never the reverse: silence, not a guess. */}
+          <StatusHelp
+            current={app.status}
+            nextStates={app.valid_next_states}
+            terminalStates={terminalStates}
+          />
         </div>
         {app.valid_next_states.length === 0 ? (
           <p className="mt-3 text-sm text-ink-soft">
@@ -95,6 +111,7 @@ export default async function ApplicationDetailPage({
             lockVersion={app.lock_version}
             validNextStates={app.valid_next_states}
             currentStatus={app.status}
+            terminalStates={terminalStates}
           />
         )}
       </section>
@@ -107,7 +124,7 @@ export default async function ApplicationDetailPage({
           id={numId}
           lockVersion={app.lock_version}
           status={app.status}
-          activeStates={tableRes.ok ? (tableRes.data?.active_states ?? []) : []}
+          activeStates={activeStates}
           company={app.company}
           role={app.role}
           url={app.url}

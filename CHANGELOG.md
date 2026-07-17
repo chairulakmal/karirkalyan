@@ -6,6 +6,81 @@ Open work lives in [`TODO.md`](TODO.md). Settled decisions-not-to-build are reco
 
 ---
 
+## v1.5.1 — 2026-07-17
+
+`v1.5.0` deleted one TypeScript copy of an FSM fact and walked past a second, which its own docs
+audit caught and wrote down. This release deletes that one — then, on being asked what *else* the
+same payload was serving to nobody, found and deleted a third. It also documents the query
+parameters `GET /applications` has never published, which is not drift from `v1.5.0` but a gap
+that predates it. One branch, one PR *(fix/v1.5.1, #68)*.
+
+A patch by the mechanical test: no migration, no new capability. Both halves make the system
+easier to describe accurately without changing what it does.
+
+### Both dead copies in the transition payload are gone
+
+- **`web/app/lib/format.ts`'s `PERMANENT_STATUSES` is deleted.** It mirrored
+  `ApplicationFSM::TERMINAL_STATES` and said so in its own comment, while `terminal_states` was
+  already shipping in `/transitions` and already typed in `types.ts` — fetched, typed, then
+  ignored in favour of the hardcoded set. The three places that stated permanence (the status
+  help's badge, and the irreversibility line on the detail page's confirm and the board card
+  menu's) now read the fetched table. `transitions.ts`'s `HARD_TERMINAL` alias goes with it;
+  `CONFIRM_REQUIRED` and `REVIVAL_STATES` stay, because *which moves are worth a prompt* is UI
+  judgement, while *which states are irreversible* is an FSM fact. That distinction is the whole
+  rule, and it is what the file was getting wrong by holding all three side by side.
+- **`new-application-form.tsx`'s three hardcoded `<option>`s are gone too.** `wishlist`, `draft`,
+  `applied` was `ApplicationFSM::ENTRY_STATES` copied verbatim — the identical bug to
+  `PERMANENT_STATUSES`, in the identical payload: `entry_states` was served, typed in `types.ts`,
+  and consumed nowhere. This one is the *create path*, not a display detail: the controller
+  rejects a create outside the entry set with a `422`, so a stale copy would hide a state the API
+  accepts or offer one it refuses. The form now builds its picker from the fetched set. It was
+  found by asking the question the audit hadn't — *which other fields of this payload does nobody
+  read?* — which is the check that would have caught `PERMANENT_STATUSES` in `v1.5.0`, and
+  `entry_states` here, one release earlier each.
+- **The claim the README makes is now the one the code backs.** "The frontend never copies the
+  FSM" has been retracted twice: once by `v1.5.0`'s audit, once here, and the rescope that
+  replaced it — "every FSM fact the app *relies on*" — was itself false while
+  `new-application-form.tsx` stood. The sentence had been rewritten three times without the grep
+  behind it ever being run to the end; it returns twelve files, not the four claimed. So the claim
+  is no longer a universal about *copying*, which the codebase does not earn and cannot enforce:
+  `web/` still names states in the `Status` union (a type cannot be fetched), in the label
+  catalogs (nor can a translation), in `board.tsx`'s column *order*, and in `transitions.ts`'s
+  confirm/revival sets. What is true, and checkable, is the narrower thing: **every FSM rule the
+  UI applies is fetched** — legal moves, entry states, board columns, permanence — and nothing
+  `web/` names for itself can authorise a transition, because the server validates every move
+  against the table regardless. The sets that remain shape *affordance*: stale, `REVIVAL_STATES`
+  could offer a revival the server refuses, which is a misjudged prompt rather than a wrong move. `pipeline-diagram.tsx` stays the named exception: an illustration
+  nothing reads, so a stale arrow is a wrong drawing, not a wrong transition.
+- **A missing `terminal_states` says nothing rather than guessing.** `v1.5.0` established that a
+  field can be absent mid-deploy with `ok: true` over the top of it. The obvious fix — default the
+  set to empty — swaps one lie for another here, because the existing ternary would then tell a
+  reader that `accepted` is reopenable. The FSM always has terminal states, so an empty list can
+  only mean *unknown*: the confirm renders neither "permanent" nor "reopenable", and the badge
+  does not render. Withholding the scary half would be its own kind of wrong; the point is that
+  silence must be unclaimable in either direction. A missing `entry_states` degrades the same way
+  and for the same reason: the form drops the status picker rather than guess one, sends no
+  `status`, and lets the API apply its own default — the application is still created correctly,
+  and the FSM, which was always the authoritative path, still moves it afterwards.
+
+### The list endpoint documents its filters
+
+- **`status`, `company`, `source`, `after` and `limit` reach the published reference.** The `get`
+  block had no `parameters:` key at all, so `v1.5.0`'s headline change — `?status=` taking a list
+  — was invisible in swagger, as every filter always had been. rswag only emits what the spec
+  declares, so the fix is `parameter` blocks in the request spec, not an edit to the generated
+  YAML.
+- **Including the parts that surprise people.** An unknown `status` leaves the list *unfiltered,
+  never empty*, while an unknown `company` legitimately matches nothing — the asymmetry is
+  deliberate (a query the server understood nothing of has told it nothing) and now stated where
+  an API reader will meet it. The descriptions were written against `ListQuery` line by line
+  rather than from memory, which is what caught the edges: `?limit=` empty reads as the default
+  `10` and not as `1` (only *non-numeric* clamps to `1`), blank or whitespace-only `company` and
+  `source` are ignored like `status` rather than matching nothing, and `company` is case-sensitive
+  while `source` is not. No behaviour changed; the endpoint simply stops being silent about
+  itself.
+
+---
+
 ## v1.5.0 — 2026-07-17
 
 The dashboard's status chips looked like a filter and behaved like a radio group: `Filters.status`
