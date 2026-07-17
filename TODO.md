@@ -9,25 +9,15 @@ cards joined `v1.9.0`; `v1.4.3` and the prefill paste fallback were added out of
 `v1.4.2`'s first two items closed and left the file; and `v1.4.3` itself closed entire, so its
 section left too. On 2026-07-17 `v1.4.3` was tagged and `v1.4.2` was skipped for good, which
 renumbered that section's four survivors to `v1.4.4`; later the same day the stage filter took
-`v1.5.0`, and `v1.4.4`'s four items merged (PR #66) and are ticked below awaiting the tag.
+`v1.5.0`, and `v1.4.4` was written, merged (PR #66) and tagged, so its section left the file too.
 
-**Current release: `v1.4.3`** (2026-07-17). **`v1.4.4` is merged and awaiting its tag** — all four
-items shipped in PR #66 (`d06cbbb`), ticked below with what each one learned in the building;
-`CHANGELOG.md` § v1.4.4 has the account. A **fifth** item shipped with them that was never scoped
-here: the review of those four found that **every Rack::Attack rate limit could be skipped by
-appending `.json` to the URL**, and had been skippable since the throttles landed — the sign-in
-endpoint, the app's only unauthenticated write, had no effective limit in production. It is not
-listed below because this file is open work and that work is done; `CHANGELOG.md` § v1.4.4 leads
-with it. The section stays here, ticked rather than deleted, until the tag exists — the items leave
-this file on tagging day, the way `v1.4.2`'s first two did.
-`v1.4.2` was **never tagged
-and never will be**: the prefill fix landed on `main` above its four unwritten items, which put
-two patches at one commit, and `v1.4.3` took the tag rather than make a production fix wait.
-`CHANGELOG.md` § v1.4.3 carries the full account. Those four items are now **`v1.4.4`** — same
-work, same patch level, one number further along; the gap at `v1.4.2` is permanent. With `v1.4.4`
-merged, the nearest genuinely open work is `v1.5.0` — **the stage filter, scoped 2026-07-17**, which took
-the `v1.5.0` slot and slid every release below it one minor. What each shipped release contained
-is `CHANGELOG.md`'s job to say, not this file's.
+**Current release: `v1.4.4`** (2026-07-17). `v1.4.2` was **never tagged and never will be**: the
+prefill fix landed on `main` above its four unwritten items, which put two patches at one commit,
+and `v1.4.3` took the tag rather than make a production fix wait. `CHANGELOG.md` § v1.4.3 carries
+the full account. Those four items shipped as **`v1.4.4`** — same work, same patch level, one
+number further along; the gap at `v1.4.2` is permanent. The nearest open work is now `v1.5.0` —
+**the stage filter, scoped 2026-07-17**, which took the `v1.5.0` slot and slid every release below
+it one minor. What each shipped release contained is `CHANGELOG.md`'s job to say, not this file's.
 
 **North star (decided 2026-07-11): be the best career app for its one loyal user.** Portfolio
 value follows from that, not the other way round — a reviewer can tell a tool with a real
@@ -45,7 +35,7 @@ outranks anything else in this file on the day it happens.
 
 ---
 
-## The plan — `v1.4.4` → `v1.9.0` (scoped 2026-07-12, amended 2026-07-13 and 2026-07-17, extended 2026-07-15)
+## The plan — `v1.5.0` → `v1.9.0` (scoped 2026-07-12, amended 2026-07-13 and 2026-07-17, extended 2026-07-15)
 
 **The whole backlog fits under 1.x.** Only one item forces a major, and `SPEC.md` § Versioning
 & releases already names it: the **`positions` entity**, because it adds a table *and* changes
@@ -67,7 +57,7 @@ dashboard's status chips are radio buttons wearing a filter's clothes: exactly o
 time, or all thirteen. The one question the list cannot answer is the one asked most —
 *what's still live?* — because "active" is seven stages and the control only holds one. Adding
 multi-select is a **user-visible capability**, which the mechanical test in `SPEC.md`
-§ Versioning & releases makes a minor and not a patch, so it could not ride the patch below it. It is
+§ Versioning & releases makes a minor and not a patch, so it could not ride `v1.4.4`. It is
 sequenced ahead of the pocket app because the phone inherits whatever the filter becomes:
 shipping the app shell first would mean shipping the radio-button filter to the smaller screen,
 then rebuilding it there. The pocket app moves to `v1.6.0` and each downstream release slides
@@ -75,9 +65,9 @@ one minor — the second such slide, on the same reasoning as the first.
 
 | Release | Level | Contents |
 | --- | --- | --- |
-| ~~`v1.4.2`~~ | — | **Never tagged; the number is skipped.** Its written half — the `ListQuery` extraction, the API base rename, the privacy/doc-drift fix — shipped inside `v1.4.3`; its unwritten half is `v1.4.4` below |
+| ~~`v1.4.2`~~ | — | **Never tagged; the number is skipped.** Its written half — the `ListQuery` extraction, the API base rename, the privacy/doc-drift fix — shipped inside `v1.4.3`; its unwritten half shipped as `v1.4.4` |
 | `v1.4.3` | patch | **Shipped 2026-07-17.** Prefill: IPv4-first address pinning, and an error taxonomy that stops blaming the user's URL — plus everything `v1.4.2` had written by then. See `CHANGELOG.md` |
-| `v1.4.4` | patch | **Merged 2026-07-17, awaiting the tag.** Download filenames, upload throttle + a per-account ceiling, en/ja key parity as a CI check, the profile-card fold — `v1.4.2`'s four open items, renumbered when its tag was skipped — plus the `.json` throttle bypass the review of them found |
+| `v1.4.4` | patch | **Shipped 2026-07-17.** Download filenames, upload throttle + a per-account ceiling, en/ja key parity as a CI check, the profile-card fold — `v1.4.2`'s four open items — plus the `.json` throttle bypass the review of them found. See `CHANGELOG.md` |
 | `v1.5.0` | minor | The stage filter: multi-select status chips on the dashboard list, on by default, with "hide inactive" and friends — plus `active_states` on `/transitions` |
 | `v1.6.0` | minor | The pocket app: share-sheet capture, passkey sign-in, push digest, installed-app shell — **plus the prefill paste fallback the share sheet needs** |
 | `v1.7.0` | minor | The Japan market layer: recruiter channel + `agencies`, 年収 comp structure, Japanese-level filter |
@@ -126,192 +116,6 @@ is fine — the `web/`-only constraint was a property of v1.1.0, not a permanent
   such item must state its **annual refresh cost** when it is scoped, and the sum of those
   lines is a real cap on how many of these a solo maintainer can ship. The career-intelligence
   item already budgets this way ("one data-entry session a year"); that is the pattern.
-
----
-
-## `v1.4.4` — patch. Sequenced before `v1.5.0`, not filler
-
-**This was `v1.4.2` until 2026-07-17.** Half of that release was written when a prod report
-arrived; the fix for it landed on `main` above the half, and shipped as `v1.4.3` carrying both.
-What shipped that way — the `Applications::ListQuery` extraction, the `API_BASE` / `API_BASE_URL`
-rename, and the post-`v1.4.1` privacy/doc-drift fix — is `CHANGELOG.md` § v1.4.3's to describe,
-not this file's. What is left is the four items below, renumbered but otherwise untouched: still
-the code-quality patch that "Close the door" displaced, still sequenced ahead of `v1.5.0` because
-the stage filter reads better on top of it. Each stays a patch the same way: no new capability, no
-migration, and the previous image boots against an unchanged database.
-
-- [x] **Name downloaded resumes and cover letters after the application, not after nothing** —
-      the v1.4.0 fallout: shipping the account archive is what made it visible that neither
-      download surface names a file usefully. The same disease on two surfaces. In the archive,
-      `Exports::AccountArchive#blob_path` (`api/app/services/exports/account_archive.rb:85`)
-      builds `resumes/{id}-{company.parameterize}.pdf`, and a **Japanese company name
-      parameterizes to an empty string** — so the fallback fires and the entry is a bare
-      `resumes/12.pdf`. In the per-application download,
-      `ApplicationsController#resume` / `#cover_letter` `send_data` a hardcoded `resume.pdf` /
-      `cover_letter.pdf`, so *every* application's file saves under the same name and the second
-      one collides with the first.
-
-      **The format, settled:** `{company}-{role}-{MMDD}-{id}-resume.pdf`. The 20-character cap is
-      **per segment** — company ≤ 20, role ≤ 20 — and the stamp, the id and the `-resume.pdf`
-      suffix sit **outside** the count. A single 20-char budget for the whole name was the
-      alternative and it does not close: the suffix alone is 11 characters.
-
-      `MMDD` is the **upload** date, not the application date: `resume_updated_at` /
-      `cover_letter_updated_at` already exist per field (the detail page's "uploaded 3 days ago"
-      reads them), so it costs nothing to compute. What it buys is *in the user's downloads
-      folder*, not in the app — the app stores exactly one resume per application (`applications.resume`
-      is a single `bytea`, and an upload overwrites it), so the stamp is what stops a re-uploaded
-      resume's download from silently overwriting the copy of the old one you already saved. It
-      **disambiguates rather than guarantees**, which is why the application id stays in the name:
-      same company, same role, same day is a real collision.
-
-      **The slugger — resolved 2026-07-15: don't transliterate, preserve the Unicode.** The
-      premise that this "needs transliteration" was wrong. Kanji→reading needs a morphological
-      analyzer (日本 is *nihon* or *nippon* by context, and a wrong reading is worse than the
-      kanji itself), a kana-only romaji gem strips kanji straight back to the empty string
-      `parameterize` already produces, and the ASCII fold is a constraint nothing imposes — a
-      download filename need not be ASCII. So the slugger **sanitizes and keeps** the characters:
-      Unicode letters and digits, display case preserved (「Google」 beats 「google」, and case
-      is a no-op for Japanese), header/FS-hostile chars stripped (`/`, `\`, control chars,
-      quotes), whitespace and `-` runs collapsed, edges trimmed, capped at **20 codepoints per
-      segment** (`.first(20)` — one codepoint per kanji/kana). Proven end-to-end: `send_data`
-      with a UTF-8 name makes Rails emit both a legacy `filename="????…"` (ignored by every
-      browser since ~2011) and `filename*=UTF-8''…` (RFC 5987, what browsers actually use), so
-      the Downloads folder gets the real Japanese name with **no new gem**.
-
-      **The fallback (was the open decision):** a segment that sanitizes to empty is **dropped,
-      not placeheld** — "unknown"/"untitled" adds fake meaning. The id is the uniqueness
-      guarantee (degenerate worst case `0712-12-resume.pdf`), and since `company` and `role` are
-      both `null: false` a segment only empties on an all-punctuation/emoji name.
-
-      **One archive-only trap:** rubyzip 3.4.1 writes the UTF-8 bytes but omits the EFS flag
-      (general-purpose bit 11) → mojibake in strict extractors; `Zip.unicode_names = true` in an
-      initializer sets it (once, at boot — thread-safe). Confirmed both facts against the gem.
-
-      **Home:** a shared `Application#download_basename(kind:)` returning
-      `{company}-{role}-{MMDD}-{id}-{kind}.pdf`, called by both `ApplicationsController` and
-      `AccountArchive#blob_path`. `MMDD` reads `resume_updated_at` / `cover_letter_updated_at`
-      (both in schema), falling back to `created_at` when a legacy row has the blob but not the
-      stamp.
-
-      Rails owns the fix on both surfaces — the Next proxy passes `Content-Disposition` straight
-      through, and SPEC.md § Exports already commits to the server being the one place that names
-      a file.
-- [x] **Throttle uploads, and cap applications per account** — operations, not a feature; the
-      field admission test deliberately does not apply. Nothing else in the repo defends the
-      data: the real job-search history — applications, timeline, resumes stored as bytea —
-      lives in one Railway Postgres, and **the Railway Hobby plan has no managed backups**
-      (confirmed 2026-07-11). The defence that already exists — the nightly `pg_dump` in the
-      private `karirkalyan-backups` repo (restore drill passed) and the full-account export —
-      is recorded in `CHANGELOG.md` (§ Backups, § v1.4.0); what remains open is this abuse
-      surface. `rack_attack.rb` throttles sign-in, the AI prefill and the account export (there
-      is no sign-up throttle because `v1.4.1` removed the endpoint), but **nothing throttles
-      the upload path** (`PATCH /applications/:id` with a resume or cover letter). The exposure
-      is smaller than it looks and it is worth being precise about why: an upload
-      **overwrites** — `applications.resume` is a single `bytea`, there is no version history —
-      and `Application::MAX_FILE_SIZE` caps each blob at 1 MB with a PDF content check. So a
-      client looping PATCH burns CPU and write I/O but its storage footprint stays flat at 2 MB
-      per application. **The unbounded axis is `POST /applications`**, which nothing caps: every
-      new application is another 2 MB of storage allowance, on a database whose whole backup story
-      is a nightly `pg_dump`. Two throttles, both per-account (the cost is a function of whose data
-      it is, not where the request came from — same reasoning as the export throttle, `CHANGELOG.md`
-      § v1.4.0): a write/upload cap, and a ceiling on applications per account. The per-account
-      pattern and the `429` responder already exist; this is a config change, not a design.
-
-      **Corrected 2026-07-17, in the building: half of that last sentence was wrong.** A
-      Rack::Attack throttle bounds a *rate over a window*, and every window resets — so any
-      positive rate integrates to unbounded total, and a throttle cannot express "a ceiling on
-      applications per account" at all. The upload cap was config as promised
-      (`applications/write`, 30/min + 300/hour per account). The ceiling was not: it shipped as
-      `Application::MAX_PER_USER` (200), a model validation on create, reporting through the
-      existing `validation_failed` envelope with detail code `too_many_applications` on field
-      `base` — the same shape the 1 MB upload cap uses. See `SPEC.md` § Security.
-- [x] **Make en/ja key parity a check, not a convention** *(added 2026-07-16 — `v1.4.3` found the
-      gap while adding four catalog keys)*. `CLAUDE.md` and this file both say parity must hold,
-      and **nothing enforces it**: no test, no CI step, and next-intl's type augmentation is not
-      wired up, so a key landing in `en.json` alone compiles, lints and builds clean. The
-      consequence is quiet rather than loud — `t.has()` means a miss degrades to status-keyed copy
-      instead of crashing — which is exactly why review will not reliably catch it: nothing is
-      visibly broken in the locale the reviewer reads. *(That sentence is **false**, and the
-      correction below is the record of it — a missing key does not degrade quietly, it renders the
-      key path on the page. The conclusion it reached happened to be right for a different reason.)*
-      A leaf-key diff of the two catalogs, failing
-      the `web/` job on any asymmetry, is a few lines and turns a rule held by discipline into one
-      held by CI. **Decide the counting convention when it is written**: the FSM reason chips
-      (`en.json` § `board`) are arrays, and dict-only counting versus counting array elements is
-      what made a docs audit report a false drift here. Whatever the check counts, it must count
-      the same thing on both sides — which is also why the hardcoded counts are gone from the docs.
-
-      **Corrected 2026-07-17, in the building:** the reason chips are `transitions.reasons.*`, not
-      `board` — `board` holds no arrays at all. Built as `web/scripts/check-i18n-parity.mjs`
-      (`npm run lint:i18n`), in the `verify` job ahead of the build. The convention it settled on:
-      **every path — containers as well as leaves, array elements counted individually**
-      (`transitions.reasons.ghosted[0]`), which makes a short array report its missing index rather
-      than hiding inside an opaque leaf. A script rather than a test because `web/` has no
-      unit-test runner. The catalogs were already at parity when it was written, so it landed
-      green; it is a ratchet, not a repair. See `SPEC.md` § i18n → Catalog parity is checked in CI.
-
-      **Corrected again 2026-07-17, by the review of this release — twice, and both are worth
-      keeping.** *The rationale above was wrong.* A missing `ja` key does **not** degrade to
-      fallback copy: `i18n/request.ts` loads exactly one catalog and sets no fallback locale, so
-      next-intl renders **the key path itself** — a Japanese reader gets the literal string
-      `dashboard.yourData` where a sentence belongs, and the only alarm is a `console.error` in a
-      server log nobody reads. Loudly broken, and CI called it fine. The silent-degradation story
-      is real but belongs to `apiFailure()`'s `t.has()` filter, which drops a missing *error* key
-      — a different path, conflated with this one. *And the shape check was dead code*: recording
-      only leaves meant a path that is a string in one catalog and an object in the other was never
-      a key on the object side, so the comparison short-circuited on `undefined`. Recording
-      containers is what makes it real, and is why the convention line above changed.
-
-      **The limit, learned the hard way in this same release:** it checks **symmetry, not
-      completeness**. A key missing from *both* catalogs is perfectly symmetric and passes — which
-      is exactly how the ceiling item above shipped with no copy at all, one commit after this
-      check landed. `SPEC.md` § i18n now says so where someone will read it.
-- [x] **Fold "Your data" into the profile card, and make the card a component** (`web/`-only).
-      The dashboard renders the same
-      `<section className="border border-dune bg-linen p-5">` twice: the **profile** block
-      (`web/app/[locale]/(app)/dashboard/page.tsx:54–76` — email, member since) and the **exports**
-      block (`:97–116` — eyebrow "Your data", the CSV and account-archive links), with the
-      `avg_days_to_offer` line (`:78–91`) wedged between them. They are one thought — *who you are,
-      and what you can take with you* — split across two cards by nothing but render order. Merge
-      the exports block into the profile card, and lift the result into
-      `web/app/components/profile-card.tsx` so `/settings` or an account page can import it later
-      rather than copy it.
-
-      **Two traps, both cheap to walk into:**
-
-      **The export links must not inherit the profile block's `{me && …}` gate.** The profile block
-      is conditional on `stats.user` and the exports block is not — if the merged card is gated as a
-      whole, a failed `/dashboard` fetch silently removes the *only* surface that honours
-      `/privacy`'s "getting your data out" promise, and it fails invisibly, in exactly the moment
-      the user most wants their data. Render the card's export half unconditionally, or keep the
-      export actions outside the gate.
-
-      **The component takes the user as a prop; it does not fetch one.** `page.tsx:11` reads
-      `stats.user` from the dashboard payload precisely so there is no second `/me` request — that
-      fold is what `v1.3.0` shipped. A component that fetches its own user re-introduces the request
-      the fold removed, on every page that imports it.
-
-      **One decision, not a mechanical move: the heading.** `dashboard.exports.eyebrow` is "Your
-      data" in EN but 「データの書き出し」 (*exporting data*) in JA — not a translation of each
-      other, and only the EN one reads as a card title. Merging under a single heading is a copy
-      decision in both locales, and whichever eyebrow loses becomes a dead catalog key to delete
-      (en/ja key parity holds and should stay that way).
-
-      **Built 2026-07-17. The heading decision: neither eyebrow survived as-is.** The card is
-      `dashboard.yourData` — "Your data" / 「あなたのデータ」 — which is the EN export eyebrow
-      promoted to name the whole card, and a *new* JA string, because 「データの書き出し」 means
-      *exporting data* and cannot head a card that opens with an email address. `dashboard.profile`
-      ("Profile" / 「プロフィール」) and `dashboard.exports.eyebrow` are both gone; `exports.blurb`,
-      `.csv` and `.archive` stay where they are. Catalogs went 346 → 345 keys, still at parity —
-      the check from the item above ran on this change, which is what it is for. The export half
-      renders outside the `{user && …}` gate as the trap above demands, and `ProfileCard` takes
-      `user` as a prop. `SPEC.md` § Exports → The download surface now carries both rules, so the
-      next person to touch this finds them in the spec rather than in this file.
-
-      Carry the two comments at `:93–96` and the `eslint-disable no-html-link-for-pages` lines with
-      the move — the export anchors are plain `<a>`s to `/api/exports/*` because those are API
-      routes, not localized pages, and that is a fact about the destination, not a style lapse.
 
 ---
 
