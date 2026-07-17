@@ -8,18 +8,24 @@ the section of the release that ships it. Four things happened on 2026-07-16: th
 cards joined `v1.9.0`; `v1.4.3` and the prefill paste fallback were added out of one prod bug;
 `v1.4.2`'s first two items closed and left the file; and `v1.4.3` itself closed entire, so its
 section left too. On 2026-07-17 `v1.4.3` was tagged and `v1.4.2` was skipped for good, which
-renumbered that section's four survivors to `v1.4.4`.
+renumbered that section's four survivors to `v1.4.4`; later the same day the stage filter took
+`v1.5.0`, and `v1.4.4`'s four items merged (PR #66) and are ticked below awaiting the tag.
 
-**Current release: `v1.4.3`** (2026-07-17). **`v1.4.4` is in flight** — all four of its items are
-written and sitting on `feat/v1.4.4`, ticked below with what each one learned in the building;
-`CHANGELOG.md` § v1.4.4 has the account. The section stays here, ticked rather than deleted, until
-the tag exists — the items leave this file on tagging day, the way `v1.4.2`'s first two did.
+**Current release: `v1.4.3`** (2026-07-17). **`v1.4.4` is merged and awaiting its tag** — all four
+items shipped in PR #66 (`d06cbbb`), ticked below with what each one learned in the building;
+`CHANGELOG.md` § v1.4.4 has the account. A **fifth** item shipped with them that was never scoped
+here: the review of those four found that **every Rack::Attack rate limit could be skipped by
+appending `.json` to the URL**, and had been skippable since the throttles landed — the sign-in
+endpoint, the app's only unauthenticated write, had no effective limit in production. It is not
+listed below because this file is open work and that work is done; `CHANGELOG.md` § v1.4.4 leads
+with it. The section stays here, ticked rather than deleted, until the tag exists — the items leave
+this file on tagging day, the way `v1.4.2`'s first two did.
 `v1.4.2` was **never tagged
 and never will be**: the prefill fix landed on `main` above its four unwritten items, which put
 two patches at one commit, and `v1.4.3` took the tag rather than make a production fix wait.
 `CHANGELOG.md` § v1.4.3 carries the full account. Those four items are now **`v1.4.4`** — same
 work, same patch level, one number further along; the gap at `v1.4.2` is permanent. With `v1.4.4`
-written, the nearest genuinely open work is `v1.5.0` — **the stage filter, scoped 2026-07-17**, which took
+merged, the nearest genuinely open work is `v1.5.0` — **the stage filter, scoped 2026-07-17**, which took
 the `v1.5.0` slot and slid every release below it one minor. What each shipped release contained
 is `CHANGELOG.md`'s job to say, not this file's.
 
@@ -71,7 +77,7 @@ one minor — the second such slide, on the same reasoning as the first.
 | --- | --- | --- |
 | ~~`v1.4.2`~~ | — | **Never tagged; the number is skipped.** Its written half — the `ListQuery` extraction, the API base rename, the privacy/doc-drift fix — shipped inside `v1.4.3`; its unwritten half is `v1.4.4` below |
 | `v1.4.3` | patch | **Shipped 2026-07-17.** Prefill: IPv4-first address pinning, and an error taxonomy that stops blaming the user's URL — plus everything `v1.4.2` had written by then. See `CHANGELOG.md` |
-| `v1.4.4` | patch | Download filenames, upload throttle, en/ja key parity as a CI check, the profile-card fold — `v1.4.2`'s four open items, renumbered when its tag was skipped |
+| `v1.4.4` | patch | **Merged 2026-07-17, awaiting the tag.** Download filenames, upload throttle + a per-account ceiling, en/ja key parity as a CI check, the profile-card fold — `v1.4.2`'s four open items, renumbered when its tag was skipped — plus the `.json` throttle bypass the review of them found |
 | `v1.5.0` | minor | The stage filter: multi-select status chips on the dashboard list, on by default, with "hide inactive" and friends — plus `active_states` on `/transitions` |
 | `v1.6.0` | minor | The pocket app: share-sheet capture, passkey sign-in, push digest, installed-app shell — **plus the prefill paste fallback the share sheet needs** |
 | `v1.7.0` | minor | The Japan market layer: recruiter channel + `agencies`, 年収 comp structure, Japanese-level filter |
@@ -226,7 +232,10 @@ migration, and the previous image boots against an unchanged database.
       wired up, so a key landing in `en.json` alone compiles, lints and builds clean. The
       consequence is quiet rather than loud — `t.has()` means a miss degrades to status-keyed copy
       instead of crashing — which is exactly why review will not reliably catch it: nothing is
-      visibly broken in the locale the reviewer reads. A leaf-key diff of the two catalogs, failing
+      visibly broken in the locale the reviewer reads. *(That sentence is **false**, and the
+      correction below is the record of it — a missing key does not degrade quietly, it renders the
+      key path on the page. The conclusion it reached happened to be right for a different reason.)*
+      A leaf-key diff of the two catalogs, failing
       the `web/` job on any asymmetry, is a few lines and turns a rule held by discipline into one
       held by CI. **Decide the counting convention when it is written**: the FSM reason chips
       (`en.json` § `board`) are arrays, and dict-only counting versus counting array elements is
@@ -236,11 +245,28 @@ migration, and the previous image boots against an unchanged database.
       **Corrected 2026-07-17, in the building:** the reason chips are `transitions.reasons.*`, not
       `board` — `board` holds no arrays at all. Built as `web/scripts/check-i18n-parity.mjs`
       (`npm run lint:i18n`), in the `verify` job ahead of the build. The convention it settled on:
-      **every leaf path, array elements counted individually** (`transitions.reasons.ghosted[0]`),
-      which makes a short array report its missing index rather than hiding inside an opaque leaf.
-      A script rather than a test because `web/` has no unit-test runner. The catalogs were already
-      at parity when it was written — 346 keys, both sides — so it landed green; it is a ratchet,
-      not a repair. See `SPEC.md` § i18n → Catalog parity is checked in CI.
+      **every path — containers as well as leaves, array elements counted individually**
+      (`transitions.reasons.ghosted[0]`), which makes a short array report its missing index rather
+      than hiding inside an opaque leaf. A script rather than a test because `web/` has no
+      unit-test runner. The catalogs were already at parity when it was written, so it landed
+      green; it is a ratchet, not a repair. See `SPEC.md` § i18n → Catalog parity is checked in CI.
+
+      **Corrected again 2026-07-17, by the review of this release — twice, and both are worth
+      keeping.** *The rationale above was wrong.* A missing `ja` key does **not** degrade to
+      fallback copy: `i18n/request.ts` loads exactly one catalog and sets no fallback locale, so
+      next-intl renders **the key path itself** — a Japanese reader gets the literal string
+      `dashboard.yourData` where a sentence belongs, and the only alarm is a `console.error` in a
+      server log nobody reads. Loudly broken, and CI called it fine. The silent-degradation story
+      is real but belongs to `apiFailure()`'s `t.has()` filter, which drops a missing *error* key
+      — a different path, conflated with this one. *And the shape check was dead code*: recording
+      only leaves meant a path that is a string in one catalog and an object in the other was never
+      a key on the object side, so the comparison short-circuited on `undefined`. Recording
+      containers is what makes it real, and is why the convention line above changed.
+
+      **The limit, learned the hard way in this same release:** it checks **symmetry, not
+      completeness**. A key missing from *both* catalogs is perfectly symmetric and passes — which
+      is exactly how the ceiling item above shipped with no copy at all, one commit after this
+      check landed. `SPEC.md` § i18n now says so where someone will read it.
 - [x] **Fold "Your data" into the profile card, and make the card a component** (`web/`-only).
       The dashboard renders the same
       `<section className="border border-dune bg-linen p-5">` twice: the **profile** block
