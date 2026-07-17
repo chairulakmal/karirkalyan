@@ -65,6 +65,7 @@
     "companyRoleRequired": "Company and role are required.",
     "chooseFile": "Choose a PDF file.",
     "urlRequired": "Paste a job posting URL first.",
+    "pasteRequired": "Paste the posting text first.",
     "invalidCredentials": "That email and password don't match an account.",
     "code": {
       "unauthenticated": "Your session is no longer valid. Sign in again to continue.",
@@ -75,10 +76,11 @@
       "invalid_transition": "That status change isn't allowed from the current status.",
       "validation_failed": "Those details couldn't be saved. Check the form and try again.",
       "invalid_url": "That couldn't be read as a job posting URL.",
-      "prefill_blocked": "That site blocks automated readers, so the posting couldn't be fetched. Fill in the details manually.",
+      "prefill_blocked": "That site blocks automated readers, so the posting couldn't be fetched from here.",
       "rate_limited": "Too many requests. Wait a moment and try again.",
       "prefill_unreachable": "That page couldn't be reached. Check it opens in your browser, then try again.",
-      "prefill_failed": "The job posting couldn't be read. Fill in the details manually.",
+      "prefill_failed": "No job posting could be read from that.",
+      "prefill_paste_too_long": "That posting is too long to read in one go, even once its formatting is stripped. Trim it and try again.",
       "prefill_unavailable": "URL pre-fill is temporarily unavailable."
     },
     "field": {
@@ -377,6 +379,11 @@
     "prefillButton": "Pre-fill with AI",
     "prefillHint": "Paste a Wantedly, LinkedIn, or company posting — Claude reads Japanese too. Review the fields before saving.",
     "prefillDone": "Filled from the posting — review and edit before saving.",
+    "pasteLabel": "Or paste the posting yourself",
+    "pasteHint": "That page can't be read from here, but you can. Open it in your browser, select the posting, and paste it below — Claude reads the text the same way either way.",
+    "pastePlaceholder": "Paste the job posting text…",
+    "pasteButton": "Pre-fill from the paste",
+    "pasteCounter": "{count} characters pasted",
     "company": "Company",
     "role": "Role",
     "status": "Status",

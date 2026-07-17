@@ -5,25 +5,37 @@ require "uri"
 require "cgi"
 
 module Applications
-  # Fetches a job-posting URL, strips it to text, and asks Claude to pull out
-  # the company, role, and a short notes summary. Returns a plain hash — the
-  # caller (and ultimately the user) reviews the values before anything is saved.
+  # Turns a job posting into { company, role, notes } with Claude. Returns a plain
+  # hash — the caller (and ultimately the user) reviews the values before anything
+  # is saved.
+  #
+  # The pipeline is fetch -> to_text -> extract, and there are two ways in:
+  #   url:  the whole pipeline. The only path that can be refused by a site.
+  #   text: the user pasted the posting, so the fetch is skipped and the same
+  #         to_text -> extract tail runs on it. See #call_on_paste.
+  #
+  # The class keeps its name: a URL is still the primary source, and the paste is
+  # the fallback for when that source is unreachable — not a co-equal mode.
   #
   # Claude reads Japanese postings natively, so this works across Wantedly,
   # Greenhouse, and company career pages without a per-site parser.
   #
   # Errors are typed so the controller can tell the user which of these happened.
   # They ask the user for different things, so reporting one as another is a lie:
-  #   InvalidUrlError  -> 422 invalid_url         (the URL is the problem — never fetched)
-  #   BlockedError     -> 422 prefill_blocked     (the site refuses automated readers)
-  #   FetchError       -> 502 prefill_unreachable (couldn't get the page; a retry may help)
-  #   UnreadableError  -> 502 prefill_failed      (got the page, found no text in it)
-  #   ExtractionError  -> 502 prefill_failed      (Claude call failed or returned nothing usable)
-  #   ConfigError      -> 503 prefill_unavailable (ANTHROPIC_API_KEY not set)
+  #   InvalidUrlError   -> 422 invalid_url           (the URL is the problem — never fetched)
+  #   BlockedError      -> 422 prefill_blocked       (the site refuses automated readers)
+  #   PasteTooLongError -> 422 prefill_paste_too_long (the paste exceeds the cap once stripped)
+  #   FetchError        -> 502 prefill_unreachable   (couldn't get the page; a retry may help)
+  #   UnreadableError   -> 502 prefill_failed        (got the page, found no text in it)
+  #   ExtractionError   -> 502 prefill_failed        (Claude call failed or returned nothing usable)
+  #   ConfigError       -> 503 prefill_unavailable   (ANTHROPIC_API_KEY not set)
   class UrlPrefillService
     class Error < StandardError; end
     class InvalidUrlError < Error; end
     class FetchError      < Error; end
+    # Only the paste path raises this. A fetched page over the cap is truncated in
+    # silence (see #capped) — the difference is whether the user watched us read it.
+    class PasteTooLongError < Error; end
     # A failed fetch, so it subclasses FetchError — which obliges the controller to
     # rescue it *first*. That ordering is not decoration: a base class rescued ahead
     # of its subclass is the exact bug this taxonomy exists to fix.
@@ -83,12 +95,19 @@ module Applications
       a blank line, then the rest of the summary.
     PROMPT
 
-    def initialize(url, client: nil)
-      @raw_url = url.to_s.strip
-      @client  = client
+    def initialize(url = nil, text: nil, client: nil)
+      @raw_url  = url.to_s.strip
+      @raw_text = text.to_s
+      @client   = client
     end
 
     def call
+      # Text wins over URL, because the only reason to paste is that the URL has
+      # already failed. Blank text is not a paste — it is a field nobody filled in —
+      # so it falls through to the URL path, and a request carrying neither ends at
+      # validated_uri's InvalidUrlError: we were given nothing to read.
+      return call_on_paste if @raw_text.present?
+
       uri = validated_uri
       # Fail before the fetch, not after it. A server with no API key would
       # otherwise spend the full SSRF-guarded round trip — up to 13s of timeouts —
@@ -96,13 +115,48 @@ module Applications
       client
 
       html = fetch(uri)
-      text = to_text(html)
+      text = capped(to_text(html))
       raise UnreadableError, "That page had no readable text to work with." if text.blank?
 
       extract(text).merge(url: uri.to_s)
     end
 
     private
+
+    # The recovery path for a posting the fetcher cannot read. Only `fetch` ever
+    # failed — `to_text` and `extract` never knew where their text came from — so
+    # this is a second door into the same pipeline, not a second pipeline.
+    #
+    # Nothing is dialled here, so nothing is guarded: the SSRF defence exists
+    # because *we* fetch a user-supplied URL, and on this path the user fetched the
+    # page themselves, in their own browser, as themselves. That is also why this
+    # is not circumvention of a site that refused us — we are not asking it again.
+    #
+    # The URL is echoed back unfetched, so a posting pasted after a block still
+    # records where it came from.
+    def call_on_paste
+      client
+
+      # Byte-capped and scrubbed exactly like a fetched body, for exactly the
+      # reason the fetch path documents: a cut landing mid-character makes every
+      # gsub in to_text raise ArgumentError, and Japanese is 3 bytes a character.
+      # It also bounds that regex work on a body whose size the user chose.
+      text = to_text(@raw_text.byteslice(0, MAX_BODY_BYTES).to_s.scrub)
+      raise UnreadableError, "That paste had no readable text in it." if text.blank?
+
+      # Refused, not truncated — the one place the two entry points diverge past
+      # the front door. The server is the only party that can measure this: the cap
+      # counts *stripped* characters, so a browser counting the raw paste would
+      # block a view-source dump that strips to a third of its size. Deciding it
+      # here is what lets the form stay out of the business of guessing.
+      if text.length > MAX_TEXT_CHARS
+        raise PasteTooLongError,
+              "That paste is #{text.length} characters once formatting is stripped, " \
+              "and the limit is #{MAX_TEXT_CHARS}. Trim it and try again."
+      end
+
+      extract(text).merge(url: @raw_url)
+    end
 
     def validated_uri
       raise InvalidUrlError, "Paste a job posting URL first." if @raw_url.blank?
@@ -251,6 +305,9 @@ module Applications
         BLOCKED_RANGES.any? { |range| range.include?(ip) }
     end
 
+    # Strips markup to text. Deliberately *uncapped* — the cap is applied by the
+    # caller, because the two entry points owe the user different things when the
+    # text is too long. See #capped and #call_on_paste.
     def to_text(html)
       text = html.dup
       text.gsub!(%r{<script\b[^>]*>.*?</script>}mi, " ")
@@ -260,6 +317,14 @@ module Applications
       text = CGI.unescapeHTML(text)
       text.gsub!(/\s+/, " ")
       text.strip!
+      text.to_s
+    end
+
+    # The fetched path truncates in silence, and that stays true: nobody watched us
+    # read that page, the user never saw its length, and a posting has said what it
+    # needs to well before 12k of stripped text. A paste is the opposite case — the
+    # user assembled it and can see it — so #call_on_paste refuses instead.
+    def capped(text)
       text[0, MAX_TEXT_CHARS].to_s
     end
 

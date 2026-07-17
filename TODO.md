@@ -195,21 +195,30 @@ The capture flow and the shell are the release — they are what changes the use
       `posting_snapshot` the same way a fetched one does — the snapshot's value is that
       extractions are re-runnable, and that is truer for postings that can never be re-fetched.
 
-      **First task, and it is a prerequisite, not a detail:** `PrefillResult`'s failure arm in
-      `web/app/lib/actions.ts` declares only `{ ok: false; error: string }`, while `apiFailure`
-      actually returns `code` and `status` alongside it. The signal `v1.4.3` created reaches the
-      server action and is then thrown away by the type, so nothing in `web/` can branch on
-      `prefill_blocked` today. Widening that arm is what makes both this item and a
-      `prefill_unreachable`-only Retry button possible. It was deliberately not done in `v1.4.3`:
-      a `code` field no caller reads is dead weight, and the branch that reads it is the
-      capability that makes this a minor.
+      **Both scoping decisions are settled (2026-07-17), and the prerequisite is done** — in
+      flight on `feat/v1.6.0-paste-fallback`. `SPEC.md` § `UrlPrefillService` is the source of
+      truth for all three; recorded here only so the next reader does not re-open them:
 
-      **Two things to decide when it is scoped, not in QA:** whether the textarea is always
-      available or only appears after a fetch fails (always-on invites manual entry where the URL
-      would have worked; error-only hides the escape hatch until the user has already been told
-      no), and whether `MAX_TEXT_CHARS` (12,000) is enforced client-side with a visible counter —
-      a pasted page is trivially longer than a stripped one, and silently truncating someone's
-      paste at 12k is a worse lie than the error message this release is fixing.
+      - **The prerequisite — `PrefillResult`'s failure arm — is widened.** It declared only
+        `{ ok: false; error: string }` while `apiFailure` had always returned `code` and `status`
+        alongside it, so the signal `v1.4.3` created reached the server action and was thrown away
+        by the type. It is now `ActionFailure`, and the form branches on `code`.
+      - **The textarea is error-only, on `prefill_blocked` *and* `prefill_failed`** — not
+        `prefill_blocked` alone. Both describe a page the user can see and the fetcher cannot: a
+        refusal, or a login wall / SPA shell that yielded no posting. A login-walled LinkedIn
+        posting — the likeliest phone case — returns `prefill_failed`, so the narrower reading
+        would have shown no escape hatch on exactly the failure the box exists for.
+        `prefill_unreachable` keeps the Pre-fill button as its retry, and `invalid_url` gets
+        nothing. Always-on was rejected: it invites manual entry where the URL would have worked.
+      - **`MAX_TEXT_CHARS` is enforced on the server, which refuses an over-cap paste
+        (`prefill_paste_too_long`) instead of truncating it.** The browser shows an informational
+        count and blocks nothing. A client-side cap was scoped first and **reversed during review**,
+        because it silently mirrored three claims while copying only one: the cap counts *stripped*
+        characters, so counting the raw paste would have refused a view-source dump that strips to a
+        third of its size — the very case SPEC promises works — and `.length`'s UTF-16 code units
+        would have scored an emoji 2 in a Japanese-language app. `MAX_FILE_BYTES`' spare-the-round-trip
+        precedent does not transfer: a file's size is a number the browser can compute, and this one
+        is not. The mirrored TypeScript constant was deleted rather than fixed.
 - [ ] **Passkey sign-in.** WebAuthn via `webauthn-ruby` hand-wired into Devise (the
       `devise-passkeys` gem is not mature enough to lean on), with an additive nullable
       `credentials` table — still a minor by the mechanical test. The provider chain is Chrome →

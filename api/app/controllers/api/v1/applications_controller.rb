@@ -38,11 +38,21 @@ module Api
         }
       end
 
-      # POST /api/v1/applications/prefill — extracts company/role/notes from a
-      # pasted job-posting URL via Claude. Returns the fields for the user to
-      # review and edit in the new-application form; nothing is persisted here.
+      # POST /api/v1/applications/prefill — extracts company/role/notes from a job
+      # posting via Claude. Returns the fields for the user to review and edit in
+      # the new-application form; nothing is persisted here.
+      #
+      # Takes `url` (fetch it) or `text` (the user pasted it, because the fetch was
+      # refused or found no posting). The service prefers `text` when both arrive —
+      # nobody pastes a posting whose URL already worked.
       def prefill
-        fields = Applications::UrlPrefillService.new(params[:url]).call
+        # `text` is only a paste if it is a string. A JSON object arrives as
+        # ActionController::Parameters, whose #to_s is a hash inspection — which is
+        # `present?`, so it would sail past the paste branch and be billed to us as
+        # a Claude call on garbage. `url` needs no such guard: anything that isn't a
+        # URL dies in validated_uri. This one has no backstop, so it gets one here.
+        text   = params[:text].is_a?(String) ? params[:text] : nil
+        fields = Applications::UrlPrefillService.new(params[:url], text: text).call
         render json: fields
       # Order matters twice over: BlockedError subclasses FetchError, and every
       # class here subclasses Error. The base-class rescue stays last and now
@@ -56,6 +66,8 @@ module Api
         render_error(e.message, code: "prefill_failed", status: :bad_gateway)
       rescue Applications::UrlPrefillService::BlockedError => e
         render_error(e.message, code: "prefill_blocked", status: :unprocessable_entity)
+      rescue Applications::UrlPrefillService::PasteTooLongError => e
+        render_error(e.message, code: "prefill_paste_too_long", status: :unprocessable_entity)
       rescue Applications::UrlPrefillService::FetchError => e
         render_error(e.message, code: "prefill_unreachable", status: :bad_gateway)
       rescue Applications::UrlPrefillService::Error => e

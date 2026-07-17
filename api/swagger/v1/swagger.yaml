@@ -131,7 +131,7 @@ paths:
               - application
   "/api/v1/applications/prefill":
     post:
-      summary: Pre-fill application fields from a job URL (AI extraction)
+      summary: Pre-fill application fields from a job posting (AI extraction)
       tags:
       - Applications
       security:
@@ -141,8 +141,7 @@ paths:
         '200':
           description: extracted fields returned for the user to review
         '422':
-          description: the URL is unusable (invalid_url), or the site refused an automated
-            reader (prefill_blocked)
+          description: the paste exceeds the cap once stripped (prefill_paste_too_long)
         '502':
           description: the page could not be fetched (prefill_unreachable), or it
             was fetched and yielded no posting (prefill_failed)
@@ -159,8 +158,19 @@ paths:
                 url:
                   type: string
                   example: https://example.com/jobs/42
-              required:
-              - url
+                  description: The posting URL to fetch, strip, and extract. Supply
+                    this or `text`.
+                text:
+                  type: string
+                  example: Backend Engineer at Mercari. Tokyo, full-time. Ruby, Go…
+                  description: The posting text, already fetched by the user — use
+                    when `url` came back `prefill_blocked` or `prefill_failed`. Skips
+                    the fetch and runs the same extraction. Must be under 12,000 characters
+                    (`MAX_TEXT_CHARS`) **once stripped to text**, which is far more
+                    than 12,000 characters of markup allows; an over-cap paste is
+                    refused as `prefill_paste_too_long` rather than truncated. Takes
+                    precedence over `url`, which is then echoed back unfetched. Ignored
+                    unless it is a JSON string.
   "/api/v1/applications/{id}":
     parameters:
     - name: id

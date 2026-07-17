@@ -32,13 +32,13 @@ Two consequences worth stating plainly:
   [`CHANGELOG.md`](CHANGELOG.md), including the pre-1.0.0 build phases that used to sit at the
   top of this file.
 
-Last synced against the code: **2026-07-17**, `v1.5.1` — § The transition table now
-records that `terminal_states` and `entry_states` are **consumed**, not just served: the status
-help's "permanent" badge and the irreversibility warning on both confirms read the former off the
-fetched table, where they used to read a TypeScript copy of `ApplicationFSM::TERMINAL_STATES`, and
-the new-application form builds its status picker from the latter, where it used to hardcode
-`ENTRY_STATES`' three options. Both were found together: they are the same bug in the same
-payload, and fixing only the one the audit named would have left the other to be re-discovered.
+Last synced against the code: **2026-07-17**, `v1.6.0` (in flight) — § `UrlPrefillService` gains a
+**second entry point**: the posting text can arrive pasted instead of fetched. Only `fetch` ever
+failed, and `extract` never knew where its text came from, so the paste enters the existing
+`to_text → extract` tail rather than forking a second pipeline. The failure codes `v1.4.3` typed
+are what make it targetable — `prefill_blocked` and `prefill_failed` are the two the paste box
+cures, and § Server-side error messages now records that `web/` reads the `code` rather than
+inferring recoverability from prose.
 Every **FSM rule the UI applies** is now fetched. The sets `web/` still names for itself decide
 presentation and affordance rather than what the FSM permits — `COLUMN_ORDER` ranks the board's
 columns whose *membership* is fetched, `CONFIRM_REQUIRED` and `REVIVAL_STATES` choose which moves
@@ -449,7 +449,37 @@ user to review and edit. Nothing is persisted. The AI fills the form; it does no
 
 The service fetches the page, strips HTML to text, and asks Claude — via the official `anthropic`
 gem — for structured fields through a tool/JSON schema, so the result is typed rather than free
-text to be parsed. **Model: Claude Haiku 4.5.** Extraction is a small, well-defined job; the
+text to be parsed.
+
+**Two entry points, one pipeline.** The pipeline is `fetch → to_text → extract`, and `POST
+/applications/prefill` accepts either `url` or `text`:
+
+- **`url`** — the whole pipeline. This is the path that can be refused.
+- **`text`** — the user pasted the posting themselves, so the fetch is skipped and the *same*
+  `to_text → extract` tail runs on what they pasted. `extract` takes text and knows nothing about
+  where it came from, which is why this is a second entry point and not a second pipeline: no new
+  infrastructure, no per-source branching past the front door, and no circumvention of a site that
+  refused us — the user fetched the page themselves, in their own browser, as themselves.
+
+`text` wins if both arrive, because the user only pastes after the URL has already failed. Neither
+one present is still `invalid_url` ("Paste a job posting URL first") — the request supplied nothing
+to work with. **Pasted text goes through `to_text` rather than around it**: it inherits the same
+byte-cap-then-`scrub`, the same tag-strip (a paste from *view-source* works), the same whitespace
+collapse, and the same `MAX_TEXT_CHARS` ceiling — one text-conditioning rule, not one per source.
+
+**The paste box is not offered on every failure, and that is the point of the taxonomy.** It is
+shown on exactly the two codes it cures — `prefill_blocked` (the site refuses automated readers)
+and `prefill_failed` (we reached the page and it yielded no posting: a login wall, an SPA shell, a
+challenge interstitial). A `prefill_unreachable` gets a **Retry** instead, because a paste would be
+manual work for a URL that may well answer on a second try, and `invalid_url` gets neither —
+nothing is wrong except the URL. Before `v1.4.3` typed these, every failure arrived as
+`invalid_url` and a paste box shown on all of them would have been noise on three failures out of
+four.
+
+The **near-zero-manual-entry test** in `TODO.md` § Standing rules is not in tension with this. That
+test refuses a paste field *replacing* free capture at prefill time; this one competes with **no
+capture at all**, because the fetch is impossible rather than merely unattempted. Same widget,
+opposite question. **Model: Claude Haiku 4.5.** Extraction is a small, well-defined job; the
 cheapest fast model is the right tool, and a typical posting costs a fraction of a cent. Claude
 specifically because it reads Japanese postings natively — the same flow works on a Wantedly
 listing, a Greenhouse page, or a company careers page without a parser per site. For a Tokyo job
@@ -486,16 +516,52 @@ Because the server fetches a user-supplied URL, the SSRF guard is load-bearing:
 - Body-size cap on the fetch; character cap on the text sent to Claude. The body is `scrub`bed
   after the byte-cap: `byteslice` is byte-indexed, Japanese text is three bytes a character, and a
   cut landing mid-character makes every later `gsub` raise `ArgumentError` — an untyped `500` on
-  exactly the postings this service exists to read.
+  exactly the postings this service exists to read. **A paste is byte-capped and `scrub`bed the
+  same way before `to_text`**, for the same reason and with the same constant: it bounds the
+  regex work on a body the user chose the size of.
+
+**The fetch truncates at `MAX_TEXT_CHARS` (12,000); the paste refuses.** That is the one place the
+two entry points diverge past the front door, and the difference is whether the user watched us
+read it. A fetched page over the cap is cut by `#capped` in silence — nobody saw its length, and a
+posting has said what it needs to well before 12k of stripped text. A paste is something the user
+assembled and can see, so cutting it silently would tell them their whole posting reached Claude
+when a third of it did. `PasteTooLongError` → `prefill_paste_too_long` instead, naming the real
+figure.
+
+**The cap is measured server-side, and the browser deliberately does not mirror it.** The ceiling
+applies to *stripped* text, and only the server has stripped it: a view-source paste is routinely
+3× its own stripped length, so a form counting the raw paste would refuse postings that sail
+through whole. `MAX_FILE_BYTES`' spare-the-round-trip logic does not transfer, because a file's
+size is a number the browser can actually compute and this one is not. The paste box therefore
+shows an **informational** character count with no limit attached and blocks nothing; the server
+owns the decision, because it is the only party that can make it correctly.
+
+Two consequences worth stating, since both look like oversights:
+
+- **The counter counts codepoints** (`[...posting].length`), not `.length`'s UTF-16 code units.
+  Ruby's cap counts codepoints, an emoji scores 2 under `.length`, and this app is full of
+  Japanese — a code-unit count would match neither what the user sees nor what the server does.
+- **`errors.code.prefill_paste_too_long` does not name the number**, following
+  `base_too_many_applications` (§ Server-side error messages) rather than `resume_too_long`. Here
+  it is not only the drift argument: the count the user can see is the *raw* paste, and the limit
+  applies to the stripped text, so quoting "12,000" beside a counter reading 16,800 would invite
+  exactly the wrong comparison. The English sentence from the API names both real figures; the
+  localized copy says it is too long and to trim it.
 
 Rate limits are enforced per-IP *and* per-account — see Security.
 
 Errors are typed so that each one tells the user a different true thing, and the mapping is the
 whole point of the taxonomy: `InvalidUrlError` → `invalid_url` (your URL is the problem — fix it),
 `BlockedError` → `prefill_blocked` (the site refuses automated readers; nothing to fix),
+`PasteTooLongError` → `prefill_paste_too_long` (the paste is over the cap once stripped — trim it),
 `FetchError` → `prefill_unreachable` (check the page is live, then retry), `UnreadableError` and
 `ExtractionError` → `prefill_failed` (we read the page, it yielded no posting), `ConfigError` →
 `prefill_unavailable`. Statuses are in § Error codes. The user can always fill the form in by hand.
+
+**`prefill_failed`'s copy names no source**, because both entry points reach it: a fetched page
+that yielded no posting and a paste with no readable text in it raise the same `UnreadableError`.
+Copy that said "that page couldn't be read" would be telling someone who had just pasted a posting
+about a page nobody fetched.
 
 Two edges of that mapping are deliberate. **An extraction where every field comes back empty is an
 `ExtractionError`, not a `200`** — Claude read the page and found no posting in it, so rendering a
@@ -763,7 +829,7 @@ DELETE /api/v1/auth/account                       204, erases the account and ev
 
 GET    /api/v1/applications                       cursor-paginated
 POST   /api/v1/applications                       status must be in ENTRY_STATES
-POST   /api/v1/applications/prefill               AI URL pre-fill (Claude Haiku 4.5)
+POST   /api/v1/applications/prefill               AI pre-fill (Claude Haiku 4.5); `url` or `text`
 GET    /api/v1/applications/:id                   + valid_next_states, + timeline_entries
 PATCH  /api/v1/applications/:id
 DELETE /api/v1/applications/:id
@@ -802,6 +868,7 @@ its own (a `409` is retryable, a `422` is not), but the code is what clients sho
 | `invalid_url` | `422` | The pre-fill URL itself is the problem — malformed, a port other than 80/443, or a private/internal address. Never fetched (`InvalidUrlError`) |
 | `prefill_blocked` | `422` | The site refused an automated reader — `401`/`403`, or a `cf-mitigated` header on any status. The URL is fine and retrying will not help (`BlockedError`). An upstream `429` is deliberately *not* this: it is the one refusal that lifts, so it resolves to `prefill_unreachable` and the user is told to retry |
 | `rate_limited` | `429` | Rack::Attack throttle; `Retry-After` header set |
+| `prefill_paste_too_long` | `422` | A pasted posting exceeds `MAX_TEXT_CHARS` (12,000) **once stripped to text** (`PasteTooLongError`). Only the paste path raises it — a fetched page over the cap is truncated in silence, because the user never saw its length. Measured server-side on purpose: the browser cannot know the stripped length without a second copy of `to_text` |
 | `prefill_unreachable` | `502` | The pre-fill page could not be fetched — DNS, connect, TLS, timeout, redirect loop, or an HTTP error the site did not refuse us with (`FetchError`) |
 | `prefill_failed` | `502` | The page was fetched but yielded nothing usable — no readable text (`UnreadableError`), or the Claude call failed or came back empty (`ExtractionError`) |
 | `prefill_unavailable` | `503` | `ANTHROPIC_API_KEY` missing — the rest of the app keeps working |
@@ -1825,6 +1892,17 @@ An upstream failure resolves to localized copy in this order — first hit wins:
    codes added to the API before the catalog learns them, and route-handler-synthesized
    errors that carry no code.
 4. `errors.unknown`.
+
+**The `code` also decides what recovery is offered, not just which sentence is shown.** Two
+failures can both be "the pre-fill didn't work" and still want different things from the user, so
+`web/` branches on the code rather than the prose: `prefill_blocked` and `prefill_failed` open the
+paste box (§ `UrlPrefillService`), `prefill_unreachable` leaves the Pre-fill button to be pressed
+again, `invalid_url` offers neither. This is why the failure arms of the action types carry
+`code`/`status` at all — `ActionFailure` has always returned them, and a result type that narrowed
+them away would throw the signal out at the door, which is what `PrefillResult` did until
+`v1.6.0`. **Never branch on the `error` sentence**: it is prose, it is translated, and the codes
+exist precisely so nobody has to parse it. The same rule already governs the `409` / `stale_record`
+optimistic-lock recovery.
 
 Nothing ever string-matches the English `error` sentence — the codes exist precisely so no
 one has to parse prose. Codes are append-only on the API side, and step 3 means an unknown

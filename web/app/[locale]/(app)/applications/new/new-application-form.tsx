@@ -1,14 +1,43 @@
 "use client";
 
 import { useState, useTransition } from "react";
-import { useTranslations } from "next-intl";
-import { createApplication, prefillFromUrl } from "@/app/lib/actions";
+import { useLocale, useTranslations } from "next-intl";
+import { createApplication, prefillFromText, prefillFromUrl } from "@/app/lib/actions";
+import type { PrefillResult } from "@/app/lib/actions";
 import { fileSizeMb, MAX_FILE_BYTES } from "@/app/lib/files";
 import { Field } from "@/app/components/field";
 import type { Status } from "@/app/lib/types";
 
+/* The two failure codes a paste actually cures, and the reason the error
+   taxonomy was typed in the first place. `prefill_blocked` is a site refusing an
+   automated reader; `prefill_failed` is us reaching the page and finding no
+   posting in it — a login wall, an SPA shell, a challenge interstitial. Both
+   describe a page the user can see and we cannot, which is precisely what a paste
+   fixes.
+
+   The two absent codes are the point. `prefill_unreachable` may well answer on a
+   second try, so it keeps the Pre-fill button as its retry rather than demanding
+   the user hand-carry a page that was never refused; `invalid_url` means the URL
+   is wrong, and pasting a posting would not make it right. Offering the box on
+   all four would be noise on half of them. */
+type PrefillCode =
+  | "invalid_url"
+  | "prefill_blocked"
+  | "prefill_failed"
+  | "prefill_unreachable"
+  | "prefill_paste_too_long"
+  | "prefill_unavailable";
+
+/* Typed on the way in so a typo cannot compile, widened on the way out so `.has`
+   still takes the `string | undefined` an ActionFailure carries. */
+const PASTE_CURES: ReadonlySet<string> = new Set<PrefillCode>([
+  "prefill_blocked",
+  "prefill_failed",
+]);
+
 export function NewApplicationForm({ entryStates }: { entryStates: Status[] }) {
   const t = useTranslations("newApplication");
+  const locale = useLocale();
   const [error, setError] = useState<string | null>(null);
   const [pending, startTransition] = useTransition();
 
@@ -35,6 +64,32 @@ export function NewApplicationForm({ entryStates }: { entryStates: Status[] }) {
   const [prefillError, setPrefillError] = useState<string | null>(null);
   const [prefilled, setPrefilled] = useState(false);
 
+  // The escape hatch stays shut until a failure the paste can actually cure. It
+  // never closes again on its own: once the user has been told no, hiding their
+  // way out from under them is worse than a little clutter.
+  const [pasteOpen, setPasteOpen] = useState(false);
+  const [posting, setPosting] = useState("");
+
+  /* Informational, and deliberately not a limit. The cap is on the *stripped*
+     text, which only the server can measure — counting the raw paste here would
+     block a view-source dump that strips to a third of its length, and MAX_FILE_BYTES'
+     spare-the-round-trip logic does not transfer to a number the client cannot
+     compute. So the server refuses an over-cap paste (`prefill_paste_too_long`)
+     with the real figure, and this only tells the user how much they pasted.
+
+     Spread, not `.length`: that counts UTF-16 code units, so an emoji scores 2 and
+     a Japanese posting's count would be a number matching nothing the user or the
+     server can see. Ruby counts codepoints, and this is a Japanese-language app. */
+  const pastedChars = [...posting].length;
+
+  function applyPrefill(result: Extract<PrefillResult, { ok: true }>) {
+    if (result.company) setCompany(result.company);
+    if (result.role) setRole(result.role);
+    if (result.notes) setNotes(result.notes);
+    if (result.url) setUrl(result.url);
+    setPrefilled(true);
+  }
+
   function onPrefill() {
     setPrefillError(null);
     setPrefilled(false);
@@ -42,13 +97,25 @@ export function NewApplicationForm({ entryStates }: { entryStates: Status[] }) {
       const result = await prefillFromUrl(url);
       if (!result.ok) {
         setPrefillError(result.error);
+        // Branching on `code`, never on the sentence — the codes exist so nobody
+        // has to parse prose, and the prose is translated besides.
+        if (result.code && PASTE_CURES.has(result.code)) setPasteOpen(true);
         return;
       }
-      if (result.company) setCompany(result.company);
-      if (result.role) setRole(result.role);
-      if (result.notes) setNotes(result.notes);
-      if (result.url) setUrl(result.url);
-      setPrefilled(true);
+      applyPrefill(result);
+    });
+  }
+
+  function onPrefillFromPaste() {
+    setPrefillError(null);
+    setPrefilled(false);
+    startPrefill(async () => {
+      const result = await prefillFromText(posting, url);
+      if (!result.ok) {
+        setPrefillError(result.error);
+        return;
+      }
+      applyPrefill(result);
     });
   }
 
@@ -90,6 +157,45 @@ export function NewApplicationForm({ entryStates }: { entryStates: Status[] }) {
           <p className="mt-2 text-sm text-danger">{prefillError}</p>
         ) : null}
         {prefilled ? <p className="mt-2 text-sm text-cobalt">{t("prefillDone")}</p> : null}
+
+        {pasteOpen ? (
+          <div className="mt-4 border-t border-cobalt/30 pt-4">
+            {/* A real <label>, not a styled <span>: it is what gives the textarea an
+                accessible name, and what lets a test reach it by getByLabel — the
+                same reasoning field.tsx's wrapper already carries. */}
+            <label className="block">
+              <span className="kk-label">{t("pasteLabel")}</span>
+              <p id="paste-hint" className="mt-1 text-xs font-normal text-ink-soft">
+                {t("pasteHint")}
+              </p>
+              {/* No maxLength, deliberately: it would truncate the paste on arrival
+                  and say nothing — the exact silent cut this box exists to avoid.
+                  Nothing is blocked here either; the server owns the cap, because
+                  it is the only side that can measure the stripped length. */}
+              <textarea
+                value={posting}
+                onChange={(e) => setPosting(e.target.value)}
+                rows={8}
+                placeholder={t("pastePlaceholder")}
+                aria-describedby="paste-hint paste-count"
+                className="mt-2 block w-full border border-dune bg-linen px-3 py-2 text-sm text-midnight placeholder:text-ink-soft"
+              />
+            </label>
+            <div className="mt-2 flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+              <span id="paste-count" aria-live="polite" className="text-xs text-ink-soft">
+                {t("pasteCounter", { count: pastedChars.toLocaleString(locale) })}
+              </span>
+              <button
+                type="button"
+                onClick={onPrefillFromPaste}
+                disabled={prefilling || !posting.trim()}
+                className="shrink-0 border border-cobalt bg-cobalt px-4 py-2 text-sm font-medium text-linen transition hover:bg-cobalt-2 disabled:opacity-50"
+              >
+                {prefilling ? t("prefillReading") : t("pasteButton")}
+              </button>
+            </div>
+          </div>
+        ) : null}
       </div>
 
       <Row>
