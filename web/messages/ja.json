@@ -380,9 +380,11 @@
     "company": "企業",
     "role": "職種",
     "status": "ステータス",
-    "statusWishlist": "検討中 — 保存だけして、応募するかもしれない",
-    "statusDraft": "下書き — 応募を準備中",
-    "statusApplied": "応募済み — すでに提出した",
+    "entryStatus": {
+      "wishlist": "検討中 — 保存だけして、応募するかもしれない",
+      "draft": "下書き — 応募を準備中",
+      "applied": "応募済み — すでに提出した"
+    },
     "statusHint": "ステータスはあとから応募ページで進められます。",
     "appliedOn": "応募日",
     "followUpDate": "フォローアップ日",

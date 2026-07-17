@@ -9,6 +9,35 @@ RSpec.describe "Applications", type: :request do
       security [ bearerAuth: [] ]
       produces "application/json"
 
+      # Every filter is optional, and input the server cannot parse is ignored
+      # rather than rejected — these arrive from navigation (a stale bookmark, a
+      # hand-edited URL), not a form, so a 422 would be the wrong answer. The
+      # filters AND together. Behaviour lives in Applications::ListQuery; these
+      # blocks only publish it, since rswag emits nothing the spec does not
+      # declare.
+      parameter name: :status, in: :query, required: false, schema: { type: :string },
+                description: "Comma-separated states, e.g. `applied,offer` — any member matches. " \
+                             "Unknown states are dropped, and a list left with none is **unfiltered, " \
+                             "not empty**: a query the server understood nothing of has told it nothing, " \
+                             "so it must not answer with a blank page dressed as a real result. There is " \
+                             "deliberately no query meaning \"show nothing\"."
+      parameter name: :company, in: :query, required: false, schema: { type: :string },
+                description: "Exact company name, case-sensitive. Unlike `status`, a name no application " \
+                             "carries is a real filter and legitimately matches nothing — but blank or " \
+                             "whitespace-only is ignored, like `status`, and returns everything."
+      parameter name: :source, in: :query, required: false, schema: { type: :string },
+                description: "Job board, matched as a case-insensitive substring of the URL (e.g. " \
+                             "`linkedin.com`); there is no `source` column. Pass `(none)` for applications " \
+                             "with no link. Like `company`, an unmatched value legitimately returns nothing, " \
+                             "while blank or whitespace-only is ignored."
+      parameter name: :after, in: :query, required: false, schema: { type: :string },
+                description: "Cursor from a previous page's `meta.next_cursor` — an opaque Base64 " \
+                             "timestamp. A malformed cursor returns the first page."
+      parameter name: :limit, in: :query, required: false,
+                schema: { type: :integer, minimum: 1, maximum: 100, default: 10 },
+                description: "Page size, clamped to 1..100 rather than rejected. Non-numeric reads as 1; " \
+                             "absent or empty reads as the default 10."
+
       response "200", "paginated envelope with data + meta" do
         let(:Authorization) { jwt_for(user) }
         before { without_n_plus_one_scanning { create_list(:application, 2, :applied, user: user) } }

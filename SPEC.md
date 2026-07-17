@@ -32,12 +32,33 @@ Two consequences worth stating plainly:
   [`CHANGELOG.md`](CHANGELOG.md), including the pre-1.0.0 build phases that used to sit at the
   top of this file.
 
-Last synced against the code: **2026-07-17**, `v1.5.0` (in flight) — § API contract's `status`
-filter became a **list**: `GET /applications?status=applied,offer` ORs within the filter and
-still ANDs against `company` / `source`, with an empty or all-unknown list treated as unfiltered
-rather than as `where(status: [])`'s silent zero rows — the reading that would have contradicted
-§ `Applications::ListQuery`'s promise that junk falls back to the unfiltered first page.
-`status=applied` still parses as a one-element list, so the wire is backward-compatible.
+Last synced against the code: **2026-07-17**, `v1.5.1` (in flight) — § The transition table now
+records that `terminal_states` and `entry_states` are **consumed**, not just served: the status
+help's "permanent" badge and the irreversibility warning on both confirms read the former off the
+fetched table, where they used to read a TypeScript copy of `ApplicationFSM::TERMINAL_STATES`, and
+the new-application form builds its status picker from the latter, where it used to hardcode
+`ENTRY_STATES`' three options. Both were found together: they are the same bug in the same
+payload, and fixing only the one the audit named would have left the other to be re-discovered.
+Every **FSM rule the UI applies** is now fetched. The sets `web/` still names for itself decide
+presentation and affordance rather than what the FSM permits — `COLUMN_ORDER` ranks the board's
+columns whose *membership* is fetched, `CONFIRM_REQUIRED` and `REVIVAL_STATES` choose which moves
+get a prompt and which offer a way back. Stale, those could misjudge how a move is *offered*
+(`REVIVAL_STATES` most of all — see its own header, which admits it reads an FSM edge the fetched
+`transitions[status]` also answers); none could authorise one, which the server validates
+regardless. The
+homepage's `pipeline-diagram.tsx` remains the one declared exception, an illustration nothing
+reads. A missing `terminal_states` degrades to **silence** — neither "permanent" nor "reopenable" — since
+the FSM always has terminal states and an empty list can therefore only mean the table did not
+arrive. A missing `entry_states` degrades the same way, to the **absence of a picker**: the form
+sends no `status` and the API applies its own default, because an empty entry set likewise cannot
+be real, and guessing one risks offering a state the API would `422`. § API contract's
+`GET /applications` now documents its query parameters, which it never had — a swagger-only gap,
+so no prose here moved. Before that, `v1.5.0` — § API contract's
+`status` filter became a **list**: `GET /applications?status=applied,offer` ORs within the filter
+and still ANDs against `company` / `source`, with an empty or all-unknown list treated as
+unfiltered rather than as `where(status: [])`'s silent zero rows — the reading that would have
+contradicted § `Applications::ListQuery`'s promise that junk falls back to the unfiltered first
+page. `status=applied` still parses as a one-element list, so the wire is backward-compatible.
 § The transition table gained `active_states`, and `ApplicationFSM::ACTIVE_STATES` now owns the
 definition the frontend used to hardcode: promoting "active" from a display detail to a
 user-facing filter contract would otherwise have left FSM vocabulary living in two languages.
@@ -825,6 +846,35 @@ a second language is the one thing this codebase does not permit (§ State machi
 here is the same one that governs `transitions` itself: a fetched copy cannot drift, a re-typed
 copy can.
 
+`terminal_states` is consumed the same way and for the same reason. It decides whether the status
+help calls a state permanent, and whether the confirm shown before a move — on the board's card
+menu and the detail page's transition buttons alike — warns that the move is irreversible. Those
+are user-facing claims about the FSM, so a state promoted to terminal in Ruby would leave all
+three lying. It is fetched, never re-typed.
+
+**A missing `terminal_states` degrades to silence, not to a claim.** `apiFetch` casts rather than
+parses and `web/` and `api/` are separate Railway services, so a payload predating a field can
+still arrive with `ok: true` mid-deploy. An empty list therefore reads as *unknown*, and the
+permanent badge and the permanent/reopenable line render as **neither** — the FSM always has three
+terminal states, so empty is never a real answer. Defaulting to "reopenable" would swap one lie
+for another: the point is not to withhold the scary half, it is to make silence unclaimable in
+either direction.
+
+`entry_states` is consumed by the one screen that needs it: the new-application form builds its
+status picker from it, rather than hardcoding the three options `ApplicationFSM::ENTRY_STATES`
+lists. This is the create path, not a display detail — `Api::V1::ApplicationsController` rejects a
+create outside the entry set with a `422`, so a copy gone stale would either hide a state the API
+accepts or offer one it refuses. Only the *set* is fetched; which member is pre-selected is a
+form default (`draft`, matching the API's own fallback when no `status` is sent) and falls back to
+the first offered state if `draft` ever leaves the set.
+
+**A missing `entry_states` drops the picker rather than guessing one.** The reasoning is
+`terminal_states`' above: an empty entry set cannot be real, so it reads as *unknown*. With no
+picker the form sends no `status` and the API applies its own default — the created application
+is still correct, and the user can move it afterwards through the FSM, which is the one path that
+was ever authoritative. Rendering a guessed set would be the "reopenable" mistake in create's
+clothing: an invented claim about the FSM that the API may answer with a `422`.
+
 `transitions` maps **every** state through `ApplicationFSM.valid_next_states`, so the archived
 rule (any non-terminal state → `archived`, an early return in `assert_transition!`, not a row
 in `TRANSITIONS`) is already folded in — this is the *effective* table, not the raw constant.
@@ -1602,9 +1652,12 @@ flick of the wrist shouldn't express.
 
 Every card carries a focusable menu button listing **all** legal next states, including the
 closed ones drag refuses. The menu is the accessible path and the only complete one; drag is a
-convenience layered on top. The confirm/revival semantics (`CONFIRM_REQUIRED`, `REVIVAL_STATES`,
-`HARD_TERMINAL`) move out of `transition-buttons.tsx` into a shared module so the detail page and
-the board cannot drift.
+convenience layered on top. The confirm/revival semantics (`CONFIRM_REQUIRED`, `REVIVAL_STATES`)
+move out of `transition-buttons.tsx` into a shared module (`web/app/lib/transitions.ts`) so the
+detail page and the board cannot drift. Those two sets are UI judgement — which moves are worth a
+prompt — and stay there. Which states are *irreversible* is an FSM fact, not a judgement, so it
+comes from the fetched table's `terminal_states` (§ API contract) rather than a third set beside
+them.
 
 The table only decides what *looks* droppable. The server re-validates every transition through
 `Applications::TransitionService` regardless — a stale table degrades the highlighting, never the

@@ -5,8 +5,10 @@ import type { Status } from "./types";
  * `messages/{en,ja}.json` under the `status` namespace, read with
  * `useTranslations("status")` in a client component or `getTranslations("status")`
  * in a server one. Keeping an English copy here as well would give the FSM's
- * vocabulary two sources of truth. Only the untranslatable parts remain: the
- * badge palette and the status sets.
+ * vocabulary two sources of truth. Only the untranslatable part remains: the
+ * badge palette, which is a brand mapping rather than an FSM fact — no set of
+ * states lives here, because ApplicationFSM owns those and /transitions serves
+ * them.
  */
 
 /**
@@ -32,13 +34,6 @@ const STATUS_CLASS: Record<Status, string> = {
   withdrawn: "bg-dune/60 text-ink-soft ring-dune",
   archived: "bg-dune/60 text-ink-soft ring-dune",
 };
-
-// Mirrors ApplicationFSM::TERMINAL_STATES — no transitions out, ever.
-export const PERMANENT_STATUSES: ReadonlySet<Status> = new Set([
-  "accepted",
-  "declined",
-  "archived",
-]);
 
 export function statusBadgeClass(s: Status): string {
   return STATUS_CLASS[s];

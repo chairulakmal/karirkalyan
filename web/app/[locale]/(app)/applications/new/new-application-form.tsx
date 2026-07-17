@@ -5,8 +5,9 @@ import { useTranslations } from "next-intl";
 import { createApplication, prefillFromUrl } from "@/app/lib/actions";
 import { fileSizeMb, MAX_FILE_BYTES } from "@/app/lib/files";
 import { Field } from "@/app/components/field";
+import type { Status } from "@/app/lib/types";
 
-export function NewApplicationForm() {
+export function NewApplicationForm({ entryStates }: { entryStates: Status[] }) {
   const t = useTranslations("newApplication");
   const [error, setError] = useState<string | null>(null);
   const [pending, startTransition] = useTransition();
@@ -18,8 +19,16 @@ export function NewApplicationForm() {
   const [role, setRole] = useState("");
   const [notes, setNotes] = useState("");
 
-  // Creation sets the initial state; the FSM governs every change after that.
-  const [status, setStatus] = useState("draft");
+  /* Creation sets the initial state; the FSM governs every change after that.
+     Which states are offered comes from the fetched `entry_states` — the FSM
+     owns that set. Only the *pre-selection* is decided here: "draft" is what
+     the API falls back to when no status is sent, so preferring it keeps the
+     form agreeing with the server. That is a default rather than a set, and it
+     cannot go stale into a wrong option — if "draft" ever leaves the entry set,
+     `includes` fails and the first offered state is selected instead. */
+  const [status, setStatus] = useState<Status | "">(
+    entryStates.includes("draft") ? "draft" : (entryStates[0] ?? ""),
+  );
   const [appliedAt, setAppliedAt] = useState(todayISO());
 
   const [prefilling, startPrefill] = useTransition();
@@ -99,20 +108,30 @@ export function NewApplicationForm() {
           onChange={(e) => setRole(e.target.value)}
         />
       </Row>
-      <label className="block text-sm">
-        <span className="kk-label">{t("status")}</span>
-        <select
-          name="status"
-          value={status}
-          onChange={(e) => setStatus(e.target.value)}
-          className="mt-1.5 block w-full border border-dune bg-linen px-3 py-2 text-sm text-midnight"
-        >
-          <option value="wishlist">{t("statusWishlist")}</option>
-          <option value="draft">{t("statusDraft")}</option>
-          <option value="applied">{t("statusApplied")}</option>
-        </select>
-        <span className="mt-1 block text-xs text-ink-soft">{t("statusHint")}</span>
-      </label>
+      {/* No entry set means the table failed or predates the field — not that
+          there are no entry states, which the FSM never allows. Dropping the
+          picker sends no `status`, so the API applies its own default; offering
+          a guessed set would risk a 422 on a state it no longer accepts. */}
+      {entryStates.length === 0 ? null : (
+        <label className="block text-sm">
+          <span className="kk-label">{t("status")}</span>
+          <select
+            name="status"
+            value={status}
+            // Every option's value is a member of `entryStates`, so the cast
+            // re-states what the render below already guarantees.
+            onChange={(e) => setStatus(e.target.value as Status)}
+            className="mt-1.5 block w-full border border-dune bg-linen px-3 py-2 text-sm text-midnight"
+          >
+            {entryStates.map((s) => (
+              <option key={s} value={s}>
+                {t(`entryStatus.${s}`)}
+              </option>
+            ))}
+          </select>
+          <span className="mt-1 block text-xs text-ink-soft">{t("statusHint")}</span>
+        </label>
+      )}
       {status === "applied" ? (
         <Field
           name="applied_at"

@@ -15,16 +15,20 @@ left as well — leaving behind the three things it deferred on purpose, re-home
 dropped: the cross-group facet counts moved to `v1.9.0`'s stat cards, which reopen the dashboard
 payload they need, and the chip disclosure and URL filter state moved to § Conditional. The docs
 audit between that merge and its tag opened `v1.5.1` out of two findings: `v1.5.0` deleted one
-TypeScript copy of an FSM fact and walked past a second.
+TypeScript copy of an FSM fact and walked past a second. `v1.5.1` was then written, merged
+(PR #68) and tagged the same day. Its review found a *third* copy of the same shape — the
+new-application form's hardcoded entry states — which it also deleted, so every **FSM rule the UI
+applies** is now fetched; the states `web/` still names shape presentation and affordance, and the
+server validates every move regardless. That section left the file, leaving behind the two things it deferred on purpose,
+re-homed below rather than dropped.
 
-**Current release: `v1.5.0`** (2026-07-17). `v1.4.2` was **never tagged and never will be**: the
+**Current release: `v1.5.1`** (2026-07-17). `v1.4.2` was **never tagged and never will be**: the
 prefill fix landed on `main` above its four unwritten items, which put two patches at one commit,
 and `v1.4.3` took the tag rather than make a production fix wait. `CHANGELOG.md` § v1.4.3 carries
 the full account. Those four items shipped as **`v1.4.4`** — same work, same patch level, one
-number further along; the gap at `v1.4.2` is permanent. The nearest open work is now **`v1.5.1`**,
-opened by `v1.5.0`'s own docs audit; the pocket app follows as `v1.6.0`, a minor further down than
-it was scoped at. What each shipped release contained is `CHANGELOG.md`'s job to say, not this
-file's.
+number further along; the gap at `v1.4.2` is permanent. The nearest open work is now the pocket
+app, **`v1.6.0`** — a minor further down than it was scoped at. What each shipped release
+contained is `CHANGELOG.md`'s job to say, not this file's.
 
 **North star (decided 2026-07-11): be the best career app for its one loyal user.** Portfolio
 value follows from that, not the other way round — a reviewer can tell a tool with a real
@@ -42,7 +46,7 @@ outranks anything else in this file on the day it happens.
 
 ---
 
-## The plan — `v1.5.1` → `v1.9.0` (scoped 2026-07-12, amended 2026-07-13 and 2026-07-17, extended 2026-07-15)
+## The plan — `v1.6.0` → `v1.9.0` (scoped 2026-07-12, amended 2026-07-13 and 2026-07-17, extended 2026-07-15)
 
 **The whole backlog fits under 1.x.** Only one item forces a major, and `SPEC.md` § Versioning
 & releases already names it: the **`positions` entity**, because it adds a table *and* changes
@@ -76,7 +80,7 @@ one minor — the second such slide, on the same reasoning as the first.
 | `v1.4.3` | patch | **Shipped 2026-07-17.** Prefill: IPv4-first address pinning, and an error taxonomy that stops blaming the user's URL — plus everything `v1.4.2` had written by then. See `CHANGELOG.md` |
 | `v1.4.4` | patch | **Shipped 2026-07-17.** Download filenames, upload throttle + a per-account ceiling, en/ja key parity as a CI check, the profile-card fold — `v1.4.2`'s four open items — plus the `.json` throttle bypass the review of them found. See `CHANGELOG.md` |
 | `v1.5.0` | minor | **Shipped 2026-07-17.** The stage filter: multi-select status chips on the dashboard list, All/Active/None presets, and `active_states` on `/transitions` — which also took the board's column list off a hardcoded TypeScript copy. See `CHANGELOG.md` |
-| `v1.5.1` | patch | The FSM copy `v1.5.0` missed (`PERMANENT_STATUSES`), and the query parameters `/applications` has never documented |
+| `v1.5.1` | patch | **Shipped 2026-07-17.** The FSM copy `v1.5.0` missed (`PERMANENT_STATUSES`) is deleted, and so is the third its own review found (the form's hardcoded `ENTRY_STATES`) — every FSM rule the UI applies is now fetched. `/applications`'s query parameters reach the published reference for the first time. See `CHANGELOG.md` |
 | `v1.6.0` | minor | The pocket app: share-sheet capture, passkey sign-in, push digest, installed-app shell — **plus the prefill paste fallback the share sheet needs** |
 | `v1.7.0` | minor | The Japan market layer: recruiter channel + `agencies`, 年収 comp structure, Japanese-level filter |
 | `v1.7.1` | patch | Japanese phrase-based line breaking |
@@ -124,46 +128,6 @@ is fine — the `web/`-only constraint was a property of v1.1.0, not a permanent
   such item must state its **annual refresh cost** when it is scoped, and the sum of those
   lines is a real cap on how many of these a solo maintainer can ship. The career-intelligence
   item already budgets this way ("one data-entry session a year"); that is the pattern.
-
----
-
-## `v1.5.1` — patch. The FSM copy `v1.5.0` didn't notice (inserted 2026-07-17)
-
-Both items found by the docs audit that ran between `v1.5.0`'s merge and its tag, and both are
-the same kind of thing: a claim the repo makes about itself that the code does not back. Neither
-adds a capability and neither touches the schema, so both are a patch by the mechanical test.
-
-- [ ] **Delete `PERMANENT_STATUSES` and read `terminal_states` off the table that already
-      carries it.** `web/app/lib/format.ts:36` is a verbatim TypeScript copy of
-      `ApplicationFSM::TERMINAL_STATES` (`api/app/lib/application_fsm.rb:38`), and its own comment
-      says so — *"Mirrors ApplicationFSM::TERMINAL_STATES"*. **This is the exact thing `v1.5.0`
-      deleted `ACTIVE_STATUSES` for**, left standing because the release only went looking for the
-      board's columns. It is the worse of the two on that release's own reasoning: `terminal_states`
-      already ships in the same `/transitions` payload (`transitions_controller.rb:14`) and is
-      already declared at `web/app/lib/types.ts:74` — so the field is fetched, typed, and then
-      ignored in favour of a hardcoded set. And it is user-facing, not a display detail:
-      `status-help.tsx:48` gates the "No further transitions — permanent" warning on it, and
-      `transitions.ts:32` re-exports it as `HARD_TERMINAL`, which is what makes the board and the
-      detail page confirm before a terminal move. A stage promoted to terminal in Ruby would leave
-      both lying.
-
-      **The work is not the four call sites, it's `status-help.tsx`.** `board.tsx` and
-      `transition-buttons.tsx` already hold `table`; that component does not, so this is a prop-
-      threading question — pass `terminalStates` down, or have the component take the table. Decide
-      that seam before writing the change, and mind the version-skew rule `v1.5.0` established:
-      `terminal_states` missing must degrade to *not* claiming permanence, never to claiming it.
-      **When it lands, `README.md:26` and `README.ja.md:26` can go back to the stronger universal
-      claim** ("the frontend never copies the FSM"), which this release's audit had to retract to a
-      narrower one because it was false. Retract nothing else there.
-- [ ] **`GET /api/v1/applications` documents none of its query parameters.** The `get:` block in
-      `api/swagger/v1/swagger.yaml:20` has no `parameters:` key at all — `status`, `company`,
-      `source`, `after` and `limit` are all absent, so `v1.5.0`'s headline API change is invisible
-      in the published reference and always was. **Pre-existing, not drift from `v1.5.0`**: nothing
-      in swagger is *wrong* about `status`, it simply says nothing. rswag only emits what the spec
-      declares, so the fix is `parameter` blocks in
-      `api/spec/requests/api/v1/applications_spec.rb` — a test change that regenerates the YAML,
-      not an edit to the YAML, which is generated output. Document the comma-separated list and the
-      "unknown values ⇒ unfiltered, never empty" contract while there.
 
 ---
 
@@ -623,6 +587,26 @@ none at all — so the release passes the major test the same way the rest of th
 
 ## Conditional — open, but deliberately tagged to no release
 
+- [ ] **Enforce the "no hardcoded FSM sets" claim in CI, instead of asserting it in prose**
+      *(added 2026-07-17, from `v1.5.1`'s review)* — the claim in `README.md:26` has now been
+      written three times and been wrong twice, each time because the grep behind it was never run
+      to the end. A `web/scripts/check-fsm-copies.mjs`, beside the existing
+      `check-i18n-parity.mjs`, could fail the build on a state-name array outside an allow-list
+      (`types.ts`, the catalogs, `pipeline-diagram.tsx`, `COLUMN_ORDER`, `CONFIRM_REQUIRED`,
+      `REVIVAL_STATES`), which turns a sentence a reader must trust into one the build proves.
+      **Conditional, not scheduled**, because the allow-list is the whole difficulty: entries are
+      legitimate for reasons a script cannot check, so a careless one re-admits the bug the check
+      exists to catch. Worth doing only when the allow-list can be justified line by line.
+- [ ] **`reopenable` infers an FSM edge it could fetch** *(added 2026-07-17, from `v1.5.1`'s
+      review)* — `transition-buttons.tsx` and `board.tsx` render "can be re-opened to Applied
+      later" whenever a state is *not* terminal, and `REVIVAL_STATES` hardcodes which three states
+      revive. Both are the complement of the claim `v1.5.1` just stopped hardcoding, and the
+      fetched `table.transitions[status]?.includes("applied")` answers it directly — `table` is
+      already in scope in `board.tsx`. It is true today only because `CONFIRM_REQUIRED` minus the
+      terminal states happens to equal `REVIVAL_STATES`: an invariant held by two hardcoded sets
+      agreeing with Ruby, not by construction. **Conditional** because nothing user-facing is
+      wrong today and the server refuses an illegal revival regardless; it is a
+      correct-for-the-wrong-reason, which is the kind that breaks quietly when the FSM next moves.
 - [ ] **`timeline_entries` offer-lookup index** — still open, and still conditional; nothing in
       `v1.4`–`v1.9` grows that table (the `v1.9.0` stage notes add a nullable column, not rows). The
       `avg_days_to_offer` subquery filters `to_status = 'offer'`, and there is deliberately no

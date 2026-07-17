@@ -1,8 +1,19 @@
 import { getTranslations } from "next-intl/server";
+import { apiFetch } from "@/app/lib/api";
+import type { TransitionTable } from "@/app/lib/types";
 import { NewApplicationForm } from "./new-application-form";
 
 export default async function NewApplicationPage() {
-  const t = await getTranslations("newApplication");
+  const [t, tableRes] = await Promise.all([
+    getTranslations("newApplication"),
+    apiFetch<TransitionTable>("/transitions"),
+  ]);
+
+  /* Which states an application may be *created* in is an FSM fact, so it is
+     fetched rather than copied (SPEC.md § The transition table). Degrades to
+     `[]` when the table fails or predates the field; the form reads that as
+     *unknown* and drops the picker, letting the API pick the initial state. */
+  const entryStates = tableRes.ok ? (tableRes.data.entry_states ?? []) : [];
 
   return (
     <div className="mx-auto max-w-2xl">
@@ -13,7 +24,7 @@ export default async function NewApplicationPage() {
           code: (chunks) => <code className="font-mono">{chunks}</code>,
         })}
       </p>
-      <NewApplicationForm />
+      <NewApplicationForm entryStates={entryStates} />
     </div>
   );
 }

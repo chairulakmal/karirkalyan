@@ -24,6 +24,51 @@ paths:
       - Applications
       security:
       - bearerAuth: []
+      parameters:
+      - name: status
+        in: query
+        required: false
+        schema:
+          type: string
+        description: 'Comma-separated states, e.g. `applied,offer` — any member matches.
+          Unknown states are dropped, and a list left with none is **unfiltered, not
+          empty**: a query the server understood nothing of has told it nothing, so
+          it must not answer with a blank page dressed as a real result. There is
+          deliberately no query meaning "show nothing".'
+      - name: company
+        in: query
+        required: false
+        schema:
+          type: string
+        description: Exact company name, case-sensitive. Unlike `status`, a name no
+          application carries is a real filter and legitimately matches nothing —
+          but blank or whitespace-only is ignored, like `status`, and returns everything.
+      - name: source
+        in: query
+        required: false
+        schema:
+          type: string
+        description: Job board, matched as a case-insensitive substring of the URL
+          (e.g. `linkedin.com`); there is no `source` column. Pass `(none)` for applications
+          with no link. Like `company`, an unmatched value legitimately returns nothing,
+          while blank or whitespace-only is ignored.
+      - name: after
+        in: query
+        required: false
+        schema:
+          type: string
+        description: Cursor from a previous page's `meta.next_cursor` — an opaque
+          Base64 timestamp. A malformed cursor returns the first page.
+      - name: limit
+        in: query
+        required: false
+        schema:
+          type: integer
+          minimum: 1
+          maximum: 100
+          default: 10
+        description: Page size, clamped to 1..100 rather than rejected. Non-numeric
+          reads as 1; absent or empty reads as the default 10.
       responses:
         '200':
           description: does not return another user's applications
