@@ -6,6 +6,83 @@ Open work lives in [`TODO.md`](TODO.md). Settled decisions-not-to-build are reco
 
 ---
 
+## v1.5.0 — 2026-07-17
+
+The dashboard's status chips looked like a filter and behaved like a radio group: `Filters.status`
+was `Status | null`, so the reachable views were **one stage, or all thirteen**. The question the
+list is asked most — *what's still live?* — is seven stages wide, and the control could not hold
+it. One branch, one PR *(feat/stage-filter, #67)*.
+
+A minor by the mechanical test, and it could not have ridden `v1.4.4`: multi-select is a
+user-visible capability the app did not previously have. No migration — `v1.4.4`'s image boots
+against this database unchanged, because this release does not touch it.
+
+### The chips are a filter now
+
+- **`?status=` takes a comma-separated list.** Values OR within the filter and still AND against
+  company and board — [disjunctive faceting](https://baymard.com/blog/vertical-filtering-design),
+  the mechanic every faceted list uses and few state. One element behaves exactly as the scalar
+  did, so the parameter is backward-compatible and nothing that linked to it broke.
+- **Presets sit above the row: All, Active, None.** "Active" is the seven stages still in play,
+  which is the whole point of the release; "None" is a client-side state, deliberately not a query
+  (see below).
+- **Checkboxes, not dimming.** The selected state is carried by a real checkbox rather than
+  `opacity-40` on a brand colour — a dimmed swatch is still colour alone, which fails WCAG 1.4.1,
+  and inclusive semantics ought to be visible in the control's shape rather than inferred.
+- **A polite live region announces the new count.** Toggling a chip rewrites the list without
+  moving focus, so a screen reader otherwise gets no signal that anything happened.
+- **The fieldset is `aria-busy` while a page is in flight, never `disabled`.** `disabled` reaches
+  every control inside it — including the checkbox the user just toggled — and a disabled element
+  cannot hold focus, so each toggle would drop the caret to `<body>` and cost a keyboard user a
+  full tab back. The handler is blocked instead of the control.
+
+### An empty filter means unfiltered, never empty
+
+`where(status: [])` matches **zero rows, silently**. A hand-edited `?status=junk` would therefore
+return a blank page dressed as a real answer — against `ListQuery`'s standing contract that bad
+input narrows to the unfiltered first page, which exists because these params arrive from
+navigation rather than from a form nobody validated. So the intersection with `VALID_STATES` is
+taken first, and an empty result is discarded rather than executed: a list the server understood
+none of has told it nothing. **There is deliberately no query that means "show nothing"** — that
+is a client-side state, and modelling it server-side would make the trap reachable on purpose.
+
+### `active_states` on `/transitions`, and the board's hardcoded copy is gone
+
+- **`ApplicationFSM::ACTIVE_STATES` is subtracted, not listed** — `VALID_STATES` minus
+  `TERMINAL_STATES` minus `rejected`/`ghosted`/`withdrawn`. A stage added to `TRANSITIONS` is in
+  play the day it lands and nobody has to remember a second list; only the subtraction is a
+  judgement. Those three are *not* terminal — each revives to `applied` — yet nothing is pending in
+  them, which is why `TERMINAL_STATES` alone could not express this.
+- **`web/app/lib/format.ts`'s `ACTIVE_STATUSES` is deleted.** It was a TypeScript copy of an FSM
+  fact, which the transition-table invariant exists to forbid; the board's columns now come from
+  the API. The computed list is byte-identical to the deleted one, so the board's behaviour is
+  unchanged — this release only moves where the answer comes from.
+- **It did not delete the other one.** The docs audit between this merge and its tag found
+  `PERMANENT_STATUSES` still in the same file, mirroring `TERMINAL_STATES` — and saying so in its
+  own comment — while `terminal_states` ships in the very payload this release started reading.
+  The release went looking for the board's columns and found only what it was looking for. It is
+  scoped as `v1.5.1`; recorded here because a release that deletes one copy of a fact and walks
+  past a second should say so itself rather than let the next reader find it.
+- **The chips sort against `states` from the same payload.** `by_status` is `group(:status).count`
+  — `GROUP BY` with no `ORDER BY` — so its order is the query plan's, not a promise, and the row
+  could silently reshuffle between reloads.
+
+### Version skew is a real state, and two pages disagree about it correctly
+
+`web` and `api` are **separate Railway services**, so one commit is not one deployment: for the
+length of a deploy window, `/transitions` can answer `200` with the payload from before
+`active_states` existed. `apiFetch` casts rather than parses (and returns `null as T` for a 204 or
+a non-JSON 200), so `ok: true` has never implied a populated, current `data`. The two consumers
+resolve that differently on purpose:
+
+- **The dashboard degrades**: `active_states` powers the "Active" preset and the overdue marker
+  only, so a missing one drops the preset rather than the list — the same tolerance the page
+  already extends to `/dashboard` itself failing.
+- **The board refuses**: `active_states` *is* its columns, so an unusable table is a failed table.
+  It guards with `Array.isArray` and renders the error state with a message that names the likely
+  cause, because "a deploy may be in progress, try again in a moment" is actionable and a blank
+  board is not.
+
 ## v1.4.4 — 2026-07-17
 
 The four items `v1.4.2` left open, shipped under the number they were renumbered to when that tag

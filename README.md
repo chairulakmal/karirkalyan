@@ -23,7 +23,7 @@ A full-stack job application tracker — Rails 8 API + Next.js 16. It tracks whi
 - **State machine as a plain Ruby module** — [`application_fsm.rb`](api/app/lib/application_fsm.rb) is a PORO with a `TRANSITIONS` array. No gem — open the file and you can read every allowed transition. Diagram and design notes [below](#finite-state-machine).
 - **Transactional audit trail** — every status change goes through `Applications::TransitionService`, which writes the status update and a `TimelineEntry` in a single transaction. Direct attribute writes to `status` are not used anywhere.
 - **Optimistic locking** — `lock_version` turns a concurrent edit into a `409 Conflict` instead of a silent overwrite.
-- **The frontend never copies the FSM** — the Kanban board fetches the transition table from `GET /api/v1/transitions` rather than mirroring it in TypeScript. Dragging a card runs a real transition — optimistic, with a `409` snap-back — and a card menu lists every legal next state, so the board also works without drag-and-drop.
+- **The frontend fetches the FSM rather than copying it** — the Kanban board reads both the transition table *and* which states are still in play from `GET /api/v1/transitions`, so neither its legal moves nor its column set is a TypeScript copy of a Ruby fact. Dragging a card runs a real transition — optimistic, with a `409` snap-back — and a card menu lists every legal next state, so the board also works without drag-and-drop.
 
 ### One Postgres, no Redis
 

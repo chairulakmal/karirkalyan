@@ -10,14 +10,21 @@ cards joined `v1.9.0`; `v1.4.3` and the prefill paste fallback were added out of
 section left too. On 2026-07-17 `v1.4.3` was tagged and `v1.4.2` was skipped for good, which
 renumbered that section's four survivors to `v1.4.4`; later the same day the stage filter took
 `v1.5.0`, and `v1.4.4` was written, merged (PR #66) and tagged, so its section left the file too.
+Then `v1.5.0` was scoped, written, merged (PR #67) and tagged inside the same day, so its section
+left as well — leaving behind the three things it deferred on purpose, re-homed rather than
+dropped: the cross-group facet counts moved to `v1.9.0`'s stat cards, which reopen the dashboard
+payload they need, and the chip disclosure and URL filter state moved to § Conditional. The docs
+audit between that merge and its tag opened `v1.5.1` out of two findings: `v1.5.0` deleted one
+TypeScript copy of an FSM fact and walked past a second.
 
-**Current release: `v1.4.4`** (2026-07-17). `v1.4.2` was **never tagged and never will be**: the
+**Current release: `v1.5.0`** (2026-07-17). `v1.4.2` was **never tagged and never will be**: the
 prefill fix landed on `main` above its four unwritten items, which put two patches at one commit,
 and `v1.4.3` took the tag rather than make a production fix wait. `CHANGELOG.md` § v1.4.3 carries
 the full account. Those four items shipped as **`v1.4.4`** — same work, same patch level, one
-number further along; the gap at `v1.4.2` is permanent. The nearest open work is now `v1.5.0` —
-**the stage filter, scoped 2026-07-17**, which took the `v1.5.0` slot and slid every release below
-it one minor. What each shipped release contained is `CHANGELOG.md`'s job to say, not this file's.
+number further along; the gap at `v1.4.2` is permanent. The nearest open work is now **`v1.5.1`**,
+opened by `v1.5.0`'s own docs audit; the pocket app follows as `v1.6.0`, a minor further down than
+it was scoped at. What each shipped release contained is `CHANGELOG.md`'s job to say, not this
+file's.
 
 **North star (decided 2026-07-11): be the best career app for its one loyal user.** Portfolio
 value follows from that, not the other way round — a reviewer can tell a tool with a real
@@ -35,7 +42,7 @@ outranks anything else in this file on the day it happens.
 
 ---
 
-## The plan — `v1.5.0` → `v1.9.0` (scoped 2026-07-12, amended 2026-07-13 and 2026-07-17, extended 2026-07-15)
+## The plan — `v1.5.1` → `v1.9.0` (scoped 2026-07-12, amended 2026-07-13 and 2026-07-17, extended 2026-07-15)
 
 **The whole backlog fits under 1.x.** Only one item forces a major, and `SPEC.md` § Versioning
 & releases already names it: the **`positions` entity**, because it adds a table *and* changes
@@ -68,7 +75,8 @@ one minor — the second such slide, on the same reasoning as the first.
 | ~~`v1.4.2`~~ | — | **Never tagged; the number is skipped.** Its written half — the `ListQuery` extraction, the API base rename, the privacy/doc-drift fix — shipped inside `v1.4.3`; its unwritten half shipped as `v1.4.4` |
 | `v1.4.3` | patch | **Shipped 2026-07-17.** Prefill: IPv4-first address pinning, and an error taxonomy that stops blaming the user's URL — plus everything `v1.4.2` had written by then. See `CHANGELOG.md` |
 | `v1.4.4` | patch | **Shipped 2026-07-17.** Download filenames, upload throttle + a per-account ceiling, en/ja key parity as a CI check, the profile-card fold — `v1.4.2`'s four open items — plus the `.json` throttle bypass the review of them found. See `CHANGELOG.md` |
-| `v1.5.0` | minor | The stage filter: multi-select status chips on the dashboard list, on by default, with "hide inactive" and friends — plus `active_states` on `/transitions` |
+| `v1.5.0` | minor | **Shipped 2026-07-17.** The stage filter: multi-select status chips on the dashboard list, All/Active/None presets, and `active_states` on `/transitions` — which also took the board's column list off a hardcoded TypeScript copy. See `CHANGELOG.md` |
+| `v1.5.1` | patch | The FSM copy `v1.5.0` missed (`PERMANENT_STATUSES`), and the query parameters `/applications` has never documented |
 | `v1.6.0` | minor | The pocket app: share-sheet capture, passkey sign-in, push digest, installed-app shell — **plus the prefill paste fallback the share sheet needs** |
 | `v1.7.0` | minor | The Japan market layer: recruiter channel + `agencies`, 年収 comp structure, Japanese-level filter |
 | `v1.7.1` | patch | Japanese phrase-based line breaking |
@@ -119,173 +127,43 @@ is fine — the `web/`-only constraint was a property of v1.1.0, not a permanent
 
 ---
 
-## `v1.5.0` — minor. "The stage filter" (inserted 2026-07-17)
+## `v1.5.1` — patch. The FSM copy `v1.5.0` didn't notice (inserted 2026-07-17)
 
-Make the dashboard's applications list
-(`web/app/[locale]/(app)/dashboard/applications-list.tsx`) answer *what's still live?* — the
-question it is asked most and currently cannot answer at all. The status chips look like a
-filter but behave like a radio group: `Filters.status` is `Status | null`, so the reachable
-views are **one stage, or all thirteen**. "Active" is seven stages (`ACTIVE_STATUSES`,
-`web/app/lib/format.ts:45`), "dead" is four, and neither is expressible. The list already
-*knows* the distinction — it suppresses the overdue-follow-up warning on non-active rows
-(`applications-list.tsx:260`) — it just won't let the user filter by it.
+Both items found by the docs audit that ran between `v1.5.0`'s merge and its tag, and both are
+the same kind of thing: a claim the repo makes about itself that the code does not back. Neither
+adds a capability and neither touches the schema, so both are a patch by the mechanical test.
 
-**Scope boundary: the dashboard list only.** Not the board (`web/app/lib/board.tsx` is
-columns-by-status; a status filter there means hiding columns, a different question), and not
-the two dropdowns — company and board stay single-select. The chips are the whole item.
+- [ ] **Delete `PERMANENT_STATUSES` and read `terminal_states` off the table that already
+      carries it.** `web/app/lib/format.ts:36` is a verbatim TypeScript copy of
+      `ApplicationFSM::TERMINAL_STATES` (`api/app/lib/application_fsm.rb:38`), and its own comment
+      says so — *"Mirrors ApplicationFSM::TERMINAL_STATES"*. **This is the exact thing `v1.5.0`
+      deleted `ACTIVE_STATUSES` for**, left standing because the release only went looking for the
+      board's columns. It is the worse of the two on that release's own reasoning: `terminal_states`
+      already ships in the same `/transitions` payload (`transitions_controller.rb:14`) and is
+      already declared at `web/app/lib/types.ts:74` — so the field is fetched, typed, and then
+      ignored in favour of a hardcoded set. And it is user-facing, not a display detail:
+      `status-help.tsx:48` gates the "No further transitions — permanent" warning on it, and
+      `transitions.ts:32` re-exports it as `HARD_TERMINAL`, which is what makes the board and the
+      detail page confirm before a terminal move. A stage promoted to terminal in Ruby would leave
+      both lying.
 
-**The default inverts: all chips ON.** Today one chip is selected and the user opts *in*; the
-model becomes all thirteen selected and the user opts *out* — "hide inactive" rather than
-"show these seven". **Researched 2026-07-17, and the sources do not endorse this — read the
-tension before building it.** No UX body gives a rule for the default selection state of a
-multi-select set, and the prevailing convention is deselected-by-default. Two GOV.UK lines come
-closest, and they point opposite ways:
-
-- [*Filter a list*](https://design-patterns.service.justice.gov.uk/patterns/filter-a-list/):
-  **"The list should first appear unfiltered."** All-ON **satisfies** this — thirteen of thirteen
-  *is* the unfiltered list. No conflict.
-- [*Checkboxes*](https://design-system.service.gov.uk/components/checkboxes/): **"Do not
-  pre-select checkbox options as this makes it more likely that users will not realise they've
-  missed a question [and] submit the wrong answer."** This is the real objection — but its
-  reasoning is **form submission**: there is no question to miss here and nothing to submit
-  wrong. Adjacent, not on point. Recorded because it is the strongest thing standing against
-  this decision and it should not be buried.
-
-The precedent for going ahead is a **closed, fully-known set the user subtracts from** — Google
-Flights and Kayak default every airline on. Thirteen FSM states the user already has a mental
-model of is that shape. Chart legends share the instinct (every series visible, click to hide),
-but that is a charting-library convention about *visual layers*, not research about *records* —
-a hint that the gesture reads naturally, not evidence.
-
-**So: a judgement call with a named precedent and a documented objection, not a sourced rule.**
-No controlled comparison of the two defaults appears to exist. If it doesn't survive contact, the
-fallback is today's opt-in default with the presets kept — which is why the presets are specified
-independently of the default and must not depend on it.
-
-**What Baymard *does* settle** ([combining filter
-options](https://baymard.com/blog/allow-applying-of-multiple-filter-values)): multiple values
-*within one filter type* follow **OR** logic — matching any selected value — while separate
-filter types AND together. So `status` OR-s internally and still ANDs with company/board, which
-is exactly what `where(status: [...])` does for free. The same source says to **style
-multi-select values as checkboxes** so the inclusive semantics are visible; the chips must
-therefore stop looking like radio buttons.
-
-**The consequence that makes this cheap: all-ON and all-OFF-today are the same query.** Thirteen
-of thirteen states selected is an unfiltered list — identical to the current "All" chip. The
-inversion is a *mental-model and affordance* change, not a new result set, and it costs nothing
-on the wire.
-
-- [x] **`status` accepts a list, server-side** — `Applications::ListQuery`
-      (`api/app/queries/applications/list_query.rb`) widens `filter_by_status` from
-      `where(status: status)` to a comma-separated list intersected with
-      `ApplicationFSM::VALID_STATES`. **Backward-compatible on the wire**: `status=applied`
-      parses as a one-element list, and today's server already *ignores* `status=applied,offer`
-      as an unknown state rather than erroring — so old and new never crash on each other.
-      **One param, not two.** No `exclude_status` companion: over a closed set, "hide
-      {ghosted, rejected}" *is* "show the other eleven", so show/hide is one control with two
-      framings. A second param could contradict the first (`status=applied&exclude_status=applied`)
-      and there is no right answer to that. Consistent with the research: **no design system in
-      the survey — NN/g, Baymard, GOV.UK, Material, HIG, Polaris, Atlassian — documents an
-      include/exclude mode toggle for filters.** Filtering is inclusion everywhere it is
-      specified.
-- [x] **The empty-list trap** — `where(status: [])` matches **zero rows, silently**. That is a
-      real hazard the moment a list can be empty, and it contradicts `ListQuery`'s stated
-      contract: every param is nil-tolerant, junk falls back to the *unfiltered first page*
-      because these arrive from navigation, not a form. So: an empty or all-unknown list is
-      **unfiltered**, same as `nil`. The client must never rely on that — it is the defence for
-      a hand-edited URL. Which forces the UI rule below.
-- [x] **Zero chips selected is a UI state, not a query.** All thirteen selected → send **no
-      `status` param at all** (byte-identical to today's "All"). Zero selected → **do not
-      fetch**; render an empty state locally that says every stage is hidden and offers one
-      click back. Otherwise "hide all" either shows everything (server's nil-tolerance) or an
-      unexplained blank — NN/g's
-      [empty-state guidance](https://www.nngroup.com/articles/empty-state-interface-design/)
-      calls out that *"totally empty states cause confusion about how and whether the system is
-      working"*, and wants a reason given, not a blank panel. The existing `noMatches` copy is
-      the wrong message here: nothing failed to match, the user hid it.
-- [x] **Presets: "All", "Active", "None"** — the bulk actions the chips are tedious without.
-      **The wire format is explicit chips, not a macro**: "Active" expands client-side to
-      `status=wishlist,draft,applied,phone_screen,technical,final_round,offer` and lights those
-      seven. A `status=active` macro would make the param polymorphic — a state *or* a group —
-      the same near-miss naming the `API_BASE` / `API_BASE_URL` rename (`v1.4.3`) was done to
-      remove. A preset is a **shortcut to a chip selection**, and stays visibly so: after
-      clicking it the user sees which seven, and can toggle one off.
-- [x] **`active_states` on `/transitions`, and delete `ACTIVE_STATUSES`** — *the invariant this
-      item would otherwise damage*. "Active" is currently a hardcoded TypeScript set
-      (`web/app/lib/format.ts:45`) and **is not derivable from what the server sends**: it
-      excludes the three `TERMINAL_STATES` *plus* `rejected`, `ghosted` and `withdrawn`. It
-      survives today as a display detail; promoting it to a **user-facing filter contract**
-      makes it FSM vocabulary mirrored in TypeScript, which is the one thing this codebase does
-      not do. `GET /transitions` already exists to serve exactly this — `states`, `entry_states`,
-      `terminal_states` (`api/app/controllers/api/v1/transitions_controller.rb:13`) — so add
-      `active_states`, own the definition in `ApplicationFSM`, and delete the TS copy. Four call
-      sites: `format.ts:45`, `details-editor.tsx:78`, `applications-list.tsx:260`, `board.tsx:97`
-      and `:100`. **Do this first** — the preset is downstream of it.
-- [x] **Chips become checkboxes, semantically** — they are `<button>`s with radio behaviour
-      today and must become independently-toggleable. **The APG has no chip pattern**; chips map
-      onto an existing one, and the choice is real — Material's own MDC gives filter chips
-      `role="checkbox"` while Angular Material chose `role="option"` in a `listbox`. **Go
-      checkbox**: [the APG checkbox pattern](https://www.w3.org/WAI/ARIA/apg/patterns/checkbox/)
-      is the fit for independent multi-select toggles, it matches Baymard's "style them as
-      checkboxes" advice above, and GOV.UK wants native semantics — *"group checkboxes together
-      in a `<fieldset>` with a `<legend>` that describes them"*. The
-      [toggle-button pattern](https://www.w3.org/WAI/ARIA/apg/patterns/button/) (`aria-pressed`)
-      is defensible but awkward here: *"it is critical the label on a toggle does not change when
-      its state changes"*, so the accessible name is stuck as the bare stage name. `listbox` is
-      the wrong shape — it models one selection acted on as a unit, and APG forbids mixing
-      `aria-selected` with `aria-checked`. **Selected state cannot be dimming alone** —
-      unselected chips are `opacity-40` today, which both risks
-      [WCAG 1.4.1](https://www.w3.org/WAI/WCAG21/Understanding/use-of-color.html) (*"colour is
-      not used as the only visual means of conveying information"* — a dimmed brand colour is
-      still colour) and drags the label toward failing contrast. Needs a structural mark: a
-      check, a filled box.
-- [x] **Keep the counts on the chips, and keep them global — this is mostly *right*, not a
-      compromise.** Counts matter: NN/g ties them directly to the failure mode this item
-      creates — *"facets also show the number of elements available under each filter, and thus
-      help users avoid zero-search results"*
-      ([applying filters](https://www.nngroup.com/articles/applying-filters/)) — and Baymard
-      agrees *"the number of matching products next to each filter option... gives users
-      confidence before they click"*. **Do not drop them when the chips go multi-select.**
-      On narrowing, the convention is **disjunctive faceting**: within *one* facet group, counts
-      ignore that group's own selections, so OR-ing `applied` + `rejected` must **not** collapse
-      the unselected `technical` chip's count to zero — otherwise every count decays toward zero
-      as you select and the numbers stop predicting anything. Status is one group, so **global
-      is the correct within-group answer** and today's `by_status` already gives it. *(Sourced
-      from Algolia/Meilisearch docs — a search-vendor convention, not a UX research body; NN/g
-      and Baymard imply the mechanic but never state it.)* **The one real gap** is cross-group:
-      status counts should narrow by company/board and can't, because `facets` carries only
-      `[company, board]` pairs — no status — so the dropdowns narrow each other
-      (`buckets(pick, constrainTo)`) while the chips answer a different question. That is a
-      dashboard-payload change and belongs with `v1.9.0`'s stat cards, which reopen the payload
-      anyway.
-- [x] **`SPEC.md` in the same PR** — `SPEC.md:758` currently reads *"`status` (exact)"* and
-      becomes a list. Check `SPEC.md:1917` while there: the board section rejects per-column
-      pagination partly because *"it needs a new `status` filter parameter on the API"* — that
-      argument's premise changes when this ships, so either the reasoning is restated or the
-      rejection is re-argued. Do not leave it silently false.
-
-**Explicitly not in this release.** **URL state** — filters are `useState` only and no filtered
-view is linkable or survives reload. That is a real limitation and arguably worse once a
-selection is thirteen chips wide, but it is a routing change (`i18n/navigation.ts`), not a
-filter change; it stays out so this item doesn't grow a second spine. **Batch vs instant
-filtering** — each chip click refetches, and NN/g notes batch filtering's *"risk that users will
-select a combination of criteria that leads to zero results"* while
-[interactive filtering](https://www.nngroup.com/articles/applying-filters/) suits users still
-learning the space. Per-click refetch is the right default here and is already what the code
-does; revisit only if it feels slow.
-
-**Deferred with a known price: thirteen chips is over the sourced limit.** Baymard's
-[Macy's filter testing](https://baymard.com/blog/macys-filtering-experience) puts the number
-plainly — *"Around 10 values is the sweetspot... displaying much more than 10 values impeded the
-user's overview of the other available filtering types"* — and the recommended shape is 4–8
-high-traffic values inline with the tail behind a "show more" disclosure, which beat both the
-full-list and inline-scroll alternatives. Thirteen states is past that line. It is deferred
-anyway because **the list already renders all thirteen today** and this release does not make
-that worse — but the presets are now doing double duty: they are the mitigation for a chip row
-that is, by evidence, too long to scan. If the row proves unscannable in use, the fix is
-Baymard's — the seven active stages inline, the six closed ones behind a disclosure — and
-`active_states` from the item above is already the split that needs. **Do not re-record this as
-"no evidence found"**: the evidence exists and this release is choosing against it knowingly.
+      **The work is not the four call sites, it's `status-help.tsx`.** `board.tsx` and
+      `transition-buttons.tsx` already hold `table`; that component does not, so this is a prop-
+      threading question — pass `terminalStates` down, or have the component take the table. Decide
+      that seam before writing the change, and mind the version-skew rule `v1.5.0` established:
+      `terminal_states` missing must degrade to *not* claiming permanence, never to claiming it.
+      **When it lands, `README.md:26` and `README.ja.md:26` can go back to the stronger universal
+      claim** ("the frontend never copies the FSM"), which this release's audit had to retract to a
+      narrower one because it was false. Retract nothing else there.
+- [ ] **`GET /api/v1/applications` documents none of its query parameters.** The `get:` block in
+      `api/swagger/v1/swagger.yaml:20` has no `parameters:` key at all — `status`, `company`,
+      `source`, `after` and `limit` are all absent, so `v1.5.0`'s headline API change is invisible
+      in the published reference and always was. **Pre-existing, not drift from `v1.5.0`**: nothing
+      in swagger is *wrong* about `status`, it simply says nothing. rswag only emits what the spec
+      declares, so the fix is `parameter` blocks in
+      `api/spec/requests/api/v1/applications_spec.rb` — a test change that regenerates the YAML,
+      not an edit to the YAML, which is generated output. Document the comma-separated list and the
+      "unknown values ⇒ unfiltered, never empty" contract while there.
 
 ---
 
@@ -414,15 +292,30 @@ footnote.
       without a VAPID keypair: generate one once (the `web-push` gem does it), store it as env
       vars on Railway prod **and** local dev, never in the repo. This adds a **required env
       var**, so it is load-bearing under the versioning test — SPEC.md § env updates in the same
-      PR, and dropping it later would be a major. Decide now whether the keypair is per-env
-      (safer — a leaked dev key can't sign prod pushes) or shared.
+      PR, and dropping it later would be a major.
+
+      **Settled 2026-07-17 — the keypair is per-environment.** Dev and prod get their own, so a
+      leaked or casually-shared dev key cannot sign a push to the production user. The cost is
+      that a subscription is bound to the environment that issued it: the browser stores the
+      public key it subscribed with, so pointing local dev at a prod-issued subscription fails
+      the signature check rather than falling back — expect to re-subscribe when switching, and
+      treat that as the design working, not a bug to route around.
 - [ ] **WebAuthn RP ID / origin config across environments** *(prerequisite for
-      passkeys)*. A passkey binds to an origin; the RP ID is the registrable domain
-      (`karirkalyan.up.railway.app` in prod, `localhost` in dev), and a mismatch fails the
-      ceremony **silently** with an opaque browser error — the worst kind of trap to debug. It
-      must be env-derived, never hardcoded. Record the consequence now: **if a custom domain is
-      ever added the RP ID changes and every existing credential is orphaned**, so the domain
-      decision wants making before enrollment ships, not after.
+      passkeys)*. A passkey binds to an origin, and a mismatched RP ID fails the ceremony
+      **silently** with an opaque browser error — the worst kind of trap to debug. It must be
+      env-derived, never hardcoded.
+
+      **Settled 2026-07-17 — the RP ID is `kk.chairulakmal.com` in prod, `localhost` in dev.**
+      This item used to say `karirkalyan.up.railway.app`, which was already stale: the app has
+      been on the custom domain since `v1.4.x` (`api/app/lib/allowed_hosts.rb:12`, SPEC.md
+      § Deployment). That retires the consequence this item was written to warn about — the
+      domain move that would have orphaned every credential has already happened, before
+      enrollment exists to orphan. **Use the full host, not the registrable domain**, which is
+      what this item previously said: the registrable domain of `kk.chairulakmal.com` is
+      `chairulakmal.com`, and `awano.chairulakmal.com` exists (SPEC.md § Frontend tech stack) —
+      scoping to the parent would make KarirKalyan's passkeys assertable by every sibling
+      subdomain, current and future. The narrower ID costs nothing here, because there is no
+      second host that needs to share these credentials.
 - [ ] **The service worker file, its registration, and its CSP fit** *(prerequisite
       for push, and the installed-app feel)*. None exists today. Three parts: the SW script
       itself (**push + `notificationclick` handlers only, never a `fetch` handler** — the nonce
@@ -613,6 +506,16 @@ none at all — so the release passes the major test the same way the rest of th
       slice by channel and Japanese level. **Alternative rejected:** a dedicated `/insights`
       page — a new route and nav weight for one user; if the cards earn promotion later, the
       queries move with them.
+
+      **Inherited from `v1.5.0` — make the stage counts cross-narrow while the payload is
+      open.** The stage filter shipped disjunctive faceting only *within* a filter type: the
+      company and board dropdowns narrow each other through `buckets(pick, constrainTo)`, but
+      the stage chips' counts ignore both, because `facets` carries `[company, board]` pairs and
+      no status. So the chips answer a different question than the row beside them — "12 phone
+      screens" stays 12 after picking a company that has one. Fixing it means status in the
+      facet payload, which is this item's change to make: it reopens `/dashboard`'s response
+      anyway, and doing it here costs one column rather than a second migration of the same
+      shape.
 - [ ] **Triage the two candidate-side board columns without opening each card** *(added
       2026-07-16)*. `web/app/[locale]/(app)/board/board.tsx:251–252` renders every card as
       company + role and nothing else, so deciding what to do with a `wishlist` or `draft` item
@@ -728,6 +631,29 @@ none at all — so the release passes the major test the same way the rest of th
       created_at)` **if the table grows**, not before. (`feat/ghost-prediction` widened the bare
       `application_id` index to `(application_id, created_at)` for the ghost-risk window
       function — a replacement, not an addition.)
+- [ ] **Stage chips behind a "show more" disclosure** — conditional on the row proving
+      unscannable in use, and **not** on finding evidence: the evidence exists and `v1.5.0`
+      chose against it knowingly. Baymard's
+      [Macy's filter testing](https://baymard.com/blog/macys-filtering-experience) is plain —
+      *"Around 10 values is the sweetspot... displaying much more than 10 values impeded the
+      user's overview of the other available filtering types"* — and the shape that beat both
+      the full list and an inline scroll is 4–8 high-traffic values inline with the tail behind
+      a disclosure. Thirteen states is past that line. `v1.5.0` deferred it because the list
+      already rendered all thirteen and the release did not make that worse, but the "All /
+      Active / None" presets are now carrying the mitigation. The split this needs already
+      exists and is already fetched: `active_states` from `/transitions` is exactly the seven
+      inline stages, leaving the six closed ones behind the disclosure. **Do not re-record this
+      as "no evidence found".**
+- [ ] **Filter state in the URL** — conditional, and a real limitation today: the dashboard's
+      filters are `useState` only, so no filtered view is linkable, survives a reload, or comes
+      back with the back button. `v1.5.0` made this arguably worse by widening a selection from
+      one stage to thirteen chips, and still left it out on purpose — it is a routing change
+      (`web/i18n/navigation.ts`), not a filter change, and folding it in would have grown that
+      item a second spine. Worth doing when a filtered view is something the user wants to *keep*
+      or send, rather than rebuild each visit. Note the collision with the empty-list contract in
+      `SPEC.md` § Query layer: params would then arrive from a pasted URL as well as from
+      navigation, which is the case `ListQuery`'s "junk narrows to nothing ⇒ unfiltered, never
+      empty" rule already exists to answer.
 - [ ] **Email verification** (Devise `:confirmable`) — **only if registration ever reopens.**
       Dropped from the plan by `v1.4.1`: `:confirmable` confirms that whoever typed an address
       into a sign-up form can read that mailbox, and there is no sign-up form. The operator types

@@ -33,8 +33,8 @@ pipeline. Built as a portfolio project by Chairul Akmal.
   function. Below five recorded replies at a stage it falls back to a global default (21 days for
   applied, 14 for phone_screen) and labels the threshold as a default rather than a personal one.
 - Offers a Kanban board at /board: one column per active status, and dragging a card between
-  columns performs a real FSM transition. The board fetches the legal moves from
-  GET /api/v1/transitions rather than keeping its own copy of the table, and the server
+  columns performs a real FSM transition. The board fetches the legal moves and its column set
+  from GET /api/v1/transitions rather than keeping its own copy of the table, and the server
   re-validates every move regardless. Each card also has a menu listing every legal next state,
   which is the keyboard-accessible path.
 - Cursor-based pagination on the applications list
