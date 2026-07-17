@@ -246,13 +246,34 @@ The capture flow and the shell are the release — they are what changes the use
       Android: the notification itself produces the dot/count.
 - [ ] **The installed-app shell.** Bottom tab bar (Dashboard / Applications / Board)
       with `env(safe-area-inset-bottom)` — which also dissolves the 375px Japanese-nav-label
-      squeeze the header comment fights (`web/app/[locale]/(app)/layout.tsx:21`); `start_url` →
-      `/dashboard` so launching the installed app opens *into* the app instead of riding the
-      proxy redirect off the marketing page; manifest `shortcuts` (long-press the icon → New
-      application / Board); a `monochrome` icon for Android themed icons — on a Nothing Phone
-      specifically this is a disproportionate delight detail, its launcher aesthetic *is*
-      monochrome themed icons; and verify the 512px maskable icon actually has safe-zone padding
-      rather than just carrying the `maskable` label.
+      squeeze the header comment fights (`web/app/[locale]/(app)/layout.tsx:21`); manifest
+      `shortcuts` (long-press the icon → New application / Board); and a `monochrome` icon for
+      Android themed icons — on a Nothing Phone specifically this is a disproportionate delight
+      detail, its launcher aesthetic *is* monochrome themed icons.
+
+      **The manifest half shipped separately (2026-07-17)** — it was pure JSON plus one generated
+      asset, with no component behind it, so it did not need to wait for the tab bar. `start_url`
+      is now `/dashboard`, `scope` and `id` are explicit, and the icon purposes are split. What is
+      left above is the part that needs components and design decisions. `SPEC.md` § Installable
+      app is the source of truth; three notes so they are not re-litigated:
+
+      - **The maskable audit is closed, and it asked the wrong question.** The item used to say
+        "verify the 512px maskable icon actually has safe-zone padding" — measured, it always had:
+        the wordmark's furthest corner is 182.6px from centre against a 204.8px safe radius. The
+        real defect was the opposite half of the contract — the plate had **transparent corners**,
+        and `maskable` is full-bleed by contract because the launcher supplies the shape. A new
+        flattened `icon-maskable-512.png` carries `maskable`; the drawn rounded-corner icons keep
+        `any`.
+      - **`shortcuts` is not blocked on code, it is blocked on a decision.** A manifest is a static
+        file with one set of strings, and this app is bilingual — so shortcut labels would ship
+        English-only to a Japanese user, next to a UI that is not. Either accept that (as
+        `name`/`short_name` already do, but those are the wordmark, which § i18n already exempts as
+        untranslated — a label like "New application" is not), or serve the manifest from a route
+        handler that reads the locale, which is a new dynamic surface and a CSP question. Decide
+        before writing it.
+      - **`monochrome` needs an asset that does not exist.** It is not the existing icon recoloured:
+        a monochrome icon supplies a *shape* in alpha and lets the launcher tint it, so the plate
+        must go and the wordmark become the mask. `karirkalyan-monogram.svg` is the closest source.
 
 ### Infrastructure prerequisites — before any of the four ships *(added 2026-07-15)*
 
