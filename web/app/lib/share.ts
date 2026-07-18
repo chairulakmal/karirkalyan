@@ -25,12 +25,19 @@ function first(param: Param): string {
 }
 
 function urlIn(candidate: string): string | null {
-  const match = /https?:\/\/\S+/.exec(candidate);
+  /* A character class of RFC 3986's URL alphabet, not \S+: Japanese prose has
+     no spaces, so \S+ would run from the scheme to the end of the sentence —
+     「詳細は https://…/pos（応募はお早めに）」 parses as a URL and auto-runs
+     the pre-fill on garbage. Stopping at the first character a URL cannot
+     contain ends the match at fullwidth punctuation and CJK for free; a share
+     sheet hands over real links percent-encoded, so the ASCII-valid prefix is
+     the link. */
+  const match = /https?:\/\/[A-Za-z0-9\-._~:/?#[\]@!$&'()*+,;=%]+/i.exec(candidate);
   if (!match) return null;
 
-  // Prose wraps links in punctuation ("see https://…, apply now") that \S+
-  // swallows. Real URLs end in it rarely enough that stripping is the better
-  // error, and the pre-fill's own fetch is the judge either way.
+  // Prose wraps links in punctuation ("see https://…, apply now") that the
+  // class above still admits. Real URLs end in it rarely enough that stripping
+  // is the better error, and the pre-fill's own fetch is the judge either way.
   const found = match[0].replace(/[),.;!?\]'"]+$/, "");
   try {
     const parsed = new URL(found);
@@ -45,11 +52,13 @@ export function capturedShare(params: {
   text?: Param;
   title?: Param;
 }): SharedCapture | null {
-  for (const candidate of [first(params.url), first(params.text), first(params.title)]) {
+  const sharedText = first(params.text);
+
+  for (const candidate of [first(params.url), sharedText, first(params.title)]) {
     const url = urlIn(candidate);
     if (url) return { kind: "url", url };
   }
 
-  const text = first(params.text).trim();
+  const text = sharedText.trim();
   return text ? { kind: "text", text } : null;
 }

@@ -28,6 +28,18 @@ test("a shared URL is extracted from the text param and auto-runs the pre-fill",
   await expect(page.getByRole("alert")).toBeVisible({ timeout: 15_000 });
 });
 
+test("a URL inside Japanese prose ends at the fullwidth punctuation", async ({
+  page,
+}) => {
+  // Japanese has no spaces, so a naive \S+ match would run from the scheme to
+  // the end of the sentence — the review finding this spec pins. The URL must
+  // come out exact, with the surrounding prose left behind.
+  const sharedText = `詳細は${POSTING_URL}（応募はお早めに）をご覧ください`;
+  await page.goto(`/applications/new?text=${encodeURIComponent(sharedText)}`);
+
+  await expect(page.locator('input[name="url"]')).toHaveValue(POSTING_URL);
+});
+
 test("a text-only share opens the paste box seeded, and runs nothing", async ({
   page,
 }) => {
