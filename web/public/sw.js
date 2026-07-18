@@ -1,11 +1,20 @@
 /* The push-only service worker (SPEC.md § Installable app § The service worker).
  *
- * Exactly two events, and it must never gain a `fetch` handler: every route
+ * Exactly three events, and it must never gain a `fetch` handler: every route
  * renders dynamically so its scripts carry the per-request CSP nonce, and a
  * worker that cached HTML would serve pages whose nonces no longer match the
  * response header — every script silently blocked. Offline support is out for
  * the same reason: offline IS a fetch handler.
  */
+
+self.addEventListener("activate", (event) => {
+  /* Take control of already-open tabs immediately: notificationclick's
+     navigate() rejects on windows this worker does not control, and without
+     claim() a tab open since before registration stays uncontrolled until it
+     reloads. Safe precisely because there is no fetch handler — claiming
+     changes who may navigate a tab, never what its requests return. */
+  event.waitUntil(self.clients.claim());
+});
 
 self.addEventListener("push", (event) => {
   let payload = { title: "KarirKalyan", body: "", url: "/dashboard" };
@@ -21,6 +30,11 @@ self.addEventListener("push", (event) => {
       body: payload.body,
       icon: "/brand/icons/png/icon-primary-192.png",
       badge: "/brand/icons/png/icon-monochrome-512.png",
+      /* One digest, one notification: a re-delivered push (the server job
+         retries transient failures) replaces the copy already showing
+         instead of stacking a duplicate. */
+      tag: "follow-up-digest",
+      renotify: true,
       data: { url: payload.url },
     }),
   );
@@ -31,13 +45,19 @@ self.addEventListener("notificationclick", (event) => {
   const url = event.notification.data?.url ?? "/dashboard";
 
   event.waitUntil(
-    clients.matchAll({ type: "window", includeUncontrolled: true }).then((windows) => {
+    (async () => {
+      const windows = await clients.matchAll({ type: "window", includeUncontrolled: true });
       const existing = windows.find((w) => "focus" in w);
       if (existing) {
-        existing.navigate(url);
-        return existing.focus();
+        await existing.focus();
+        try {
+          await existing.navigate(url);
+        } catch {
+          /* An uncontrolled window cannot be navigated — focus is enough. */
+        }
+        return;
       }
-      return clients.openWindow(url);
-    }),
+      await clients.openWindow(url);
+    })(),
   );
 });

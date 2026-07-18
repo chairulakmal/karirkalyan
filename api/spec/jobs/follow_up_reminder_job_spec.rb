@@ -1,5 +1,11 @@
 require "rails_helper"
 
+# Negated so the quiet-mode example can assert "mail yes, push no" over ONE
+# perform — the claim makes a second run a no-op, and the non-block
+# have_been_enqueued reads the adapter's absolute queue, which leaks across
+# examples.
+RSpec::Matchers.define_negated_matcher :not_have_enqueued_job, :have_enqueued_job
+
 RSpec.describe FollowUpReminderJob, type: :job do
   # Every example is anchored to midday JST on Friday 2026-07-10 — an ordinary business
   # day — so "today" is stable and the dead-zone examples below can move it deliberately.
@@ -144,8 +150,11 @@ RSpec.describe FollowUpReminderJob, type: :job do
 
   # Two channels, one claim (SPEC.md § Push notifications): the timeline entry
   # is the exactly-once anchor for both, so the push job mirrors the mailer's
-  # enqueue behaviour example for example.
+  # enqueue behaviour example for example. PushVapid is stubbed explicitly —
+  # dev has keys in .env, CI has none, and these examples must not care.
   describe "the push channel" do
+    before { allow(PushVapid).to receive(:configured?).and_return(true) }
+
     it "enqueues one PushDigestJob per user, carrying the claimed ids" do
       second = create(:application, :applied, user: user, follow_up_at: Time.zone.local(2026, 7, 10, 9, 0, 0))
 
@@ -156,6 +165,14 @@ RSpec.describe FollowUpReminderJob, type: :job do
     it "does not enqueue a duplicate push on retry" do
       described_class.new.perform
       expect { described_class.new.perform }.not_to have_enqueued_job(PushDigestJob)
+    end
+
+    it "skips the enqueue entirely without VAPID keys — email-only mode is quiet" do
+      allow(PushVapid).to receive(:configured?).and_return(false)
+
+      expect { described_class.new.perform }
+        .to have_enqueued_mail(FollowUpMailer, :digest).once
+        .and not_have_enqueued_job(PushDigestJob)
     end
   end
 

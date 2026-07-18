@@ -15,10 +15,13 @@ class FollowUpReminderJob < ApplicationJob
 
       # Two channels, one claim: the timeline entry above is the exactly-once
       # anchor for both. Each channel is decoupled onto its own job so a
-      # failure in one retries alone — a push-service outage must not re-mail,
-      # and an SMTP failure must not re-push (SPEC.md § Push notifications).
+      # failure in one is handled alone — a push-service failure retries the
+      # push job (its own declared retry_on), never re-mails, and an SMTP
+      # failure retries the mail without re-pushing. The enqueue itself is
+      # gated so email-only mode stays genuinely quiet: no VAPID keys, no
+      # throwaway job rows (SPEC.md § Push notifications).
       FollowUpMailer.digest(user, won).deliver_later
-      PushDigestJob.perform_later(user, won.map(&:id))
+      PushDigestJob.perform_later(user, won.map(&:id)) if PushVapid.configured?
       [ user, won ]
     end
 

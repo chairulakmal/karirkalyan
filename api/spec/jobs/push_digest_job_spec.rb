@@ -69,6 +69,23 @@ RSpec.describe PushDigestJob do
       .with(hash_including(endpoint: survivor.endpoint))
   end
 
+  # The transient path: every other subscription is served BEFORE the error
+  # re-raises into retry_on — one flaky endpoint must not cost the user's
+  # other devices their notification, and the notification tag makes the
+  # retry's re-send a visual no-op on devices that already showed it.
+  it "serves the other subscriptions before re-raising a transient network error" do
+    survivor = create(:push_subscription, user: user)
+    allow(WebPush).to receive(:payload_send)
+      .with(hash_including(endpoint: subscription.endpoint))
+      .and_raise(Net::OpenTimeout)
+
+    expect { perform }.to raise_error(Net::OpenTimeout)
+
+    expect(WebPush).to have_received(:payload_send)
+      .with(hash_including(endpoint: survivor.endpoint))
+    expect(PushSubscription.exists?(subscription.id)).to be(true)
+  end
+
   it "logs and keeps the row on any other push-service error, still serving the others" do
     survivor = create(:push_subscription, user: user)
     too_many = double(code: "429", message: "Too Many Requests", body: "")

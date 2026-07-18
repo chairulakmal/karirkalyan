@@ -92,14 +92,13 @@ export function PushManager() {
       if (subscription) {
         // Browser first, then the row: a dangling server row self-prunes on
         // the next digest (SPEC.md § Push notifications), while a dangling
-        // browser subscription would keep receiving nothing forever.
+        // browser subscription would keep receiving nothing forever. That
+        // self-pruning is also why a failed row delete is not surfaced: the
+        // browser is the authority on status, this device IS off, and the
+        // leftover row cleans itself up on the next send.
         const endpoint = subscription.endpoint;
         await subscription.unsubscribe();
-        const result = await unsubscribePush(endpoint);
-        if (!result.ok) {
-          setError(result.error);
-          return;
-        }
+        await unsubscribePush(endpoint);
       }
       setStatus("off");
     } catch {
