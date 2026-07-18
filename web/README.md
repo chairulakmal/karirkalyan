@@ -1,6 +1,6 @@
 # KarirKalyan — Next.js Frontend
 
-Next.js 16 App Router frontend. Consumes the Rails API over REST and handles JWT auth server-side so the token never reaches client JavaScript.
+The operational README for `web/`, KarirKalyan's Next.js 16 App Router frontend — how it authenticates, routes, and runs locally. The most important rule in it: the JWT never reaches client JavaScript — sign-in exchanges the token through a route handler that sets an `httpOnly` cookie, which is one reason Next.js was chosen over a pure SPA. Contents: the stack, the auth design, i18n and its CI-enforced catalog parity, the screens, local setup, and the Playwright end-to-end suite. How the system works and why lives in [`SPEC.md`](../SPEC.md); this file is what you type.
 
 ## Stack
 

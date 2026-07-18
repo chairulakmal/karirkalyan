@@ -1,6 +1,6 @@
 # KarirKalyan — Rails API
 
-Rails 8 API-only backend for KarirKalyan. Handles auth, application tracking, background reminders, and dashboard aggregations.
+The operational README for `api/`, KarirKalyan's Rails 8 API-only backend — how to run it, deploy it, and test it. The most important line in it is the seed: registration is closed, so `bin/rails db:seed` is the only way to get a login. Contents: the stack, local setup, deployment env vars, background jobs and scheduled reminders, caching, the AI pre-fill and its guardrails, demo data and its hourly reset, running tests, regenerating the API docs, key files, and the route table. How the system works and why lives in [`SPEC.md`](../SPEC.md); this file is what you type.
 
 ## Stack
 
