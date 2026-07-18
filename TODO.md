@@ -1,8 +1,8 @@
 # TODO
 
-The plan: open work only, grouped by the release that ships it. The most important thing about this file is what it may not hold — shipped work lives in [`CHANGELOG.md`](CHANGELOG.md), and so do the settled decisions-not-to-build (dark mode, document version history, client-side error tracking — see its § Decisions); what each shipped release contained is `CHANGELOG.md`'s job to say, not this file's. Contents: the release plan `v1.6.0` → `v1.9.0` and its standing rules, then the conditional items tagged to no release, the upstream-blocked maintenance, and the `2.0.0` career-growth cluster whose trigger is a date in the user's life, not a release number.
+The plan: open work only, grouped by the release that ships it. The most important thing about this file is what it may not hold — shipped work lives in [`CHANGELOG.md`](CHANGELOG.md), and so do the settled decisions-not-to-build (dark mode, document version history, client-side error tracking — see its § Decisions); what each shipped release contained is `CHANGELOG.md`'s job to say, not this file's. Contents: the release plan `v1.7.0` → `v1.9.0` and its standing rules, then the conditional items tagged to no release, the upstream-blocked maintenance, and the `2.0.0` career-growth cluster whose trigger is a date in the user's life, not a release number.
 
-**Current release: `v1.5.1`; `v1.6.0` is in flight, feature-complete.** All of its planned scope — the capture flow, the installed-app shell, passkey sign-in, and push delivery for the digest — has landed on `main` (`CHANGELOG.md` § v1.6.0 records it); the pre-tag docs sweep is done (2026-07-18), and what remains before the tag is the release mechanics themselves.
+**Current release: `v1.6.0`, tagged 2026-07-18.** What it contained is `CHANGELOG.md` § v1.6.0's job to say. The production VAPID keypair is set on the `api` service (verified 2026-07-18), so push delivery is live, not degraded. Next up: `v1.7.0`, the Japan market layer.
 
 **North star: be the best career app for its one loyal user: myself (the author).** Portfolio value follows from that, not the other way round — a reviewer can tell a tool with a real user from a feature showcase. Two consequences for sequencing: items are ordered by **when in the user's life they pay off** (search-time items while the search is active; the `positions` entity is triggered by accepting an offer, not by finishing a prior release), and the worst-day operations work — backups, export, abuse throttles — earns its place without passing any feature admission test, because nothing else in the repo defends the data.
 
@@ -10,37 +10,26 @@ The plan: open work only, grouped by the release that ships it. The most importa
 
 ---
 
-## The plan — `v1.6.0` → `v1.9.0`
+## The plan — `v1.7.0` → `v1.9.0`
 
 **The whole backlog fits under 1.x.** Only one item forces a major, and `SPEC.md` § Versioning & releases already names it: the **`positions` entity**, because it adds a table *and* changes what `accepted` means in `ApplicationFSM`. Everything else here is an additive migration or has no schema at all, so the previous image would still boot against the database the release leaves behind — which is the whole of the major test.
 
 | Release | Level | Contents |
 | --- | --- | --- |
-| `v1.6.0` | minor | The pocket app: share-sheet capture, passkey sign-in, push digest, installed-app shell — plus the prefill paste fallback the share sheet needs |
 | `v1.7.0` | minor | The Japan market layer: recruiter channel + `agencies`, 年収 comp structure, Japanese-level filter, posting snapshot, plus the header account menu that gives `/settings` a phone home |
 | `v1.7.1` | patch | Japanese phrase-based line breaking |
 | `v1.8.0` | minor | Hiring entity, timezone overlap + `.ics`, visa / status of residence |
 | `v1.9.0` | minor | The follow-through: dashboard stat cards, board triage cards, cover-letter talking points, push interview/deadline alerts, public HSP calculator, interview stage notes |
 
-The pocket app leads because during an active search postings are met on the phone, and its share-sheet capture multiplies the exact prefill pipeline the Japan layer bets on. Each item below carries its release tag; the table is the summary of those tags, not a second source of truth. Market-dependent claims were researched against current web sources (dates inline) and fall under the perishable-facts rule below.
+Each item below carries its release tag; the table is the summary of those tags, not a second source of truth. Market-dependent claims were researched against current web sources (dates inline) and fall under the perishable-facts rule below.
 
 **Context for the feature releases.** A generic tracker is a CRUD demo; the differentiators in `v1.7.0`–`v1.8.0` are the ones a Tokyo hiring reviewer could not have seen in someone else's portfolio, because they encode knowledge of the market rather than knowledge of Rails. The table stakes are already in — follow-up digest, CSV export, ghost prediction (see `CHANGELOG.md`) — and the pre-1.0.0 Phase 9 roadmap's analytics dashboard and AI cover-letter assist are both scoped into `v1.9.0` in deliberately reduced shape (stat cards, not a page; talking points, not drafts). Most of what follows touches `api/`; that is fine — the `web/`-only constraint was a property of v1.1.0, not a permanent rule.
 
 ### Standing rules
 
-- **The trap that would break this plan: every new column in `v1.6.0`–`v1.9.0` must be nullable or defaulted.** A `NOT NULL` column with no default means the previous image's `INSERT`s fail against the new database — and by the mechanical test that quietly turns a minor into a **major**. It is the only way this plan accidentally violates its own versioning. The pocket app's two new tables (`credentials`, `push_subscriptions`) are purely additive and pass for free — the rule bites on columns added to tables the previous image writes to.
+- **The trap that would break this plan: every new column in `v1.7.0`–`v1.9.0` must be nullable or defaulted.** A `NOT NULL` column with no default means the previous image's `INSERT`s fail against the new database — and by the mechanical test that quietly turns a minor into a **major**. It is the only way this plan accidentally violates its own versioning. `v1.6.0`'s two new tables (`credentials`, `push_subscriptions`) were purely additive and passed for free — the rule bites on columns added to tables the previous image writes to.
 - **Field admission test, for any new per-application column** — channel, agency, comp structure, language level, hiring entity, timezone, all of them: it must be **captured at prefill time by `UrlPrefillService`, or cost near-zero manual entry**. The app has one user, and a field he stops filling in after the fifth application is dead schema plus form friction.
 - **Perishable-facts refresh rule, for every Japan-market item** — each embeds perishable external facts: fee schedules, processing times, survey medians. A career tool that confidently states last year's rules is worse than one that says nothing, so each such item must state its **annual refresh cost** when it is scoped, and the sum of those lines is a real cap on how many of these a solo maintainer can ship. The career-intelligence item already budgets this way ("one data-entry session a year"); that is the pattern.
-
----
-
-## `v1.6.0` — minor. "The pocket app"
-
-**Feature-complete; untagged.** Every planned item landed on `main`: the share-sheet capture and paste fallback, the manifest work and installed shell, passkey sign-in, and push delivery for the follow-up digest with all four of its prerequisites (VAPID lifecycle, the push-only service worker and its CSP fit, the permission-prompt timing, and the test seam). `CHANGELOG.md` § v1.6.0 records what shipped; the settled designs live in `SPEC.md` — § Installable app (shell, share target, and § The service worker, which also records that **offline stays out**: it is architectural, not deferred), § Passkeys, § Push notifications, and § `UrlPrefillService`. The scope boundary held: Android-first, web-only — no TWA/Play packaging, no iOS work.
-
-What remains before tagging, and it is process rather than feature work:
-
-- [ ] **Cut the tag.** The pre-tag docs sweep is **done** (2026-07-18, verified by a `docs-auditor` pass: both READMEs, `llms.txt`, `api/README.md`'s env vars, routes and jobs, `web/README.md`'s screens table; swagger and `CHANGELOG.md` were already current). What remains is the release mechanics: move the `CHANGELOG.md` in-flight block under the version heading, `git tag v1.6.0`, `gh release create`. One deploy note rides with it: **production needs a VAPID keypair set on the `api` service** (`bin/rails push:vapid`, per-environment on purpose); without it the app runs fine and push degrades to `503 push_unavailable`, so this is a post-merge chore, not a release blocker.
 
 ---
 
