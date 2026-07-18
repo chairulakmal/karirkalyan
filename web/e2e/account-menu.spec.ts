@@ -2,6 +2,10 @@ import { test, expect } from "@playwright/test";
 
 import { EMAIL } from "./credentials";
 
+// The email goes into accessible-name regexes; its dots must not match "any
+// character".
+const EMAIL_PATTERN = new RegExp(EMAIL.replace(/[.*+?^${}()|[\]\\]/g, "\\$&"));
+
 /**
  * The header's account menu (SPEC.md § Auth flow). The chip's initial and the
  * menu's email row both come from the httpOnly `account_email` cookie the
@@ -17,7 +21,7 @@ test("account chip shows the initial and the menu reaches settings", async ({ pa
 
   // Accessible name carries the full email; the visible glyph is one initial
   // from the local part: the seeded account's "e".
-  const chip = header.getByRole("button", { name: new RegExp(EMAIL) });
+  const chip = header.getByRole("button", { name: EMAIL_PATTERN });
   await expect(chip).toBeVisible();
   await expect(chip).toHaveText(EMAIL.charAt(0).toUpperCase());
   await expect(chip).toHaveAttribute("aria-expanded", "false");
@@ -45,7 +49,7 @@ test("sign-out lives in the menu, not on the header bar", async ({ page }) => {
   const signOut = header.getByRole("button", { name: /sign out/i });
   await expect(signOut).toHaveCount(0);
 
-  await header.getByRole("button", { name: new RegExp(EMAIL) }).click();
+  await header.getByRole("button", { name: EMAIL_PATTERN }).click();
   await expect(signOut).toBeVisible();
   // Not clicked: signing out here would revoke the shared storageState the
   // rest of the suite reuses (see auth.setup.ts).

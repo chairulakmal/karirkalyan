@@ -56,32 +56,33 @@ export function AccountMenu({ email }: { email: string | null }) {
         aria-expanded={open}
         aria-controls={panelId}
         aria-label={label}
-        title={label}
         onClick={() => setOpen((current) => !current)}
         className="flex size-8 items-center justify-center bg-cobalt text-sm font-medium text-linen transition hover:bg-cobalt-2"
       >
         {initial || "@"}
       </button>
-      {open && (
-        <div
-          id={panelId}
-          className="absolute right-0 top-full z-10 mt-2 w-56 border border-dune bg-linen py-1 shadow-lg"
+      {/* Always in the DOM so aria-controls has a target while closed; hidden
+          toggles visibility. z-20 clears the sticky tab bar's z-10, the same
+          precedent board.tsx sets for its menus. */}
+      <div
+        id={panelId}
+        hidden={!open}
+        className="absolute right-0 top-full z-20 mt-2 w-56 border border-dune bg-linen py-1 shadow-lg"
+      >
+        {email && (
+          <p className="break-all border-b border-dune px-4 py-2 text-xs text-ink-soft">
+            {email}
+          </p>
+        )}
+        <Link
+          href="/settings"
+          onClick={() => setOpen(false)}
+          className="block px-4 py-2 font-medium hover:text-cobalt"
         >
-          {email && (
-            <p className="break-all border-b border-dune px-4 py-2 text-xs text-ink-soft">
-              {email}
-            </p>
-          )}
-          <Link
-            href="/settings"
-            onClick={() => setOpen(false)}
-            className="block px-4 py-2 font-medium hover:text-cobalt"
-          >
-            {t("settings")}
-          </Link>
-          <SignOutButton className="block w-full px-4 py-2 text-left font-medium text-ink-soft hover:text-cobalt disabled:opacity-50" />
-        </div>
-      )}
+          {t("settings")}
+        </Link>
+        <SignOutButton className="block w-full px-4 py-2 text-left font-medium text-ink-soft hover:text-cobalt disabled:opacity-50" />
+      </div>
     </div>
   );
 }
