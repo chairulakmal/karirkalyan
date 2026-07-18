@@ -82,6 +82,9 @@ export async function generateMetadata({
 
 export const viewport = {
   themeColor: "#1A2F6B",
+  // Without viewport-fit=cover every env(safe-area-inset-*) is 0, and the
+  // tab bar's gesture-bar padding silently does nothing in the WebAPK.
+  viewportFit: "cover" as const,
 };
 
 export default async function RootLayout({
