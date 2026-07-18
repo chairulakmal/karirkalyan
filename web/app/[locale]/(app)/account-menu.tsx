@@ -8,12 +8,12 @@ import { SignOutButton } from "./sign-out-button";
 /**
  * The header's account chip + menu (SPEC.md § Auth flow): Settings and Sign
  * out behind a square initials chip, at every width. A plain disclosure, not
- * an ARIA menu — two links do not earn roving focus. The chip is square on
+ * an ARIA menu (two links do not earn roving focus). The chip is square on
  * purpose: radius 0 is the design system, and the circle convention signals a
  * person's photo, which this app never has.
  *
  * `email` comes from the httpOnly `account_email` cookie via the layout, as a
- * prop — never fetched (ProfileCard's rule, SPEC.md § Exports). It is null for
+ * prop, never fetched (ProfileCard's rule, SPEC.md § Exports). It is null for
  * sessions minted before the cookie existed; the chip then falls back to a
  * neutral glyph, and both entries still work.
  */
@@ -43,7 +43,7 @@ export function AccountMenu({ email }: { email: string | null }) {
     };
   }, [open]);
 
-  // One initial from the email local part — never from a name, which the data
+  // One initial from the email local part, never from a name, which the data
   // model doesn't hold and whose initials are culturally fraught anyway.
   const initial = email?.split("@")[0]?.trim().charAt(0).toUpperCase();
   const label = email ? `${t("account")}: ${email}` : t("account");

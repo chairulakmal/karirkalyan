@@ -5,7 +5,7 @@ import { EMAIL } from "./credentials";
 /**
  * The header's account menu (SPEC.md § Auth flow). The chip's initial and the
  * menu's email row both come from the httpOnly `account_email` cookie the
- * sign-in handler set during `auth.setup.ts` — so these assertions are also
+ * sign-in handler set during `auth.setup.ts`, so these assertions are also
  * the proof that the cookie made it through sign-in and into the layout.
  */
 test("account chip shows the initial and the menu reaches settings", async ({ page }) => {
@@ -16,7 +16,7 @@ test("account chip shows the initial and the menu reaches settings", async ({ pa
   const header = page.locator("header").first();
 
   // Accessible name carries the full email; the visible glyph is one initial
-  // from the local part — the seeded account's "e".
+  // from the local part: the seeded account's "e".
   const chip = header.getByRole("button", { name: new RegExp(EMAIL) });
   await expect(chip).toBeVisible();
   await expect(chip).toHaveText(EMAIL.charAt(0).toUpperCase());

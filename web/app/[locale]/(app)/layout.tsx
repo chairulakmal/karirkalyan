@@ -15,7 +15,7 @@ const reviewerLinkClass = "underline underline-offset-4 hover:text-cobalt";
 export default async function AppLayout({ children }: { children: React.ReactNode }) {
   const t = await getTranslations("nav");
   // The display cookie the sign-in handlers set beside the JWT (SPEC.md
-  // § Auth flow) — read here, passed down as a prop, never fetched. Null for
+  // § Auth flow): read here, passed down as a prop, never fetched. Null for
   // sessions minted before the cookie existed; it ages out within a day.
   const email = (await cookies()).get(ACCOUNT_EMAIL_COOKIE_NAME)?.value ?? null;
 
@@ -51,7 +51,7 @@ export default async function AppLayout({ children }: { children: React.ReactNod
                 the push enable toggle is on /settings and the installed app is
                 the device push targets, so the phone must reach the page
                 without a typed URL (SPEC.md § Auth flow). Locale stays outside
-                the menu — language switching is a first-visit action. */}
+                the menu: language switching is a first-visit action. */}
             <AccountMenu email={email} />
             <LocaleSwitcher />
           </nav>

@@ -6,11 +6,11 @@ const COOKIE_OPTIONS = {
   secure: process.env.NODE_ENV === "production",
   sameSite: "lax",
   path: "/",
-  maxAge: 60 * 60 * 24, // 1 day — matches Devise JWT expiration_time
+  maxAge: 60 * 60 * 24, // 1 day, matches Devise JWT expiration_time
 } as const;
 
-// Stores the Rails-issued JWT in the httpOnly `session` cookie — the one write
-// that keeps the token out of client JS (SPEC.md § Auth flow) — and the email
+// Stores the Rails-issued JWT in the httpOnly `session` cookie (the one write
+// that keeps the token out of client JS, SPEC.md § Auth flow) and the email
 // from the same sign-in response in the httpOnly `account_email` cookie beside
 // it, so the header's account chip never has to fetch. Shared by the password
 // and passkey sign-in route handlers, which is why it lives here and not
