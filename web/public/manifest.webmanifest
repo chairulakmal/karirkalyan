@@ -6,6 +6,11 @@
   "start_url": "/dashboard",
   "scope": "/",
   "display": "standalone",
+  "share_target": {
+    "action": "/applications/new",
+    "method": "GET",
+    "params": { "title": "title", "text": "text", "url": "url" }
+  },
   "background_color": "#F7F3EA",
   "theme_color": "#1A2F6B",
   "icons": [

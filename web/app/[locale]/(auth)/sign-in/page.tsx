@@ -1,12 +1,24 @@
 import { getTranslations } from "next-intl/server";
+import { capturedShare } from "@/app/lib/share";
 import { AuthForm } from "./sign-in-form";
 
 export default async function SignInPage({
   searchParams,
 }: {
-  searchParams: Promise<{ expired?: string }>;
+  /* Beyond `expired`: a signed-out share bounces here with its share_target
+     params intact (the proxy's redirect preserves the query string), and the
+     capture must survive sign-in rather than being dropped for /dashboard.
+     SPEC.md § Installable app § Share target. */
+  searchParams: Promise<{
+    expired?: string;
+    url?: string | string[];
+    text?: string | string[];
+    title?: string | string[];
+  }>;
 }) {
-  const [{ expired }, t] = await Promise.all([searchParams, getTranslations("auth")]);
+  const [params, t] = await Promise.all([searchParams, getTranslations("auth")]);
+  const { expired } = params;
+  const share = capturedShare(params);
 
   return (
     <>
@@ -21,7 +33,7 @@ export default async function SignInPage({
           {t("expired")}
         </p>
       )}
-      <AuthForm />
+      <AuthForm share={share} />
     </>
   );
 }

@@ -1,10 +1,11 @@
 "use client";
 
-import { useState, useTransition } from "react";
+import { useEffect, useRef, useState, useTransition } from "react";
 import { useTranslations } from "next-intl";
 import { createApplication, prefillFromText, prefillFromUrl } from "@/app/lib/actions";
 import type { PrefillResult } from "@/app/lib/actions";
 import { fileSizeMb, MAX_FILE_BYTES } from "@/app/lib/files";
+import type { SharedCapture } from "@/app/lib/share";
 import { Field } from "@/app/components/field";
 import type { Status } from "@/app/lib/types";
 
@@ -35,14 +36,25 @@ const PASTE_CURES: ReadonlySet<string> = new Set<PrefillCode>([
   "prefill_failed",
 ]);
 
-export function NewApplicationForm({ entryStates }: { entryStates: Status[] }) {
+export function NewApplicationForm({
+  entryStates,
+  share = null,
+}: {
+  entryStates: Status[];
+  share?: SharedCapture | null;
+}) {
   const t = useTranslations("newApplication");
   const [error, setError] = useState<string | null>(null);
   const [pending, startTransition] = useTransition();
 
+  // What a share-sheet navigation carried, already reduced server-side to the
+  // one field it belongs in (SPEC.md § Installable app § Share target).
+  const sharedUrl = share?.kind === "url" ? share.url : null;
+  const sharedText = share?.kind === "text" ? share.text : null;
+
   // Controlled so the AI pre-fill can populate them. The URL field doubles as
   // the pre-fill source.
-  const [url, setUrl] = useState("");
+  const [url, setUrl] = useState(sharedUrl ?? "");
   const [company, setCompany] = useState("");
   const [role, setRole] = useState("");
   const [notes, setNotes] = useState("");
@@ -65,9 +77,12 @@ export function NewApplicationForm({ entryStates }: { entryStates: Status[] }) {
 
   // The escape hatch stays shut until a failure the paste can actually cure. It
   // never closes again on its own: once the user has been told no, hiding their
-  // way out from under them is worse than a little clutter.
-  const [pasteOpen, setPasteOpen] = useState(false);
-  const [posting, setPosting] = useState("");
+  // way out from under them is worse than a little clutter. The one other way
+  // in: a text-only share *is* a posting with no URL to try, so it arrives with
+  // the box open and seeded — and nothing run, because the paste box's design
+  // is that the user vouches for what is in it before it is sent.
+  const [pasteOpen, setPasteOpen] = useState(sharedText !== null);
+  const [posting, setPosting] = useState(sharedText ?? "");
 
   /* Informational, and deliberately not a limit. The cap is on the *stripped*
      text, which only the server can measure — counting the raw paste here would
@@ -89,11 +104,11 @@ export function NewApplicationForm({ entryStates }: { entryStates: Status[] }) {
     setPrefilled(true);
   }
 
-  function onPrefill() {
+  function runUrlPrefill(source: string) {
     setPrefillError(null);
     setPrefilled(false);
     startPrefill(async () => {
-      const result = await prefillFromUrl(url);
+      const result = await prefillFromUrl(source);
       if (!result.ok) {
         setPrefillError(result.error);
         // Branching on `code`, never on the sentence — the codes exist so nobody
@@ -104,6 +119,26 @@ export function NewApplicationForm({ entryStates }: { entryStates: Status[] }) {
       applyPrefill(result);
     });
   }
+
+  function onPrefill() {
+    runUrlPrefill(url);
+  }
+
+  /* A shared URL is an instruction, not a draft: the share sheet's contract is
+     "share a posting → land in a prefilled form", so arrival fires the same
+     pre-fill the button does (SPEC.md § Installable app § Share target).
+     Ref-guarded so Strict Mode's doubled effect cannot spend two Claude calls
+     on one share. */
+  const autoPrefilled = useRef(false);
+  useEffect(() => {
+    if (!sharedUrl || autoPrefilled.current) return;
+    autoPrefilled.current = true;
+    runUrlPrefill(sharedUrl);
+    // runUrlPrefill reads only stable setters, but is re-created per render —
+    // depending on its identity would re-fire a network call every render,
+    // which is the bug, not the fix.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [sharedUrl]);
 
   function onPrefillFromPaste() {
     setPrefillError(null);
