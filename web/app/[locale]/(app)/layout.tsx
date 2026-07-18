@@ -41,6 +41,13 @@ export default async function AppLayout({ children }: { children: React.ReactNod
             <span className="hidden sm:block">
               <NavLink href="/applications/new">{t("new")}</NavLink>
             </span>
+            {/* Settings is not in the tab bar, so unlike the three links above
+                it has no phone home — that is deliberate: passkey enrollment
+                is desktop-first (SPEC.md § Passkeys), and the page stays
+                reachable by URL on any width. */}
+            <span className="hidden sm:block">
+              <NavLink href="/settings">{t("settings")}</NavLink>
+            </span>
             <SignOutButton />
             <LocaleSwitcher />
           </nav>

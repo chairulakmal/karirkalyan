@@ -31,6 +31,15 @@ export type User = {
   updated_at: string;
 };
 
+// A WebAuthn passkey as GET /api/v1/passkeys serialises it — the settings
+// list's four fields; external_id and public_key never leave the server.
+export type Passkey = {
+  id: number;
+  nickname: string | null;
+  created_at: string;
+  last_used_at: string | null;
+};
+
 export type Application = {
   id: number;
   user_id: number;

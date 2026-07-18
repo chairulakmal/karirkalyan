@@ -21,6 +21,13 @@ Rails.application.routes.draw do
     namespace :v1 do
       namespace :auth do
         delete "account", to: "registrations#destroy"
+
+        # Passkey sign-in — the unauthenticated WebAuthn ceremony (SPEC.md
+        # § Passkeys). POST /auth/passkey is in devise-jwt's dispatch_requests,
+        # so a verified assertion answers with the same Authorization header
+        # as POST /auth/sign_in. Enrollment lives at /passkeys below.
+        post "passkey/options", to: "passkey_sessions#options"
+        post "passkey",         to: "passkey_sessions#create"
       end
 
       resources :applications do
@@ -31,6 +38,13 @@ Rails.application.routes.draw do
           patch :transition
           get   :resume
           get   :cover_letter
+        end
+      end
+
+      # Passkey enrollment and management — authenticated (SPEC.md § Passkeys).
+      resources :passkeys, only: [ :index, :create, :destroy ] do
+        collection do
+          post :options
         end
       end
 

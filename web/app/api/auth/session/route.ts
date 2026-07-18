@@ -1,6 +1,7 @@
 import { cookies } from "next/headers";
 import { INTERNAL_API_URL, SESSION_COOKIE_NAME } from "@/app/lib/api";
 import { forbiddenOrigin, isAllowedOrigin } from "@/app/lib/csrf";
+import { setSessionCookie } from "@/app/lib/session-cookie";
 
 // POST = sign-in. Proxies email/password to Rails, captures the JWT from the
 // Authorization response header, and stores it in an httpOnly cookie so it
@@ -82,15 +83,4 @@ export async function DELETE(request: Request) {
 
   cookieStore.delete(SESSION_COOKIE_NAME);
   return Response.json({ ok: true });
-}
-
-async function setSessionCookie(token: string) {
-  const cookieStore = await cookies();
-  cookieStore.set(SESSION_COOKIE_NAME, token, {
-    httpOnly: true,
-    secure: process.env.NODE_ENV === "production",
-    sameSite: "lax",
-    path: "/",
-    maxAge: 60 * 60 * 24, // 1 day — matches Devise JWT expiration_time
-  });
 }
