@@ -1,12 +1,12 @@
 # Changelog
 
-The history: shipped work, newest first — `v1.6.0` (in flight) back through `v1.0.0` — with branch/PR names noting where each change landed, and each release since `v1.3.1` naming its patch/minor level against the versioning policy's mechanical test. The most important section is the one that is not a release: § Decisions records the settled decisions-not-to-build, so that [`TODO.md`](TODO.md) — where open work lives — can stay plan-only without the reasoning getting lost.
+The history: shipped work, newest first — `v1.6.0` back through `v1.0.0` — with branch/PR names noting where each change landed, and each release since `v1.3.1` naming its patch/minor level against the versioning policy's mechanical test. The most important section is the one that is not a release: § Decisions records the settled decisions-not-to-build, so that [`TODO.md`](TODO.md) — where open work lives — can stay plan-only without the reasoning getting lost.
 
 ---
 
-## v1.6.0 — in flight, untagged
+## v1.6.0 — 2026-07-18
 
-The pocket app, feature-complete and untagged: the capture flow, the installed shell, passkey sign-in, and push delivery for the digest, landed on `main` ahead of the tag — recorded per the docs-follow-the-feature rule, so this section grows until the release is cut. Latest tag is still `v1.5.1`; what remains in [`TODO.md`](TODO.md) is the pre-tag docs sweep, not feature work. A minor by the mechanical test: user-visible capabilities and two purely additive migrations — `credentials` plus a nullable `users.webauthn_id`, and `push_subscriptions` — none of which the `v1.5.1` image ever writes, so that image still boots and serves against this database unchanged.
+The pocket app: the capture flow, the installed shell, passkey sign-in, and push delivery for the digest. A minor by the mechanical test: user-visible capabilities and two purely additive migrations — `credentials` plus a nullable `users.webauthn_id`, and `push_subscriptions` — none of which the `v1.5.1` image ever writes, so that image still boots and serves against this database unchanged.
 
 ### Capture via the share sheet *(#72)*
 
