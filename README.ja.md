@@ -6,7 +6,7 @@
 
 Rails 8 API と Next.js 16 のカンバンボードで構成した求人応募トラッカーです。ステータス変更はすべてサーバー側で強制される有限状態機械を通り、クライアントは遷移ルールを自前で持たず、どの移動が合法かを API に問い合わせます。
 
-https://github.com/user-attachments/assets/5593f60c-adac-46a7-8985-b02ecee5fe36
+https://github.com/user-attachments/assets/862ca199-95e5-4e27-b9ef-ada7eb10a350
 
 *30秒デモ：カードを別のカラムへドラッグし、タイムラインに遷移が記録されるのを確認し、返信が途絶えた応募がゴースト予測でフラグされる様子を見る。*
 
