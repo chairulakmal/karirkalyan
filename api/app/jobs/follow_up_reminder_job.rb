@@ -13,7 +13,12 @@ class FollowUpReminderJob < ApplicationJob
       won = applications.select { |application| claim(application) }
       next if won.empty?
 
+      # Two channels, one claim: the timeline entry above is the exactly-once
+      # anchor for both. Each channel is decoupled onto its own job so a
+      # failure in one retries alone — a push-service outage must not re-mail,
+      # and an SMTP failure must not re-push (SPEC.md § Push notifications).
       FollowUpMailer.digest(user, won).deliver_later
+      PushDigestJob.perform_later(user, won.map(&:id))
       [ user, won ]
     end
 

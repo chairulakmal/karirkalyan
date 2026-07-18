@@ -142,6 +142,23 @@ RSpec.describe FollowUpReminderJob, type: :job do
     end
   end
 
+  # Two channels, one claim (SPEC.md § Push notifications): the timeline entry
+  # is the exactly-once anchor for both, so the push job mirrors the mailer's
+  # enqueue behaviour example for example.
+  describe "the push channel" do
+    it "enqueues one PushDigestJob per user, carrying the claimed ids" do
+      second = create(:application, :applied, user: user, follow_up_at: Time.zone.local(2026, 7, 10, 9, 0, 0))
+
+      expect { described_class.new.perform }
+        .to have_enqueued_job(PushDigestJob).with(user, match_array([ application.id, second.id ])).once
+    end
+
+    it "does not enqueue a duplicate push on retry" do
+      described_class.new.perform
+      expect { described_class.new.perform }.not_to have_enqueued_job(PushDigestJob)
+    end
+  end
+
   # The app runs in JST while timestamps are stored in UTC, so "due by end of today" must
   # mean the JST day — a late-evening JST reminder must not slip into the previous UTC day.
   describe "JST day boundary" do

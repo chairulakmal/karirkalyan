@@ -15,6 +15,10 @@ gem "devise"
 gem "devise-jwt"
 gem "webauthn"
 
+# Web Push (RFC 8030) — the follow-up digest's second channel (SPEC.md § Push
+# notifications). Also owns VAPID key generation (bin/rails push:vapid).
+gem "web-push"
+
 # Background jobs & cache — Postgres-backed, no Redis needed (replaces Sidekiq/Redis).
 # Solid Queue runs inside Puma via `plugin :solid_queue` (SOLID_QUEUE_IN_PUMA env var);
 # recurring jobs are declared in config/recurring.yml.

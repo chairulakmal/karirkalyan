@@ -268,6 +268,41 @@ export async function deletePasskey(id: number): Promise<ActionResult> {
   return { ok: true };
 }
 
+// --- Push subscriptions (SPEC.md § Push notifications) -----------------------
+//
+// Authenticated API calls, so server actions — the same division of labour as
+// the passkey enrollment actions above. The public key is fetched from the API
+// rather than duplicated into a web-side env var, so the two services cannot
+// drift.
+
+export type PushPublicKeyResult = { ok: true; publicKey: string } | ActionFailure;
+
+export async function getPushPublicKey(): Promise<PushPublicKeyResult> {
+  const res = await apiFetch<{ public_key: string }>("/push_subscriptions/public_key");
+  if (!res.ok) return apiFailure(res);
+  return { ok: true, publicKey: res.data.public_key };
+}
+
+// `subscription` is the browser PushSubscription's toJSON() output — opaque to
+// this layer for the same reason the passkey ceremony JSON is.
+export async function subscribePush(subscription: unknown): Promise<ActionResult> {
+  const res = await apiFetch("/push_subscriptions", {
+    method: "POST",
+    body: JSON.stringify({ subscription }),
+  });
+  if (!res.ok) return apiFailure(res);
+  return { ok: true };
+}
+
+export async function unsubscribePush(endpoint: string): Promise<ActionResult> {
+  const res = await apiFetch("/push_subscriptions", {
+    method: "DELETE",
+    body: JSON.stringify({ endpoint }),
+  });
+  if (!res.ok) return apiFailure(res);
+  return { ok: true };
+}
+
 type ApplicationInput = {
   company?: string;
   role?: string;

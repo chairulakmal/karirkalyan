@@ -3,6 +3,7 @@ import { Link } from "@/i18n/navigation";
 import { NavLink } from "@/app/components/nav-link";
 import { LocaleSwitcher } from "@/app/components/locale-switcher";
 import { Mark, Wordmark } from "@/app/components/wordmark";
+import { ServiceWorkerRegistrar } from "@/app/components/service-worker-registrar";
 import { TabBar } from "@/app/components/tab-bar";
 import { SignOutButton } from "./sign-out-button";
 import { REPO_URL } from "@/app/lib/links";
@@ -71,6 +72,7 @@ export default async function AppLayout({ children }: { children: React.ReactNod
         </div>
       </footer>
       <TabBar />
+      <ServiceWorkerRegistrar />
     </>
   );
 }
