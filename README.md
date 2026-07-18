@@ -6,7 +6,7 @@
 
 A job application tracker with a Rails 8 API and a Next.js 16 kanban board. Every status change goes through a server-enforced finite state machine, and the client asks the API which moves are legal instead of keeping its own copy of the rules.
 
-https://github.com/user-attachments/assets/5593f60c-adac-46a7-8985-b02ecee5fe36
+https://github.com/user-attachments/assets/862ca199-95e5-4e27-b9ef-ada7eb10a350
 
 *30 seconds: drag a card to a new column, open the timeline to see the transition recorded, then find a quiet application flagged as ghost risk.*
 
