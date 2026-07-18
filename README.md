@@ -6,14 +6,11 @@
 
 A job application tracker with a Rails 8 API and a Next.js 16 kanban board. Every status change goes through a server-enforced finite state machine, and the client asks the API which moves are legal instead of keeping its own copy of the rules.
 
-<!-- DEMO VIDEO: drag .mp4 here in the GitHub editor -->
+https://github.com/user-attachments/assets/5593f60c-adac-46a7-8985-b02ecee5fe36
 
 *30 seconds: drag a card to a new column, open the timeline to see the transition recorded, then find a quiet application flagged as ghost risk.*
 
 <!-- SCREENSHOT: kanban board at /board, English locale, demo account data. Embed here once captured. -->
-
-
-https://github.com/user-attachments/assets/5593f60c-adac-46a7-8985-b02ecee5fe36
 
 **Live demo:** [kk.chairulakmal.com](https://kk.chairulakmal.com). The demo account is one click ("Try demo account" on the sign-in page) and comes prefilled with 12 applications covering every state. API docs are served as Swagger UI at [`/api-docs`](https://api-production-4899.up.railway.app/api-docs).
 
