@@ -55,11 +55,19 @@ module Applications
 
     MODEL          = "claude-haiku-4-5-20251001"
     MAX_REDIRECTS  = 3
-    MAX_BODY_BYTES = 2_000_000   # cap the HTML we read (~2 MB)
+    MAX_BODY_BYTES = 2_000_000   # cap the HTML we read (~2 MB), enforced while streaming
     MAX_TEXT_CHARS = 12_000      # cap the text sent to Claude (~3-4k tokens)
     OPEN_TIMEOUT   = 5           # seconds
-    READ_TIMEOUT   = 8           # seconds
+    READ_TIMEOUT   = 8           # seconds, per read — bounds a stalled socket, not a slow body
+    FETCH_DEADLINE = 15          # seconds, the whole fetch: every hop, every chunk
     USER_AGENT     = "KarirKalyan-Prefill/1.0 (+https://kk.chairulakmal.com)"
+
+    # Raised internally to stop reading a response at MAX_BODY_BYTES; never leaves
+    # #fetch. Not part of the error taxonomy on purpose: hitting the cap is a
+    # truncation the pipeline already promises to absorb (see #capped), not a
+    # failure to report.
+    class BodyCapReached < StandardError; end
+    private_constant :BodyCapReached
 
     # SSRF defence: extra ranges beyond IPAddr's loopback?/private?/link_local?.
     # `::ffff:0:0/96` covers IPv4-mapped addresses, so `::ffff:127.0.0.1` is caught
@@ -170,7 +178,12 @@ module Applications
       raise InvalidUrlError, "Enter a valid http(s) URL."
     end
 
-    def fetch(uri, redirects_left: MAX_REDIRECTS)
+    def fetch(uri, redirects_left: MAX_REDIRECTS, deadline: nil)
+      # One deadline for the whole fetch, threaded through every redirect hop.
+      # READ_TIMEOUT is per-read: a trickle stream that delivers a chunk every few
+      # seconds, forever, never trips it. This is what bounds it.
+      deadline ||= monotonic_now + FETCH_DEADLINE
+
       # Resolve + validate once, then pin the connection to that exact IP.
       # Letting Net::HTTP re-resolve the host would reopen a DNS-rebinding hole:
       # a name that validated as public could rebind to a private IP between the
@@ -189,11 +202,26 @@ module Applications
       http.open_timeout = OPEN_TIMEOUT
       http.read_timeout = READ_TIMEOUT
 
-      response = http.start do |conn|
-        request = Net::HTTP::Get.new(uri)
-        request["User-Agent"] = USER_AGENT
-        request["Accept"]     = "text/html,application/xhtml+xml"
-        conn.request(request)
+      body     = +""
+      response = nil
+      begin
+        http.start do |conn|
+          request = Net::HTTP::Get.new(uri)
+          request["User-Agent"] = USER_AGENT
+          request["Accept"]     = "text/html,application/xhtml+xml"
+          # Block form, streamed. The unstreamed path has no cap worth the name:
+          # response.body buffers the entire body before byteslice sees a byte, so
+          # a huge or endless response occupies the container's memory — inline in
+          # a Puma request thread — with the cap as decoration. Streaming stops
+          # *reading* at the cap.
+          conn.request(request) do |resp|
+            response = resp
+            read_capped(resp, body, deadline)
+          end
+        end
+      rescue BodyCapReached
+        # The cap is a truncation, not a failure: keep what was read. The
+        # connection is dropped mid-body, which is fine — it is not reused.
       end
 
       # Ahead of the `case`, not inside its `else`. A Turnstile interstitial answers
@@ -208,8 +236,9 @@ module Applications
         # byteslice is byte-indexed and Japanese text is 3 bytes a character, so a
         # cut at the cap lands mid-character and every later gsub raises
         # ArgumentError — an untyped 500 on the exact pages this service exists to
-        # read. scrub drops the partial character instead.
-        response.body.to_s.byteslice(0, MAX_BODY_BYTES).to_s.scrub
+        # read. scrub drops the partial character instead. (The stream stops at the
+        # cap, but the final chunk can overshoot it; the byteslice trims that.)
+        body.byteslice(0, MAX_BODY_BYTES).to_s.scrub
       when Net::HTTPRedirection
         raise FetchError, "That URL redirected too many times." if redirects_left <= 0
 
@@ -222,7 +251,7 @@ module Applications
         # "your URL is malformed" is precisely the bug this release exists to fix,
         # so a rejection past hop 0 is a fetch failure.
         begin
-          fetch(URI.join(uri.to_s, location), redirects_left: redirects_left - 1)
+          fetch(URI.join(uri.to_s, location), redirects_left: redirects_left - 1, deadline: deadline)
         rescue InvalidUrlError
           raise FetchError, "That page redirected somewhere we won't follow."
         end
@@ -231,6 +260,25 @@ module Applications
       end
     rescue SocketError, SystemCallError, Timeout::Error, OpenSSL::SSL::SSLError, URI::InvalidURIError
       raise FetchError, "Couldn't reach that URL."
+    end
+
+    # Reads a response body in chunks into +buffer+, stopping at MAX_BODY_BYTES or
+    # the deadline. Runs for *every* response, not just the 200s: returning from
+    # the request block without reading leaves Net::HTTP to drain the body into
+    # memory itself on the way out (Net::HTTPResponse#reading_body reads whatever
+    # the block didn't), which would reopen the unbounded read on exactly the
+    # responses nobody looks at — redirects and error pages.
+    def read_capped(resp, buffer, deadline)
+      resp.read_body do |chunk|
+        raise FetchError, "That page took too long to read." if monotonic_now > deadline
+
+        buffer << chunk
+        raise BodyCapReached if buffer.bytesize >= MAX_BODY_BYTES
+      end
+    end
+
+    def monotonic_now
+      Process.clock_gettime(Process::CLOCK_MONOTONIC)
     end
 
     # A refusal, not a failure: the URL is fine and a retry fetches the same wall,

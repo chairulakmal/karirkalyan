@@ -8,6 +8,12 @@ The history: shipped work, newest first — `v1.7.0` (in flight) back through `v
 
 The Japan market layer (recruiter channel, 年収 comp structure, Japanese-level filter, posting snapshot), recorded here feature by feature as work lands, per the docs-follow-the-feature rule. Latest tag is `v1.6.0`. The account menu below rides this release outside the field trio because it closes a gap `v1.6.0` left open.
 
+### The prefill fetch bounded in memory and time *(perf/api-memory-bounded-fetch, #77)*
+
+- **`UrlPrefillService` streams the response body and stops reading at `MAX_BODY_BYTES`.** The old path read the entire body into memory before `byteslice` applied the 2 MB cap, inline in a Puma request thread, so against a huge or endless response the cap was decoration. Every response drains through the capped read, redirects and error pages included, because `Net::HTTP` otherwise buffers an unread body itself on the way out of the request block.
+- **One 15 s wall-clock deadline covers the whole fetch across redirect hops.** `read_timeout` is per-read, so a trickle stream that delivers a chunk every few seconds never tripped it; exceeding the deadline is a `FetchError` (retry), keeping the taxonomy honest about a slow page being a transient failure.
+- **Solid Queue worker poll slows from 0.1 s to 1 s.** Every job in the system is hourly or daily, and at 0.1 s the poll loop was ~36k queries/hour of allocation churn on an otherwise idle process, the main feeder of the 0.35 → 0.49 GB heap creep Railway metrics show between deploys. The investigation behind both changes (every memory spike in 72h of metrics matched a deploy's old+new container overlap, none matched app activity) is written up in PR #77.
+
 ### Account menu in the app header *(feat/account-menu, #76)*
 
 - **Settings and Sign out collapse behind a square initials chip, at every width.** The gap it closes: the push enable toggle lives on `/settings`, a push subscription is per browser instance, and the one device push delivery targets (the installed Android app) was the one that could not reach the page without a typed URL. The `sm`-and-up settings-link decision this amends is re-recorded, not silently contradicted (`SPEC.md` § Auth flow). Sign-out moves off the header bar into the menu, so the below-`sm` header shrinks rather than grows; the locale switcher stays outside, because language switching is a first-visit action; the tab bar keeps its three tabs, since settings is a secondary destination and the bar's slots are for primary ones.

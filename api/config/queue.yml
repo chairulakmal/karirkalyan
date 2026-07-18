@@ -6,7 +6,11 @@ default: &default
     - queues: "*"
       threads: 3
       processes: <%= ENV.fetch("JOB_CONCURRENCY", 1) %>
-      polling_interval: 0.1
+      # 1 s, not the snappier 0.1 s this shipped with: every job here is scheduled
+      # hourly or daily, so sub-second pickup buys nothing, and at 0.1 s the poll
+      # loop was ~36k queries/hour of allocation churn feeding steady heap growth
+      # on an otherwise idle process (SPEC.md § Background jobs, Poll cadence).
+      polling_interval: 1
 
 development:
   <<: *default

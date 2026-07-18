@@ -210,7 +210,7 @@ RSpec.describe Applications::UrlPrefillService do
       let(:addresses) { [ "93.184.216.34" ] }
       let(:response) do
         Net::HTTPOK.new("1.1", "200", "OK").tap do |r|
-          allow(r).to receive(:body).and_return("<html>Mercari — Backend Engineer</html>")
+          allow(r).to receive(:read_body).and_yield("<html>Mercari — Backend Engineer</html>")
         end
       end
 
@@ -222,7 +222,9 @@ RSpec.describe Applications::UrlPrefillService do
         allow(http).to receive(:open_timeout=)
         allow(http).to receive(:read_timeout=)
         allow(http).to receive(:start).and_yield(http).and_return(response)
-        allow(http).to receive(:request).and_return(response)
+        # The service reads bodies in the block form of #request; a stub that only
+        # returned the response would leave the body unread and the fetch empty.
+        allow(http).to receive(:request) { |_request, &reader| reader&.call(response); response }
       end
 
       it "sets ipaddr= to the resolved address" do
@@ -306,7 +308,10 @@ RSpec.describe Applications::UrlPrefillService do
         allow(http).to receive(:open_timeout=)
         allow(http).to receive(:read_timeout=)
         allow(http).to receive(:start).and_yield(http).and_return(response)
-        allow(http).to receive(:request).and_return(response)
+        allow(http).to receive(:request) { |_request, &reader| reader&.call(response); response }
+        # Every response is drained through the capped read, error pages included,
+        # so even a refusal needs a readable (if empty) body.
+        allow(response).to receive(:read_body) unless response.nil?
       end
 
       # TokyoDev's actual behaviour, verified 2026-07-16: 403 + cf-mitigated, to
@@ -350,10 +355,14 @@ RSpec.describe Applications::UrlPrefillService do
       # is, or this is the one challenge shape that gets through.
       context "with a 200 carrying a Cloudflare challenge" do
         let(:response) do
-          Net::HTTPOK.new("1.1", "200", "OK").tap do |r|
-            r["cf-mitigated"] = "challenge"
-            allow(r).to receive(:body).and_return("<html>Just a moment… Enable JavaScript.</html>")
-          end
+          Net::HTTPOK.new("1.1", "200", "OK").tap { |r| r["cf-mitigated"] = "challenge" }
+        end
+
+        # This context's own before runs after the outer one, so the interstitial's
+        # real text survives the outer empty-body stub — the point being that the
+        # header is read before the perfectly readable content is.
+        before do
+          allow(response).to receive(:read_body).and_yield("<html>Just a moment… Enable JavaScript.</html>")
         end
 
         it "raises BlockedError rather than shipping the interstitial to Claude" do
@@ -418,11 +427,26 @@ RSpec.describe Applications::UrlPrefillService do
       end
 
       def redirect_to(location)
-        Net::HTTPFound.new("1.1", "302", "Found").tap { |r| r["location"] = location }
+        Net::HTTPFound.new("1.1", "302", "Found").tap do |r|
+          r["location"] = location if location
+          allow(r).to receive(:read_body)
+        end
       end
 
       def page(body)
-        Net::HTTPOK.new("1.1", "200", "OK").tap { |r| allow(r).to receive(:body).and_return(body) }
+        Net::HTTPOK.new("1.1", "200", "OK").tap { |r| allow(r).to receive(:read_body).and_yield(body) }
+      end
+
+      # Yielding stand-in for the block form of #request. Given several responses
+      # it serves them in order and repeats the last one, so a redirect loop can
+      # loop and a redirect-then-page sequence can land.
+      def stub_requests(conn, *responses)
+        remaining = responses.dup
+        allow(conn).to receive(:request) do |_request, &reader|
+          resp = remaining.length > 1 ? remaining.shift : remaining.first
+          reader&.call(resp)
+          resp
+        end
       end
 
       before do
@@ -432,10 +456,8 @@ RSpec.describe Applications::UrlPrefillService do
 
       it "follows a redirect and returns the destination page" do
         allow(Resolv).to receive(:getaddresses).with("jobs.example.com").and_return([ "93.184.216.35" ])
-        allow(connections["example.com"]).to receive(:request)
-          .and_return(redirect_to("https://jobs.example.com/42"))
-        allow(connections["jobs.example.com"]).to receive(:request)
-          .and_return(page("<html>Mercari — Backend Engineer</html>"))
+        stub_requests(connections["example.com"], redirect_to("https://jobs.example.com/42"))
+        stub_requests(connections["jobs.example.com"], page("<html>Mercari — Backend Engineer</html>"))
 
         expect(service.call).to include(company: "Mercari")
       end
@@ -445,8 +467,8 @@ RSpec.describe Applications::UrlPrefillService do
       # pasted — that is the one they recognise — so the second request is what
       # proves the join worked.
       it "resolves a relative Location against the current hop" do
-        allow(connections["example.com"]).to receive(:request)
-          .and_return(redirect_to("/jobs/43"), page("<html>Mercari — Backend Engineer</html>"))
+        stub_requests(connections["example.com"],
+                      redirect_to("/jobs/43"), page("<html>Mercari — Backend Engineer</html>"))
 
         expect(service.call).to include(company: "Mercari")
         expect(connections["example.com"]).to have_received(:request).twice
@@ -454,8 +476,7 @@ RSpec.describe Applications::UrlPrefillService do
 
       it "re-runs the SSRF guard on the hop, not just on the pasted URL" do
         allow(Resolv).to receive(:getaddresses).with("cdn.internal.corp").and_return([ "10.0.0.5" ])
-        allow(connections["example.com"]).to receive(:request)
-          .and_return(redirect_to("https://cdn.internal.corp/x"))
+        stub_requests(connections["example.com"], redirect_to("https://cdn.internal.corp/x"))
 
         expect { service.call }.to raise_error(described_class::FetchError)
         expect(connections["cdn.internal.corp"]).not_to have_received(:start)
@@ -465,8 +486,7 @@ RSpec.describe Applications::UrlPrefillService do
       # where the site sent us is this taxonomy's own bug, one hop later.
       it "blames the fetch, not the user's URL, when a hop is refused" do
         allow(Resolv).to receive(:getaddresses).with("cdn.internal.corp").and_return([ "10.0.0.5" ])
-        allow(connections["example.com"]).to receive(:request)
-          .and_return(redirect_to("https://cdn.internal.corp/x"))
+        stub_requests(connections["example.com"], redirect_to("https://cdn.internal.corp/x"))
 
         expect { service.call }.to raise_error(described_class::FetchError) do |error|
           expect(error).not_to be_a(described_class::InvalidUrlError)
@@ -474,8 +494,7 @@ RSpec.describe Applications::UrlPrefillService do
       end
 
       it "refuses a hop to a non-80/443 port without dying inside Net::HTTP" do
-        allow(connections["example.com"]).to receive(:request)
-          .and_return(redirect_to("http://example.com:8080/jobs"))
+        stub_requests(connections["example.com"], redirect_to("http://example.com:8080/jobs"))
 
         expect { service.call }.to raise_error(described_class::FetchError)
       end
@@ -483,22 +502,19 @@ RSpec.describe Applications::UrlPrefillService do
       # URI.join produces a URI::FTP here, which clears a port-only check and then
       # raises ArgumentError inside Net::HTTP::Get.new — an untyped 500.
       it "refuses a hop to a non-http scheme riding an allowed port" do
-        allow(connections["example.com"]).to receive(:request)
-          .and_return(redirect_to("ftp://example.com:80/x"))
+        stub_requests(connections["example.com"], redirect_to("ftp://example.com:80/x"))
 
         expect { service.call }.to raise_error(described_class::FetchError)
       end
 
       it "gives up rather than following a redirect loop forever" do
-        allow(connections["example.com"]).to receive(:request)
-          .and_return(redirect_to("http://example.com/jobs/42"))
+        stub_requests(connections["example.com"], redirect_to("http://example.com/jobs/42"))
 
         expect { service.call }.to raise_error(described_class::FetchError, /too many times/)
       end
 
       it "raises FetchError when a redirect carries no Location" do
-        allow(connections["example.com"]).to receive(:request)
-          .and_return(Net::HTTPFound.new("1.1", "302", "Found"))
+        stub_requests(connections["example.com"], redirect_to(nil))
 
         expect { service.call }.to raise_error(described_class::FetchError, /redirect/)
       end
@@ -517,7 +533,7 @@ RSpec.describe Applications::UrlPrefillService do
       end
       let(:response) do
         Net::HTTPOK.new("1.1", "200", "OK").tap do |r|
-          allow(r).to receive(:body).and_return(oversized_japanese_page)
+          allow(r).to receive(:read_body).and_yield(oversized_japanese_page)
         end
       end
 
@@ -529,12 +545,87 @@ RSpec.describe Applications::UrlPrefillService do
         allow(http).to receive(:open_timeout=)
         allow(http).to receive(:read_timeout=)
         allow(http).to receive(:start).and_yield(http).and_return(response)
-        allow(http).to receive(:request).and_return(response)
+        allow(http).to receive(:request) { |_request, &reader| reader&.call(response); response }
       end
 
       it "truncates without splitting a character, and extracts normally" do
         expect(oversized_japanese_page.bytesize).to be > described_class::MAX_BODY_BYTES
         expect(service.call).to include(company: "Mercari")
+      end
+    end
+
+    # The cap has to bound what we *read*, not just what we keep. Net::HTTP's
+    # unstreamed #body buffers the entire response before byteslice sees a byte,
+    # so against an endless stream the old cap was decoration — and this fetch
+    # runs inline in a Puma request thread, so the memory it occupies is the
+    # container's. The stub serves chunks forever; the assertion is that the
+    # service stops asking.
+    context "when the body is served as an unbounded stream" do
+      subject(:service) { described_class.new("http://example.com/jobs/42", client: client) }
+
+      let(:http)          { instance_double(Net::HTTP) }
+      let(:chunk)         { "<p>東京の求人 Ruby エンジニア Mercari</p>#{"x" * 100_000}" }
+      let(:chunks_served) { Hash.new(0) }
+      let(:response) do
+        Net::HTTPOK.new("1.1", "200", "OK").tap do |r|
+          allow(r).to receive(:read_body) do |&reader|
+            loop do
+              chunks_served[:count] += 1
+              reader.call(chunk)
+            end
+          end
+        end
+      end
+
+      before do
+        allow(Resolv).to receive(:getaddresses).with("example.com").and_return([ "93.184.216.34" ])
+        allow(Net::HTTP).to receive(:new).with("example.com", 80, nil).and_return(http)
+        allow(http).to receive(:ipaddr=)
+        allow(http).to receive(:use_ssl=)
+        allow(http).to receive(:open_timeout=)
+        allow(http).to receive(:read_timeout=)
+        allow(http).to receive(:start).and_yield(http).and_return(response)
+        allow(http).to receive(:request) { |_request, &reader| reader&.call(response); response }
+      end
+
+      it "stops reading at the byte cap instead of buffering the stream" do
+        expect(service.call).to include(company: "Mercari")
+        expect(chunks_served[:count]).to be <= (described_class::MAX_BODY_BYTES / chunk.bytesize) + 1
+      end
+    end
+
+    # READ_TIMEOUT is per-read: a server that delivers a chunk every few seconds,
+    # forever, never trips it. The wall-clock deadline is what bounds that — and
+    # it is a FetchError (retry), not a BlockedError (give up), because a slow
+    # page is the transient kind of failure.
+    context "when the body trickles in past the fetch deadline" do
+      subject(:service) { described_class.new("http://example.com/jobs/42", client: client) }
+
+      let(:http) { instance_double(Net::HTTP) }
+      let(:response) do
+        Net::HTTPOK.new("1.1", "200", "OK").tap do |r|
+          allow(r).to receive(:read_body).and_yield("<html>").and_yield("slow").and_yield("</html>")
+        end
+      end
+
+      before do
+        allow(Resolv).to receive(:getaddresses).with("example.com").and_return([ "93.184.216.34" ])
+        allow(Net::HTTP).to receive(:new).with("example.com", 80, nil).and_return(http)
+        allow(http).to receive(:ipaddr=)
+        allow(http).to receive(:use_ssl=)
+        allow(http).to receive(:open_timeout=)
+        allow(http).to receive(:read_timeout=)
+        allow(http).to receive(:start).and_yield(http).and_return(response)
+        allow(http).to receive(:request) { |_request, &reader| reader&.call(response); response }
+        # First reading is the deadline being set, second is the first chunk's
+        # check landing past it. No sleeping in the suite.
+        allow(service).to receive(:monotonic_now)
+          .and_return(0, described_class::FETCH_DEADLINE + 1)
+      end
+
+      it "raises FetchError rather than reading for as long as the site cares to drip" do
+        expect { service.call }
+          .to raise_error(described_class::FetchError, /took too long/)
       end
     end
 
