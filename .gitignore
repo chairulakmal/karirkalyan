@@ -10,3 +10,7 @@
 
 # macOS
 .DS_Store
+
+# demo recordings — uploaded via the GitHub editor, never committed
+*.webm
+*.mp4
