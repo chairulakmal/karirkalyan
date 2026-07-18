@@ -22,7 +22,13 @@ export default async function AppLayout({ children }: { children: React.ReactNod
                 below sm, so the wordmark no longer competes with them. */}
             <Wordmark size="sm" />
           </Link>
-          <nav className="flex items-center gap-4 whitespace-nowrap text-sm sm:gap-5">
+          {/* Named because below sm two nav landmarks coexist — this one and
+              the tab bar ("Primary") — and an unnamed landmark next to a named
+              one reads as an afterthought in a screen-reader landmark list. */}
+          <nav
+            aria-label={t("account")}
+            className="flex items-center gap-4 whitespace-nowrap text-sm sm:gap-5"
+          >
             {/* The three page links hide below sm — the bottom tab bar is the
                 primary nav there. Sign-out and locale stay: the bar has no
                 room for either, and both must remain reachable on a phone. */}

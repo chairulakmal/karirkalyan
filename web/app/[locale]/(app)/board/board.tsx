@@ -333,7 +333,11 @@ function CardMenu({
       {open && (
         <div
           role="menu"
-          className="absolute right-0 z-10 mt-1 w-56 border border-dune bg-linen shadow-lg"
+          // z-20, not z-10: the ancestors here create no stacking context, so
+          // this competes at the root against the sticky tab bar's z-10 — at
+          // equal z the later-rendered bar would paint over (and swallow taps
+          // meant for) a bottom-row card's menu on phone widths.
+          className="absolute right-0 z-20 mt-1 w-56 border border-dune bg-linen shadow-lg"
         >
           {confirming === null ? (
             <>

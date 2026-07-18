@@ -30,6 +30,9 @@ export function TabBar() {
           // Exact match, same rule as NavLink: deeper paths (/applications/[id])
           // light no tab — the detail page is reachable from two of them.
           const active = pathname === href;
+          // The top border is the non-color active cue (WCAG 1.4.1), the same
+          // job NavLink's underline does — transparent on inactive tabs so the
+          // label doesn't shift when it appears.
           return (
             <Link
               key={href}
@@ -37,8 +40,8 @@ export function TabBar() {
               aria-current={active ? "page" : undefined}
               className={
                 active
-                  ? "py-3 text-center text-sm font-medium text-cobalt"
-                  : "py-3 text-center text-sm font-medium text-ink-soft hover:text-cobalt"
+                  ? "border-t-2 border-cobalt py-3 text-center text-sm font-medium text-cobalt"
+                  : "border-t-2 border-transparent py-3 text-center text-sm font-medium text-ink-soft hover:text-cobalt"
               }
             >
               {t(key)}
