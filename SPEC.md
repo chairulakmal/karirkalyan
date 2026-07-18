@@ -30,7 +30,7 @@ Last synced against the code: **2026-07-18**, `v1.6.0` (in flight) — push deli
 - [How to use this file](#how-to-use-this-file)
 - [System overview](#system-overview) — [Registration is closed](#registration-is-closed)
 - [Backend (`api/`)](#backend-api) — [Tech stack](#backend-tech-stack) · [Data model](#data-model) · [State machine](#state-machine) · [Service layer](#service-layer) · [Query layer](#query-layer) · [API contract](#api-contract) · [Background jobs](#background-jobs) · [Mail](#mail) · [Security](#security) · [Passkeys (WebAuthn)](#passkeys-webauthn) · [Push notifications](#push-notifications) · [Observability](#observability)
-- [Frontend (`web/`)](#frontend-web) — [Tech stack](#frontend-tech-stack) · [Design system](#design-system) · [Auth flow](#auth-flow) · [Public pages](#public-pages) · [Legal pages](#legal-pages) · [Route guard](#route-guard) · [Board view](#board-view) · [i18n](#i18n) · [Installable app](#installable-app)
+- [Frontend (`web/`)](#frontend-web) — [Tech stack](#frontend-tech-stack) · [Design system](#design-system) · [Auth flow](#auth-flow) · [Public pages](#public-pages) · [Legal pages](#legal-pages) · [Route guard](#route-guard) · [Caching](#caching-use-cache) · [Board view](#board-view) · [i18n](#i18n) · [Installable app](#installable-app)
 - [Testing strategy](#testing-strategy)
 - [Deployment (Railway)](#deployment-railway) — [Backups](#backups)
 - [Local development](#local-development)
@@ -993,6 +993,12 @@ Authorization is presence of the `session` cookie — there are no roles. Paths 
 It also resolves the locale and applies next-intl's rewrite/redirect before the auth check, so the guard always sees a locale-stripped pathname. See the i18n section below.
 
 `proxy.ts` also sets the CSP. The policy is per-request nonce-based (`script-src 'self' 'nonce-…' 'strict-dynamic'`), with no `'unsafe-inline'`; development keeps `'unsafe-eval'` for HMR. **Because nonces are applied only during SSR, `await connection()` in the root layout opts the whole app into dynamic rendering**, so every page's scripts get the nonce. There is consequently no static optimization left to lose — which is why locale-prefixed routing in v1.1.0 costs nothing.
+
+### Caching (`use cache`)
+
+> **At a glance** · Next.js 16's `'use cache'` directive requires `cacheComponents: true` in `next.config.ts`, which this project does not set. A stray directive fails the build loudly rather than silently doing nothing; enabling the flag is a whole-app decision, not a per-component fix.
+
+`'use cache'` is a Cache Components feature, distinct from `React.cache` and `unstable_cache`. Without `cacheComponents: true` Next.js rejects the directive outright, so there is no silent-degradation failure mode to worry about. Enabling the flag interacts with the dynamic-rendering constraint above (every route renders dynamically so its scripts carry the CSP nonce), so it is a deliberate architectural decision: don't switch it on to fix a single component. If it is ever enabled, caching belongs at the component or data-fetch layer, never on a server action or a mutation in `app/lib/actions.ts`.
 
 ### Board view
 
