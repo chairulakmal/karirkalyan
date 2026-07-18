@@ -66,7 +66,11 @@ module Api
           sign_in(user, store: false)
 
           render json: { user: { id: user.id, email: user.email } }, status: :ok
-        rescue *CEREMONY_ERRORS
+        rescue *CEREMONY_ERRORS => e
+          # Logged so a systemic failure (a regression 401ing every user) is
+          # distinguishable from hostile junk; the response stays the one
+          # unenumerated 401 either way.
+          Rails.logger.info("passkey authentication rejected: #{e.class}: #{e.message}")
           render_invalid_passkey
         end
 

@@ -56,7 +56,10 @@ module Api
         else
           render_validation_failed(credential)
         end
-      rescue *CEREMONY_ERRORS
+      rescue *CEREMONY_ERRORS => e
+        # Same rule as the sign-in ceremony: a rescue that renders a fallback
+        # must leave a log line, or an incident reads as user error.
+        Rails.logger.info("passkey enrollment rejected: #{e.class}: #{e.message}")
         render_passkey_verification_failed
       end
 

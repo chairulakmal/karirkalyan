@@ -309,6 +309,28 @@ RSpec.describe "Passkeys", type: :request do
                                headers: { "Authorization" => token }, as: :json
       expect(response).to have_http_status(:unprocessable_entity)
     end
+
+    # The throttle bounds the rate; this is what bounds the total — the
+    # Application::MAX_PER_USER argument in miniature (SPEC.md § Passkeys).
+    # stub_const to 1 like the application-ceiling spec: building 20 fixtures
+    # would read to the N+1 scanner as 20 identical COUNTs.
+    it "refuses enrollment past Credential::MAX_PER_USER, through the standard envelope" do
+      stub_const("Credential::MAX_PER_USER", 1)
+      create(:credential, user: user)
+
+      post "/api/v1/passkeys/options", headers: { "Authorization" => token }
+      challenge = response.parsed_body.fetch("challenge")
+      attestation = fake_client.create(challenge: challenge, user_verified: true)
+
+      post "/api/v1/passkeys", params: { credential: attestation },
+                               headers: { "Authorization" => token }, as: :json
+
+      expect(response).to have_http_status(:unprocessable_entity)
+      expect(response.parsed_body["code"]).to eq("validation_failed")
+      expect(response.parsed_body["details"]).to include(
+        { "field" => "base", "code" => "too_many_passkeys" }
+      )
+    end
   end
 
   describe "erasing the account takes its passkeys with it" do

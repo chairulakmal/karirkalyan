@@ -18,7 +18,12 @@ module PasskeyChallenges
       Rails.cache.write(registration_key(user), challenge, expires_in: TTL)
     end
 
-    # The stored challenge, at most once per store — nil after that.
+    # The stored challenge, at most once per store — nil after that. This one
+    # is read-then-delete, which leaves a concurrency window the authenticated
+    # take below refuses to leave — accepted here because the key is scoped to
+    # an already-authenticated user racing only themselves, and the prize for
+    # winning the race is enrolling their own passkey twice, which the
+    # external_id uniqueness constraint refuses anyway.
     def take_registration!(user)
       key = registration_key(user)
       challenge = Rails.cache.read(key)
@@ -30,12 +35,16 @@ module PasskeyChallenges
       Rails.cache.write(authentication_key(challenge), true, expires_in: TTL)
     end
 
-    # True exactly once per issued challenge.
+    # True exactly once per issued challenge. read enforces the TTL (an
+    # expired entry reads as nil even before the store sweeps it, while delete
+    # would still count the row); delete is the atomic single-use check — it
+    # returns whether a live entry was actually removed (one SQL DELETE in
+    # Solid Cache, monitor-held in MemoryStore), so of two concurrent callers
+    # exactly one gets true. read-then-delete alone would be a TOCTOU race:
+    # both readers see true, both proceed.
     def take_authentication!(challenge)
       key = authentication_key(challenge)
-      known = Rails.cache.read(key)
-      Rails.cache.delete(key)
-      known.present?
+      Rails.cache.read(key).present? && Rails.cache.delete(key)
     end
 
     private

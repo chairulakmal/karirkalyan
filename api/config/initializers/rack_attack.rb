@@ -97,6 +97,15 @@ class Rack::Attack
     account_id(req)
   end
 
+  # The two enrollment-side passkey writes. DELETE is absent for the same
+  # reason it is on applications: it gives capacity back.
+  def self.passkey_write_user_id(req)
+    return unless req.post? &&
+                  [ "/api/v1/passkeys", "/api/v1/passkeys/options" ].include?(normalized_path(req))
+
+    account_id(req)
+  end
+
   throttle("auth/sign_in", limit: 5, period: 1.minute) do |req|
     req.ip if normalized_path(req) == "/api/v1/auth/sign_in" && req.post?
   end
@@ -152,6 +161,13 @@ class Rack::Attack
   # a request that is cheap either way. 30/min is far above a human editing their applications.
   throttle("applications/write/minute", limit: 30, period: 1.minute) { |req| application_write_user_id(req) }
   throttle("applications/write/hour", limit: 300, period: 1.hour) { |req| application_write_user_id(req) }
+
+  # Passkey enrollment is an authenticated write like the two above, and the
+  # shared demo login makes every authenticated write a public one. The rate
+  # is bounded here; the total is bounded by Credential::MAX_PER_USER, because
+  # a throttle cannot bound a total — every window resets (SPEC.md § Passkeys).
+  throttle("passkeys/write/minute", limit: 10, period: 1.minute) { |req| passkey_write_user_id(req) }
+  throttle("passkeys/write/hour", limit: 30, period: 1.hour) { |req| passkey_write_user_id(req) }
 
   self.throttled_responder = lambda do |request|
     match_data  = request.env["rack.attack.match_data"] || {}

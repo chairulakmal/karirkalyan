@@ -96,7 +96,8 @@
       "resume_not_a_pdf": "The resume must be a PDF.",
       "cover_letter_too_long": "The cover letter must be under 1 MB.",
       "cover_letter_not_a_pdf": "The cover letter must be a PDF.",
-      "base_too_many_applications": "Your account is full. Delete an application to add another one."
+      "base_too_many_applications": "Your account is full. Delete an application to add another one.",
+      "base_too_many_passkeys": "Your account has reached its passkey limit. Remove one to add another."
     }
   },
   "home": {

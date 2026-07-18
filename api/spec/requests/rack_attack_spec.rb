@@ -28,8 +28,50 @@ RSpec.describe "Rack::Attack throttling", type: :request, skip_n_plus_one: true 
   end
 
   # The auth/sign_up throttle was deleted along with the endpoint it protected
-  # (SPEC.md § Registration is closed). Nothing to test here; sign_in is the only
-  # unauthenticated write left.
+  # (SPEC.md § Registration is closed). The unauthenticated writes are sign_in
+  # above and the passkey ceremony below.
+
+  describe "POST /api/v1/auth/passkey* — per-IP ceremony throttle" do
+    # Options and verify share one 10/min family: a ceremony costs two
+    # requests, so the budget is the same five sign-ins a minute the password
+    # throttle allows (SPEC.md § Passkeys).
+    it "returns 429 on the 11th ceremony request from one IP, across both legs" do
+      10.times do
+        post "/api/v1/auth/passkey/options"
+        expect(response).to have_http_status(:ok)
+      end
+
+      post "/api/v1/auth/passkey", params: { challenge: "x", credential: { id: "x" } }, as: :json
+
+      expect(response).to have_http_status(:too_many_requests)
+      expect(response.parsed_body["code"]).to eq("rate_limited")
+    end
+  end
+
+  describe "writes to /api/v1/passkeys — per-account enrollment cap" do
+    let(:user)  { create(:user) }
+    let(:token) { jwt_for(user) }
+
+    it "returns 429 after 10 enrollment writes in a minute" do
+      10.times do
+        post "/api/v1/passkeys/options", headers: { "Authorization" => token }
+        expect(response).to have_http_status(:ok)
+      end
+
+      post "/api/v1/passkeys/options", headers: { "Authorization" => token }
+
+      expect(response).to have_http_status(:too_many_requests)
+    end
+
+    it "does not throttle a delete — it gives capacity back" do
+      credential = create(:credential, user: user)
+      10.times { post "/api/v1/passkeys/options", headers: { "Authorization" => token } }
+
+      delete "/api/v1/passkeys/#{credential.id}", headers: { "Authorization" => token }
+
+      expect(response).to have_http_status(:no_content)
+    end
+  end
 
   describe "POST /api/v1/auth/sign_in — per-account brute-force backstop" do
     let(:body) { { user: { email: "victim@example.com", password: "wrongpass" } } }
