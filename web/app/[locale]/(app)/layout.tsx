@@ -3,6 +3,7 @@ import { Link } from "@/i18n/navigation";
 import { NavLink } from "@/app/components/nav-link";
 import { LocaleSwitcher } from "@/app/components/locale-switcher";
 import { Mark, Wordmark } from "@/app/components/wordmark";
+import { TabBar } from "@/app/components/tab-bar";
 import { SignOutButton } from "./sign-out-button";
 import { REPO_URL } from "@/app/lib/links";
 
@@ -17,22 +18,29 @@ export default async function AppLayout({ children }: { children: React.ReactNod
         <div className="mx-auto flex max-w-5xl items-center justify-between px-6 py-4">
           <Link href="/dashboard" className="flex items-center gap-3">
             <Mark size={28} />
-            {/* Wordmark text hidden below sm — the mark carries the identity
-                and frees the width the Japanese nav labels need at 375px. */}
-            <span className="hidden sm:block">
-              <Wordmark size="sm" />
-            </span>
+            {/* Visible at every width: the tab bar carries the nav labels
+                below sm, so the wordmark no longer competes with them. */}
+            <Wordmark size="sm" />
           </Link>
-          <nav className="flex items-center gap-4 whitespace-nowrap text-sm sm:gap-5">
-            {/* Hidden below sm: the mark on the left already links to the
-                dashboard, so the label is redundant where width is scarce. */}
+          {/* Named because below sm two nav landmarks coexist — this one and
+              the tab bar ("Primary") — and an unnamed landmark next to a named
+              one reads as an afterthought in a screen-reader landmark list. */}
+          <nav
+            aria-label={t("account")}
+            className="flex items-center gap-4 whitespace-nowrap text-sm sm:gap-5"
+          >
+            {/* The three page links hide below sm — the bottom tab bar is the
+                primary nav there. Sign-out and locale stay: the bar has no
+                room for either, and both must remain reachable on a phone. */}
             <span className="hidden sm:block">
               <NavLink href="/dashboard">{t("dashboard")}</NavLink>
             </span>
-            {/* Stays visible below sm: unlike the dashboard (the mark links
-                there), there is no second way to reach the board. */}
-            <NavLink href="/board">{t("board")}</NavLink>
-            <NavLink href="/applications/new">{t("new")}</NavLink>
+            <span className="hidden sm:block">
+              <NavLink href="/board">{t("board")}</NavLink>
+            </span>
+            <span className="hidden sm:block">
+              <NavLink href="/applications/new">{t("new")}</NavLink>
+            </span>
             <SignOutButton />
             <LocaleSwitcher />
           </nav>
@@ -55,6 +63,7 @@ export default async function AppLayout({ children }: { children: React.ReactNod
           </div>
         </div>
       </footer>
+      <TabBar />
     </>
   );
 }

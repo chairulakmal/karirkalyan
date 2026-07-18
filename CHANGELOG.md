@@ -6,7 +6,7 @@ The history: shipped work, newest first — `v1.6.0` (in flight) back through `v
 
 ## v1.6.0 — in flight, untagged
 
-The pocket app's capture flow, landed on `main` ahead of the tag — recorded now per the docs-follow-the-feature rule, so this section grows until the release is cut. Latest tag is still `v1.5.1`; the release's remaining scope (passkey sign-in, push delivery, the installed-app shell's component half, and their infrastructure prerequisites) stays in [`TODO.md`](TODO.md) until it ships. A minor so far by the mechanical test: two user-visible capabilities, no migration — there is no schema in any of it, so the `v1.5.1` image boots against this database unchanged.
+The pocket app's capture flow and installed shell, landed on `main` ahead of the tag — recorded now per the docs-follow-the-feature rule, so this section grows until the release is cut. Latest tag is still `v1.5.1`; the release's remaining scope (passkey sign-in, push delivery, and their infrastructure prerequisites) stays in [`TODO.md`](TODO.md) until it ships. A minor so far by the mechanical test: user-visible capabilities, no migration — there is no schema in any of it, so the `v1.5.1` image boots against this database unchanged.
 
 ### Capture via the share sheet *(#72)*
 
@@ -23,7 +23,13 @@ The pocket app's capture flow, landed on `main` ahead of the tag — recorded no
 
 ### The manifest, measured rather than assumed *(#70)*
 
-- `start_url` is `/dashboard` instead of launching the installed app onto the marketing page; `id` and `scope` are explicit, pinning identity before a WebAPK exists to be orphaned by it; the icon purposes split, because `any` wants the drawn rounded corners and `maskable` wants none. Pure JSON plus one generated asset — which is why it did not wait for the tab bar. The component half of the installed-app shell (bottom tabs, `shortcuts`, the `monochrome` icon) is still open in `TODO.md`.
+- `start_url` is `/dashboard` instead of launching the installed app onto the marketing page; `id` and `scope` are explicit, pinning identity before a WebAPK exists to be orphaned by it; the icon purposes split, because `any` wants the drawn rounded corners and `maskable` wants none. Pure JSON plus one generated asset — which is why it did not wait for the tab bar. The component half followed — § The installed shell, next.
+
+### The installed shell *(feat/installed-app-shell, #73)*
+
+- **A bottom tab bar below `sm`** — Dashboard / New / Board, the header nav relocated rather than a new information architecture: the labels are the existing `nav` catalog keys, so both locales and the parity check came for free. `sticky bottom-0` in the body's flex column, not `fixed`, so content and footer end above it at full scroll and nothing carries a compensating padding; `padding-bottom: env(safe-area-inset-bottom)` clears Android's gesture bar, and the viewport now declares `viewportFit: "cover"`, without which every `env()` inset is silently zero. The header below `sm` sheds the links the bar carries and the wordmark returns at phone widths — the 375px Japanese-label squeeze the old header comments fought is dissolved rather than mitigated.
+- **Manifest `shortcuts`** — long-press the launcher icon for New application (`/applications/new` — the same deep-link contract `share_target` uses) or Board. **The labels ship English-only in a bilingual app, decided with eyes open**: a manifest is fetched at install and WebAPK-update time, so a locale-reading manifest route would freeze the labels to install-day locale anyway — the same freeze the `start_url` reasoning refused — while converting a static file into a dynamic surface (proxy matcher, CSP, caching) for two strings. Recorded in `SPEC.md` § Shortcuts so it is not re-litigated.
+- **A `monochrome` icon** — the third purpose with a third contract: shape only. Android themed icons tint a mask (on Nothing OS the launcher aesthetic *is* monochrome themed icons), so the plate is gone and the glyph is the shape: the asset is derived from the monogram render by unmixing each pixel to its plate→ink ratio and writing that ratio as alpha. Measured like `maskable`, not assumed: furthest glyph corner 183.0px against the 204.8px safe radius at 512 — the identical ~22px margin, as it must be, because it is the same artwork.
 
 ### Fixed
 

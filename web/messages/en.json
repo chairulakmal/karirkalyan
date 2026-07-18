@@ -3,6 +3,8 @@
     "dashboard": "Dashboard",
     "board": "Kanban",
     "new": "New",
+    "primary": "Primary",
+    "account": "Account",
     "signOut": "Sign out",
     "signingOut": "Signing out…",
     "forReviewers": "For reviewers",
