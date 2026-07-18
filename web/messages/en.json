@@ -3,6 +3,7 @@
     "dashboard": "Dashboard",
     "board": "Kanban",
     "new": "New",
+    "settings": "Settings",
     "primary": "Primary",
     "account": "Account",
     "signOut": "Sign out",
@@ -72,11 +73,13 @@
     "code": {
       "unauthenticated": "Your session is no longer valid. Sign in again to continue.",
       "invalid_credentials": "That email and password don't match an account.",
+      "invalid_passkey": "Passkey sign-in failed. Try again, or sign in with your password.",
       "forbidden": "The demo account can't be deleted — it's shared, so everyone reviewing this project needs it.",
       "not_found": "That application no longer exists.",
       "stale_record": "This application was changed elsewhere. Reload and try again.",
       "invalid_transition": "That status change isn't allowed from the current status.",
       "validation_failed": "Those details couldn't be saved. Check the form and try again.",
+      "passkey_verification_failed": "That passkey couldn't be added. Try again.",
       "invalid_url": "That couldn't be read as a job posting URL.",
       "prefill_blocked": "That site blocks automated readers, so the posting couldn't be fetched from here.",
       "rate_limited": "Too many requests. Wait a moment and try again.",
@@ -244,7 +247,29 @@
     "email": "Email",
     "password": "Password",
     "signingIn": "Signing in…",
+    "signInWithPasskey": "Sign in with a passkey",
+    "passkeySigningIn": "Waiting for your passkey…",
     "registrationClosed": "Registration is closed — this app holds resumes, and it is deliberately not built to be anyone's custodian but its author's. The demo account above is the full app, with twelve applications already in it."
+  },
+  "settings": {
+    "title": "Settings",
+    "passkeysTitle": "Passkeys",
+    "passkeysDescription": "Sign in with your password manager, fingerprint, or face instead of typing a password. A passkey added here syncs through your password manager to your other devices — and your password keeps working either way.",
+    "empty": "No passkeys yet.",
+    "unnamed": "Unnamed passkey",
+    "added": "Added {date}",
+    "lastUsed": "Last used {date}",
+    "neverUsed": "Never used",
+    "nickname": "Name (optional)",
+    "nicknamePlaceholder": "e.g. Proton Pass",
+    "addPasskey": "Add a passkey",
+    "addingPasskey": "Waiting for your authenticator…",
+    "unsupported": "This browser can't create passkeys. Password sign-in keeps working.",
+    "createFailed": "The passkey couldn't be created. Try again.",
+    "remove": "Remove",
+    "removing": "Removing…",
+    "confirmRemove": "Remove this passkey? You can add it again later.",
+    "cancel": "Cancel"
   },
   "dashboard": {
     "eyebrow": "Overview",
@@ -358,9 +383,21 @@
     "confirm": "Confirm",
     "cancel": "Cancel",
     "reasons": {
-      "ghosted": ["Company reached back out", "Responded after follow-up", "Recorded in error"],
-      "rejected": ["Recruiter rescinded rejection", "Position reopened", "Recorded in error"],
-      "withdrawn": ["Re-engaged with company", "Withdrew by mistake", "Recorded in error"]
+      "ghosted": [
+        "Company reached back out",
+        "Responded after follow-up",
+        "Recorded in error"
+      ],
+      "rejected": [
+        "Recruiter rescinded rejection",
+        "Position reopened",
+        "Recorded in error"
+      ],
+      "withdrawn": [
+        "Re-engaged with company",
+        "Withdrew by mistake",
+        "Recorded in error"
+      ]
     }
   },
   "files": {

@@ -567,6 +567,115 @@ paths:
           description: current user profile
         '401':
           description: not authenticated
+  "/api/v1/passkeys/options":
+    post:
+      summary: WebAuthn registration options
+      tags:
+      - Passkeys
+      security:
+      - bearerAuth: []
+      description: |
+        Creation options for enrolling a passkey (SPEC.md § Passkeys): discoverable
+        credentials (`residentKey: "required"`), no authenticator attachment restriction,
+        `attestation: "none"`. The challenge is single-use and expires in five minutes.
+      responses:
+        '200':
+          description: creation options
+        '401':
+          description: not authenticated
+  "/api/v1/passkeys":
+    get:
+      summary: List enrolled passkeys
+      tags:
+      - Passkeys
+      security:
+      - bearerAuth: []
+      responses:
+        '200':
+          description: the user's passkeys — id, nickname, created_at, last_used_at
+            only
+    post:
+      summary: Enroll a passkey
+      tags:
+      - Passkeys
+      security:
+      - bearerAuth: []
+      parameters: []
+      responses:
+        '201':
+          description: passkey enrolled
+        '422':
+          description: attestation does not verify, or the challenge expired
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                credential:
+                  type: object
+                  description: The browser PublicKeyCredential, serialized with toJSON()
+                nickname:
+                  type: string
+              required:
+              - credential
+  "/api/v1/passkeys/{id}":
+    delete:
+      summary: Remove a passkey
+      tags:
+      - Passkeys
+      security:
+      - bearerAuth: []
+      parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: integer
+      responses:
+        '204':
+          description: removed
+        '404':
+          description: another user's passkey — scoped, never a 403
+  "/api/v1/auth/passkey/options":
+    post:
+      summary: WebAuthn assertion options
+      tags:
+      - Auth
+      description: |
+        Assertion options for passkey sign-in — unauthenticated, usernameless. The
+        allow-list is empty (credentials are discoverable; the browser's picker chooses).
+        The challenge is single-use and expires in five minutes.
+      responses:
+        '200':
+          description: assertion options
+  "/api/v1/auth/passkey":
+    post:
+      summary: Sign in with a passkey
+      tags:
+      - Auth
+      parameters: []
+      responses:
+        '200':
+          description: signed in — JWT returned in Authorization header
+        '401':
+          description: unknown credential, bad challenge, or failed verification
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                challenge:
+                  type: string
+                  description: The challenge echoed from the options response
+                credential:
+                  type: object
+                  description: The browser PublicKeyCredential assertion, serialized
+                    with toJSON()
+              required:
+              - challenge
+              - credential
   "/api/v1/transitions":
     get:
       summary: Get the FSM's effective transition table

@@ -4,6 +4,7 @@ import { useRouter } from "@/i18n/navigation";
 import { useState, useTransition } from "react";
 import { useTranslations } from "next-intl";
 import { Field } from "@/app/components/field";
+import { usePasskeysSupported } from "@/app/lib/passkeys";
 import type { SharedCapture } from "@/app/lib/share";
 
 // `/api/auth/session` answers with `{ error, code }`, mirroring the Rails API behind
@@ -28,8 +29,12 @@ export function AuthForm({ share = null }: { share?: SharedCapture | null }) {
   const [error, setError] = useState<string | null>(null);
   const [pending, startTransition] = useTransition();
   const [demoPending, setDemoPending] = useState(false);
+  const [passkeyPending, setPasskeyPending] = useState(false);
+  // False on the server render, the real detection after hydration — so the
+  // button appears a beat late rather than mismatching.
+  const passkeyReady = usePasskeysSupported();
 
-  const busy = pending || demoPending;
+  const busy = pending || demoPending || passkeyPending;
 
   // `overrides` names a catalog entry that reads better than the generic one
   // for that status — a 401 here means bad credentials, not a dead session.
@@ -51,6 +56,25 @@ export function AuthForm({ share = null }: { share?: SharedCapture | null }) {
     return (await res.json().catch(() => null)) as FailureBody;
   }
 
+  /* A share that bounced into sign-in continues to the capture form it was
+     aimed at; everything else lands on the dashboard. The destination is
+     built from the extracted capture only — a fixed internal path plus one
+     encoded parameter — never from a caller-supplied path, so this is not
+     an open ?next= redirect (SPEC.md § Installable app § Share target).
+     Shared by the password and passkey paths — a session is a session. */
+  function continueSignedIn() {
+    const destination =
+      share === null
+        ? "/dashboard"
+        : share.kind === "url"
+          ? `/applications/new?url=${encodeURIComponent(share.url)}`
+          : `/applications/new?text=${encodeURIComponent(share.text)}`;
+    startTransition(() => {
+      router.push(destination);
+      router.refresh();
+    });
+  }
+
   async function doSignIn(email: string, password: string): Promise<boolean> {
     setError(null);
     const res = await fetch("/api/auth/session", {
@@ -62,22 +86,55 @@ export function AuthForm({ share = null }: { share?: SharedCapture | null }) {
       setError(errorMessage(res.status, await failureBody(res), { 401: "invalidCredentials" }));
       return false;
     }
-    /* A share that bounced into sign-in continues to the capture form it was
-       aimed at; everything else lands on the dashboard. The destination is
-       built from the extracted capture only — a fixed internal path plus one
-       encoded parameter — never from a caller-supplied path, so this is not
-       an open ?next= redirect (SPEC.md § Installable app § Share target). */
-    const destination =
-      share === null
-        ? "/dashboard"
-        : share.kind === "url"
-          ? `/applications/new?url=${encodeURIComponent(share.url)}`
-          : `/applications/new?text=${encodeURIComponent(share.text)}`;
-    startTransition(() => {
-      router.push(destination);
-      router.refresh();
-    });
+    continueSignedIn();
     return true;
+  }
+
+  // The WebAuthn ceremony (SPEC.md § Auth flow): options from the route
+  // handler, the browser's own picker chooses the credential (discoverable —
+  // no email asked), the assertion goes back with the echoed challenge, and
+  // the handler sets the same session cookie the password path does.
+  async function onPasskeySignIn() {
+    setError(null);
+    setPasskeyPending(true);
+    try {
+      const optRes = await fetch("/api/auth/passkey/options", { method: "POST" });
+      if (!optRes.ok) {
+        setError(errorMessage(optRes.status, await failureBody(optRes)));
+        return;
+      }
+      const optionsJSON = (await optRes.json()) as PublicKeyCredentialRequestOptionsJSON;
+
+      let assertion: Credential | null;
+      try {
+        assertion = await navigator.credentials.get({
+          publicKey: PublicKeyCredential.parseRequestOptionsFromJSON(optionsJSON),
+        });
+      } catch (e) {
+        // Cancelling the browser's own picker is not an error the page
+        // needs to repeat back; anything else is.
+        if (e instanceof DOMException && e.name === "NotAllowedError") return;
+        setError(tErrors("code.invalid_passkey"));
+        return;
+      }
+      if (!(assertion instanceof PublicKeyCredential)) return;
+
+      const res = await fetch("/api/auth/passkey", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          challenge: optionsJSON.challenge,
+          credential: assertion.toJSON(),
+        }),
+      });
+      if (!res.ok) {
+        setError(errorMessage(res.status, await failureBody(res)));
+        return;
+      }
+      continueSignedIn();
+    } finally {
+      setPasskeyPending(false);
+    }
   }
 
   async function onSubmit(formData: FormData) {
@@ -126,6 +183,20 @@ export function AuthForm({ share = null }: { share?: SharedCapture | null }) {
           {pending ? t("signingIn") : t("signIn")}
         </button>
       </form>
+
+      {/* Rendered only when the browser has the WebAuthn JSON methods the
+          ceremony uses — feature-detected, never assumed (SPEC.md § Auth flow).
+          Password sign-in stays forever as the fallback either way. */}
+      {passkeyReady ? (
+        <button
+          type="button"
+          onClick={onPasskeySignIn}
+          disabled={busy}
+          className="w-full border border-dune px-4 py-2.5 text-sm font-medium text-ink transition hover:border-cobalt hover:text-cobalt disabled:opacity-50"
+        >
+          {passkeyPending ? t("passkeySigningIn") : t("signInWithPasskey")}
+        </button>
+      ) : null}
 
       <p className="border-t border-dune pt-4 text-xs leading-relaxed text-ink-soft">
         {t("registrationClosed")}

@@ -9,9 +9,11 @@ gem "tzinfo-data", platforms: %i[ windows jruby ]
 gem "rack-cors"
 gem "rack-attack"
 
-# Auth
+# Auth. webauthn is hand-wired into Devise for passkey sign-in — the
+# devise-passkeys extension is not mature enough to lean on (SPEC.md § Passkeys).
 gem "devise"
 gem "devise-jwt"
+gem "webauthn"
 
 # Background jobs & cache — Postgres-backed, no Redis needed (replaces Sidekiq/Redis).
 # Solid Queue runs inside Puma via `plugin :solid_queue` (SOLID_QUEUE_IN_PUMA env var);

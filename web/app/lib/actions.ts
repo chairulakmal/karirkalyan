@@ -224,6 +224,50 @@ export async function deleteApplication(id: number): Promise<ActionFailure> {
   redirect({ href: "/dashboard", locale });
 }
 
+// --- Passkeys (SPEC.md § Passkeys; § Auth flow) ------------------------------
+//
+// The *authenticated* halves of the enrollment ceremony are ordinary API calls,
+// so they are server actions like every other authenticated mutation. Only the
+// unauthenticated sign-in legs are route handlers, because only they must lift
+// the Authorization header into the session cookie.
+
+// The ceremony JSON is opaque to this layer: it is produced by the webauthn gem
+// and consumed by PublicKeyCredential.parseCreationOptionsFromJSON in the
+// browser. Typing it field-by-field here would be a hand-copied contract.
+export type PasskeyOptionsResult =
+  | { ok: true; options: Record<string, unknown> }
+  | ActionFailure;
+
+export async function getPasskeyRegistrationOptions(): Promise<PasskeyOptionsResult> {
+  const res = await apiFetch<Record<string, unknown>>("/passkeys/options", {
+    method: "POST",
+  });
+  if (!res.ok) return apiFailure(res);
+  return { ok: true, options: res.data };
+}
+
+export async function registerPasskey(
+  credential: unknown,
+  nickname: string,
+): Promise<ActionResult> {
+  const res = await apiFetch("/passkeys", {
+    method: "POST",
+    body: JSON.stringify({ credential, nickname: nickname.trim() || null }),
+  });
+  if (!res.ok) return apiFailure(res);
+
+  revalidatePath(getPathname({ href: "/settings", locale: await getLocale() }));
+  return { ok: true };
+}
+
+export async function deletePasskey(id: number): Promise<ActionResult> {
+  const res = await apiFetch(`/passkeys/${id}`, { method: "DELETE" });
+  if (!res.ok) return apiFailure(res);
+
+  revalidatePath(getPathname({ href: "/settings", locale: await getLocale() }));
+  return { ok: true };
+}
+
 type ApplicationInput = {
   company?: string;
   role?: string;

@@ -108,7 +108,18 @@ class Rack::Attack
   throttle("auth/sign_in/email/hourly", limit: 50, period: 1.hour) { |req| sign_in_email(req) }
 
   # There is no auth/sign_up throttle because there is no sign-up endpoint — see
-  # SPEC.md § Registration is closed. sign_in is the only unauthenticated write left.
+  # SPEC.md § Registration is closed. The unauthenticated writes left are sign_in
+  # above and the passkey ceremony below.
+
+  # Passkey sign-in, one per-IP family across both ceremony legs (options +
+  # verify): a ceremony costs two requests, so 10/min is the same five
+  # sign-ins a minute the password throttle allows. No email-keyed backstop
+  # because there is no email in the request, and no guessing surface for one
+  # to protect — an assertion is a signature over a server-issued challenge,
+  # not a secret that enumeration erodes (SPEC.md § Passkeys).
+  throttle("auth/passkey", limit: 10, period: 1.minute) do |req|
+    req.ip if normalized_path(req).start_with?("/api/v1/auth/passkey") && req.post?
+  end
 
   # AI URL pre-fill fans out to a paid Claude call + an outbound HTTP fetch.
   # Per-IP cap (coarse, also covers multi-account abuse from one IP)...

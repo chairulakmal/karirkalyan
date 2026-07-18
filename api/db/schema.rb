@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[8.1].define(version: 2026_07_11_000001) do
+ActiveRecord::Schema[8.1].define(version: 2026_07_18_000001) do
   # These are extensions that must be enabled in order to support this database
   enable_extension "pg_catalog.plpgsql"
   enable_extension "pgcrypto"
@@ -34,6 +34,19 @@ ActiveRecord::Schema[8.1].define(version: 2026_07_11_000001) do
     t.index ["follow_up_at"], name: "index_applications_on_follow_up_at"
     t.index ["status"], name: "index_applications_on_status"
     t.index ["user_id", "created_at"], name: "index_applications_on_user_id_and_created_at", order: { created_at: :desc }
+  end
+
+  create_table "credentials", force: :cascade do |t|
+    t.datetime "created_at", null: false
+    t.string "external_id", null: false
+    t.datetime "last_used_at"
+    t.string "nickname"
+    t.string "public_key", null: false
+    t.bigint "sign_count", default: 0, null: false
+    t.datetime "updated_at", null: false
+    t.bigint "user_id", null: false
+    t.index ["external_id"], name: "index_credentials_on_external_id", unique: true
+    t.index ["user_id"], name: "index_credentials_on_user_id"
   end
 
   create_table "solid_cache_entries", force: :cascade do |t|
@@ -188,11 +201,13 @@ ActiveRecord::Schema[8.1].define(version: 2026_07_11_000001) do
     t.string "encrypted_password", default: "", null: false
     t.string "jti", null: false
     t.datetime "updated_at", null: false
+    t.string "webauthn_id"
     t.index ["email"], name: "index_users_on_email", unique: true
     t.index ["jti"], name: "index_users_on_jti", unique: true
   end
 
   add_foreign_key "applications", "users"
+  add_foreign_key "credentials", "users"
   add_foreign_key "solid_queue_blocked_executions", "solid_queue_jobs", column: "job_id", on_delete: :cascade
   add_foreign_key "solid_queue_claimed_executions", "solid_queue_jobs", column: "job_id", on_delete: :cascade
   add_foreign_key "solid_queue_failed_executions", "solid_queue_jobs", column: "job_id", on_delete: :cascade

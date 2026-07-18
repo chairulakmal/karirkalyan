@@ -27,7 +27,13 @@ Devise.setup do |config|
 
   config.jwt do |jwt|
     jwt.secret = ENV.fetch("DEVISE_JWT_SECRET_KEY")
-    jwt.dispatch_requests = [ [ "POST", %r{^/api/v1/auth/sign_in$} ] ]
+    # Both sign-in doors dispatch the same token: a verified passkey assertion
+    # (SPEC.md § Passkeys) is a password sign-in from the JWT's point of view —
+    # same 1-day expiry, same JTI, so sign-out revokes every device either way.
+    jwt.dispatch_requests = [
+      [ "POST", %r{^/api/v1/auth/sign_in$} ],
+      [ "POST", %r{^/api/v1/auth/passkey$} ]
+    ]
     jwt.revocation_requests = [ [ "DELETE", %r{^/api/v1/auth/sign_out$} ] ]
     jwt.expiration_time = 1.day.to_i
   end
