@@ -33,6 +33,7 @@ Every page lives under a `[locale]` segment — `en` and `ja` (`i18n/routing.ts`
 | `/board` | Kanban board — drag a card to run an FSM transition; legality read from `GET /api/v1/transitions`, optimistic with a `409` snap-back |
 | `/applications/new` | Create a new application — includes the AI job-URL pre-fill |
 | `/applications/[id]` | Detail view — FSM transition buttons (from `valid_next_states`), timeline entries, resume/cover letter upload |
+| `/settings` | Passkey enrollment (create and revoke; feature-detected, desktop-first) and the push-notification toggle for the follow-up digest. The only place the notification-permission prompt can fire |
 | `/about`, `/docs` | Project write-up and documentation |
 | `/privacy`, `/terms` | Legal pages, both locales — readable signed in or out |
 

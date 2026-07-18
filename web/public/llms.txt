@@ -16,7 +16,14 @@ pipeline. Built as a portfolio project by Chairul Akmal (https://chairulakmal.co
 - Sends follow-up reminders via idempotent Solid Queue background jobs, batched into one digest
   per user per day rather than one email per application. The digest holds on weekends, Japanese
   national holidays, New Year, Golden Week and Obon, and the held reminders go out on the next
-  business day — deferred, not dropped.
+  business day — deferred, not dropped. With notifications enabled on /settings, the same daily
+  batch also arrives as a Web Push notification on the installed app; a push failure retries
+  without re-sending the email.
+- Signs in with passkeys (WebAuthn) as well as a password: discoverable credentials make the
+  ceremony usernameless, no authenticator restriction keeps third-party providers such as
+  Proton Pass usable, and a verified assertion mints the same short-lived, revocable JWT as a
+  password sign-in. The password form remains as the permanent fallback; passkey enrollment
+  lives on /settings.
 - Exports your data two ways: a CSV of your applications, and a full-account zip containing
   account.json plus every resume and cover letter you uploaded. Both are downloads from the
   dashboard; the zip is the one that can actually restore an account.
@@ -41,7 +48,9 @@ pipeline. Built as a portfolio project by Chairul Akmal (https://chairulakmal.co
   and land in the new-application form with the AI pre-fill already reading it; a share with no
   link in it seeds a paste box instead, and the same paste box is offered when a site refuses
   the automated fetch. Install goes through Chrome — share-sheet integration lives in the
-  WebAPK, which Brave cannot mint.
+  WebAPK, which Brave cannot mint. Once installed it behaves like an app: phone widths get a
+  bottom tab bar, long-pressing the launcher icon offers New application and Board shortcuts,
+  and a monochrome manifest icon lets Android themed icons tint the monogram.
 - Cursor-based pagination on the applications list
 
 ## Registration is closed
@@ -49,9 +58,11 @@ pipeline. Built as a portfolio project by Chairul Akmal (https://chairulakmal.co
 There is no sign-up form and no sign-up endpoint. The app holds resumes — the most PII-dense
 document most people own — and it is deliberately not built to be anyone's custodian but its
 author's. Visitors sign in to the shared demo account below, which is the full app with twelve
-applications already in it, not a stripped sandbox. Accounts are created by the operator with
-`bin/rails users:create`. Data and erasure requests go to karirkalyan@cypherpunkzero.com; there
-is no self-service delete button, and the app does not claim one.
+applications already in it, not a stripped sandbox. Sign-in supports passkeys (WebAuthn)
+alongside the password form; the demo account uses the password. Accounts are created by the
+operator with `bin/rails users:create`. Data and erasure requests go to
+karirkalyan@cypherpunkzero.com; there is no self-service delete button, and the app does not
+claim one.
 
 ## Tech stack
 

@@ -51,6 +51,7 @@ Jobs run in-process in development via the `:async` adapter (`config/environment
 | `SMTP_PASS` | SMTP password / API key. For Resend, a `re_…` API key. |
 | `MAILER_FROM` | `From:` address for outbound mail, e.g. `KarirKalyan <reminders@kk.chairulakmal.com>`. Must be on a domain verified with the SMTP provider. |
 | `ANTHROPIC_API_KEY` | Anthropic API key (pay-as-you-go, from console.anthropic.com) for the AI job-URL pre-fill. Pre-fill is a synchronous request, not a background job. If unset, `POST /applications/prefill` returns `503` and the rest of the app is unaffected. |
+| `VAPID_PUBLIC_KEY` / `VAPID_PRIVATE_KEY` | Web Push VAPID keypair for the push digest. Generate: `bin/rails push:vapid`, one pair **per environment** (a dev key must never be able to sign a push to the production user), never committed. If unset, the push endpoints return `503 push_unavailable`, the follow-up digest stays email-only, and the rest of the app is unaffected. |
 | `HONEYBADGER_API_KEY` | Error reporting (`config/honeybadger.yml`). |
 
 ### Background jobs & scheduled reminders
@@ -65,7 +66,7 @@ Recurring work is declared in `config/recurring.yml`:
 | `reset_demo_account` | hourly, at :42 | `DemoResetJob` — see [Demo data](#demo-data) |
 | `clear_solid_queue_finished_jobs` | hourly, at :12 | Keeps the jobs table from growing unbounded |
 
-`FollowUpReminderJob`: it collects every application whose `follow_up_at` has fallen due (reaching back 30 days, so nothing that was held is lost), writes a `TimelineEntry` per application (the exactly-once idempotency anchor), groups the winners **by user**, and enqueues one `FollowUpMailer.digest` via `deliver_later` on the `mailers` queue — one email per user per day, not one per application. Decoupling delivery means a transient SMTP failure retries the email without ever duplicating the timeline entry.
+`FollowUpReminderJob`: it collects every application whose `follow_up_at` has fallen due (reaching back 30 days, so nothing that was held is lost), writes a `TimelineEntry` per application (the exactly-once idempotency anchor), groups the winners **by user**, and enqueues one `FollowUpMailer.digest` via `deliver_later` on the `mailers` queue — one email per user per day, not one per application. The same per-user batch also fans into a second channel: one `PushDigestJob` per user delivers the digest as a Web Push notification (`web-push` gem, VAPID) to every enrolled device. The timeline claim stays the single exactly-once anchor, so decoupling delivery means a transient SMTP failure retries the email without ever duplicating the timeline entry, a push failure retries without re-mailing, and a subscription the push service reports gone (`404`/`410`) deletes itself.
 
 The job **holds** on any day `JapanCalendar` does not call a business day: weekends, national holidays (via the `holidays` gem, so 春分の日 tracks the equinox and 振替休日 is applied), New Year, Golden Week, Obon. Held is not dropped — the idempotency key is derived from `follow_up_at`, **not** from the day the job runs, so the next business day picks the reminder up and sends it exactly once. The same property means an overdue application is not re-nudged every morning, and moving `follow_up_at` re-arms it.
 
@@ -162,6 +163,9 @@ Outputs to `swagger/v1/swagger.yaml`.
 POST   /api/v1/auth/sign_in
 DELETE /api/v1/auth/sign_out
 DELETE /api/v1/auth/account                # erases the account and everything under it
+POST   /api/v1/auth/passkey/options        # WebAuthn assertion options (usernameless ceremony)
+POST   /api/v1/auth/passkey                # verify the assertion; answers with the same
+                                           #   Authorization header as sign_in
 
 # There is no sign-up route — registration is closed (SPEC.md § Registration is
 # closed). Accounts are made with `bin/rails users:create EMAIL=… PASSWORD=…`.
@@ -175,6 +179,16 @@ DELETE /api/v1/applications/:id
 PATCH  /api/v1/applications/:id/transition
 GET    /api/v1/applications/:id/resume
 GET    /api/v1/applications/:id/cover_letter
+
+GET    /api/v1/passkeys                  # the account's enrolled passkeys
+POST   /api/v1/passkeys/options          # WebAuthn creation options
+POST   /api/v1/passkeys                  # register a new passkey
+DELETE /api/v1/passkeys/:id
+
+GET    /api/v1/push_subscriptions/public_key   # the VAPID public key the browser subscribes with
+POST   /api/v1/push_subscriptions
+DELETE /api/v1/push_subscriptions        # endpoint in the body, not an id: the browser
+                                         #   knows its endpoint, not our row id
 
 GET    /api/v1/exports/applications      # CSV of every application — text/csv
 GET    /api/v1/exports/account           # full account: JSON + uploaded PDFs — application/zip
