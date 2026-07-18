@@ -1,3 +1,4 @@
+import { cookies } from "next/headers";
 import { getTranslations } from "next-intl/server";
 import { Link } from "@/i18n/navigation";
 import { NavLink } from "@/app/components/nav-link";
@@ -5,13 +6,18 @@ import { LocaleSwitcher } from "@/app/components/locale-switcher";
 import { Mark, Wordmark } from "@/app/components/wordmark";
 import { ServiceWorkerRegistrar } from "@/app/components/service-worker-registrar";
 import { TabBar } from "@/app/components/tab-bar";
-import { SignOutButton } from "./sign-out-button";
+import { AccountMenu } from "./account-menu";
+import { ACCOUNT_EMAIL_COOKIE_NAME } from "@/app/lib/api";
 import { REPO_URL } from "@/app/lib/links";
 
 const reviewerLinkClass = "underline underline-offset-4 hover:text-cobalt";
 
 export default async function AppLayout({ children }: { children: React.ReactNode }) {
   const t = await getTranslations("nav");
+  // The display cookie the sign-in handlers set beside the JWT (SPEC.md
+  // § Auth flow): read here, passed down as a prop, never fetched. Null for
+  // sessions minted before the cookie existed; it ages out within a day.
+  const email = (await cookies()).get(ACCOUNT_EMAIL_COOKIE_NAME)?.value ?? null;
 
   return (
     <>
@@ -31,8 +37,7 @@ export default async function AppLayout({ children }: { children: React.ReactNod
             className="flex items-center gap-4 whitespace-nowrap text-sm sm:gap-5"
           >
             {/* The three page links hide below sm — the bottom tab bar is the
-                primary nav there. Sign-out and locale stay: the bar has no
-                room for either, and both must remain reachable on a phone. */}
+                primary nav there. */}
             <span className="hidden sm:block">
               <NavLink href="/dashboard">{t("dashboard")}</NavLink>
             </span>
@@ -42,14 +47,12 @@ export default async function AppLayout({ children }: { children: React.ReactNod
             <span className="hidden sm:block">
               <NavLink href="/applications/new">{t("new")}</NavLink>
             </span>
-            {/* Settings is not in the tab bar, so unlike the three links above
-                it has no phone home — that is deliberate: passkey enrollment
-                is desktop-first (SPEC.md § Passkeys), and the page stays
-                reachable by URL on any width. */}
-            <span className="hidden sm:block">
-              <NavLink href="/settings">{t("settings")}</NavLink>
-            </span>
-            <SignOutButton />
+            {/* Settings and sign-out live in the account menu, at every width:
+                the push enable toggle is on /settings and the installed app is
+                the device push targets, so the phone must reach the page
+                without a typed URL (SPEC.md § Auth flow). Locale stays outside
+                the menu: language switching is a first-visit action. */}
+            <AccountMenu email={email} />
             <LocaleSwitcher />
           </nav>
         </div>

@@ -1,6 +1,19 @@
 # Changelog
 
-The history: shipped work, newest first — `v1.6.0` back through `v1.0.0` — with branch/PR names noting where each change landed, and each release since `v1.3.1` naming its patch/minor level against the versioning policy's mechanical test. The most important section is the one that is not a release: § Decisions records the settled decisions-not-to-build, so that [`TODO.md`](TODO.md) — where open work lives — can stay plan-only without the reasoning getting lost.
+The history: shipped work, newest first — `v1.7.0` (in flight) back through `v1.0.0` — with branch/PR names noting where each change landed, and each release since `v1.3.1` naming its patch/minor level against the versioning policy's mechanical test. The most important section is the one that is not a release: § Decisions records the settled decisions-not-to-build, so that [`TODO.md`](TODO.md) — where open work lives — can stay plan-only without the reasoning getting lost.
+
+---
+
+## v1.7.0 — in flight, untagged
+
+The Japan market layer (recruiter channel, 年収 comp structure, Japanese-level filter, posting snapshot), recorded here feature by feature as work lands, per the docs-follow-the-feature rule. Latest tag is `v1.6.0`. The account menu below rides this release outside the field trio because it closes a gap `v1.6.0` left open.
+
+### Account menu in the app header *(feat/account-menu, #76)*
+
+- **Settings and Sign out collapse behind a square initials chip, at every width.** The gap it closes: the push enable toggle lives on `/settings`, a push subscription is per browser instance, and the one device push delivery targets (the installed Android app) was the one that could not reach the page without a typed URL. The `sm`-and-up settings-link decision this amends is re-recorded, not silently contradicted (`SPEC.md` § Auth flow). Sign-out moves off the header bar into the menu, so the below-`sm` header shrinks rather than grows; the locale switcher stays outside, because language switching is a first-visit action; the tab bar keeps its three tabs, since settings is a secondary destination and the bar's slots are for primary ones.
+- **The email reaches the header through a companion cookie, never a fetch.** Both sign-in responses already carry `{ user: { id, email } }`; the two sign-in route handlers now read the body they were discarding and set an `httpOnly` `account_email` cookie beside the `session` cookie, same attributes and one-day `maxAge`, cleared everywhere the session cookie is. The layout reads it server-side and passes a prop: `ProfileCard`'s prop-not-fetch rule applied to the layout, keeping the `v1.3.0` fold folded. A pre-existing session lacks the cookie for at most a day and degrades to a neutral glyph; a hand-edited value is display-only and self-affecting.
+- **Square on purpose, one initial from the email local part.** Radius `0` is the design system, and the circle convention signals a person's photo this app never has; name-derived initials are culturally fraught (name order, single names, non-Latin scripts) and the data model holds no name anyway. The full email is the chip's accessible label and the menu's first row. The menu is a plain disclosure rather than an ARIA `menu` (two links do not earn roving focus): outside click and `Escape` close it, `Escape` returns focus to the chip.
+- **Pinned by e2e**: chip initial and accessible name, disclosure behaviour, settings navigation, sign-out's relocation into the menu, and the expired-session bounce now clearing `account_email` beside `session`.
 
 ---
 

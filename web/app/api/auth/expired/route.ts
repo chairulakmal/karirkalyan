@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { SESSION_COOKIE_NAME } from "@/app/lib/api";
+import { ACCOUNT_EMAIL_COOKIE_NAME, SESSION_COOKIE_NAME } from "@/app/lib/api";
 
 // Landing spot when the Rails API answers 401 (expired or revoked JWT).
 // apiFetch redirects here because render contexts can't modify cookies;
@@ -21,5 +21,6 @@ export async function GET() {
     headers: { Location: "/sign-in?expired=1" },
   });
   response.cookies.delete(SESSION_COOKIE_NAME);
+  response.cookies.delete(ACCOUNT_EMAIL_COOKIE_NAME);
   return response;
 }
