@@ -107,7 +107,7 @@
     "tryDemo": "Try the demo",
     "ctaAbout": "How it's built",
     "about": "About",
-    "eyebrow": "A portfolio project by Chairul Akmal",
+    "eyebrow": "A portfolio project by <link>Chairul Akmal</link>",
     "headline": "A job tracker built on a <accent>finite state machine</accent>.",
     "lede": "Thirteen states, an explicit transition table, and an immutable audit trail behind every change. Track an application from <em>wishlist</em> to <em>offer</em> without the pipeline ever lying to you about where it is.",
     "stack": "Rails 8 · Next.js 16 · PostgreSQL 18",
@@ -126,7 +126,7 @@
     "tagline": "A job application tracker built on a finite state machine: thirteen states, an explicit transition table, and an immutable audit trail. Rails 8 API, Next.js 16 frontend, one PostgreSQL database."
   },
   "footer": {
-    "copyright": "© 2026 Chairul Akmal",
+    "copyright": "© 2026 <link>Chairul Akmal</link>",
     "apiDocs": "API docs",
     "privacy": "Privacy",
     "terms": "Terms",

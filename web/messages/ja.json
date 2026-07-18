@@ -107,7 +107,7 @@
     "tryDemo": "デモを試す",
     "ctaAbout": "設計を読む",
     "about": "このプロジェクトについて",
-    "eyebrow": "Chairul Akmal のポートフォリオプロジェクト",
+    "eyebrow": "<link>Chairul Akmal</link> のポートフォリオプロジェクト",
     "headline": "<accent>有限ステートマシン</accent>で動く、応募管理ツール。",
     "lede": "13の状態、明示的な遷移テーブル、そしてすべての変更の背後に残る不変の監査ログ。<em>検討中</em>から<em>内定</em>まで、パイプラインが現在地を偽ることはありません。",
     "stack": "Rails 8 · Next.js 16 · PostgreSQL 18",
@@ -126,7 +126,7 @@
     "tagline": "有限ステートマシンで動く応募管理ツール。13の状態、明示的な遷移テーブル、不変の監査ログ。Rails 8 の API と Next.js 16 のフロントエンド、データベースは PostgreSQL ひとつ。"
   },
   "footer": {
-    "copyright": "© 2026 Chairul Akmal",
+    "copyright": "© 2026 <link>Chairul Akmal</link>",
     "apiDocs": "APIドキュメント",
     "privacy": "プライバシー",
     "terms": "利用規約",

@@ -3,7 +3,7 @@
 > Full-stack job application tracker — Rails 8 API + Next.js 16 frontend
 
 KarirKalyan is a web application for tracking job applications through a finite state machine (FSM)
-pipeline. Built as a portfolio project by Chairul Akmal.
+pipeline. Built as a portfolio project by Chairul Akmal (https://chairulakmal.com).
 
 ## What it does
 
@@ -81,4 +81,6 @@ https://github.com/chairulakmal/karirkalyan
 
 ## Author
 
-Chairul Akmal — https://github.com/chairulakmal
+Chairul Akmal
+- Website: https://chairulakmal.com
+- GitHub: https://github.com/chairulakmal

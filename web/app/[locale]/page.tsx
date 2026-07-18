@@ -24,7 +24,8 @@ export default async function Home() {
     author: {
       "@type": "Person",
       name: "Chairul Akmal",
-      url: "https://github.com/chairulakmal",
+      url: "https://chairulakmal.com",
+      sameAs: ["https://github.com/chairulakmal"],
     },
   };
 
@@ -63,7 +64,20 @@ export default async function Home() {
 
       <main className="flex-1 px-6 py-20 md:px-8 md:py-28">
         <div className="mx-auto w-full max-w-5xl">
-          <p className="kk-label">{t("eyebrow")}</p>
+          <p className="kk-label">
+            {t.rich("eyebrow", {
+              link: (chunks) => (
+                <a
+                  href="https://chairulakmal.com"
+                  target="_blank"
+                  rel="noreferrer noopener"
+                  className="underline underline-offset-4 hover:text-midnight"
+                >
+                  {chunks}
+                </a>
+              ),
+            })}
+          </p>
 
           {/* The headline is the only display-scale type on the site. It gets the
               144 optical cut; every other heading keeps the 36 cut from globals. */}

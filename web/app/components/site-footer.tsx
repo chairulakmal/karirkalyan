@@ -17,7 +17,20 @@ export async function SiteFooter({ wide = false }: { wide?: boolean }) {
           wide ? "max-w-5xl" : "max-w-2xl"
         }`}
       >
-        <p>{t("copyright")}</p>
+        <p>
+          {t.rich("copyright", {
+            link: (chunks) => (
+              <a
+                href="https://chairulakmal.com"
+                target="_blank"
+                rel="noreferrer noopener"
+                className="underline underline-offset-4 hover:text-midnight"
+              >
+                {chunks}
+              </a>
+            ),
+          })}
+        </p>
         <p className="flex items-center gap-4">
           {/* Points at the in-app docs page, not the raw Swagger UI: the
               reference is one click further, framed rather than dumped. */}
