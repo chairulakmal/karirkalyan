@@ -19,6 +19,8 @@ test.describe("expired session bounce", () => {
     expect(response.status()).toBe(307);
     expect(response.headers()["location"]).toBe("/sign-in?expired=1");
     expect(response.headers()["set-cookie"]).toContain("session=;");
+    // The display cookie leaves with the session it labels (SPEC.md § Auth flow).
+    expect(response.headers()["set-cookie"]).toContain("account_email=;");
 
     await ctx.dispose();
   });

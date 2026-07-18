@@ -14,6 +14,10 @@ import { redirect } from "next/navigation";
  */
 export const INTERNAL_API_URL = process.env.API_URL ?? "http://localhost:3001";
 const SESSION_COOKIE = "session";
+// Display-only companion to `session` (SPEC.md § Auth flow): the header's
+// account chip reads it server-side. Set and cleared only beside the session
+// cookie, never on its own.
+export const ACCOUNT_EMAIL_COOKIE_NAME = "account_email";
 
 import { type ApiErrorDetail, isApiErrorDetail } from "./api-error";
 

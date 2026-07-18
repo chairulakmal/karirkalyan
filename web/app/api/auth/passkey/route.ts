@@ -1,6 +1,6 @@
 import { INTERNAL_API_URL } from "@/app/lib/api";
 import { forbiddenOrigin, isAllowedOrigin } from "@/app/lib/csrf";
-import { setSessionCookie } from "@/app/lib/session-cookie";
+import { setSessionCookies } from "@/app/lib/session-cookie";
 
 // Second leg of the passkey sign-in ceremony (SPEC.md § Auth flow, § Passkeys):
 // proxies the assertion to Rails, captures the JWT from the Authorization
@@ -60,6 +60,12 @@ export async function POST(request: Request) {
     return Response.json({ error: "No token returned from API" }, { status: 502 });
   }
 
-  await setSessionCookie(token);
+  // Same shape as the password handler: token from the header, email from the
+  // body's { user: { id, email } } for the account chip's display cookie.
+  const payload = (await upstream.json().catch(() => null)) as {
+    user?: { email?: string };
+  } | null;
+
+  await setSessionCookies(token, payload?.user?.email);
   return Response.json({ ok: true });
 }

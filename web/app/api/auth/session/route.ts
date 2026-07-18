@@ -1,7 +1,11 @@
 import { cookies } from "next/headers";
-import { INTERNAL_API_URL, SESSION_COOKIE_NAME } from "@/app/lib/api";
+import {
+  ACCOUNT_EMAIL_COOKIE_NAME,
+  INTERNAL_API_URL,
+  SESSION_COOKIE_NAME,
+} from "@/app/lib/api";
 import { forbiddenOrigin, isAllowedOrigin } from "@/app/lib/csrf";
-import { setSessionCookie } from "@/app/lib/session-cookie";
+import { setSessionCookies } from "@/app/lib/session-cookie";
 
 // POST = sign-in. Proxies email/password to Rails, captures the JWT from the
 // Authorization response header, and stores it in an httpOnly cookie so it
@@ -63,11 +67,18 @@ export async function POST(request: Request) {
     return Response.json({ error: "No token returned from API" }, { status: 502 });
   }
 
-  await setSessionCookie(token);
+  // The body carries { user: { id, email } }; the email feeds the account
+  // chip's display cookie (SPEC.md § Auth flow). The token still comes from
+  // the header alone.
+  const payload = (await upstream.json().catch(() => null)) as {
+    user?: { email?: string };
+  } | null;
+
+  await setSessionCookies(token, payload?.user?.email);
   return Response.json({ ok: true });
 }
 
-// DELETE = sign-out. Rotates the JTI on the Rails side, then clears the cookie.
+// DELETE = sign-out. Rotates the JTI on the Rails side, then clears both cookies.
 export async function DELETE(request: Request) {
   if (!isAllowedOrigin(request)) return forbiddenOrigin();
 
@@ -82,5 +93,6 @@ export async function DELETE(request: Request) {
   }
 
   cookieStore.delete(SESSION_COOKIE_NAME);
+  cookieStore.delete(ACCOUNT_EMAIL_COOKIE_NAME);
   return Response.json({ ok: true });
 }
