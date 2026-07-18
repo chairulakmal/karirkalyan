@@ -4,7 +4,7 @@
 
 [🇯🇵 日本語](README.ja.md)
 
-A job application tracker with a Rails 8 API and a Next.js 16 kanban board. Every status change goes through a server-enforced finite state machine, and the client asks the API which moves are legal instead of keeping its own copy of the rules.
+A job application tracker with a Rails 8 API and a Next.js 16 kanban board. Every status change goes through a server-enforced finite state machine, and the client asks the API which moves are legal instead of keeping its own copy of the rules. Below: a live demo, the highlights, the stack, how to run it locally, and how it is tested; [ARCHITECTURE.md](ARCHITECTURE.md) walks the design decisions.
 
 https://github.com/user-attachments/assets/862ca199-95e5-4e27-b9ef-ada7eb10a350
 

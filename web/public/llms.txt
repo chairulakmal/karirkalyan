@@ -37,6 +37,11 @@ pipeline. Built as a portfolio project by Chairul Akmal.
   from GET /api/v1/transitions rather than keeping its own copy of the table, and the server
   re-validates every move regardless. Each card also has a menu listing every legal next state,
   which is the keyboard-accessible path.
+- Installs as an Android PWA and registers as a share target: share a job posting from any app
+  and land in the new-application form with the AI pre-fill already reading it; a share with no
+  link in it seeds a paste box instead, and the same paste box is offered when a site refuses
+  the automated fetch. Install goes through Chrome — share-sheet integration lives in the
+  WebAPK, which Brave cannot mint.
 - Cursor-based pagination on the applications list
 
 ## Registration is closed

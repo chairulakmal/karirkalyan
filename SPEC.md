@@ -1,6 +1,6 @@
 # KarirKalyan — Technical Specification
 
-> A full-stack job application tracker: Rails 8 API (`api/`) + Next.js 16 frontend (`web/`).
+> The technical source of truth for KarirKalyan, a full-stack job application tracker: Rails 8 API (`api/`) + Next.js 16 frontend (`web/`). It describes the system **as it is**, and the most important rule about it is **spec-first: change this file before you change code** — if code and spec disagree, one of them is a bug. It covers both apps end to end — data model, state machine, services, API contract, jobs, security, auth, i18n, the installable app — plus testing, deployment, local dev, versioning, and the decisions log; the full table of contents is under [Contents](#contents).
 >
 > I work mostly in TypeScript and Next.js. I built KarirKalyan to learn Rails the way I'd actually use it in production, so this document records the decisions and the reasoning behind each one — not just the feature list.
 
@@ -30,9 +30,9 @@ Last synced against the code: **2026-07-18**, `v1.6.0` (in flight) — § Instal
 - [How to use this file](#how-to-use-this-file)
 - [System overview](#system-overview) — [Registration is closed](#registration-is-closed)
 - [Backend (`api/`)](#backend-api) — [Tech stack](#backend-tech-stack) · [Data model](#data-model) · [State machine](#state-machine) · [Service layer](#service-layer) · [Query layer](#query-layer) · [API contract](#api-contract) · [Background jobs](#background-jobs) · [Mail](#mail) · [Security](#security) · [Observability](#observability)
-- [Frontend (`web/`)](#frontend-web) — [Tech stack](#frontend-tech-stack) · [Design system](#design-system) · [Auth flow](#auth-flow) · [Public pages](#public-pages) · [Legal pages](#legal-pages) · [Route guard](#route-guard) · [Board view](#board-view) · [i18n](#i18n)
+- [Frontend (`web/`)](#frontend-web) — [Tech stack](#frontend-tech-stack) · [Design system](#design-system) · [Auth flow](#auth-flow) · [Public pages](#public-pages) · [Legal pages](#legal-pages) · [Route guard](#route-guard) · [Board view](#board-view) · [i18n](#i18n) · [Installable app](#installable-app)
 - [Testing strategy](#testing-strategy)
-- [Deployment (Railway)](#deployment-railway)
+- [Deployment (Railway)](#deployment-railway) — [Backups](#backups)
 - [Local development](#local-development)
 - [Versioning & releases](#versioning--releases)
 - [Decisions log](#decisions-log)

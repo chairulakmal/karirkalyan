@@ -1,6 +1,6 @@
 # Architecture
 
-Seven decisions carry most of this codebase. Each section states the choice, the reasoning, and the trade-off accepted, with file paths so you can read the implementation next to the claim. [SPEC.md](SPEC.md) is the full technical spec; this file is the shorter guided tour.
+The technical brief: a guided tour of the seven decisions that carry most of this codebase, each section stating the choice, the reasoning, and the trade-off accepted — with file paths throughout, because the point of the file is that nothing in it asks to be taken on faith. The seven: a state machine in plain Ruby, the transactional write path behind every transition, ghost prediction derived from the audit trail, digest scheduling that defers and never drops, i18n parity as a CI check, one PostgreSQL instance for everything, and a JWT that never reaches the browser. [SPEC.md](SPEC.md) is the full technical spec; this file is the shorter read.
 
 ## The state machine is a plain Ruby module
 
@@ -25,7 +25,7 @@ flowchart LR
     pipeline -- no response --> ghosted
 ```
 
-Omitted from the diagram for readability: any non-terminal state can move to `withdrawn` or `archived`, and `rejected`, `ghosted`, and `withdrawn` each revive to `applied`, because recruiters rescind rejections and ghosting companies sometimes come back. Only `accepted`, `declined`, and `archived` are hard terminal. Creation is separate from transition: a new application may start as `wishlist`, `draft`, or `applied` (`ENTRY_STATES`), and everything later is reachable only by transitioning, which keeps the audit trail honest.
+Omitted from the diagram for readability: any non-terminal state can move to `archived`; the six pre-offer states (`wishlist` through `final_round`) can move to `withdrawn` (from `offer` the candidate-side exit is `declined`, not `withdrawn`); and `rejected`, `ghosted`, and `withdrawn` each revive to `applied`, because recruiters rescind rejections and ghosting companies sometimes come back. Only `accepted`, `declined`, and `archived` are hard terminal. Creation is separate from transition: a new application may start as `wishlist`, `draft`, or `applied` (`ENTRY_STATES`), and everything later is reachable only by transitioning, which keeps the audit trail honest.
 
 The client never holds a copy of this table. `GET /api/v1/transitions` ([`api/app/controllers/api/v1/transitions_controller.rb`](api/app/controllers/api/v1/transitions_controller.rb)) serves the effective table, every state mapped through `valid_next_states` plus the entry, terminal, and active state lists. The board's drag targets and the detail page's transition buttons come from that response. The cost is one extra request; the server re-validates every transition regardless, so a stale client can offer a move badly but never authorize one.
 

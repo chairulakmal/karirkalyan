@@ -1,6 +1,37 @@
 # Changelog
 
-Shipped work, newest first. Branch/PR names note where each change landed. Open work lives in [`TODO.md`](TODO.md). Settled decisions-not-to-build are recorded here too (§ Decisions below), so that `TODO.md` can stay open work only without the reasoning getting lost.
+The history: shipped work, newest first — `v1.6.0` (in flight) back through `v1.0.0` — with branch/PR names noting where each change landed, and each release since `v1.3.1` naming its patch/minor level against the versioning policy's mechanical test. The most important section is the one that is not a release: § Decisions records the settled decisions-not-to-build, so that [`TODO.md`](TODO.md) — where open work lives — can stay plan-only without the reasoning getting lost.
+
+---
+
+## v1.6.0 — in flight, untagged
+
+The pocket app's capture flow, landed on `main` ahead of the tag — recorded now per the docs-follow-the-feature rule, so this section grows until the release is cut. Latest tag is still `v1.5.1`; the release's remaining scope (passkey sign-in, push delivery, the installed-app shell's component half, and their infrastructure prerequisites) stays in [`TODO.md`](TODO.md) until it ships. A minor so far by the mechanical test: two user-visible capabilities, no migration — there is no schema in any of it, so the `v1.5.1` image boots against this database unchanged.
+
+### Capture via the share sheet *(#72)*
+
+- **The manifest declares [`share_target`](https://developer.mozilla.org/en-US/docs/Web/Progressive_web_apps/Manifest/Reference/share_target)**: share a posting from any Android app and land on `GET /applications/new` as a deep link. The form extracts the first `http(s)` URL from whichever param the sharing app hid it in (`url`, `text`, or `title` — LinkedIn puts it in `text`), rejects non-web schemes, and auto-runs the pre-fill on arrival; a share with no URL in it at all seeds the paste box instead of dead-ending.
+- **The capture survives the sign-in bounce.** The 1-day JWT makes an expired session the common case on a phone, and the old guard dropped every redirect on `/dashboard` — which would have discarded exactly the share the feature exists to catch. The captured posting now forwards through sign-in.
+- **Install once, via Chrome.** `share_target` needs a real WebAPK and Brave has no minting server — a Brave install is a home-screen shortcut where the feature silently doesn't exist. Sharing *from* Brave still reaches the WebAPK. The install note is in both READMEs.
+
+### Paste fallback for postings the fetcher cannot read *(feat/v1.6.0-paste-fallback, #69)*
+
+- **A second entry point into the existing pipeline, not a second pipeline.** `POST /applications/prefill` now accepts `text` as well as `url`: the pipeline was always `fetch → to_text → extract` and only `fetch` ever failed, so a paste enters the same `to_text → extract` tail — same byte-cap-then-`scrub`, same tag-strip, same whitespace collapse.
+- **The textarea is error-only, on `prefill_blocked` *and* `prefill_failed`** — both describe a page the user can see and the fetcher cannot (a refusal; a login wall or SPA shell that yielded no posting — the likeliest phone case, a login-walled LinkedIn posting, returns the latter). `prefill_unreachable` keeps the Pre-fill button as its retry; `invalid_url` gets nothing. Always-on was rejected: it invites manual entry where the URL would have worked.
+- **The prerequisite rode along**: `PrefillResult`'s failure arm declared only `{ ok: false; error: string }` while `apiFailure` had always returned `code` and `status` beside it — the taxonomy's signal reached the server action and was thrown away by the type. It is now `ActionFailure`, and the form branches on `code`.
+- **`MAX_TEXT_CHARS` is enforced on the server, which refuses an over-cap paste (`prefill_paste_too_long`) rather than truncating it.** The browser shows an informational codepoint count and blocks nothing. A client-side mirror of the cap was scoped and **reversed during review**: the cap counts *stripped* characters, so counting the raw paste would refuse a view-source dump that strips to a third of its size — the very case the tag-strip promises works — and `.length`'s UTF-16 code units would score an emoji 2 in a Japanese-language app. The mirrored TypeScript constant was deleted rather than fixed.
+
+### The manifest, measured rather than assumed *(#70)*
+
+- `start_url` is `/dashboard` instead of launching the installed app onto the marketing page; `id` and `scope` are explicit, pinning identity before a WebAPK exists to be orphaned by it; the icon purposes split, because `any` wants the drawn rounded corners and `maskable` wants none. Pure JSON plus one generated asset — which is why it did not wait for the tab bar. The component half of the installed-app shell (bottom tabs, `shortcuts`, the `monochrome` icon) is still open in `TODO.md`.
+
+### Fixed
+
+- **The expired-session bounce emits a relative `Location`** *(#71)*. The absolute URL it built from `request.url` resolved to the internal origin behind Railway's proxy and sent real browsers to `https://localhost:8080`. The unprefixed relative path also lets next-intl land a `ja` session on `/ja/sign-in` via `NEXT_LOCALE`, which the old redirect never did.
+
+### Chore
+
+- Bundle update clearing fresh loofah / rails-html-sanitizer advisories *(b685dfe)*.
 
 ---
 
