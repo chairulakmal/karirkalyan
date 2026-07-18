@@ -1,8 +1,6 @@
 # KarirKalyan
 
-[![API CI](https://github.com/chairulakmal/karirkalyan/actions/workflows/api.yml/badge.svg)](https://github.com/chairulakmal/karirkalyan/actions/workflows/api.yml)
-[![Web CI](https://github.com/chairulakmal/karirkalyan/actions/workflows/web.yml/badge.svg)](https://github.com/chairulakmal/karirkalyan/actions/workflows/web.yml)
-[![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
+[![API CI](https://github.com/chairulakmal/karirkalyan/actions/workflows/api.yml/badge.svg)](https://github.com/chairulakmal/karirkalyan/actions/workflows/api.yml) [![Web CI](https://github.com/chairulakmal/karirkalyan/actions/workflows/web.yml/badge.svg)](https://github.com/chairulakmal/karirkalyan/actions/workflows/web.yml) [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
 
 [🇯🇵 日本語](README.ja.md)
 
@@ -157,8 +155,7 @@ web/
   app/[locale]/(app)/board/board.tsx            ← Kanban board — drag = transition, legality read from the API
 ```
 
-Architecture rationale for every decision lives in [SPEC.md](SPEC.md), the technical source of
-truth for this project.
+Architecture rationale for every decision lives in [SPEC.md](SPEC.md), the technical source of truth for this project.
 
 ---
 

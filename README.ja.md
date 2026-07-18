@@ -1,8 +1,6 @@
 # KarirKalyan（キャリルカリャン）
 
-[![API CI](https://github.com/chairulakmal/karirkalyan/actions/workflows/api.yml/badge.svg)](https://github.com/chairulakmal/karirkalyan/actions/workflows/api.yml)
-[![Web CI](https://github.com/chairulakmal/karirkalyan/actions/workflows/web.yml/badge.svg)](https://github.com/chairulakmal/karirkalyan/actions/workflows/web.yml)
-[![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
+[![API CI](https://github.com/chairulakmal/karirkalyan/actions/workflows/api.yml/badge.svg)](https://github.com/chairulakmal/karirkalyan/actions/workflows/api.yml) [![Web CI](https://github.com/chairulakmal/karirkalyan/actions/workflows/web.yml/badge.svg)](https://github.com/chairulakmal/karirkalyan/actions/workflows/web.yml) [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
 
 [🇬🇧 English](README.md)
 
@@ -157,8 +155,7 @@ web/
   app/[locale]/(app)/board/board.tsx            ← カンバンボード。ドラッグ＝遷移、可否はAPIから取得
 ```
 
-アーキテクチャの意思決定の詳細は、本プロジェクトの技術的な信頼できる唯一の情報源である
-[SPEC.md](SPEC.md) にあります。
+アーキテクチャの意思決定の詳細は、本プロジェクトの技術的な信頼できる唯一の情報源である[SPEC.md](SPEC.md) にあります。
 
 ---
 
