@@ -6,7 +6,7 @@
 
 [🇯🇵 日本語](README.ja.md)
 
-A full-stack job application tracker — Rails 8 API + Next.js 16. It tracks which companies you've applied to, where each application stands, and when to follow up. I'm the author, and I use it for my real-life job search — every feature here exists because I needed it. The product ships in English *and* Japanese.
+A full-stack job application tracker — Rails 8 API + Next.js 16. It tracks which companies you've applied to, where each application stands, and when to follow up. I'm the author, and I use it for my real-life job search — every feature here exists because I needed it. That is the project's **north star: be the best career app for its one loyal user — me.** Portfolio value follows from that, not the other way round: a reviewer can tell a tool with a real user from a feature showcase. The product ships in English *and* Japanese.
 
 **Live:** [kk.chairulakmal.com](https://kk.chairulakmal.com) · **API docs:** Swagger UI at [`/api-docs`](https://api-production-4899.up.railway.app/api-docs) on the API service
 

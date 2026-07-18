@@ -1,832 +1,186 @@
 # TODO
 
-Open work only, grouped by the release that ships it. Shipped work lives in
-[`CHANGELOG.md`](CHANGELOG.md), and so do the settled decisions-not-to-build (dark mode,
-document version history, client-side error tracking — see its § Decisions). Last cut back to
-open work on 2026-07-13; restructured by release on 2026-07-15 so each item is told once, in
-the section of the release that ships it. Four things happened on 2026-07-16: the board triage
-cards joined `v1.9.0`; `v1.4.3` and the prefill paste fallback were added out of one prod bug;
-`v1.4.2`'s first two items closed and left the file; and `v1.4.3` itself closed entire, so its
-section left too. On 2026-07-17 `v1.4.3` was tagged and `v1.4.2` was skipped for good, which
-renumbered that section's four survivors to `v1.4.4`; later the same day the stage filter took
-`v1.5.0`, and `v1.4.4` was written, merged (PR #66) and tagged, so its section left the file too.
-Then `v1.5.0` was scoped, written, merged (PR #67) and tagged inside the same day, so its section
-left as well — leaving behind the three things it deferred on purpose, re-homed rather than
-dropped: the cross-group facet counts moved to `v1.9.0`'s stat cards, which reopen the dashboard
-payload they need, and the chip disclosure and URL filter state moved to § Conditional. The docs
-audit between that merge and its tag opened `v1.5.1` out of two findings: `v1.5.0` deleted one
-TypeScript copy of an FSM fact and walked past a second. `v1.5.1` was then written, merged
-(PR #68) and tagged the same day. Its review found a *third* copy of the same shape — the
-new-application form's hardcoded entry states — which it also deleted, so every **FSM rule the UI
-applies** is now fetched; the states `web/` still names shape presentation and affordance, and the
-server validates every move regardless. That section left the file, leaving behind the two things it deferred on purpose,
-re-homed below rather than dropped.
+Open work only, grouped by the release that ships it. Shipped work lives in [`CHANGELOG.md`](CHANGELOG.md), and so do the settled decisions-not-to-build (dark mode, document version history, client-side error tracking — see its § Decisions). What each shipped release contained is `CHANGELOG.md`'s job to say, not this file's.
 
-**Current release: `v1.5.1`** (2026-07-17). `v1.4.2` was **never tagged and never will be**: the
-prefill fix landed on `main` above its four unwritten items, which put two patches at one commit,
-and `v1.4.3` took the tag rather than make a production fix wait. `CHANGELOG.md` § v1.4.3 carries
-the full account. Those four items shipped as **`v1.4.4`** — same work, same patch level, one
-number further along; the gap at `v1.4.2` is permanent. The nearest open work is now the pocket
-app, **`v1.6.0`** — a minor further down than it was scoped at. What each shipped release
-contained is `CHANGELOG.md`'s job to say, not this file's.
+**Current release: `v1.5.1`.** The nearest open work is the pocket app, `v1.6.0`.
 
-**North star (decided 2026-07-11): be the best career app for its one loyal user.** Portfolio
-value follows from that, not the other way round — a reviewer can tell a tool with a real
-user from a feature showcase. Two consequences for sequencing: items are ordered by **when in
-the user's life they pay off** (search-time items while the search is active; the `positions`
-entity is triggered by accepting an offer, not by finishing a prior release), and the worst-day
-operations work — backups, export, abuse throttles — earns its place without passing any
-feature admission test, because nothing else in the repo defends the data.
+**North star: be the best career app for its one loyal user: myself (the author).** Portfolio value follows from that, not the other way round — a reviewer can tell a tool with a real user from a feature showcase. Two consequences for sequencing: items are ordered by **when in the user's life they pay off** (search-time items while the search is active; the `positions` entity is triggered by accepting an offer, not by finishing a prior release), and the worst-day operations work — backups, export, abuse throttles — earns its place without passing any feature admission test, because nothing else in the repo defends the data.
 
-**One standing promise outranks everything here on the day it breaks:** `/privacy` and `/terms`
-name `karirkalyan@cypherpunkzero.com` (`web/app/lib/links.ts:13`) as the address an erasure request
-goes to; the mailbox is set up and was verified to receive mail (2026-07-12). It is a **published
-promise**, not a gate — if that routing ever breaks, the legal pages are lying, so fixing it
-outranks anything else in this file on the day it happens.
+**One standing promise outranks everything here on the day it breaks:** `/privacy` and `/terms` name `karirkalyan@cypherpunkzero.com` (`web/app/lib/links.ts:13`) as the address an erasure request goes to; the mailbox is set up and was verified to receive mail (2026-07-12). It is a **published promise**, not a gate — if that routing ever breaks, the legal pages are lying, so fixing it outranks anything else in this file on the day it happens.
 
 ---
 
-## The plan — `v1.6.0` → `v1.9.0` (scoped 2026-07-12, amended 2026-07-13 and 2026-07-17, extended 2026-07-15)
+## The plan — `v1.6.0` → `v1.9.0`
 
-**The whole backlog fits under 1.x.** Only one item forces a major, and `SPEC.md` § Versioning
-& releases already names it: the **`positions` entity**, because it adds a table *and* changes
-what `accepted` means in `ApplicationFSM`. Everything else here is an additive migration or has
-no schema at all, so the previous image would still boot against the database the release leaves
-behind — which is the whole of the major test.
-
-**Amended 2026-07-13 — the mobile access layer.** The original plan was deep on the data model
-and silent on where its one user physically is: during an active search, postings are met on the
-phone, and the access story was a desktop one — browser, URL, a password form the 1-day JWT
-resurfaces every morning. `v1.6.0` is now **"the pocket app"**, inserted *ahead of* the Japan
-market layer because both pay off while the search is active, and the share-sheet capture flow
-multiplies exactly the prefill pipeline the Japan layer bets on. Everything downstream slid one
-minor. The dark-mode decision's argument (`CHANGELOG.md` § Decisions) continues here: a job
-seeker's professional context isn't just light-themed, it's mobile.
-
-**Amended 2026-07-17 — the stage filter takes `v1.5.0`, and everything slides again.** The
-dashboard's status chips are radio buttons wearing a filter's clothes: exactly one stage at a
-time, or all thirteen. The one question the list cannot answer is the one asked most —
-*what's still live?* — because "active" is seven stages and the control only holds one. Adding
-multi-select is a **user-visible capability**, which the mechanical test in `SPEC.md`
-§ Versioning & releases makes a minor and not a patch, so it could not ride `v1.4.4`. It is
-sequenced ahead of the pocket app because the phone inherits whatever the filter becomes:
-shipping the app shell first would mean shipping the radio-button filter to the smaller screen,
-then rebuilding it there. The pocket app moves to `v1.6.0` and each downstream release slides
-one minor — the second such slide, on the same reasoning as the first.
+**The whole backlog fits under 1.x.** Only one item forces a major, and `SPEC.md` § Versioning & releases already names it: the **`positions` entity**, because it adds a table *and* changes what `accepted` means in `ApplicationFSM`. Everything else here is an additive migration or has no schema at all, so the previous image would still boot against the database the release leaves behind — which is the whole of the major test.
 
 | Release | Level | Contents |
 | --- | --- | --- |
-| ~~`v1.4.2`~~ | — | **Never tagged; the number is skipped.** Its written half — the `ListQuery` extraction, the API base rename, the privacy/doc-drift fix — shipped inside `v1.4.3`; its unwritten half shipped as `v1.4.4` |
-| `v1.4.3` | patch | **Shipped 2026-07-17.** Prefill: IPv4-first address pinning, and an error taxonomy that stops blaming the user's URL — plus everything `v1.4.2` had written by then. See `CHANGELOG.md` |
-| `v1.4.4` | patch | **Shipped 2026-07-17.** Download filenames, upload throttle + a per-account ceiling, en/ja key parity as a CI check, the profile-card fold — `v1.4.2`'s four open items — plus the `.json` throttle bypass the review of them found. See `CHANGELOG.md` |
-| `v1.5.0` | minor | **Shipped 2026-07-17.** The stage filter: multi-select status chips on the dashboard list, All/Active/None presets, and `active_states` on `/transitions` — which also took the board's column list off a hardcoded TypeScript copy. See `CHANGELOG.md` |
-| `v1.5.1` | patch | **Shipped 2026-07-17.** The FSM copy `v1.5.0` missed (`PERMANENT_STATUSES`) is deleted, and so is the third its own review found (the form's hardcoded `ENTRY_STATES`) — every FSM rule the UI applies is now fetched. `/applications`'s query parameters reach the published reference for the first time. See `CHANGELOG.md` |
-| `v1.6.0` | minor | The pocket app: share-sheet capture, passkey sign-in, push digest, installed-app shell — **plus the prefill paste fallback the share sheet needs** |
-| `v1.7.0` | minor | The Japan market layer: recruiter channel + `agencies`, 年収 comp structure, Japanese-level filter |
+| `v1.6.0` | minor | The pocket app: share-sheet capture, passkey sign-in, push digest, installed-app shell — plus the prefill paste fallback the share sheet needs |
+| `v1.7.0` | minor | The Japan market layer: recruiter channel + `agencies`, 年収 comp structure, Japanese-level filter, posting snapshot |
 | `v1.7.1` | patch | Japanese phrase-based line breaking |
 | `v1.8.0` | minor | Hiring entity, timezone overlap + `.ics`, visa / status of residence |
 | `v1.9.0` | minor | The follow-through: dashboard stat cards, board triage cards, cover-letter talking points, push interview/deadline alerts, public HSP calculator, interview stage notes |
 
-`v1.3.1` through `v1.4.1` shipped 2026-07-12 — see `CHANGELOG.md` for what each contained.
+The pocket app leads because during an active search postings are met on the phone, and its share-sheet capture multiplies the exact prefill pipeline the Japan layer bets on. Each item below carries its release tag; the table is the summary of those tags, not a second source of truth. Market-dependent claims were researched against current web sources (dates inline) and fall under the perishable-facts rule below.
 
-**Provenance.** Items were verified against the code on 2026-07-10 — all still hold. The
-market-dependent claims (Japan market, global remote) were verified against current web sources
-on 2026-07-11 — citations inline where a claim came from research rather than the code. Items
-were scoped into releases on 2026-07-12 and renumbered twice — on 2026-07-13 when the pocket app
-was inserted, and on 2026-07-17 when the stage filter took `v1.5.0` and pushed the pocket app to
-`v1.6.0`. The stage filter's UX decisions were verified against current web sources on
-2026-07-17; citations inline. Each item below carries its release tag; the table above is the
-summary of those tags, not a second source of truth.
-
-**Context for the feature releases.** A generic tracker is a CRUD demo; the differentiators in
-`v1.7.0`–`v1.8.0` are the ones a Tokyo hiring reviewer could not have seen in someone else's
-portfolio, because they encode knowledge of the market rather than knowledge of Rails. The
-table stakes are already in — the follow-up digest and CSV export shipped in `v1.4.0`, ghost
-prediction in `v1.3.0` (see `CHANGELOG.md`) — and the pre-1.0.0 Phase 9 notes (now in
-`CHANGELOG.md`) also name an analytics dashboard and an AI cover-letter assist as the declared
-roadmap; both were scoped into `v1.9.0` on 2026-07-15, each in a deliberately reduced shape
-(stat cards, not a page; talking points, not drafts). Most of what follows touches `api/`; that
-is fine — the `web/`-only constraint was a property of v1.1.0, not a permanent rule.
+**Context for the feature releases.** A generic tracker is a CRUD demo; the differentiators in `v1.7.0`–`v1.8.0` are the ones a Tokyo hiring reviewer could not have seen in someone else's portfolio, because they encode knowledge of the market rather than knowledge of Rails. The table stakes are already in — follow-up digest, CSV export, ghost prediction (see `CHANGELOG.md`) — and the pre-1.0.0 Phase 9 roadmap's analytics dashboard and AI cover-letter assist are both scoped into `v1.9.0` in deliberately reduced shape (stat cards, not a page; talking points, not drafts). Most of what follows touches `api/`; that is fine — the `web/`-only constraint was a property of v1.1.0, not a permanent rule.
 
 ### Standing rules
 
-- **The trap that would break this plan: every new column in `v1.6.0`–`v1.9.0` must be
-  nullable or defaulted.** A `NOT NULL` column with no default means the previous image's
-  `INSERT`s fail against the new database — and by the mechanical test that quietly turns a
-  minor into a **major**. It is the only way this plan accidentally violates its own
-  versioning. The pocket app's two new tables (`credentials`, `push_subscriptions`) are purely
-  additive and pass for free — the rule bites on columns added to tables the previous image
-  writes to.
-- **Field admission test (added 2026-07-11), for any new per-application column** — channel,
-  agency, comp structure, language level, hiring entity, timezone, all of them: it must be
-  **captured at prefill time by `UrlPrefillService`, or cost near-zero manual entry**. The app
-  has one user, and a field he stops filling in after the fifth application is dead schema
-  plus form friction.
-- **Perishable-facts refresh rule (added 2026-07-11), for every Japan-market item** — each
-  embeds perishable external facts: fee schedules, processing times, survey medians. A career
-  tool that confidently states last year's rules is worse than one that says nothing, so each
-  such item must state its **annual refresh cost** when it is scoped, and the sum of those
-  lines is a real cap on how many of these a solo maintainer can ship. The career-intelligence
-  item already budgets this way ("one data-entry session a year"); that is the pattern.
+- **The trap that would break this plan: every new column in `v1.6.0`–`v1.9.0` must be nullable or defaulted.** A `NOT NULL` column with no default means the previous image's `INSERT`s fail against the new database — and by the mechanical test that quietly turns a minor into a **major**. It is the only way this plan accidentally violates its own versioning. The pocket app's two new tables (`credentials`, `push_subscriptions`) are purely additive and pass for free — the rule bites on columns added to tables the previous image writes to.
+- **Field admission test, for any new per-application column** — channel, agency, comp structure, language level, hiring entity, timezone, all of them: it must be **captured at prefill time by `UrlPrefillService`, or cost near-zero manual entry**. The app has one user, and a field he stops filling in after the fifth application is dead schema plus form friction.
+- **Perishable-facts refresh rule, for every Japan-market item** — each embeds perishable external facts: fee schedules, processing times, survey medians. A career tool that confidently states last year's rules is worse than one that says nothing, so each such item must state its **annual refresh cost** when it is scoped, and the sum of those lines is a real cap on how many of these a solo maintainer can ship. The career-intelligence item already budgets this way ("one data-entry session a year"); that is the pattern.
 
 ---
 
-## `v1.6.0` — minor. "The pocket app" (inserted 2026-07-13)
+## `v1.6.0` — minor. "The pocket app"
 
-The mobile access layer: make opening KarirKalyan on the phone feel like opening a good Android
-app, not a desktop site. During an active search, postings are met on the phone — LinkedIn's
-app, TokyoDev in a mobile tab, a recruiter's email on the train — while the access story was a
-desktop one: browser → URL → a password form the 1-day JWT
-(`api/config/initializers/devise.rb:32`) resurfaces every morning → a top-header nav. Half the
-substrate already exists unused: `web/public/manifest.webmanifest` already declares
-`display: standalone` with brand icons and theme color. The app is already *installable*; it
-just isn't an *app* once installed.
+The mobile access layer: make opening KarirKalyan on the phone feel like opening a good Android app, not a desktop site. During an active search, postings are met on the phone — LinkedIn's app, TokyoDev in a mobile tab, a recruiter's email on the train — while the access story is a desktop one: browser → URL → a password form the 1-day JWT (`api/config/initializers/devise.rb:32`) resurfaces every morning → a top-header nav. Half the substrate already exists unused: `web/public/manifest.webmanifest` already declares `display: standalone` with brand icons and theme color. The app is already *installable*; it just isn't an *app* once installed.
 
-**Device facts this release is built on (recorded 2026-07-13):** the user carries a **Nothing
-Phone 3a** (Android 15) and runs **Brave with Proton Pass** on both the phone and the Ubuntu
-desktop. He will install the PWA via Chrome, but **passkeys must stay accessible through Proton
-Pass**, not Google Password Manager. Hence the scope boundary: **Android-first, web-only** — the
-deliverable is the WebAPK Chrome mints, no TWA/Bubblewrap/Play packaging, and no iOS work in v1
-(`public/apple-icon.png` stays — it is a favicon-tier asset, not an iOS commitment, the same
-logic as the dark brand icons in the dark-mode decision, `CHANGELOG.md` § Decisions).
+**Device facts this release is built on:** the user carries a **Nothing Phone 3a** (Android 15) and runs **Brave with Proton Pass** on both the phone and the Ubuntu desktop. He will install the PWA via Chrome, but **passkeys must stay accessible through Proton Pass**, not Google Password Manager. Hence the scope boundary: **Android-first, web-only** — the deliverable is the WebAPK Chrome mints, no TWA/Bubblewrap/Play packaging, and no iOS work in v1 (`public/apple-icon.png` stays — it is a favicon-tier asset, not an iOS commitment, the same logic as the dark brand icons in the dark-mode decision, `CHANGELOG.md` § Decisions).
 
-**If the release runs heavy, the cut order is:** passkeys collapse to a 30-day JWT (the access
-win ships, the mechanism follows), then push (the email digest already exists as the channel).
-The capture flow and the shell are the release — they are what changes the user story.
+**If the release runs heavy, the cut order is:** passkeys collapse to a 30-day JWT (the access win ships, the mechanism follows), then push (the email digest already exists as the channel). The capture flow and the shell are the release — they are what changes the user story.
 
-- [ ] **Capture via the share sheet** — *the feature; the rest of the release serves it*. A
-      `/applications/new?url=…` deep link that triggers `UrlPrefillService` on arrival, plus
-      [`share_target`](https://developer.mozilla.org/en-US/docs/Web/Progressive_web_apps/Manifest/Reference/share_target)
-      in the manifest: share a posting from any app → land in a prefilled form. **Researched
-      2026-07-12 — the install trap:** `share_target` needs a real WebAPK, and
-      [Brave has no minting server](https://support.brave.app/hc/en-us/articles/39077114659597-How-do-I-install-and-use-Web-Apps-in-Brave)
-      — an install from Brave is a home-screen shortcut that
-      [silently lacks installation-gated capabilities](https://web.dev/learn/pwa/installation),
-      so it would look like the feature doesn't exist. The app is installed **once, via Chrome**;
-      browsing stays in Brave, and sharing *from* Brave still reaches the WebAPK — the share
-      source doesn't matter. That one-sentence install step goes in the docs. Sequencing
-      rationale: `v1.7.0`'s three fields are all captured at prefill time, so mobile capture
-      multiplies the exact pipeline that release bets on — which is why this lands first.
-- [ ] **Paste fallback for postings the fetcher cannot read** *(added 2026-07-16 — the recovery
-      path `v1.4.3`'s honest error message has nowhere to point)*. When the fetch is blocked, let
-      the user paste the posting text into a textarea and run the extraction on that instead.
-      **`v1.4.3` left the signal this hangs on**: a blocked fetch is now its own error code,
-      `prefill_blocked`, distinct from a URL that is genuinely bad — so `web/` can offer the
-      textarea on exactly the failure the paste box cures, and stay out of the way on the ones it
-      does not. Before that split every prefill failure arrived as `invalid_url`, and a paste box
-      shown on all of them would have been noise on three failures out of four.
-      **The pipeline is already `fetch → to_text → extract` and only the first step ever fails** —
-      `extract` takes text and knows nothing about where it came from, so this is a second entry
-      point into an existing path, not a second pipeline. No new infra, no circumvention.
+- [ ] **Capture via the share sheet** — *the feature; the rest of the release serves it*. A `/applications/new?url=…` deep link that triggers `UrlPrefillService` on arrival, plus [`share_target`](https://developer.mozilla.org/en-US/docs/Web/Progressive_web_apps/Manifest/Reference/share_target) in the manifest: share a posting from any app → land in a prefilled form. **Researched 2026-07-12 — the install trap:** `share_target` needs a real WebAPK, and [Brave has no minting server](https://support.brave.app/hc/en-us/articles/39077114659597-How-do-I-install-and-use-Web-Apps-in-Brave) — an install from Brave is a home-screen shortcut that [silently lacks installation-gated capabilities](https://web.dev/learn/pwa/installation), so it would look like the feature doesn't exist. The app is installed **once, via Chrome**; browsing stays in Brave, and sharing *from* Brave still reaches the WebAPK — the share source doesn't matter. That one-sentence install step goes in the docs. Sequencing rationale: `v1.7.0`'s three fields are all captured at prefill time, so mobile capture multiplies the exact pipeline that release bets on — which is why this lands first.
+- [ ] **Paste fallback for postings the fetcher cannot read** — the recovery path the honest prefill error message has nowhere to point. When the fetch is blocked, let the user paste the posting text into a textarea and run the extraction on that instead. A blocked fetch is its own error code, `prefill_blocked`, distinct from a URL that is genuinely bad — so `web/` can offer the textarea on exactly the failure the paste box cures, and stay out of the way on the ones it does not. **The pipeline is already `fetch → to_text → extract` and only the first step ever fails** — `extract` takes text and knows nothing about where it came from, so this is a second entry point into an existing path, not a second pipeline. No new infra, no circumvention.
 
-      **It rides `v1.6.0` because it is the share sheet's failure mode, not a stray fix.** The
-      capture item above is a URL landing in `UrlPrefillService` — so every site that 403s the
-      fetcher is a share that dead-ends in the release's headline flow. Cloudflare-fronted boards
-      and login-walled ones (LinkedIn, which the fetcher will never reach) are exactly the places
-      postings are met on a phone. If the release runs heavy this is **not** in the cut order:
-      it is small, and it is what stops the capture flow from failing in public.
+      **It rides `v1.6.0` because it is the share sheet's failure mode, not a stray fix.** The capture item above is a URL landing in `UrlPrefillService` — so every site that 403s the fetcher is a share that dead-ends in the release's headline flow. Cloudflare-fronted boards and login-walled ones (LinkedIn, which the fetcher will never reach) are exactly the places postings are met on a phone. If the release runs heavy this is **not** in the cut order: it is small, and it is what stops the capture flow from failing in public.
 
-      **The v1.7.0 tension, stated rather than left to trip someone:** the `posting snapshot` item
-      rejects "a manual paste field" for failing the near-zero-entry test. That rejection stands
-      and does not conflict — it is about *automatic capture at prefill time*, where a paste field
-      would be manual entry replacing something free. This is a **fallback for when the automatic
-      path is impossible**, where the alternative is not free capture but no capture. Same widget,
-      opposite question. Sequencing note for `v1.7.0`: a pasted posting should populate
-      `posting_snapshot` the same way a fetched one does — the snapshot's value is that
-      extractions are re-runnable, and that is truer for postings that can never be re-fetched.
+      **The v1.7.0 tension, stated rather than left to trip someone:** the `posting snapshot` item rejects "a manual paste field" for failing the near-zero-entry test. That rejection stands and does not conflict — it is about *automatic capture at prefill time*, where a paste field would be manual entry replacing something free. This is a **fallback for when the automatic path is impossible**, where the alternative is not free capture but no capture. Same widget, opposite question. Sequencing note for `v1.7.0`: a pasted posting should populate `posting_snapshot` the same way a fetched one does — the snapshot's value is that extractions are re-runnable, and that is truer for postings that can never be re-fetched.
 
-      **Both scoping decisions are settled (2026-07-17), and the prerequisite is done** — in
-      flight on `feat/v1.6.0-paste-fallback`. `SPEC.md` § `UrlPrefillService` is the source of
-      truth for all three; recorded here only so the next reader does not re-open them:
+      **Both scoping decisions are settled, and the prerequisite is done** — in flight on `feat/v1.6.0-paste-fallback`. `SPEC.md` § `UrlPrefillService` is the source of truth for all three; recorded here only so the next reader does not re-open them:
 
-      - **The prerequisite — `PrefillResult`'s failure arm — is widened.** It declared only
-        `{ ok: false; error: string }` while `apiFailure` had always returned `code` and `status`
-        alongside it, so the signal `v1.4.3` created reached the server action and was thrown away
-        by the type. It is now `ActionFailure`, and the form branches on `code`.
-      - **The textarea is error-only, on `prefill_blocked` *and* `prefill_failed`** — not
-        `prefill_blocked` alone. Both describe a page the user can see and the fetcher cannot: a
-        refusal, or a login wall / SPA shell that yielded no posting. A login-walled LinkedIn
-        posting — the likeliest phone case — returns `prefill_failed`, so the narrower reading
-        would have shown no escape hatch on exactly the failure the box exists for.
-        `prefill_unreachable` keeps the Pre-fill button as its retry, and `invalid_url` gets
-        nothing. Always-on was rejected: it invites manual entry where the URL would have worked.
-      - **`MAX_TEXT_CHARS` is enforced on the server, which refuses an over-cap paste
-        (`prefill_paste_too_long`) instead of truncating it.** The browser shows an informational
-        count and blocks nothing. A client-side cap was scoped first and **reversed during review**,
-        because it silently mirrored three claims while copying only one: the cap counts *stripped*
-        characters, so counting the raw paste would have refused a view-source dump that strips to a
-        third of its size — the very case SPEC promises works — and `.length`'s UTF-16 code units
-        would have scored an emoji 2 in a Japanese-language app. `MAX_FILE_BYTES`' spare-the-round-trip
-        precedent does not transfer: a file's size is a number the browser can compute, and this one
-        is not. The mirrored TypeScript constant was deleted rather than fixed.
-- [ ] **Passkey sign-in.** WebAuthn via `webauthn-ruby` hand-wired into Devise (the
-      `devise-passkeys` gem is not mature enough to lean on), with an additive nullable
-      `credentials` table — still a minor by the mechanical test. The provider chain is Chrome →
-      Android Credential Manager → **Proton Pass**, so the implementation must keep provider
-      choice open: **discoverable credentials** (`residentKey: "required"`), **no
-      `authenticatorAttachment` restriction** (a `platform` restriction on desktop would demand
-      the machine's own authenticator and bypass the Proton Pass extension), **`attestation:
-      "none"`** (attestation policy is how sites accidentally block third-party providers).
-      Enrollment ships **desktop-first**: a passkey created on Ubuntu (Brave + Proton Pass
-      extension intercepts the ceremony) syncs through Proton Pass to the phone — no separate
-      phone enrollment flow. **Password sign-in stays forever as the fallback**: the chain has
-      more moving parts than a first-party one, and Brave has shipped real third-party-passkey
-      regressions ([brave-browser#38345](https://github.com/brave/brave-browser/issues/38345),
-      [#37984](https://github.com/brave/brave-browser/issues/37984)). If the release runs heavy,
-      the cut is a 30-day JWT (the revocation list is already wired via `revocation_requests`,
-      and the JWT-never-reaches-JS invariant is untouched) with passkeys as the follow-up minor.
-- [ ] **Push delivery for the follow-up digest.** A second channel for the digest
-      job that already exists: an additive `push_subscriptions` table, VAPID keys, and a delivery
-      branch next to the mailer. **The trap that must be written before the code: the service
-      worker is push-only — no `fetch` handler, ever.** Every route renders dynamically for the
-      CSP nonce (`web/proxy.ts` builds the policy per request), so a service worker that caches
-      HTML serves pages whose nonces no longer match the header and scripts get silently blocked.
-      Corollary, recorded under "Deliberately excluded" below: **offline is out** — it is the
-      one native trait this architecture cannot have cheaply. The launcher badge needs no work on
-      Android: the notification itself produces the dot/count.
-- [ ] **The installed-app shell.** Bottom tab bar (Dashboard / Applications / Board)
-      with `env(safe-area-inset-bottom)` — which also dissolves the 375px Japanese-nav-label
-      squeeze the header comment fights (`web/app/[locale]/(app)/layout.tsx:21`); manifest
-      `shortcuts` (long-press the icon → New application / Board); and a `monochrome` icon for
-      Android themed icons — on a Nothing Phone specifically this is a disproportionate delight
-      detail, its launcher aesthetic *is* monochrome themed icons.
+      - **The prerequisite — `PrefillResult`'s failure arm — is widened.** It declared only `{ ok: false; error: string }` while `apiFailure` had always returned `code` and `status` alongside it, so the error-taxonomy signal reached the server action and was thrown away by the type. It is now `ActionFailure`, and the form branches on `code`.
+      - **The textarea is error-only, on `prefill_blocked` *and* `prefill_failed`** — not `prefill_blocked` alone. Both describe a page the user can see and the fetcher cannot: a refusal, or a login wall / SPA shell that yielded no posting. A login-walled LinkedIn posting — the likeliest phone case — returns `prefill_failed`, so the narrower reading would have shown no escape hatch on exactly the failure the box exists for. `prefill_unreachable` keeps the Pre-fill button as its retry, and `invalid_url` gets nothing. Always-on was rejected: it invites manual entry where the URL would have worked.
+      - **`MAX_TEXT_CHARS` is enforced on the server, which refuses an over-cap paste (`prefill_paste_too_long`) instead of truncating it.** The browser shows an informational count and blocks nothing. A client-side cap was scoped first and **reversed during review**, because it silently mirrored three claims while copying only one: the cap counts *stripped* characters, so counting the raw paste would have refused a view-source dump that strips to a third of its size — the very case SPEC promises works — and `.length`'s UTF-16 code units would have scored an emoji 2 in a Japanese-language app. `MAX_FILE_BYTES`' spare-the-round-trip precedent does not transfer: a file's size is a number the browser can compute, and this one is not. The mirrored TypeScript constant was deleted rather than fixed.
+- [ ] **Passkey sign-in.** WebAuthn via `webauthn-ruby` hand-wired into Devise (the `devise-passkeys` gem is not mature enough to lean on), with an additive nullable `credentials` table — still a minor by the mechanical test. The provider chain is Chrome → Android Credential Manager → **Proton Pass**, so the implementation must keep provider choice open: **discoverable credentials** (`residentKey: "required"`), **no `authenticatorAttachment` restriction** (a `platform` restriction on desktop would demand the machine's own authenticator and bypass the Proton Pass extension), **`attestation: "none"`** (attestation policy is how sites accidentally block third-party providers). Enrollment ships **desktop-first**: a passkey created on Ubuntu (Brave + Proton Pass extension intercepts the ceremony) syncs through Proton Pass to the phone — no separate phone enrollment flow. **Password sign-in stays forever as the fallback**: the chain has more moving parts than a first-party one, and Brave has shipped real third-party-passkey regressions ([brave-browser#38345](https://github.com/brave/brave-browser/issues/38345), [#37984](https://github.com/brave/brave-browser/issues/37984)). If the release runs heavy, the cut is a 30-day JWT (the revocation list is already wired via `revocation_requests`, and the JWT-never-reaches-JS invariant is untouched) with passkeys as the follow-up minor.
+- [ ] **Push delivery for the follow-up digest.** A second channel for the digest job that already exists: an additive `push_subscriptions` table, VAPID keys, and a delivery branch next to the mailer. **The trap that must be written before the code: the service worker is push-only — no `fetch` handler, ever.** Every route renders dynamically for the CSP nonce (`web/proxy.ts` builds the policy per request), so a service worker that caches HTML serves pages whose nonces no longer match the header and scripts get silently blocked. Corollary, recorded under "Deliberately excluded" below: **offline is out** — it is the one native trait this architecture cannot have cheaply. The launcher badge needs no work on Android: the notification itself produces the dot/count.
+- [ ] **The installed-app shell.** Bottom tab bar (Dashboard / Applications / Board) with `env(safe-area-inset-bottom)` — which also dissolves the 375px Japanese-nav-label squeeze the header comment fights (`web/app/[locale]/(app)/layout.tsx:21`); manifest `shortcuts` (long-press the icon → New application / Board); and a `monochrome` icon for Android themed icons — on a Nothing Phone specifically this is a disproportionate delight detail, its launcher aesthetic *is* monochrome themed icons.
 
-      **The manifest half shipped separately (2026-07-17)** — it was pure JSON plus one generated
-      asset, with no component behind it, so it did not need to wait for the tab bar. `start_url`
-      is now `/dashboard`, `scope` and `id` are explicit, and the icon purposes are split. What is
-      left above is the part that needs components and design decisions. `SPEC.md` § Installable
-      app is the source of truth; three notes so they are not re-litigated:
+      **The manifest half already shipped** — it was pure JSON plus one generated asset, with no component behind it, so it did not need to wait for the tab bar. `start_url` is now `/dashboard`, `scope` and `id` are explicit, and the icon purposes are split. What is left above is the part that needs components and design decisions. `SPEC.md` § Installable app is the source of truth; two notes so they are not re-litigated:
 
-      - **The maskable audit is closed, and it asked the wrong question.** The item used to say
-        "verify the 512px maskable icon actually has safe-zone padding" — measured, it always had:
-        the wordmark's furthest corner is 182.6px from centre against a 204.8px safe radius. The
-        real defect was the opposite half of the contract — the plate had **transparent corners**,
-        and `maskable` is full-bleed by contract because the launcher supplies the shape. A new
-        flattened `icon-maskable-512.png` carries `maskable`; the drawn rounded-corner icons keep
-        `any`.
-      - **`shortcuts` is not blocked on code, it is blocked on a decision.** A manifest is a static
-        file with one set of strings, and this app is bilingual — so shortcut labels would ship
-        English-only to a Japanese user, next to a UI that is not. Either accept that (as
-        `name`/`short_name` already do, but those are the wordmark, which § i18n already exempts as
-        untranslated — a label like "New application" is not), or serve the manifest from a route
-        handler that reads the locale, which is a new dynamic surface and a CSP question. Decide
-        before writing it.
-      - **`monochrome` needs an asset that does not exist.** It is not the existing icon recoloured:
-        a monochrome icon supplies a *shape* in alpha and lets the launcher tint it, so the plate
-        must go and the wordmark become the mask. `karirkalyan-monogram.svg` is the closest source.
+      - **`shortcuts` is not blocked on code, it is blocked on a decision.** A manifest is a static file with one set of strings, and this app is bilingual — so shortcut labels would ship English-only to a Japanese user, next to a UI that is not. Either accept that (as `name`/`short_name` already do, but those are the wordmark, which § i18n already exempts as untranslated — a label like "New application" is not), or serve the manifest from a route handler that reads the locale, which is a new dynamic surface and a CSP question. Decide before writing it.
+      - **`monochrome` needs an asset that does not exist.** It is not the existing icon recoloured: a monochrome icon supplies a *shape* in alpha and lets the launcher tint it, so the plate must go and the wordmark become the mask. `karirkalyan-monogram.svg` is the closest source.
 
-### Infrastructure prerequisites — before any of the four ships *(added 2026-07-15)*
+### Infrastructure prerequisites — before any of the four ships
 
-The four items above describe the *features*; these are the setup they each fail silently
-without, and none of it exists in the tree today (no service worker, no VAPID, no `webauthn`
-gem — verified 2026-07-15). Each is greenfield, so each is a real `v1.6.0` line item, not a
-footnote.
+The four items above describe the *features*; these are the setup they each fail silently without, and none of it exists in the tree today (no service worker, no VAPID, no `webauthn` gem — verified 2026-07-15). Each is greenfield, so each is a real `v1.6.0` line item, not a footnote.
 
-- [ ] **VAPID key lifecycle** *(prerequisite for push)*. Push is dead on arrival
-      without a VAPID keypair: generate one once (the `web-push` gem does it), store it as env
-      vars on Railway prod **and** local dev, never in the repo. This adds a **required env
-      var**, so it is load-bearing under the versioning test — SPEC.md § env updates in the same
-      PR, and dropping it later would be a major.
+- [ ] **VAPID key lifecycle** *(prerequisite for push)*. Push is dead on arrival without a VAPID keypair: generate one once (the `web-push` gem does it), store it as env vars on Railway prod **and** local dev, never in the repo. This adds a **required env var**, so it is load-bearing under the versioning test — SPEC.md § env updates in the same PR, and dropping it later would be a major.
 
-      **Settled 2026-07-17 — the keypair is per-environment.** Dev and prod get their own, so a
-      leaked or casually-shared dev key cannot sign a push to the production user. The cost is
-      that a subscription is bound to the environment that issued it: the browser stores the
-      public key it subscribed with, so pointing local dev at a prod-issued subscription fails
-      the signature check rather than falling back — expect to re-subscribe when switching, and
-      treat that as the design working, not a bug to route around.
-- [ ] **WebAuthn RP ID / origin config across environments** *(prerequisite for
-      passkeys)*. A passkey binds to an origin, and a mismatched RP ID fails the ceremony
-      **silently** with an opaque browser error — the worst kind of trap to debug. It must be
-      env-derived, never hardcoded.
+      **Settled — the keypair is per-environment.** Dev and prod get their own, so a leaked or casually-shared dev key cannot sign a push to the production user. The cost is that a subscription is bound to the environment that issued it: the browser stores the public key it subscribed with, so pointing local dev at a prod-issued subscription fails the signature check rather than falling back — expect to re-subscribe when switching, and treat that as the design working, not a bug to route around.
+- [ ] **WebAuthn RP ID / origin config across environments** *(prerequisite for passkeys)*. A passkey binds to an origin, and a mismatched RP ID fails the ceremony **silently** with an opaque browser error — the worst kind of trap to debug. It must be env-derived, never hardcoded.
 
-      **Settled 2026-07-17 — the RP ID is `kk.chairulakmal.com` in prod, `localhost` in dev.**
-      This item used to say `karirkalyan.up.railway.app`, which was already stale: the app has
-      been on the custom domain since `v1.4.x` (`api/app/lib/allowed_hosts.rb:12`, SPEC.md
-      § Deployment). That retires the consequence this item was written to warn about — the
-      domain move that would have orphaned every credential has already happened, before
-      enrollment exists to orphan. **Use the full host, not the registrable domain**, which is
-      what this item previously said: the registrable domain of `kk.chairulakmal.com` is
-      `chairulakmal.com`, and `awano.chairulakmal.com` exists (SPEC.md § Frontend tech stack) —
-      scoping to the parent would make KarirKalyan's passkeys assertable by every sibling
-      subdomain, current and future. The narrower ID costs nothing here, because there is no
-      second host that needs to share these credentials.
-- [ ] **The service worker file, its registration, and its CSP fit** *(prerequisite
-      for push, and the installed-app feel)*. None exists today. Three parts: the SW script
-      itself (**push + `notificationclick` handlers only, never a `fetch` handler** — the nonce
-      trap already recorded under the push item); registration from the app shell; and serving
-      it so the per-request CSP in `web/proxy.ts` doesn't block it. The script is same-origin JS,
-      so `script-src 'self'` covers it — but verify the registration **scope** (`Service-Worker-
-      Allowed` / `worker-src`) actually reaches `/dashboard` and the routes push deep-links into.
-- [ ] **Notification-permission prompt timing** *(prerequisite for push)*. Push
-      no-ops until permission is granted, and a **denied** permission is sticky and near-
-      unrecoverable without the user digging into site settings — so the first ask has to be
-      deliberate. Decide the trigger: **never on load** (Chrome penalizes it and users reflex-
-      deny), only after an explicit opt-in on the digest setting the push channel extends. This
-      is a UX decision that belongs settled next to the push item, not discovered in QA.
-- [ ] **Test strategy for WebAuthn + push** *(prerequisite; decide the seam before
-      the code)*. The "request specs hit real Postgres" invariant covers the DB but not the
-      ceremonies. WebAuthn needs the `webauthn` gem's fake client / a virtual authenticator to
-      exercise register-then-authenticate with no real device; push needs the subscription and
-      VAPID signing mocked at the boundary. For a portfolio repo the suite is part of the signal,
-      so pick the seam deliberately rather than leaving these two features effectively untested.
+      **Settled — the RP ID is `kk.chairulakmal.com` in prod, `localhost` in dev.** The app has been on the custom domain since `v1.4.x` (`api/app/lib/allowed_hosts.rb:12`, SPEC.md § Deployment), so the domain move that would have orphaned every credential has already happened, before enrollment exists to orphan. **Use the full host, not the registrable domain**: the registrable domain of `kk.chairulakmal.com` is `chairulakmal.com`, and `awano.chairulakmal.com` exists (SPEC.md § Frontend tech stack) — scoping to the parent would make KarirKalyan's passkeys assertable by every sibling subdomain, current and future. The narrower ID costs nothing here, because there is no second host that needs to share these credentials.
+- [ ] **The service worker file, its registration, and its CSP fit** *(prerequisite for push, and the installed-app feel)*. None exists today. Three parts: the SW script itself (**push + `notificationclick` handlers only, never a `fetch` handler** — the nonce trap already recorded under the push item); registration from the app shell; and serving it so the per-request CSP in `web/proxy.ts` doesn't block it. The script is same-origin JS, so `script-src 'self'` covers it — but verify the registration **scope** (`Service-Worker-Allowed` / `worker-src`) actually reaches `/dashboard` and the routes push deep-links into.
+- [ ] **Notification-permission prompt timing** *(prerequisite for push)*. Push no-ops until permission is granted, and a **denied** permission is sticky and near-unrecoverable without the user digging into site settings — so the first ask has to be deliberate. Decide the trigger: **never on load** (Chrome penalizes it and users reflex-deny), only after an explicit opt-in on the digest setting the push channel extends. This is a UX decision that belongs settled next to the push item, not discovered in QA.
+- [ ] **Test strategy for WebAuthn + push** *(prerequisite; decide the seam before the code)*. The "request specs hit real Postgres" invariant covers the DB but not the ceremonies. WebAuthn needs the `webauthn` gem's fake client / a virtual authenticator to exercise register-then-authenticate with no real device; push needs the subscription and VAPID signing mocked at the boundary. For a portfolio repo the suite is part of the signal, so pick the seam deliberately rather than leaving these two features effectively untested.
 
-**Deliberately excluded from v1 by the pocket-app scoping: offline support, TWA / Play Store
-packaging, and all iOS work.** Offline is architectural, not deferred politeness: every route
-renders dynamically for the CSP nonce, so a service worker that caches HTML serves pages whose
-nonces no longer match the header. The other two are the scope boundary above.
+**Deliberately excluded from v1 by the pocket-app scoping: offline support, TWA / Play Store packaging, and all iOS work.** Offline is architectural, not deferred politeness: every route renders dynamically for the CSP nonce, so a service worker that caches HTML serves pages whose nonces no longer match the header. The other two are the scope boundary above.
 
 ---
 
 ## `v1.7.0` — minor. The Japan market layer
 
-Recruiter channel + `agencies` + the ownership-window warning; 年収 as a comp *structure*, not a
-number; the Japanese-level requirement filter. One release because all three pass the **field
-admission test the same way** — each is captured by `UrlPrefillService` at prefill time from the
-posting text. That is one extraction pass, one migration, one form pass; three releases would be
-three trips through the same three files. This is also the release a Tokyo reviewer could not
-have seen in someone else's portfolio — and after `v1.6.0`, its three fields land into a capture
-flow that starts on the phone's share sheet, where the postings actually are. All three items
-were **researched against current web sources 2026-07-11**, and each falls under the
-perishable-facts refresh rule above. A fourth item joined on 2026-07-15 — the posting
-snapshot — because it rides the same `UrlPrefillService` pass this release already opens.
+Recruiter channel + `agencies` + the ownership-window warning; 年収 as a comp *structure*, not a number; the Japanese-level requirement filter. One release because all three pass the **field admission test the same way** — each is captured by `UrlPrefillService` at prefill time from the posting text. That is one extraction pass, one migration, one form pass; three releases would be three trips through the same three files. This is also the release a Tokyo reviewer could not have seen in someone else's portfolio — and after `v1.6.0`, its three fields land into a capture flow that starts on the phone's share sheet, where the postings actually are. The posting snapshot rides along because it touches the same `UrlPrefillService` pass. All items fall under the perishable-facts refresh rule above.
 
-- [ ] **Model the recruiter channel.** Hiring in Japan is heavily agent-mediated. Add a channel
-      to each application — direct / agent / referral — and record which agency submitted you where.
-      Two agencies submitting the same candidate to the same company is a real and damaging
-      situation; an app that warns about a duplicate submission is solving a problem the incumbents
-      ignore. Needs a `channel` column and an `agencies` table. **Researched 2026-07-11 — the
-      mechanism has a name:** candidate **"ownership"**. [The first agency to submit you to a
-      company owns that candidacy for ~12–18
-      months](https://www.tokyodev.com/articles/recruitment-agencies-in-japan), and the fee goes
-      to the owner even if you later reach the same company through another channel — most
-      candidates don't know the rule exists. So the data model is not just a channel enum: it
-      needs `(company, agency, submitted_at)` with an ownership-window expiry, and the warning
-      fires on any second submission to a company whose window is still open.
-- [ ] **Compensation as 年収, not salary.** Japanese offers are quoted as an annual figure that
-      folds in bonus (賞与), often expressed as N months of base. Comparing "600万, 12 months + 2×
-      bonus" against a flat 14-month structure is real arithmetic that candidates get wrong. Store
-      the structure, not just the number, and normalise for comparison.
-      **Researched 2026-07-11:** [bonuses run 2–6 months of base, paid summer and winter, and
-      are 15–30% of total annual
-      comp](https://www.gtalent.jp/blog/japanwork-en/salary-tax-en/salary-system); base is
-      typically 70–80% of the package, with allowances on top (commuting reimbursement is
-      near-universal; housing/family allowances at some firms). The distinction worth a column:
-      **guaranteed months vs performance-tied bonus** — two "600万" offers with the same total
-      differ materially on that axis. For a sanity-check benchmark, the [TokyoDev 2025
-      survey](https://www.tokyodev.com/articles/the-2025-tokyodev-developer-survey-results-are-live)
-      (989 respondents) puts the median international developer at **¥9.5M** — but ¥13.5M at
-      international companies with no Japan entity vs ¥8.5M at Japanese-HQ firms, so any
-      comparison UI should surface employer type, not just the number.
-- [ ] **Japanese-level filter.** Record the Japanese proficiency a posting demands (JLPT N1/N2,
-      "business level", conversational, none) against what the user holds, and filter on it.
-      **Researched 2026-07-11:** this taxonomy matches how the market actually filters — both
-      [TokyoDev](https://www.tokyodev.com/jobs/no-japanese-required) and
-      [Japan Dev](https://japan-dev.com/) tag every posting by language requirement, and
-      TokyoDev's own framing is blunt: competition for English-only roles is fierce (orders of
-      magnitude more seekers than seats), and per the [2025
-      survey](https://www.tokyodev.com/articles/the-2025-tokyodev-developer-survey-results-are-live)
-      there are **almost no junior roles that require no Japanese** — juniors who land here
-      usually do it through Japanese-using positions. That makes this filter and the JLPT-gap
-      item in the career-growth section two halves of one feature.
-- [ ] **Posting snapshot** *(added 2026-07-15 — rides this release because it touches the same
-      prefill pass)*. Postings get taken down mid-process, usually right when the user is
-      prepping for the interview they earned with them. `UrlPrefillService` already fetches the
-      page and strips it to text before sending it to Claude; persist that stripped text into a
-      nullable `posting_snapshot` column at prefill time. Zero manual entry (passes the field
-      admission test for free), interview prep survives the posting's deletion, and every
-      extraction this release adds — channel, comp, Japanese level — becomes re-runnable
-      against dead links. **Alternatives rejected (2026-07-15):** storing the full HTML (much
-      bigger rows on a database whose blobs are already 1 MB-capped on purpose, plus
-      sanitization work to ever render it), and a manual paste field (works for postings met
-      offline, but fails the near-zero-entry test that governs this whole section). **That second
-      rejection is narrower than it reads, and `v1.6.0`'s paste fallback does not overturn it**
-      (amended 2026-07-16): what fails the test is a paste field *replacing* free capture at
-      prefill time. A paste fallback for postings the fetcher physically cannot read competes with
-      no capture at all. When both have landed, a pasted posting should fill `posting_snapshot`
-      exactly as a fetched one does — a posting that can never be re-fetched is the strongest case
-      for snapshotting it.
+- [ ] **Model the recruiter channel.** Hiring in Japan is heavily agent-mediated. Add a channel to each application — direct / agent / referral — and record which agency submitted you where. Two agencies submitting the same candidate to the same company is a real and damaging situation; an app that warns about a duplicate submission is solving a problem the incumbents ignore. Needs a `channel` column and an `agencies` table. **Researched 2026-07-11 — the mechanism has a name:** candidate **"ownership"**. [The first agency to submit you to a company owns that candidacy for ~12–18 months](https://www.tokyodev.com/articles/recruitment-agencies-in-japan), and the fee goes to the owner even if you later reach the same company through another channel — most candidates don't know the rule exists. So the data model is not just a channel enum: it needs `(company, agency, submitted_at)` with an ownership-window expiry, and the warning fires on any second submission to a company whose window is still open.
+- [ ] **Compensation as 年収, not salary.** Japanese offers are quoted as an annual figure that folds in bonus (賞与), often expressed as N months of base. Comparing "600万, 12 months + 2× bonus" against a flat 14-month structure is real arithmetic that candidates get wrong. Store the structure, not just the number, and normalise for comparison. **Researched 2026-07-11:** [bonuses run 2–6 months of base, paid summer and winter, and are 15–30% of total annual comp](https://www.gtalent.jp/blog/japanwork-en/salary-tax-en/salary-system); base is typically 70–80% of the package, with allowances on top (commuting reimbursement is near-universal; housing/family allowances at some firms). The distinction worth a column: **guaranteed months vs performance-tied bonus** — two "600万" offers with the same total differ materially on that axis. For a sanity-check benchmark, the [TokyoDev 2025 survey](https://www.tokyodev.com/articles/the-2025-tokyodev-developer-survey-results-are-live) (989 respondents) puts the median international developer at **¥9.5M** — but ¥13.5M at international companies with no Japan entity vs ¥8.5M at Japanese-HQ firms, so any comparison UI should surface employer type, not just the number.
+- [ ] **Japanese-level filter.** Record the Japanese proficiency a posting demands (JLPT N1/N2, "business level", conversational, none) against what the user holds, and filter on it. **Researched 2026-07-11:** this taxonomy matches how the market actually filters — both [TokyoDev](https://www.tokyodev.com/jobs/no-japanese-required) and [Japan Dev](https://japan-dev.com/) tag every posting by language requirement, and TokyoDev's own framing is blunt: competition for English-only roles is fierce (orders of magnitude more seekers than seats), and per the [2025 survey](https://www.tokyodev.com/articles/the-2025-tokyodev-developer-survey-results-are-live) there are **almost no junior roles that require no Japanese** — juniors who land here usually do it through Japanese-using positions. That makes this filter and the JLPT-gap item in the career-growth section two halves of one feature.
+- [ ] **Posting snapshot** *(rides this release because it touches the same prefill pass)*. Postings get taken down mid-process, usually right when the user is prepping for the interview they earned with them. `UrlPrefillService` already fetches the page and strips it to text before sending it to Claude; persist that stripped text into a nullable `posting_snapshot` column at prefill time. Zero manual entry (passes the field admission test for free), interview prep survives the posting's deletion, and every extraction this release adds — channel, comp, Japanese level — becomes re-runnable against dead links. **Alternatives rejected:** storing the full HTML (much bigger rows on a database whose blobs are already 1 MB-capped on purpose, plus sanitization work to ever render it), and a manual paste field (works for postings met offline, but fails the near-zero-entry test that governs this whole section). **That second rejection is narrower than it reads, and `v1.6.0`'s paste fallback does not overturn it**: what fails the test is a paste field *replacing* free capture at prefill time. A paste fallback for postings the fetcher physically cannot read competes with no capture at all. When both have landed, a pasted posting should fill `posting_snapshot` exactly as a fetched one does — a posting that can never be re-fetched is the strongest case for snapshotting it.
 
 ---
 
 ## `v1.7.1` — patch. Japanese phrase-based line breaking
 
-No new capability, so it cannot be a minor — but it is worth the most **right after `v1.7.0`**,
-which is the release that fills the UI with the Japanese compound nouns (agency names, comp
-structures, JLPT levels) that wrap mid-word today.
+No new capability, so it cannot be a minor — but it is worth the most **right after `v1.7.0`**, which is the release that fills the UI with the Japanese compound nouns (agency names, comp structures, JLPT levels) that wrap mid-word today.
 
-- [ ] **文節単位の改行.** Japanese has no spaces, so the browser breaks lines at almost any
-      character boundary and compound words wrap mid-word (`東京オリン` / `ピック`). Two-layer
-      fix, both cheap: (1) `word-break: auto-phrase` in CSS —
-      [Chromium 119+ only](https://caniuse.com/mdn-css_properties_word-break_auto-phrase), needs
-      `lang="ja"` on an ancestor (the i18n layout already sets it), degrades to today's behaviour
-      elsewhere, so it is a one-line progressive enhancement; (2)
-      [BudouX](https://github.com/google/budoux) (`budoux` on npm, ~15 KB, zero deps — the same
-      model that powers `auto-phrase`) run **server-side in RSC** on headings, buttons, and card
-      titles, where a bad break is most visible — long body text mostly self-corrects. BudouX
-      inserts break opportunities and pairs with `word-break: keep-all`; prefer `<wbr>` output
-      over zero-width spaces, which survive copy-paste. `Intl.Segmenter` is not a substitute — it
-      segments dictionary words, not phrases, and breaks choppier. **Researched 2026-07-11.**
-      Ecosystem note: the segmentation problem is solved (BudouX + the CSS property absorbing
-      it); the only open niche is integration glue — a next-intl-aware wrapper or a
-      remark/rehype plugin — better spent as a blog post than an npm package.
+- [ ] **文節単位の改行.** Japanese has no spaces, so the browser breaks lines at almost any character boundary and compound words wrap mid-word (`東京オリン` / `ピック`). Two-layer fix, both cheap: (1) `word-break: auto-phrase` in CSS — [Chromium 119+ only](https://caniuse.com/mdn-css_properties_word-break_auto-phrase), needs `lang="ja"` on an ancestor (the i18n layout already sets it), degrades to today's behaviour elsewhere, so it is a one-line progressive enhancement; (2) [BudouX](https://github.com/google/budoux) (`budoux` on npm, ~15 KB, zero deps — the same model that powers `auto-phrase`) run **server-side in RSC** on headings, buttons, and card titles, where a bad break is most visible — long body text mostly self-corrects. BudouX inserts break opportunities and pairs with `word-break: keep-all`; prefer `<wbr>` output over zero-width spaces, which survive copy-paste. `Intl.Segmenter` is not a substitute — it segments dictionary words, not phrases, and breaks choppier. **Researched 2026-07-11.** Ecosystem note: the segmentation problem is solved (BudouX + the CSS property absorbing it); the only open niche is integration glue — a next-intl-aware wrapper or a remark/rehype plugin — better spent as a blog post than an npm package.
 
 ---
 
 ## `v1.8.0` — minor. "Can you actually take this job?"
 
-The theme is **constraints that decide whether an offer is even takeable** — the visa item and
-the hiring-entity item are the same question asked from opposite directions, and the `.ics`
-export falls out of the timezone item. (Email verification no longer rides along: `v1.4.1`
-closed sign-up and dropped the item, but an earlier version of this section still listed it —
-that was drift, fixed 2026-07-13. What survives of it is the conditional item further down.)
+The theme is **constraints that decide whether an offer is even takeable** — the visa item and the hiring-entity item are the same question asked from opposite directions, and the `.ics` export falls out of the timezone item.
 
-- [ ] **Visa / status-of-residence tracking.** For a foreign engineer in Japan this is the
-      single most decision-relevant fact about a job posting, and no generic tracker models it. Per
-      application: does the employer sponsor, and which status of residence
-      (技術・人文知識・国際業務 is the usual one for software roles)? Globally: days remaining on
-      the user's current status, and Certificate of Eligibility timing when changing employer.
-      There is also a points-based Highly Skilled Professional track (高度専門職) with a published
-      scoring table — a points calculator would be a genuinely useful standalone tool.
-      **Researched 2026-07-11:** the [HSP points
-      system](https://www.mofa.go.jp/j_info/visit/visa/long/visa16.html) still turns on the
-      70-point threshold ([JETRO's summary of the
-      table](https://www.jetro.go.jp/en/invest/setting_up/section2/page11.html)), with PR
-      eligibility after 3 years at 70–79 points and after 1 year at 80+; the **J-Skip** track
-      (April 2023, still active) grants HSP-2 directly at ¥20M+ income for engineers, bypassing
-      the points table — [both remain current in
-      2026](https://ternrise.com/blog/japan-hsp-visa-2026-points-requirements-salary-permanent-residency).
-      One moving part: legislation passed to raise the PR application fee to up to ¥300,000,
-      timing pending a Cabinet Order. On the CoE side, [MOJ processing data puts
-      技術・人文知識・国際業務 at ~55–65 days](https://japan-visa.com/coe/time) within the
-      official 1–3-month band, and when changing employers the safe path is a fresh CoE — which
-      is exactly the lead-time arithmetic this feature should surface next to an offer deadline.
-      **The immigration numbers should be re-confirmed against the Immigration Services Agency /
-      MOJ the day a migration is actually written.**
-- [ ] **Can they actually hire you?** The filter that silently kills most global-remote
-      applications from Japan: many companies cannot employ someone resident here, and offer only a
-      contractor arrangement or an employer-of-record. Track the hiring entity and whether Japan is
-      a supported location — ideally captured at prefill time, since job postings usually say.
-      This is the remote-work analogue of the visa item, and just as underserved.
-      **Researched 2026-07-11:** the [EOR is now the default mechanism for foreign companies
-      hiring in Japan](https://japan-dev.com/blog/what-in-an-employer-of-record) — flat
-      ~$300–600/employee/month, onboarding in 1–2 weeks versus 3–6 months to incorporate an
-      entity ([TokyoDev's guide](https://www.tokyodev.com/articles/employer-of-record) covers
-      what it means for the employee side). So the field is a four-value enum, not a boolean:
-      **own Japan entity / EOR / contractor-only / cannot hire in Japan** — each implies a
-      different employment reality (an EOR contract is with the EOR, not the company you
-      interviewed with). Some EORs now also sponsor visas, which ties this to the visa item
-      above.
-- [ ] **Timezone overlap.** Store the company's home timezone and any required overlap window,
-      then show which roles are survivable from JST. A US-West role demanding four hours of overlap
-      means a 1am start. Warn at interview-scheduling time too — an invite that lands at 03:00 JST
-      should be visibly flagged, not quietly accepted.
-- [ ] **Interview scheduling with `.ics` export**, timezone-correct. Falls out of the above and
-      is small once the timezone data exists.
+- [ ] **Visa / status-of-residence tracking.** For a foreign engineer in Japan this is the single most decision-relevant fact about a job posting, and no generic tracker models it. Per application: does the employer sponsor, and which status of residence (技術・人文知識・国際業務 is the usual one for software roles)? Globally: days remaining on the user's current status, and Certificate of Eligibility timing when changing employer. There is also a points-based Highly Skilled Professional track (高度専門職) with a published scoring table — a points calculator would be a genuinely useful standalone tool. **Researched 2026-07-11:** the [HSP points system](https://www.mofa.go.jp/j_info/visit/visa/long/visa16.html) still turns on the 70-point threshold ([JETRO's summary of the table](https://www.jetro.go.jp/en/invest/setting_up/section2/page11.html)), with PR eligibility after 3 years at 70–79 points and after 1 year at 80+; the **J-Skip** track (April 2023, still active) grants HSP-2 directly at ¥20M+ income for engineers, bypassing the points table — [both remain current in 2026](https://ternrise.com/blog/japan-hsp-visa-2026-points-requirements-salary-permanent-residency). One moving part: legislation passed to raise the PR application fee to up to ¥300,000, timing pending a Cabinet Order. On the CoE side, [MOJ processing data puts 技術・人文知識・国際業務 at ~55–65 days](https://japan-visa.com/coe/time) within the official 1–3-month band, and when changing employers the safe path is a fresh CoE — which is exactly the lead-time arithmetic this feature should surface next to an offer deadline. **The immigration numbers should be re-confirmed against the Immigration Services Agency / MOJ the day a migration is actually written.**
+- [ ] **Can they actually hire you?** The filter that silently kills most global-remote applications from Japan: many companies cannot employ someone resident here, and offer only a contractor arrangement or an employer-of-record. Track the hiring entity and whether Japan is a supported location — ideally captured at prefill time, since job postings usually say. This is the remote-work analogue of the visa item, and just as underserved. **Researched 2026-07-11:** the [EOR is now the default mechanism for foreign companies hiring in Japan](https://japan-dev.com/blog/what-in-an-employer-of-record) — flat ~$300–600/employee/month, onboarding in 1–2 weeks versus 3–6 months to incorporate an entity ([TokyoDev's guide](https://www.tokyodev.com/articles/employer-of-record) covers what it means for the employee side). So the field is a four-value enum, not a boolean: **own Japan entity / EOR / contractor-only / cannot hire in Japan** — each implies a different employment reality (an EOR contract is with the EOR, not the company you interviewed with). Some EORs now also sponsor visas, which ties this to the visa item above.
+- [ ] **Timezone overlap.** Store the company's home timezone and any required overlap window, then show which roles are survivable from JST. A US-West role demanding four hours of overlap means a 1am start. Warn at interview-scheduling time too — an invite that lands at 03:00 JST should be visibly flagged, not quietly accepted.
+- [ ] **Interview scheduling with `.ics` export**, timezone-correct. Falls out of the above and is small once the timezone data exists.
 
 ---
 
-## `v1.9.0` — minor. The follow-through (scoped 2026-07-15, extended 2026-07-16)
+## `v1.9.0` — minor. The follow-through
 
-Six items — five from the 2026-07-15 scoping pass, the board triage cards added 2026-07-16 —
-and all of a kind: each one harvests machinery an earlier release built — the FSM + timeline
-(stats, stage notes, triage cards), the prefill pipeline (talking points, and the `notes` the
-triage cards excerpt), the push channel (`v1.6.0`) plus the `.ics` event data (`v1.8.0`), and
-the visa research (`v1.8.0`). Every schema touch is a nullable column — the triage cards touch
-none at all — so the release passes the major test the same way the rest of the plan does.
+Six items, all of a kind: each one harvests machinery an earlier release built — the FSM + timeline (stats, stage notes, triage cards), the prefill pipeline (talking points, and the `notes` the triage cards excerpt), the push channel (`v1.6.0`) plus the `.ics` event data (`v1.8.0`), and the visa research (`v1.8.0`). Every schema touch is a nullable column — the triage cards touch none at all — so the release passes the major test the same way the rest of the plan does.
 
-- [ ] **Dashboard stat cards — cards, not a page** *(decided 2026-07-15)*. Response rate,
-      time-in-stage, and ghost rate as 2–3 cards next to the existing `avg_days_to_offer` line —
-      all queries over the FSM and `timeline_entries`, zero schema. After `v1.7.0` they can
-      slice by channel and Japanese level. **Alternative rejected:** a dedicated `/insights`
-      page — a new route and nav weight for one user; if the cards earn promotion later, the
-      queries move with them.
+- [ ] **Dashboard stat cards — cards, not a page.** Response rate, time-in-stage, and ghost rate as 2–3 cards next to the existing `avg_days_to_offer` line — all queries over the FSM and `timeline_entries`, zero schema. After `v1.7.0` they can slice by channel and Japanese level. **Alternative rejected:** a dedicated `/insights` page — a new route and nav weight for one user; if the cards earn promotion later, the queries move with them.
 
-      **Inherited from `v1.5.0` — make the stage counts cross-narrow while the payload is
-      open.** The stage filter shipped disjunctive faceting only *within* a filter type: the
-      company and board dropdowns narrow each other through `buckets(pick, constrainTo)`, but
-      the stage chips' counts ignore both, because `facets` carries `[company, board]` pairs and
-      no status. So the chips answer a different question than the row beside them — "12 phone
-      screens" stays 12 after picking a company that has one. Fixing it means status in the
-      facet payload, which is this item's change to make: it reopens `/dashboard`'s response
-      anyway, and doing it here costs one column rather than a second migration of the same
-      shape.
-- [ ] **Triage the two candidate-side board columns without opening each card** *(added
-      2026-07-16)*. `web/app/[locale]/(app)/board/board.tsx:251–252` renders every card as
-      company + role and nothing else, so deciding what to do with a `wishlist` or `draft` item
-      costs a detail-page visit each. Give **those two columns only** three facts — an excerpt
-      of `notes`, a source badge, and how long the item has sat where it is — and sort each
-      column stalest-first. `applied` and beyond keep today's card: past `applied` the next move
-      is the company's, which is what ghost risk already watches; these two are the columns where
-      the stalled item is the user's own to move.
+      **Inherited from `v1.5.0` — make the stage counts cross-narrow while the payload is open.** The stage filter shipped disjunctive faceting only *within* a filter type: the company and board dropdowns narrow each other through `buckets(pick, constrainTo)`, but the stage chips' counts ignore both, because `facets` carries `[company, board]` pairs and no status. So the chips answer a different question than the row beside them — "12 phone screens" stays 12 after picking a company that has one. Fixing it means status in the facet payload, which is this item's change to make: it reopens `/dashboard`'s response anyway, and doing it here costs one column rather than a second migration of the same shape.
+- [ ] **Triage the two candidate-side board columns without opening each card.** `web/app/[locale]/(app)/board/board.tsx:251–252` renders every card as company + role and nothing else, so deciding what to do with a `wishlist` or `draft` item costs a detail-page visit each. Give **those two columns only** three facts — an excerpt of `notes`, a source badge, and how long the item has sat where it is — and sort each column stalest-first. `applied` and beyond keep today's card: past `applied` the next move is the company's, which is what ghost risk already watches; these two are the columns where the stalled item is the user's own to move.
 
-      **Sequencing: `Applications::ListQuery` already landed**, which is what makes this cheap —
-      the two new fields below go into a query object built to hold filters, not into a controller
-      that would then get refactored under load. Same reason `v1.7.0`'s three filters wait on the
-      same extraction.
+      **Sequencing: `Applications::ListQuery` already landed**, which is what makes this cheap — the two new fields below go into a query object built to hold filters, not into a controller that would then get refactored under load. Same reason `v1.7.0`'s three filters wait on the same extraction.
 
-      **Scope, smaller than it looks — `notes` needs no API work.** `#index` renders records
-      through `as_json`, so `notes` already ships on every board row, and `web/app/lib/types.ts`
-      already declares it. The excerpt is a `web/`-only concern. Two fields are genuinely new on
-      the index payload:
+      **Scope, smaller than it looks — `notes` needs no API work.** `#index` renders records through `as_json`, so `notes` already ships on every board row, and `web/app/lib/types.ts` already declares it. The excerpt is a `web/`-only concern. Two fields are genuinely new on the index payload:
 
-      - **`source`** — `JobBoard.from_url(url) || JobBoard::NONE`, the same call
-        `DashboardController#compute_stats` makes for `facets`. **It must be server-derived.**
-        `jobBoardLabel(host, noBoardLabel)` (`web/app/lib/format.ts`) already exists and already
-        maps hosts to brands, but it takes a *host* and no board card has one — and deriving it in
-        TypeScript from `app.url` would be a second implementation of `from_url`'s www-strip and
-        downcase, in the language that does not own the rule.
-      - **`days_in_stage`** — reuse the name and the formula `GhostRiskQuery#in_flight` already
-        uses: `COALESCE(MAX(timeline_entries.created_at), applied_at, created_at)` against a
-        Ruby-bound `Time.current`. **Not `updated_at`**, which drifts on any edit — the same
-        reasoning the `avg_days_to_offer` query is already commented with. It falls out correctly
-        for these two columns for free: a `draft` has no timeline rows and a null `applied_at`, so
-        it COALESCEs to `created_at`, its real age. **One name, not two** — `days_in_state` for an
-        identical computation would re-create exactly the near-miss naming the `API_BASE` /
-        `API_BASE_URL` rename was done to remove. The shared expression is the argument for building this next to the stat cards
-        above, which name time-in-stage as a query over the same two tables.
+      - **`source`** — `JobBoard.from_url(url) || JobBoard::NONE`, the same call `DashboardController#compute_stats` makes for `facets`. **It must be server-derived.** `jobBoardLabel(host, noBoardLabel)` (`web/app/lib/format.ts`) already exists and already maps hosts to brands, but it takes a *host* and no board card has one — and deriving it in TypeScript from `app.url` would be a second implementation of `from_url`'s www-strip and downcase, in the language that does not own the rule.
+      - **`days_in_stage`** — reuse the name and the formula `GhostRiskQuery#in_flight` already uses: `COALESCE(MAX(timeline_entries.created_at), applied_at, created_at)` against a Ruby-bound `Time.current`. **Not `updated_at`**, which drifts on any edit — the same reasoning the `avg_days_to_offer` query is already commented with. It falls out correctly for these two columns for free: a `draft` has no timeline rows and a null `applied_at`, so it COALESCEs to `created_at`, its real age. **One name, not two** — `days_in_state` for an identical computation would re-create exactly the near-miss naming the `API_BASE` / `API_BASE_URL` rename was done to remove. The shared expression is the argument for building this next to the stat cards above, which name time-in-stage as a query over the same two tables.
 
       **Traps:**
 
-      - **The timeline read must be a joined subquery, not per-row.** `#index` is a plain scope
-        `.to_a`'d, and the board follows it to exhaustion — up to 10 pages of 100 (`board/page.tsx`).
-        A naïve `MAX(created_at)` per record is a 1000-query page load.
-      - **`DashboardController` stays untouched**, and not just by preference: its cache key is
-        `count + MAX(updated_at) + Date.current` and its payload is deliberately aggregate —
-        `facets` ships `[company, board]` pairs, no per-row content. Per-item summaries there
-        would put per-row content behind a key that cannot see per-row change.
-      - **`board.tsx:88–89`'s comment has to change with the code.** It says position is not API
-        data and a client-side order would be a second source of truth — which is right today and
-        is *why* the sort key must be the server's `days_in_stage` rather than something the client
-        invents. Sorting on a server field is deriving order from server data; leaving the comment
-        as-is would make the next reader think the sort violates it.
-      - **Both locales, no hardcoded English.** The board brands stay untranslated (`jobBoardLabel`'s
-        existing rule), but the `(none)` sentinel's label and the elapsed-time string are catalog
-        keys. Elapsed time has a formatter already — `timeAgo(iso, locale)` in `format.ts` — so
-        prefer feeding it the entered-at instant over inventing a second duration format. En/ja key parity
-        holds and stays that way.
+      - **The timeline read must be a joined subquery, not per-row.** `#index` is a plain scope `.to_a`'d, and the board follows it to exhaustion — up to 10 pages of 100 (`board/page.tsx`). A naïve `MAX(created_at)` per record is a 1000-query page load.
+      - **`DashboardController` stays untouched**, and not just by preference: its cache key is `count + MAX(updated_at) + Date.current` and its payload is deliberately aggregate — `facets` ships `[company, board]` pairs, no per-row content. Per-item summaries there would put per-row content behind a key that cannot see per-row change.
+      - **`board.tsx:88–89`'s comment has to change with the code.** It says position is not API data and a client-side order would be a second source of truth — which is right today and is *why* the sort key must be the server's `days_in_stage` rather than something the client invents. Sorting on a server field is deriving order from server data; leaving the comment as-is would make the next reader think the sort violates it.
+      - **Both locales, no hardcoded English.** The board brands stay untranslated (`jobBoardLabel`'s existing rule), but the `(none)` sentinel's label and the elapsed-time string are catalog keys. Elapsed time has a formatter already — `timeAgo(iso, locale)` in `format.ts` — so prefer feeding it the entered-at instant over inventing a second duration format. En/ja key parity holds and stays that way.
 
-      **Testing, per the existing split:** the excerpt/truncation logic is pure — unit spec, no DB.
-      The two new payload fields are a request spec against real Postgres, and the case worth
-      writing is the one the formula exists to handle: an application whose `updated_at` was just
-      bumped by an edit still reports the age its timeline says it has.
+      **Testing, per the existing split:** the excerpt/truncation logic is pure — unit spec, no DB. The two new payload fields are a request spec against real Postgres, and the case worth writing is the one the formula exists to handle: an application whose `updated_at` was just bumped by an edit still reports the age its timeline says it has.
 
-      **Deliberately not built: staleness stays plain elapsed time, not a flagged state.** If it
-      ever earns a threshold, the number should **not** be borrowed from `GhostRiskQuery::DEFAULT_P90`
-      (21/14 days) — those encode how long *companies* take to reply, and nobody is replying to a
-      wishlist item. The defensible source is the user's own p90 `wishlist|draft → applied` latency,
-      read from the same `stage_exits` CTE, personal-only with the existing `MIN_SAMPLE = 5` guard
-      and **no global default** — meaning it correctly does nothing until there are five data points.
-      Absent that, a threshold would be inventing a number about the user's own procrastination.
+      **Deliberately not built: staleness stays plain elapsed time, not a flagged state.** If it ever earns a threshold, the number should **not** be borrowed from `GhostRiskQuery::DEFAULT_P90` (21/14 days) — those encode how long *companies* take to reply, and nobody is replying to a wishlist item. The defensible source is the user's own p90 `wishlist|draft → applied` latency, read from the same `stage_exits` CTE, personal-only with the existing `MIN_SAMPLE = 5` guard and **no global default** — meaning it correctly does nothing until there are five data points. Absent that, a threshold would be inventing a number about the user's own procrastination.
 
-      **Alternatives rejected (2026-07-16):** enriching every column (past `applied`, "how long has
-      this sat" is ghost risk's question, already answered on the dashboard — a second, thresholdless
-      copy on the card would be two voices on one fact); a `sort` param on `#index` (server-side
-      ordering for a client-side grouping the API does not model — the board already fetches
-      everything and buckets it in memory); and a per-row `notes` truncation on the server (the index
-      already ships full `notes` today, so truncating there is a payload change for a display
-      decision).
-- [ ] **Cover-letter talking points — bullets, not drafts** *(decided 2026-07-15)*. Extract
-      posting-vs-resume match points as bullets, reusing the Claude pipeline that already reads
-      both; the user writes the letter. **Alternative rejected:** full draft generation — a
-      generic AI voice is a real risk in a market where the letter *is* the signal, and the
-      prompt-maintenance carry is heavier. This closes the second declared Phase 9 roadmap item
-      in reduced shape.
-- [ ] **Push interview + deadline alerts.** New payloads on the push channel `v1.6.0` builds,
-      fed by the event data `v1.8.0`'s `.ics` work structures — interview reminders, offer
-      deadlines, and the CoE lead-time warning surfaced as a push, not just a page.
-      **Alternatives rejected:** email-only via the existing digest (the channel will already
-      exist; using it is the cheaper half), and leaving reminders to the phone's calendar
-      (deadline arithmetic like CoE lead time never becomes a calendar event on its own).
-- [ ] **Public HSP (高度専門職) points calculator — standalone page, not an in-app tool**
-      *(decided 2026-07-15)*. A public, no-auth calculator on the marketing side, sharing the
-      `v1.8.0` visa item's research (70-point threshold, J-Skip at ¥20M+). No schema.
-      **Chosen with eyes open against the north star:** it serves strangers, not the one loyal
-      user — the trade is portfolio/SEO value for a page whose refresh rides the visa item's
-      annual pass (perishable-facts rule applies). **Alternative rejected:** in-app, wired to
-      profile + offer fields — more integration for a number the user can compute about himself
-      once.
-- [ ] **Interview stage notes — on the timeline, not a per-app blob** *(decided 2026-07-15)*.
-      A nullable text column on `timeline_entries`, so notes (who you met, what they asked)
-      attach to the exact transition they belong to. Application-scoped facts, not relationship
-      tracking — inside the career-growth scope boundary. **Alternatives rejected:** one
-      free-form notes column on `applications` (flattens interview history into a blob), and
-      leaving notes to an external tool (the question "what did company X ask at stage Y" is
-      exactly application-shaped).
+      **Alternatives rejected:** enriching every column (past `applied`, "how long has this sat" is ghost risk's question, already answered on the dashboard — a second, thresholdless copy on the card would be two voices on one fact); a `sort` param on `#index` (server-side ordering for a client-side grouping the API does not model — the board already fetches everything and buckets it in memory); and a per-row `notes` truncation on the server (the index already ships full `notes` today, so truncating there is a payload change for a display decision).
+- [ ] **Cover-letter talking points — bullets, not drafts.** Extract posting-vs-resume match points as bullets, reusing the Claude pipeline that already reads both; the user writes the letter. **Alternative rejected:** full draft generation — a generic AI voice is a real risk in a market where the letter *is* the signal, and the prompt-maintenance carry is heavier. This closes the second declared Phase 9 roadmap item in reduced shape.
+- [ ] **Push interview + deadline alerts.** New payloads on the push channel `v1.6.0` builds, fed by the event data `v1.8.0`'s `.ics` work structures — interview reminders, offer deadlines, and the CoE lead-time warning surfaced as a push, not just a page. **Alternatives rejected:** email-only via the existing digest (the channel will already exist; using it is the cheaper half), and leaving reminders to the phone's calendar (deadline arithmetic like CoE lead time never becomes a calendar event on its own).
+- [ ] **Public HSP (高度専門職) points calculator — standalone page, not an in-app tool.** A public, no-auth calculator on the marketing side, sharing the `v1.8.0` visa item's research (70-point threshold, J-Skip at ¥20M+). No schema. **Chosen with eyes open against the north star:** it serves strangers, not the one loyal user — the trade is portfolio/SEO value for a page whose refresh rides the visa item's annual pass (perishable-facts rule applies). **Alternative rejected:** in-app, wired to profile + offer fields — more integration for a number the user can compute about himself once.
+- [ ] **Interview stage notes — on the timeline, not a per-app blob.** A nullable text column on `timeline_entries`, so notes (who you met, what they asked) attach to the exact transition they belong to. Application-scoped facts, not relationship tracking — inside the career-growth scope boundary. **Alternatives rejected:** one free-form notes column on `applications` (flattens interview history into a blob), and leaving notes to an external tool (the question "what did company X ask at stage Y" is exactly application-shaped).
 
 ---
 
 ## Conditional — open, but deliberately tagged to no release
 
-- [ ] **`web/` has no unit-test seam, so the paste box's branching is untested** *(added
-      2026-07-17, from `v1.6.0`'s paste-fallback review)* — `PASTE_CURES` decides whether the
-      escape hatch appears at all, and nothing exercises it. Every seam was checked and all four
-      are shut. Playwright runs on `push: branches: [main]` only (`web.yml:99`), so it never sees
-      a PR. The E2E job sets no `ANTHROPIC_API_KEY`, and `UrlPrefillService#call` calls `client`
-      **before** `fetch` on purpose — so every prefill there returns `prefill_unavailable`, the one
-      code `PASTE_CURES` deliberately excludes, meaning the box cannot open in CI even if a test
-      asked it to. The prefill is a server action calling Rails server-to-server, so Playwright's
-      `page.route()` has nothing to intercept. And `@playwright/test` is `web/`'s only test
-      dependency, so there is no component-level seam either. **Conditional because the fix is a
-      decision, not a task:** adding a unit runner to `web/` is config, CI wiring, and a precedent
-      binding every component after it — the same "decide the seam before the code" question
-      `v1.6.0`'s WebAuthn/push prerequisite already asks. Worth answering once for the whole
-      frontend, not twice. Note what is *not* untested: the cap, the taxonomy, and the SSRF
-      question all live in `api/`, and its specs pin them.
-- [ ] **Enforce the "no hardcoded FSM sets" claim in CI, instead of asserting it in prose**
-      *(added 2026-07-17, from `v1.5.1`'s review)* — the claim in `README.md:26` has now been
-      written three times and been wrong twice, each time because the grep behind it was never run
-      to the end. A `web/scripts/check-fsm-copies.mjs`, beside the existing
-      `check-i18n-parity.mjs`, could fail the build on a state-name array outside an allow-list
-      (`types.ts`, the catalogs, `pipeline-diagram.tsx`, `COLUMN_ORDER`, `CONFIRM_REQUIRED`,
-      `REVIVAL_STATES`), which turns a sentence a reader must trust into one the build proves.
-      **Conditional, not scheduled**, because the allow-list is the whole difficulty: entries are
-      legitimate for reasons a script cannot check, so a careless one re-admits the bug the check
-      exists to catch. Worth doing only when the allow-list can be justified line by line.
-- [ ] **`reopenable` infers an FSM edge it could fetch** *(added 2026-07-17, from `v1.5.1`'s
-      review)* — `transition-buttons.tsx` and `board.tsx` render "can be re-opened to Applied
-      later" whenever a state is *not* terminal, and `REVIVAL_STATES` hardcodes which three states
-      revive. Both are the complement of the claim `v1.5.1` just stopped hardcoding, and the
-      fetched `table.transitions[status]?.includes("applied")` answers it directly — `table` is
-      already in scope in `board.tsx`. It is true today only because `CONFIRM_REQUIRED` minus the
-      terminal states happens to equal `REVIVAL_STATES`: an invariant held by two hardcoded sets
-      agreeing with Ruby, not by construction. **Conditional** because nothing user-facing is
-      wrong today and the server refuses an illegal revival regardless; it is a
-      correct-for-the-wrong-reason, which is the kind that breaks quietly when the FSM next moves.
-- [ ] **`timeline_entries` offer-lookup index** — still open, and still conditional; nothing in
-      `v1.4`–`v1.9` grows that table (the `v1.9.0` stage notes add a nullable column, not rows). The
-      `avg_days_to_offer` subquery filters `to_status = 'offer'`, and there is deliberately no
-      index on `to_status`: at personal-tracker scale a user's timeline is a few hundred rows,
-      already reachable through `(application_id, created_at)`. Add `(to_status, application_id,
-      created_at)` **if the table grows**, not before. (`feat/ghost-prediction` widened the bare
-      `application_id` index to `(application_id, created_at)` for the ghost-risk window
-      function — a replacement, not an addition.)
-- [ ] **Stage chips behind a "show more" disclosure** — conditional on the row proving
-      unscannable in use, and **not** on finding evidence: the evidence exists and `v1.5.0`
-      chose against it knowingly. Baymard's
-      [Macy's filter testing](https://baymard.com/blog/macys-filtering-experience) is plain —
-      *"Around 10 values is the sweetspot... displaying much more than 10 values impeded the
-      user's overview of the other available filtering types"* — and the shape that beat both
-      the full list and an inline scroll is 4–8 high-traffic values inline with the tail behind
-      a disclosure. Thirteen states is past that line. `v1.5.0` deferred it because the list
-      already rendered all thirteen and the release did not make that worse, but the "All /
-      Active / None" presets are now carrying the mitigation. The split this needs already
-      exists and is already fetched: `active_states` from `/transitions` is exactly the seven
-      inline stages, leaving the six closed ones behind the disclosure. **Do not re-record this
-      as "no evidence found".**
-- [ ] **Filter state in the URL** — conditional, and a real limitation today: the dashboard's
-      filters are `useState` only, so no filtered view is linkable, survives a reload, or comes
-      back with the back button. `v1.5.0` made this arguably worse by widening a selection from
-      one stage to thirteen chips, and still left it out on purpose — it is a routing change
-      (`web/i18n/navigation.ts`), not a filter change, and folding it in would have grown that
-      item a second spine. Worth doing when a filtered view is something the user wants to *keep*
-      or send, rather than rebuild each visit. Note the collision with the empty-list contract in
-      `SPEC.md` § Query layer: params would then arrive from a pasted URL as well as from
-      navigation, which is the case `ListQuery`'s "junk narrows to nothing ⇒ unfiltered, never
-      empty" rule already exists to answer.
-- [ ] **Email verification** (Devise `:confirmable`) — **only if registration ever reopens.**
-      Dropped from the plan by `v1.4.1`: `:confirmable` confirms that whoever typed an address
-      into a sign-up form can read that mailbox, and there is no sign-up form. The operator types
-      the address into `users:create` himself, so there is nothing left to verify. It was already
-      labelled a portfolio checkbox; it is now a checkbox for a box that does not exist.
+- [ ] **`web/` has no unit-test seam, so the paste box's branching is untested** *(from `v1.6.0`'s paste-fallback review)* — `PASTE_CURES` decides whether the escape hatch appears at all, and nothing exercises it. Every seam was checked and all four are shut. Playwright runs on `push: branches: [main]` only (`web.yml:99`), so it never sees a PR. The E2E job sets no `ANTHROPIC_API_KEY`, and `UrlPrefillService#call` calls `client` **before** `fetch` on purpose — so every prefill there returns `prefill_unavailable`, the one code `PASTE_CURES` deliberately excludes, meaning the box cannot open in CI even if a test asked it to. The prefill is a server action calling Rails server-to-server, so Playwright's `page.route()` has nothing to intercept. And `@playwright/test` is `web/`'s only test dependency, so there is no component-level seam either. **Conditional because the fix is a decision, not a task:** adding a unit runner to `web/` is config, CI wiring, and a precedent binding every component after it — the same "decide the seam before the code" question `v1.6.0`'s WebAuthn/push prerequisite already asks. Worth answering once for the whole frontend, not twice. Note what is *not* untested: the cap, the taxonomy, and the SSRF question all live in `api/`, and its specs pin them.
+- [ ] **Enforce the "no hardcoded FSM sets" claim in CI, instead of asserting it in prose** *(from `v1.5.1`'s review)* — the claim in `README.md:26` has now been written three times and been wrong twice, each time because the grep behind it was never run to the end. A `web/scripts/check-fsm-copies.mjs`, beside the existing `check-i18n-parity.mjs`, could fail the build on a state-name array outside an allow-list (`types.ts`, the catalogs, `pipeline-diagram.tsx`, `COLUMN_ORDER`, `CONFIRM_REQUIRED`, `REVIVAL_STATES`), which turns a sentence a reader must trust into one the build proves. **Conditional, not scheduled**, because the allow-list is the whole difficulty: entries are legitimate for reasons a script cannot check, so a careless one re-admits the bug the check exists to catch. Worth doing only when the allow-list can be justified line by line.
+- [ ] **`reopenable` infers an FSM edge it could fetch** *(from `v1.5.1`'s review)* — `transition-buttons.tsx` and `board.tsx` render "can be re-opened to Applied later" whenever a state is *not* terminal, and `REVIVAL_STATES` hardcodes which three states revive. Both are the complement of the claim `v1.5.1` just stopped hardcoding, and the fetched `table.transitions[status]?.includes("applied")` answers it directly — `table` is already in scope in `board.tsx`. It is true today only because `CONFIRM_REQUIRED` minus the terminal states happens to equal `REVIVAL_STATES`: an invariant held by two hardcoded sets agreeing with Ruby, not by construction. **Conditional** because nothing user-facing is wrong today and the server refuses an illegal revival regardless; it is a correct-for-the-wrong-reason, which is the kind that breaks quietly when the FSM next moves.
+- [ ] **`timeline_entries` offer-lookup index** — still open, and still conditional; nothing in `v1.6`–`v1.9` grows that table (the `v1.9.0` stage notes add a nullable column, not rows). The `avg_days_to_offer` subquery filters `to_status = 'offer'`, and there is deliberately no index on `to_status`: at personal-tracker scale a user's timeline is a few hundred rows, already reachable through `(application_id, created_at)`. Add `(to_status, application_id, created_at)` **if the table grows**, not before. (`feat/ghost-prediction` widened the bare `application_id` index to `(application_id, created_at)` for the ghost-risk window function — a replacement, not an addition.)
+- [ ] **Stage chips behind a "show more" disclosure** — conditional on the row proving unscannable in use, and **not** on finding evidence: the evidence exists and `v1.5.0` chose against it knowingly. Baymard's [Macy's filter testing](https://baymard.com/blog/macys-filtering-experience) is plain — *"Around 10 values is the sweetspot... displaying much more than 10 values impeded the user's overview of the other available filtering types"* — and the shape that beat both the full list and an inline scroll is 4–8 high-traffic values inline with the tail behind a disclosure. Thirteen states is past that line. `v1.5.0` deferred it because the list already rendered all thirteen and the release did not make that worse, but the "All / Active / None" presets are now carrying the mitigation. The split this needs already exists and is already fetched: `active_states` from `/transitions` is exactly the seven inline stages, leaving the six closed ones behind the disclosure. **Do not re-record this as "no evidence found".**
+- [ ] **Filter state in the URL** — conditional, and a real limitation today: the dashboard's filters are `useState` only, so no filtered view is linkable, survives a reload, or comes back with the back button. `v1.5.0` made this arguably worse by widening a selection from one stage to thirteen chips, and still left it out on purpose — it is a routing change (`web/i18n/navigation.ts`), not a filter change, and folding it in would have grown that item a second spine. Worth doing when a filtered view is something the user wants to *keep* or send, rather than rebuild each visit. Note the collision with the empty-list contract in `SPEC.md` § Query layer: params would then arrive from a pasted URL as well as from navigation, which is the case `ListQuery`'s "junk narrows to nothing ⇒ unfiltered, never empty" rule already exists to answer.
+- [ ] **Email verification** (Devise `:confirmable`) — **only if registration ever reopens.** Dropped from the plan by `v1.4.1`: `:confirmable` confirms that whoever typed an address into a sign-up form can read that mailbox, and there is no sign-up form. The operator types the address into `users:create` himself, so there is nothing left to verify. It was already labelled a portfolio checkbox; it is now a checkbox for a box that does not exist.
 
 ---
 
 ## Maintenance — blocked on upstream, not a release
 
-The dev-server memory leak carries no release tag on purpose: it is **maintenance, not a
-release**. Its stopgap already shipped (`cf7cd8d` — 8 GB heap + heap-snapshot flag live in
-`web/package.json`), and what remains is filing upstream when the next crash writes a snapshot.
+The dev-server memory leak carries no release tag on purpose: it is **maintenance, not a release**. Its stopgap already shipped (`cf7cd8d` — 8 GB heap + heap-snapshot flag live in `web/package.json`), and what remains is filing upstream when the next crash writes a snapshot.
 
-- [ ] **`next dev` crashes even with a 4 GB heap** (`--max-old-space-size=4096`, added in
-      v1.1.1). **Diagnosed 2026-07-11** — it is a **V8 heap leak in the `next-server` process**,
-      not native/Rust memory and not the OS: 30 days of journal show zero OOM-killer or
-      systemd-oomd kills, and an instrumented run (`--report-on-signal` diagnostic reports +
-      RSS sampling) showed V8 `usedMemory` tracking RSS growth ~1:1 while the native baseline
-      stayed a flat ~0.8–1.5 GB. Retention is monotonic and unbounded: ~239 MB V8 heap at boot,
-      ~541 MB after warming the ten public routes, then **~40–60 MB retained per HMR rebuild**
-      (3.1 GB used / 5.8 GB RSS after 30 scripted edits, `detachedContextCount` 0 throughout).
-      So raising `--max-old-space-size` only postpones the `JavaScript heap out of memory`
-      abort — 4 GB dies in a normal editing session; 8 GB (the machine has 29 GB) buys a longer
-      one, nothing more.
-  - **Answered sub-questions:** `experimental.turbopackFileSystemCacheForDev` _is_ on
-    (default `true` in 16.2.6, `config-shared.js:263`; `.next/dev/cache/turbopack` is 310 MB)
-    — the leak happens with it. It does make restarts cheap: warm boot-to-ready measured at
-    ~5 s, so a periodic dev-server restart is a viable stopgap. Upstream issue #85290
-    (404 → infinite compile loop; relevant because of our `globalNotFound` setup) does
-    **not** reproduce — ten bogus URLs 404'd cleanly. The behaviour matches discussion
-    **#93451** (unbounded growth after HMR edits, ~7 GB, open and unresolved as of
-    2026-07).
-  - **Next actions:** the stopgap is **done** (`cf7cd8d`) — the dev script already runs
-    with an 8 GB heap and `--heapsnapshot-near-heap-limit=1` (allowed there; `--trace-gc`
-    is not), so the next real crash writes the heap snapshot upstream wants. What remains:
-    file on #93451/new issue with that snapshot, and restart the server when it gets slow.
-    One unexplained datum for the upstream report: V8 heap also jumped ~1.6 GB across the
-    404 phase and a 45 s idle window — growth without edits, so renders (every route is
-    dynamic here — the CSP-nonce `await connection()`) retain memory too, not just
-    compiles; the three-family font setup compiling into every layout pass may be a
-    multiplier (the old font-payload item was struck as stale in `4284f61` — production
-    loads five variable slices, not ~15 static files).
+- [ ] **`next dev` crashes even with a 4 GB heap** (`--max-old-space-size=4096`, added in v1.1.1). **Diagnosed 2026-07-11** — it is a **V8 heap leak in the `next-server` process**, not native/Rust memory and not the OS: 30 days of journal show zero OOM-killer or systemd-oomd kills, and an instrumented run (`--report-on-signal` diagnostic reports + RSS sampling) showed V8 `usedMemory` tracking RSS growth ~1:1 while the native baseline stayed a flat ~0.8–1.5 GB. Retention is monotonic and unbounded: ~239 MB V8 heap at boot, ~541 MB after warming the ten public routes, then **~40–60 MB retained per HMR rebuild** (3.1 GB used / 5.8 GB RSS after 30 scripted edits, `detachedContextCount` 0 throughout). So raising `--max-old-space-size` only postpones the `JavaScript heap out of memory` abort — 4 GB dies in a normal editing session; 8 GB (the machine has 29 GB) buys a longer one, nothing more. The behaviour matches upstream discussion **#93451** (unbounded growth after HMR edits, ~7 GB, open and unresolved as of 2026-07); issue #85290 (404 → infinite compile loop) does **not** reproduce here. Warm boot-to-ready is ~5 s with the Turbopack FS cache, so a periodic dev-server restart is a viable stopgap.
+  - **Next actions:** the stopgap is **done** (`cf7cd8d`) — the dev script already runs with an 8 GB heap and `--heapsnapshot-near-heap-limit=1` (allowed there; `--trace-gc` is not), so the next real crash writes the heap snapshot upstream wants. What remains: file on #93451/new issue with that snapshot, and restart the server when it gets slow. One unexplained datum for the upstream report: V8 heap also jumped ~1.6 GB across the 404 phase and a 45 s idle window — growth without edits, so renders (every route is dynamic here — the CSP-nonce `await connection()`) retain memory too, not just compiles; the three-family font setup compiling into every layout pass may be a multiplier (production loads five variable slices, not ~15 static files).
 
 ---
 
 ## `2.0.0` and beyond — triggered by accepting an offer, not by finishing `v1.9.0`
 
-Direction decided 2026-07-11: KarirKalyan's long-term identity is a **career growth tracker**,
-not just an application tracker — the name already says so (karir = career; the product is
-currently narrower than its own name). This whole cluster sits **outside the `v1.4`–`v1.9`
-plan** — not because it is unimportant, but because `positions` is the `2.0.0` (it adds a table
-*and* changes what `accepted` means in the FSM), and its scoping trigger is a date in the
-user's life, not a release number. Giving it a release slot in the plan would contradict that.
+KarirKalyan's long-term identity is a **career growth tracker**, not just an application tracker — the name already says so (karir = career; the product is currently narrower than its own name). This whole cluster sits **outside the `v1.6`–`v1.9` plan** — not because it is unimportant, but because `positions` is the `2.0.0` (it adds a table *and* changes what `accepted` means in the FSM), and its scoping trigger is a date in the user's life, not a release number. Giving it a release slot in the plan would contradict that.
 
-- [ ] **`positions` (tenure) entity — the keystone; design it before building anything below.**
-      *(`2.0.0` — the only major in this file)*
-      Today `accepted` is a terminal status; a career tracker needs the job you then held as a
-      first-class thing: company, title, start/end, and the comp structure from the 年収 item
-      above. Comp history across positions (benchmarkable against the TokyoDev medians cited
-      above), resume versioning, internal-promotion stages, and 職務経歴書 generation all hang
-      off it — a 職務経歴書 is literally a positions table rendered as prose. Write it into
-      SPEC.md's data model **first**; retrofitting it later means migrating what `accepted`
-      means. **Scoping trigger (decided 2026-07-11): accepting an offer**, not finishing a
-      prior release — the moment the search succeeds is the moment this entity is needed, or
-      the app exits the user's life exactly when its retention story was supposed to begin.
-- [ ] **Make the app survive its own success** *(post-`2.0.0` — every sub-item below hangs off
-      `positions`)*. Today the lifecycle ends at `accepted`: the
-      search closes and there is no reason to open the app again until the next one. Extend it
-      into the tenure _between_ searches, so landing a job is a state change, not an exit:
-  - **Resume as a living document** — the resume is already stored per application; add a
-    current, versioned profile that keeps improving while employed, so the next application
-    starts from the best version rather than a year-old PDF. Feeds the
-    rirekisho/shokumu-keirekisho generation idea below.
-  - **Low-noise market watch** — `wishlist` already models "interesting, not applied"; let it
-    be the employed-mode default. Tracking relevant roles while happily employed is how you
-    know your market value and when to move.
-  - **Skills & certs against the market, not a wishlist** — `UrlPrefillService` already reads
-    postings with Claude; extract the skills/certifications each tracked role asks for at
-    prefill time, and the gap between what target roles want and what the profile holds
-    becomes a ranked "learn next" list (JLPT level, cloud certs, a framework) with zero extra
-    data entry. Goals can target the current employer too — an internal promotion has stages
-    like an application does.
-  - **Periodic check-ins** — Solid Queue and the mailer exist; a quarterly "update your
-    resume, review your goals" nudge is one recurring job. Same dead-zone awareness as the
-    calendar-aware follow-ups that shipped in `v1.4.0`.
+- [ ] **`positions` (tenure) entity — the keystone; design it before building anything below.** *(`2.0.0` — the only major in this file)* Today `accepted` is a terminal status; a career tracker needs the job you then held as a first-class thing: company, title, start/end, and the comp structure from the 年収 item above. Comp history across positions (benchmarkable against the TokyoDev medians cited above), resume versioning, internal-promotion stages, and 職務経歴書 generation all hang off it — a 職務経歴書 is literally a positions table rendered as prose. Write it into SPEC.md's data model **first**; retrofitting it later means migrating what `accepted` means. **Scoping trigger: accepting an offer**, not finishing a prior release — the moment the search succeeds is the moment this entity is needed, or the app exits the user's life exactly when its retention story was supposed to begin.
+- [ ] **Make the app survive its own success** *(post-`2.0.0` — every sub-item below hangs off `positions`)*. Today the lifecycle ends at `accepted`: the search closes and there is no reason to open the app again until the next one. Extend it into the tenure _between_ searches, so landing a job is a state change, not an exit:
+  - **Resume as a living document** — the resume is already stored per application; add a current, versioned profile that keeps improving while employed, so the next application starts from the best version rather than a year-old PDF. Feeds the rirekisho/shokumu-keirekisho generation idea below.
+  - **Low-noise market watch** — `wishlist` already models "interesting, not applied"; let it be the employed-mode default. Tracking relevant roles while happily employed is how you know your market value and when to move.
+  - **Skills & certs against the market, not a wishlist** — `UrlPrefillService` already reads postings with Claude; extract the skills/certifications each tracked role asks for at prefill time, and the gap between what target roles want and what the profile holds becomes a ranked "learn next" list (JLPT level, cloud certs, a framework) with zero extra data entry. Goals can target the current employer too — an internal promotion has stages like an application does.
+  - **Periodic check-ins** — Solid Queue and the mailer exist; a quarterly "update your resume, review your goals" nudge is one recurring job. Same dead-zone awareness as the calendar-aware follow-ups that shipped in `v1.4.0`.
 
-  This repositions the tracker from a search tool you abandon on success into a career
-  companion with a retention story — also the better portfolio argument, since every
-  sub-item reuses machinery that already exists (bytea storage, `wishlist`, prefill
-  extraction, recurring jobs) rather than demanding new infrastructure.
+  This repositions the tracker from a search tool you abandon on success into a career companion with a retention story — also the better portfolio argument, since every sub-item reuses machinery that already exists (bytea storage, `wishlist`, prefill extraction, recurring jobs) rather than demanding new infrastructure.
 
-  **Scope boundary (decided 2026-07-11):** career growth does **not** mean drifting into a
-  **networking CRM**, a **habit tracker**, or a **learning tracker**. Those are separate
-  products with mature incumbents, and a broad-shallow app is a worse portfolio piece than a
-  narrow-deep one. The admission test for any career-growth feature: **it must reuse the FSM,
-  the timeline, the prefill extraction, or the `positions` entity** — if it needs none of
-  them, it belongs in a different app. Concretely: contacts go no further than the
-  recruiter-channel item's `agencies` table (that models submission ownership, not
-  relationships); skills/certs/JLPT go no further than the gap list derived at prefill time
-  (a ranked "learn next", never course progress or streaks); check-ins stay a recurring
-  nudge, never a journaling habit loop.
+  **Scope boundary:** career growth does **not** mean drifting into a **networking CRM**, a **habit tracker**, or a **learning tracker**. Those are separate products with mature incumbents, and a broad-shallow app is a worse portfolio piece than a narrow-deep one. The admission test for any career-growth feature: **it must reuse the FSM, the timeline, the prefill extraction, or the `positions` entity** — if it needs none of them, it belongs in a different app. Concretely: contacts go no further than the recruiter-channel item's `agencies` table (that models submission ownership, not relationships); skills/certs/JLPT go no further than the gap list derived at prefill time (a ranked "learn next", never course progress or streaks); check-ins stay a recurring nudge, never a journaling habit loop.
 
-- [ ] **Career intelligence — benchmark reports from published surveys** *(post-`2.0.0`: its
-      headline view — comp percentile for the current position — needs `positions`. The
-      offer-comp-vs-median slice becomes buildable once `v1.7.0` lands the 年収 structure, but
-      the call — decided 2026-07-15, closing the "may ride a later `v1.8.x`" question — is to
-      keep it bundled here: no annual refresh-cost commitment before `positions` makes the full
-      view buildable.)* An in-app,
-      yearly-refreshed summary of reliable market sources: the [TokyoDev annual
-      survey](https://www.tokyodev.com/articles/the-2025-tokyodev-developer-survey-results-are-live)
-      first (2025: 989 respondents; median ¥9.5M, split by employer type, experience band, and
-      language use), with MHLW's official wage statistics (賃金構造基本統計調査) as the
-      government counterpart. The point is not the report — a static summary page would fail
-      the career-growth admission test — but the user's own data shown against it: comp
-      percentile for the current position (needs the `positions` entity), offer comp vs the
-      market median for their experience band at decision time, their Japanese level against
-      the language-requirement distribution of the roles they track. Implementation is a
-      versioned reference dataset — a seed file refreshed once per survey cycle, no scraping,
-      no pipeline — so the recurring cost is one data-entry session a year. Check each
-      source's licensing/attribution terms before shipping its numbers.
-- [ ] **Rirekisho + shokumu-keirekisho generation** *(deliberately parked past `2.0.0`; ship
-      both together, after it)*. Japanese applications conventionally want
-      two documents: 履歴書 (personal history, a standardised form) and 職務経歴書 (career history,
-      free-form). Generating both as PDFs from stored profile data would be the clearest possible
-      signal that the author understands the market. 履歴書 alone is a legal minor — additive, no
-      schema break — but its twin *is* a `positions` table rendered as prose, and shipping half
-      the pair, then maintaining a PDF toolchain for a year before the other half is even
-      buildable, is the worst version of the trade. **Format question answered (2026-07-11):**
-      the JIS template was indeed [withdrawn from the JIS standards in July
-      2020](https://japan-dev.com/blog/japanese-resume-rirekisho) (stationery stores still sell
-      "JIS-compliant" pads, but it is a dead standard), and MHLW published a recommended
-      replacement format (厚生労働省様式) designed for fair hiring — [gender optional; commute
-      time, dependents, and spouse fields
-      removed](https://www.gtalent.jp/blog/japanwork-en/job-hunting-en/rirekisho-en). **Target
-      the MHLW format** — it is the closest thing to official, and its fair-hiring rationale is
-      a good line in the README. **Carry cost (recorded 2026-07-11): the highest in this
-      file.** PDF generation in Rails is a known maintenance sink — toolchain choice, CJK
-      font embedding, layout drift — and the MHLW format itself can churn. Highest wow,
-      highest carry; scope it with both eyes open, the way the dark-mode decision
-      (`CHANGELOG.md` § Decisions) weighed its cost side. **Storage of the pair is parked with
-      it (decided 2026-07-15):** typed document slots for uploading a 履歴書/職務経歴書
-      alongside the English resume were considered for v1.x and deferred — more blobs on the
-      pg_dump-backed database (the same cost the no-version-history decision refused) for
-      documents whose real payoff arrives when generation ships. If uploads are wanted sooner,
-      the shape is a typed `documents` table reusing the `v1.4.4` filename machinery, not more
-      bytea columns.
+- [ ] **Career intelligence — benchmark reports from published surveys** *(post-`2.0.0`: its headline view — comp percentile for the current position — needs `positions`. The offer-comp-vs-median slice becomes buildable once `v1.7.0` lands the 年収 structure, but the settled call is to keep it bundled here: no annual refresh-cost commitment before `positions` makes the full view buildable.)* An in-app, yearly-refreshed summary of reliable market sources: the [TokyoDev annual survey](https://www.tokyodev.com/articles/the-2025-tokyodev-developer-survey-results-are-live) first (2025: 989 respondents; median ¥9.5M, split by employer type, experience band, and language use), with MHLW's official wage statistics (賃金構造基本統計調査) as the government counterpart. The point is not the report — a static summary page would fail the career-growth admission test — but the user's own data shown against it: comp percentile for the current position (needs the `positions` entity), offer comp vs the market median for their experience band at decision time, their Japanese level against the language-requirement distribution of the roles they track. Implementation is a versioned reference dataset — a seed file refreshed once per survey cycle, no scraping, no pipeline — so the recurring cost is one data-entry session a year. Check each source's licensing/attribution terms before shipping its numbers.
+- [ ] **Rirekisho + shokumu-keirekisho generation** *(deliberately parked past `2.0.0`; ship both together, after it)*. Japanese applications conventionally want two documents: 履歴書 (personal history, a standardised form) and 職務経歴書 (career history, free-form). Generating both as PDFs from stored profile data would be the clearest possible signal that the author understands the market. 履歴書 alone is a legal minor — additive, no schema break — but its twin *is* a `positions` table rendered as prose, and shipping half the pair, then maintaining a PDF toolchain for a year before the other half is even buildable, is the worst version of the trade. **Format question answered (2026-07-11):** the JIS template was indeed [withdrawn from the JIS standards in July 2020](https://japan-dev.com/blog/japanese-resume-rirekisho) (stationery stores still sell "JIS-compliant" pads, but it is a dead standard), and MHLW published a recommended replacement format (厚生労働省様式) designed for fair hiring — [gender optional; commute time, dependents, and spouse fields removed](https://www.gtalent.jp/blog/japanwork-en/job-hunting-en/rirekisho-en). **Target the MHLW format** — it is the closest thing to official, and its fair-hiring rationale is a good line in the README. **Carry cost (recorded 2026-07-11): the highest in this file.** PDF generation in Rails is a known maintenance sink — toolchain choice, CJK font embedding, layout drift — and the MHLW format itself can churn. Highest wow, highest carry; scope it with both eyes open, the way the dark-mode decision (`CHANGELOG.md` § Decisions) weighed its cost side. **Storage of the pair is parked with it:** typed document slots for uploading a 履歴書/職務経歴書 alongside the English resume were considered for v1.x and deferred — more blobs on the pg_dump-backed database (the same cost the no-version-history decision refused) for documents whose real payoff arrives when generation ships. If uploads are wanted sooner, the shape is a typed `documents` table reusing the `v1.4.4` filename machinery, not more bytea columns.
