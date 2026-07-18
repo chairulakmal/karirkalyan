@@ -4,6 +4,7 @@ import { useRouter } from "@/i18n/navigation";
 import { useState, useTransition } from "react";
 import { useTranslations } from "next-intl";
 import { Field } from "@/app/components/field";
+import type { SharedCapture } from "@/app/lib/share";
 
 // `/api/auth/session` answers with `{ error, code }`, mirroring the Rails API behind
 // it. Localization keys off the machine-readable `code`, with the status map as the
@@ -20,7 +21,7 @@ type FailureBody = { code?: string } | null;
 
 // One mode, no toggle: registration is closed, so signing in is the only thing
 // this form can do. See SPEC.md § Registration is closed.
-export function AuthForm() {
+export function AuthForm({ share = null }: { share?: SharedCapture | null }) {
   const t = useTranslations("auth");
   const tErrors = useTranslations("errors");
   const router = useRouter();
@@ -61,8 +62,19 @@ export function AuthForm() {
       setError(errorMessage(res.status, await failureBody(res), { 401: "invalidCredentials" }));
       return false;
     }
+    /* A share that bounced into sign-in continues to the capture form it was
+       aimed at; everything else lands on the dashboard. The destination is
+       built from the extracted capture only — a fixed internal path plus one
+       encoded parameter — never from a caller-supplied path, so this is not
+       an open ?next= redirect (SPEC.md § Installable app § Share target). */
+    const destination =
+      share === null
+        ? "/dashboard"
+        : share.kind === "url"
+          ? `/applications/new?url=${encodeURIComponent(share.url)}`
+          : `/applications/new?text=${encodeURIComponent(share.text)}`;
     startTransition(() => {
-      router.push("/dashboard");
+      router.push(destination);
       router.refresh();
     });
     return true;

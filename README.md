@@ -22,6 +22,7 @@ https://github.com/user-attachments/assets/862ca199-95e5-4e27-b9ef-ada7eb10a350
 - The daily follow-up digest goes out at 08:15 JST and skips weekends and Japanese national holidays, including New Year, Golden Week, and Obon. A skipped reminder is deferred to the next business day and sent exactly once, because the idempotency key is derived from the follow-up date, not the send date.
 - The product is bilingual, English and Japanese, and CI enforces catalog parity. A missing Japanese key lints, typechecks, and builds clean, so `npm run lint:i18n` diffs the two catalogs and fails the build on any key present in only one language.
 - One PostgreSQL instance carries everything: background jobs (Solid Queue), cache and rate-limit counters (Solid Cache), and uploaded PDFs (`bytea` columns). No Redis, no object store, no separate worker service.
+- Installed on Android, the app is a share target: share a posting from any app — LinkedIn, a mobile tab, a recruiter's email — and land in the new-application form with the AI pre-fill already reading it; a share with no link in it seeds the paste box instead. One install note: install once via **Chrome**, because share-sheet integration lives in the WebAPK and Brave has no minting server — a Brave install is a home-screen shortcut where the feature silently doesn't exist. Sharing *from* Brave works fine.
 
 ## Stack
 

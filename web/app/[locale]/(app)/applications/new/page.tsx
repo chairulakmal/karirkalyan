@@ -1,13 +1,28 @@
 import { getTranslations } from "next-intl/server";
 import { apiFetch } from "@/app/lib/api";
+import { capturedShare } from "@/app/lib/share";
 import type { TransitionTable } from "@/app/lib/types";
 import { NewApplicationForm } from "./new-application-form";
 
-export default async function NewApplicationPage() {
-  const [t, tableRes] = await Promise.all([
+export default async function NewApplicationPage({
+  searchParams,
+}: {
+  /* The share_target params (SPEC.md § Installable app § Share target). The
+     share sheet is one caller of a plain deep link — the page reads these on
+     any navigation, shared or hand-built. */
+  searchParams: Promise<{
+    url?: string | string[];
+    text?: string | string[];
+    title?: string | string[];
+  }>;
+}) {
+  const [params, t, tableRes] = await Promise.all([
+    searchParams,
     getTranslations("newApplication"),
     apiFetch<TransitionTable>("/transitions"),
   ]);
+
+  const share = capturedShare(params);
 
   /* Which states an application may be *created* in is an FSM fact, so it is
      fetched rather than copied (SPEC.md § The transition table). Degrades to
@@ -24,7 +39,7 @@ export default async function NewApplicationPage() {
           code: (chunks) => <code className="font-mono">{chunks}</code>,
         })}
       </p>
-      <NewApplicationForm entryStates={entryStates} />
+      <NewApplicationForm entryStates={entryStates} share={share} />
     </div>
   );
 }
