@@ -106,6 +106,14 @@ class Rack::Attack
     account_id(req)
   end
 
+  # The push-subscription write. Same shape as passkeys: POST only, DELETE
+  # gives capacity back and the public_key GET is a cheap read.
+  def self.push_subscription_write_user_id(req)
+    return unless req.post? && normalized_path(req) == "/api/v1/push_subscriptions"
+
+    account_id(req)
+  end
+
   throttle("auth/sign_in", limit: 5, period: 1.minute) do |req|
     req.ip if normalized_path(req) == "/api/v1/auth/sign_in" && req.post?
   end
@@ -168,6 +176,12 @@ class Rack::Attack
   # a throttle cannot bound a total — every window resets (SPEC.md § Passkeys).
   throttle("passkeys/write/minute", limit: 10, period: 1.minute) { |req| passkey_write_user_id(req) }
   throttle("passkeys/write/hour", limit: 30, period: 1.hour) { |req| passkey_write_user_id(req) }
+
+  # Push subscriptions: the same posture, the same numbers, the same division
+  # of labour — this bounds the rate, PushSubscription::MAX_PER_USER bounds
+  # the total (SPEC.md § Push notifications).
+  throttle("push_subscriptions/write/minute", limit: 10, period: 1.minute) { |req| push_subscription_write_user_id(req) }
+  throttle("push_subscriptions/write/hour", limit: 30, period: 1.hour) { |req| push_subscription_write_user_id(req) }
 
   self.throttled_responder = lambda do |request|
     match_data  = request.env["rack.attack.match_data"] || {}

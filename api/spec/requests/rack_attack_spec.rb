@@ -73,6 +73,32 @@ RSpec.describe "Rack::Attack throttling", type: :request, skip_n_plus_one: true 
     end
   end
 
+  describe "POST /api/v1/push_subscriptions — per-account cap" do
+    let(:user)  { create(:user) }
+    let(:token) { jwt_for(user) }
+    let(:body) do
+      { subscription: { endpoint: "https://push.example/one", keys: { p256dh: "k", auth: "a" } } }
+    end
+
+    before { allow(PushVapid).to receive_messages(configured?: true, public_key: "pub") }
+
+    it "returns 429 after 10 subscription writes in a minute, and leaves DELETE alone" do
+      10.times do
+        post "/api/v1/push_subscriptions", params: body,
+             headers: { "Authorization" => token }, as: :json
+        expect(response).to have_http_status(:created)
+      end
+
+      post "/api/v1/push_subscriptions", params: body,
+           headers: { "Authorization" => token }, as: :json
+      expect(response).to have_http_status(:too_many_requests)
+
+      delete "/api/v1/push_subscriptions", params: { endpoint: "https://push.example/one" },
+             headers: { "Authorization" => token }, as: :json
+      expect(response).to have_http_status(:no_content)
+    end
+  end
+
   describe "POST /api/v1/auth/sign_in — per-account brute-force backstop" do
     let(:body) { { user: { email: "victim@example.com", password: "wrongpass" } } }
 

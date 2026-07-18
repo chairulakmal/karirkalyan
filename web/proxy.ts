@@ -36,6 +36,10 @@ function buildCsp(nonce: string): string {
     "img-src 'self' data:",
     "font-src 'self'",
     "connect-src 'self'",
+    // Explicit because the fallback is script-src, whose 'strict-dynamic'
+    // *ignores* 'self' — and the static /sw.js has no nonce, so without this
+    // one token the service worker registration is silently blocked.
+    "worker-src 'self'",
     "frame-ancestors 'none'",
     "base-uri 'self'",
     "form-action 'self'",
@@ -124,10 +128,13 @@ export const config = {
   // Run on every route except Next internals, api routes, static assets, and
   // crawler metadata (robots/sitemap/llms.txt must stay reachable unauthenticated).
   // The api route handlers manage their own auth (they need to see /api/auth/* unauth).
+  // sw.js is excluded for a quieter reason: the browser re-fetches a registered
+  // service worker on its own schedule, sometimes with an expired session, and
+  // a 307-to-sign-in answer is a failed worker update (SPEC.md § The service worker).
   //
   // No locale entry is needed: this excludes by leading path segment, and `/ja`
   // collides with none of them. The crawler files are never locale-prefixed.
   matcher: [
-    "/((?!api|_next/static|_next/image|favicon.ico|manifest.webmanifest|robots.txt|sitemap.xml|llms.txt|brand/|.*\\.svg$|.*\\.png$).*)",
+    "/((?!api|_next/static|_next/image|favicon.ico|manifest.webmanifest|robots.txt|sitemap.xml|llms.txt|sw.js|brand/|.*\\.svg$|.*\\.png$).*)",
   ],
 };

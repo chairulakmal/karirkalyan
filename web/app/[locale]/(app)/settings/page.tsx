@@ -2,10 +2,11 @@ import { getTranslations } from "next-intl/server";
 import { apiFetch } from "@/app/lib/api";
 import type { Passkey } from "@/app/lib/types";
 import { PasskeysManager } from "./passkeys-manager";
+import { PushManager } from "./push-manager";
 
-// Settings — passkey enrollment and management (SPEC.md § Auth flow,
-// § Passkeys). Desktop-first by design: a passkey created here syncs through
-// the password manager to the phone, so there is no phone enrollment flow.
+// Settings — passkey enrollment (SPEC.md § Auth flow, § Passkeys) and the
+// push-notification toggle (§ The service worker), which is the one surface
+// allowed to fire the permission prompt.
 export default async function SettingsPage() {
   const t = await getTranslations("settings");
   const res = await apiFetch<Passkey[]>("/passkeys");
@@ -23,6 +24,12 @@ export default async function SettingsPage() {
         ) : (
           <p className="mt-4 text-sm text-danger">{res.error}</p>
         )}
+      </section>
+
+      <section className="mt-6 border border-dune p-5">
+        <h2 className="text-lg">{t("pushTitle")}</h2>
+        <p className="mt-2 text-sm leading-relaxed text-ink-soft">{t("pushDescription")}</p>
+        <PushManager />
       </section>
     </div>
   );

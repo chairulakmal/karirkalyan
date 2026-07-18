@@ -676,6 +676,85 @@ paths:
               required:
               - challenge
               - credential
+  "/api/v1/push_subscriptions/public_key":
+    get:
+      summary: The VAPID public key the browser subscribes with
+      tags:
+      - Push
+      security:
+      - bearerAuth: []
+      description: |
+        Served rather than duplicated into a web-side env var, so the two services
+        cannot drift (SPEC.md § Push notifications). 503 push_unavailable when the
+        server has no VAPID keys — the rest of the app keeps working.
+      responses:
+        '200':
+          description: the public key
+        '503':
+          description: push not configured on this server
+  "/api/v1/push_subscriptions":
+    post:
+      summary: Register this browser's push subscription
+      tags:
+      - Push
+      security:
+      - bearerAuth: []
+      parameters: []
+      responses:
+        '201':
+          description: subscription registered
+        '422':
+          description: validation failed — blank keys, or the per-user ceiling
+        '401':
+          description: not authenticated
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                subscription:
+                  type: object
+                  description: The browser PushSubscription, serialized with toJSON()
+                  properties:
+                    endpoint:
+                      type: string
+                    keys:
+                      type: object
+                      properties:
+                        p256dh:
+                          type: string
+                        auth:
+                          type: string
+                      required:
+                      - p256dh
+                      - auth
+                  required:
+                  - endpoint
+                  - keys
+              required:
+              - subscription
+    delete:
+      summary: Unsubscribe this browser — idempotent
+      tags:
+      - Push
+      security:
+      - bearerAuth: []
+      parameters: []
+      responses:
+        '204':
+          description: unsubscribed — a 204 even for an endpoint the server never
+            knew, because the state the caller asked for is the state that obtains
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                endpoint:
+                  type: string
+              required:
+              - endpoint
   "/api/v1/transitions":
     get:
       summary: Get the FSM's effective transition table

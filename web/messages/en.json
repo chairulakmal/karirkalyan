@@ -86,7 +86,8 @@
       "prefill_unreachable": "That page couldn't be reached. Check it opens in your browser, then try again.",
       "prefill_failed": "No job posting could be read from that.",
       "prefill_paste_too_long": "That posting is too long to read in one go, even once its formatting is stripped. Trim it and try again.",
-      "prefill_unavailable": "URL pre-fill is temporarily unavailable."
+      "prefill_unavailable": "URL pre-fill is temporarily unavailable.",
+      "push_unavailable": "Push notifications aren't set up on the server right now."
     },
     "field": {
       "company_blank": "Company is required.",
@@ -97,7 +98,8 @@
       "cover_letter_too_long": "The cover letter must be under 1 MB.",
       "cover_letter_not_a_pdf": "The cover letter must be a PDF.",
       "base_too_many_applications": "Your account is full. Delete an application to add another one.",
-      "base_too_many_passkeys": "Your account has reached its passkey limit. Remove one to add another."
+      "base_too_many_passkeys": "Your account has reached its passkey limit. Remove one to add another.",
+      "base_too_many_push_subscriptions": "Your account has reached its device limit for notifications. Disable them on another device to add this one."
     }
   },
   "home": {
@@ -270,7 +272,17 @@
     "remove": "Remove",
     "removing": "Removing…",
     "confirmRemove": "Remove this passkey? You can add it again later.",
-    "cancel": "Cancel"
+    "cancel": "Cancel",
+    "pushTitle": "Notifications",
+    "pushDescription": "Get the morning follow-up digest as a notification on this device, alongside the email. Nothing is asked until you press the button, and you can turn it off here any time.",
+    "pushEnable": "Enable notifications on this device",
+    "pushEnabling": "Enabling…",
+    "pushDisable": "Turn off",
+    "pushDisabling": "Turning off…",
+    "pushEnabled": "This device receives the follow-up digest.",
+    "pushDenied": "Notifications are blocked for this site in your browser. To enable them, allow notifications in your browser's site settings, then come back here.",
+    "pushUnsupported": "This browser doesn't support push notifications. The email digest keeps working.",
+    "pushFailed": "Notifications couldn't be set up. Try again."
   },
   "dashboard": {
     "eyebrow": "Overview",

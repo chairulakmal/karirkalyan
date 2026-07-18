@@ -48,6 +48,13 @@ Rails.application.routes.draw do
         end
       end
 
+      # Web Push subscriptions (SPEC.md § Push notifications). DELETE takes the
+      # endpoint in the body rather than an id — the browser knows its endpoint,
+      # not our row id — so it is a collection route, not a member one.
+      get    "push_subscriptions/public_key", to: "push_subscriptions#public_key"
+      post   "push_subscriptions",            to: "push_subscriptions#create"
+      delete "push_subscriptions",            to: "push_subscriptions#destroy"
+
       get "exports/applications", to: "exports#applications"
       get "exports/account",      to: "exports#account"
 
