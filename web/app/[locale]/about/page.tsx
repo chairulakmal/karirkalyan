@@ -4,6 +4,7 @@ import { Link } from "@/i18n/navigation";
 import { LocaleSwitcher } from "@/app/components/locale-switcher";
 import { SiteFooter } from "@/app/components/site-footer";
 import { Mark, Wordmark } from "@/app/components/wordmark";
+import { Phrase } from "@/app/components/phrase";
 import { REPO_URL } from "@/app/lib/links";
 
 export async function generateMetadata({
@@ -57,7 +58,9 @@ export default async function About() {
       <main className="px-6 py-20 md:py-24">
         <div className="mx-auto w-full max-w-2xl">
           <p className="kk-label">{t("eyebrow")}</p>
-          <h1 className="mt-4 text-4xl leading-tight md:text-5xl">{t("title")}</h1>
+          <h1 className="mt-4 text-4xl leading-tight md:text-5xl">
+            <Phrase>{t("title")}</Phrase>
+          </h1>
           <p className="mt-6 text-lg leading-relaxed text-ink-soft">{t("lede")}</p>
 
           {/* The lede promises four decisions, so the page counts them off. The
@@ -71,7 +74,9 @@ export default async function About() {
               >
                 <p className="kk-num md:pt-2.5">{String(i + 1).padStart(2, "0")}</p>
                 <div className="mt-3 md:mt-0">
-                  <h2 className="text-2xl leading-snug">{t(`${section}Title`)}</h2>
+                  <h2 className="text-2xl leading-snug">
+                    <Phrase>{t(`${section}Title`)}</Phrase>
+                  </h2>
                   <p className="mt-4 leading-relaxed text-ink-soft">
                     {t.rich(`${section}Body`, rich)}
                   </p>
@@ -81,7 +86,9 @@ export default async function About() {
           </ol>
 
           <section className="border-t border-dune pt-10">
-            <h2 className="text-2xl leading-snug">{t("closingTitle")}</h2>
+            <h2 className="text-2xl leading-snug">
+              <Phrase>{t("closingTitle")}</Phrase>
+            </h2>
             <p className="mt-4 text-ink-soft">{t("closingBody")}</p>
 
             <div className="mt-8 flex flex-wrap items-center gap-3">

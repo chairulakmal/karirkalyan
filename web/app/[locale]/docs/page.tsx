@@ -4,6 +4,7 @@ import { Link } from "@/i18n/navigation";
 import { LocaleSwitcher } from "@/app/components/locale-switcher";
 import { SiteFooter } from "@/app/components/site-footer";
 import { Mark, Wordmark } from "@/app/components/wordmark";
+import { Phrase } from "@/app/components/phrase";
 import { REPO_URL, API_DOCS_URL } from "@/app/lib/links";
 
 export async function generateMetadata({
@@ -88,21 +89,29 @@ export default async function Docs() {
       <main className="px-6 py-20 md:py-24">
         <div className="mx-auto w-full max-w-2xl">
           <p className="kk-label">{t("eyebrow")}</p>
-          <h1 className="mt-4 text-4xl leading-tight md:text-5xl">{t("title")}</h1>
+          <h1 className="mt-4 text-4xl leading-tight md:text-5xl">
+            <Phrase>{t("title")}</Phrase>
+          </h1>
           <p className="mt-6 text-lg leading-relaxed text-ink-soft">{t("lede")}</p>
 
           <section className="mt-16">
-            <h2 className="text-2xl leading-snug">{t("authTitle")}</h2>
+            <h2 className="text-2xl leading-snug">
+              <Phrase>{t("authTitle")}</Phrase>
+            </h2>
             <p className="mt-4 text-ink-soft">{t.rich("authBody", rich)}</p>
           </section>
 
           <section className="mt-14">
-            <h2 className="text-2xl leading-snug">{t("scopeTitle")}</h2>
+            <h2 className="text-2xl leading-snug">
+              <Phrase>{t("scopeTitle")}</Phrase>
+            </h2>
             <p className="mt-4 text-ink-soft">{t.rich("scopeBody", rich)}</p>
           </section>
 
           <section className="mt-14">
-            <h2 className="text-2xl leading-snug">{t("errorsTitle")}</h2>
+            <h2 className="text-2xl leading-snug">
+              <Phrase>{t("errorsTitle")}</Phrase>
+            </h2>
             <p className="mt-4 text-ink-soft">{t.rich("errorsBody", rich)}</p>
 
             <div className="mt-6 overflow-x-auto">
@@ -130,12 +139,16 @@ export default async function Docs() {
           </section>
 
           <section className="mt-14">
-            <h2 className="text-2xl leading-snug">{t("paginationTitle")}</h2>
+            <h2 className="text-2xl leading-snug">
+              <Phrase>{t("paginationTitle")}</Phrase>
+            </h2>
             <p className="mt-4 text-ink-soft">{t.rich("paginationBody", rich)}</p>
           </section>
 
           <section className="mt-14">
-            <h2 className="text-2xl leading-snug">{t("endpointsTitle")}</h2>
+            <h2 className="text-2xl leading-snug">
+              <Phrase>{t("endpointsTitle")}</Phrase>
+            </h2>
 
             <div className="mt-6 overflow-x-auto">
               <table className="w-full border-collapse text-left text-sm">
@@ -161,7 +174,9 @@ export default async function Docs() {
           </section>
 
           <section className="mt-20 border-t border-dune pt-10">
-            <h2 className="text-2xl leading-snug">{t("swaggerTitle")}</h2>
+            <h2 className="text-2xl leading-snug">
+              <Phrase>{t("swaggerTitle")}</Phrase>
+            </h2>
             <p className="mt-4 text-ink-soft">{t("swaggerBody")}</p>
 
             <div className="mt-8 flex flex-wrap items-center gap-3">

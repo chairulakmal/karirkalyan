@@ -4,6 +4,7 @@ import { notFound } from "next/navigation";
 import { apiFetch } from "@/app/lib/api";
 import { formatDate, prettyUrl, statusBadgeClass, timeAgo } from "@/app/lib/format";
 import type { ApplicationWithDetail, TransitionTable } from "@/app/lib/types";
+import { Phrase } from "@/app/components/phrase";
 import { StatusHelp } from "@/app/components/status-help";
 import { TransitionButtons } from "./transition-buttons";
 import { FileUpload } from "./file-upload";
@@ -57,7 +58,9 @@ export default async function ApplicationDetailPage({
               {ts(`label.${app.status}`)}
             </span>
           </div>
-          <p className="mt-1 text-ink-soft">{app.role}</p>
+          <p className="mt-1 text-ink-soft">
+            <Phrase>{app.role}</Phrase>
+          </p>
           {app.url ? (
             <a
               href={app.url}
