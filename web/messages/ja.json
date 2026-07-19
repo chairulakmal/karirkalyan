@@ -409,7 +409,7 @@
     "compRange": "{min}〜{max}万円",
     "compMinMan": "年収（下限・万円）",
     "compMaxMan": "年収（上限・万円）",
-    "compMonthsGuaranteed": "保証月数",
+    "compMonthsGuaranteed": "保証給与（月数）",
     "compMonthsVariable": "業績連動賞与（月数）"
   },
   "transitions": {
@@ -489,7 +489,7 @@
       "agencyHint": "推薦してくれるエージェント。最初に企業へ推薦したエージェントがその候補を1年以上「保有」するため、記録しておくと二重推薦の警告に使われます。",
       "compMin": "年収（下限・万円）",
       "compMax": "年収（上限・万円）",
-      "monthsGuaranteed": "保証月数",
+      "monthsGuaranteed": "保証給与（月数）",
       "monthsVariable": "業績連動賞与（月数）",
       "compHint": "日本のオファーは賞与込みの年収で提示され、基本給の◯ヶ月分と表現されることが多いです（基本給12ヶ月+保証賞与2ヶ月=14）。同じ600万でも、保証されている割合は大きく異なります。"
     },

@@ -409,8 +409,8 @@
     "compRange": "{min}–{max}万円",
     "compMinMan": "Annual comp from (万円)",
     "compMaxMan": "Annual comp to (万円)",
-    "compMonthsGuaranteed": "Guaranteed months",
-    "compMonthsVariable": "Performance-tied months"
+    "compMonthsGuaranteed": "Guaranteed salary (months)",
+    "compMonthsVariable": "Performance-tied bonus (months)"
   },
   "transitions": {
     "goTo": "→ {label}",
@@ -489,8 +489,8 @@
       "agencyHint": "The agency submitting you. The first agency to submit you to a company owns that candidacy for a year or more, so recording it is what powers the duplicate-submission warning.",
       "compMin": "Annual comp from (万円)",
       "compMax": "Annual comp to (万円)",
-      "monthsGuaranteed": "Guaranteed months",
-      "monthsVariable": "Performance-tied months",
+      "monthsGuaranteed": "Guaranteed salary (months)",
+      "monthsVariable": "Performance-tied bonus (months)",
       "compHint": "Japanese offers quote 年収 as a yearly figure that folds in bonus, often as months of base: 12 months plus a 2-month guaranteed bonus is 14. Two 600万 offers with the same total can differ a lot in how much of it is guaranteed."
     },
     "ownership": {
