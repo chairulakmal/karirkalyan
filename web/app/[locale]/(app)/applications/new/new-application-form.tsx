@@ -433,6 +433,10 @@ export function NewApplicationForm({
           </div>
         ) : null}
         <Row>
+          {/* No numeric placeholders on any comp input: beside an AI-fill
+              feature, a grey "600" in a number field reads as a value the
+              prefill wrote, and an empty field is the only honest way to say
+              the posting stated nothing. Caught by exactly that misreading. */}
           <Field
             name="comp_annual_min_man"
             label={t("market.compMin")}
@@ -441,7 +445,6 @@ export function NewApplicationForm({
             step="1"
             value={compMin}
             onChange={(e) => setCompMin(e.target.value)}
-            placeholder="600"
           />
           <Field
             name="comp_annual_max_man"
@@ -451,7 +454,6 @@ export function NewApplicationForm({
             step="1"
             value={compMax}
             onChange={(e) => setCompMax(e.target.value)}
-            placeholder="900"
           />
         </Row>
         <Row>
@@ -463,7 +465,6 @@ export function NewApplicationForm({
             step="0.5"
             value={monthsGuaranteed}
             onChange={(e) => setMonthsGuaranteed(e.target.value)}
-            placeholder="14"
           />
           <Field
             name="comp_months_variable"
@@ -473,7 +474,6 @@ export function NewApplicationForm({
             step="0.5"
             value={monthsVariable}
             onChange={(e) => setMonthsVariable(e.target.value)}
-            placeholder="2"
           />
         </Row>
         <p className="text-xs text-ink-soft">{t("market.compHint")}</p>
