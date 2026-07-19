@@ -30,7 +30,7 @@ type Props = {
   compMonthsVariable: number | null;
 };
 
-// Yen from the API, 万円 on screen and in the inputs — the unit postings use.
+// Yen from the API, 万円 on screen and in the inputs (the unit postings use).
 function yenToMan(yen: number | null): string {
   return yen === null ? "" : String(yen / 10_000);
 }
@@ -120,7 +120,7 @@ export function DetailsEditor(props: Props) {
           />
           <Row label={t("created")} value={formatDate(props.createdAt, locale)} />
           <Row label={t("channel")} value={props.channel ? tc(props.channel) : t("blank")} />
-          {/* Only meaningful on the agent channel, so only shown there — a
+          {/* Only meaningful on the agent channel, so only shown there: a
               "(none)" agency row on a direct application is noise. */}
           {props.channel === "agent" ? (
             <Row label={t("agency")} value={props.agencyName ?? t("blank")} />

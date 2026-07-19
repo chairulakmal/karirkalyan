@@ -87,7 +87,7 @@ module Applications
 
     # `status`'s exact contract on Application::JAPANESE_LEVELS: OR within the
     # list, AND against the rest, and a list the server understands none of has
-    # told it nothing. Matches the *recorded* value only — `none` selects
+    # told it nothing. Matches the *recorded* value only: `none` selects
     # postings recorded as requiring no Japanese, not rows with a null column;
     # null means unrecorded, and there is deliberately no query for it.
     def filter_by_japanese_level(relation)

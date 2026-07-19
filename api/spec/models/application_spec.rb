@@ -157,7 +157,7 @@ RSpec.describe Application do
     end
   end
 
-  # The Japan-market columns (v1.8.0). All nullable — a blank record must stay
+  # The Japan-market columns (v1.8.0). All nullable: a blank record must stay
   # valid, or the standing additive-migration rule is broken at the model layer.
   describe "the market columns" do
     it "accepts a record with none of them set" do
@@ -224,7 +224,7 @@ RSpec.describe Application do
     it "excludes other companies, other channels, and never-submitted rows" do
       submission(company: "Cookpad")
       create(:application, :applied, user: user, company: "Mercari", channel: "direct")
-      # wishlist: no applied_at, never submitted — no window starts.
+      # wishlist: no applied_at, never submitted, so no window starts.
       create(:application, user: user, company: "Mercari", channel: "agent", agency: agency)
 
       expect(user.applications.open_ownership_submissions("Mercari")).to be_empty

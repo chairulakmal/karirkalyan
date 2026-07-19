@@ -224,7 +224,7 @@ export function ApplicationsList({
             onChange={(value) => changeSource(value || null)}
           />
           {/* Deliberately the dumbest filter here: the fixed taxonomy, no counts
-              and no faceting — counts would need the level in the facets
+              and no faceting, because counts would need the level in the facets
               payload, whose next reshape v1.10.0's stat-cards item already owns
               (SPEC.md § Dashboard filters). A level with no rows just matches
               nothing, which the no-matches state renders honestly. */}

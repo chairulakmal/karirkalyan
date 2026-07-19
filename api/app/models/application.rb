@@ -14,7 +14,7 @@ class Application < ApplicationRecord
   # The posting's Japanese requirement, on the market's own taxonomy (TokyoDev
   # and Japan Dev tag every posting with these buckets). What the posting asks,
   # not what the user holds. Null means unrecorded, and there is no filter
-  # value for it — `none` is a recorded "no Japanese required".
+  # value for it; `none` is a recorded "no Japanese required".
   JAPANESE_LEVELS = %w[none conversational business n2 n1].freeze
 
   # The ceiling that bounds storage. A Rack::Attack throttle cannot do this job — it bounds a
@@ -44,7 +44,7 @@ class Application < ApplicationRecord
             numericality: { greater_than: 0, only_integer: true }, allow_nil: true
   validates :comp_months_guaranteed, :comp_months_variable,
             numericality: { greater_than_or_equal_to: 0 }, allow_nil: true
-  # The same cap the prefill pipeline truncates extraction at — one constant,
+  # The same cap the prefill pipeline truncates extraction at, one constant
   # owned by the service; this only stops a client persisting past it.
   validates :posting_snapshot,
             length: { maximum: Applications::UrlPrefillService::MAX_TEXT_CHARS },

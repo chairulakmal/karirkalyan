@@ -93,12 +93,12 @@ export function NewApplicationForm({
   const [monthsVariable, setMonthsVariable] = useState("");
 
   // The stripped posting text prefill returned; submitted as posting_snapshot.
-  // Capture at prefill, persistence on create — never shown as a form field.
+  // Capture at prefill, persistence on create; never shown as a form field.
   const [postingText, setPostingText] = useState("");
 
   /* The ownership warning: open agency windows on the typed company, checked
      when the field settles (blur or prefill) rather than per keystroke. A
-     failed check renders as nothing — this is a warning surface, and a form
+     failed check renders as nothing: this is a warning surface, and a form
      that errors because a warning could not be fetched has the priorities
      backwards. */
   const [ownership, setOwnership] = useState<OwnershipCheck | null>(null);
@@ -146,7 +146,7 @@ export function NewApplicationForm({
     if (result.channel) setChannel(result.channel);
     if (result.agency) setAgencyName(result.agency);
     if (result.japanese_level) setJapaneseLevel(result.japanese_level);
-    // Yen from the API, 万円 in the form — the one place the conversion runs
+    // Yen from the API, 万円 in the form; the one place the conversion runs
     // this direction.
     if (result.comp_annual_min_yen) setCompMin(String(result.comp_annual_min_yen / 10_000));
     if (result.comp_annual_max_yen) setCompMax(String(result.comp_annual_max_yen / 10_000));
@@ -320,7 +320,7 @@ export function NewApplicationForm({
         />
       </Row>
       {/* Fires on ANY second submission while a window is open, whatever channel
-          this application uses — the fee rule bites regardless. Warning only:
+          this application uses (the fee rule bites regardless). Warning only:
           nothing blocks, the user makes the call knowing the rule exists. */}
       {ownership && ownership.submissions.length > 0 ? (
         <div role="alert" className="border border-saffron bg-saffron-2/20 p-4 text-sm">
@@ -375,7 +375,7 @@ export function NewApplicationForm({
         />
       ) : null}
 
-      {/* The Japan-market fields. All optional — prefill fills what the posting
+      {/* The Japan-market fields. All optional: prefill fills what the posting
           states, and an untouched section costs nothing to submit. */}
       <fieldset className="space-y-4 border border-dune bg-sand/30 p-4">
         <legend className="kk-label px-1">

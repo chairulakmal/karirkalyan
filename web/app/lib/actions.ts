@@ -402,7 +402,7 @@ function pickApplicationFields(formData: FormData): ApplicationInput {
 }
 
 // The form quotes 年収 in 万円 (the unit postings use); the API stores yen.
-// Null for blank, non-numeric, and non-positive alike — the same normalising
+// Null for blank, non-numeric, and non-positive alike: the same normalising
 // contract the API applies to what Claude returns.
 function manToYen(raw: string): number | null {
   const man = positiveNumber(raw);

@@ -9,7 +9,7 @@ RSpec.configure do |config|
       info: {
         title: "KarirKalyan API",
         version: "v1",
-        description: "Job application tracker API — Rails 8, Devise + JWT"
+        description: "Job application tracker API: Rails 8, Devise + JWT"
       },
       # The production server is the *API* service, not kk.chairulakmal.com — that is the
       # Next.js app, which has no /api/v1 routes, so "Try it out" against it 404s.

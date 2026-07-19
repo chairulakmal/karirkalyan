@@ -106,7 +106,7 @@ RSpec.describe Applications::ListQuery do
     end
   end
 
-  # status's exact contract on Application::JAPANESE_LEVELS — OR within the
+  # status's exact contract on Application::JAPANESE_LEVELS: OR within the
   # list, unknown members dropped, nothing left means unfiltered.
   describe "the japanese_level filter" do
     let!(:none)       { application_at(0, japanese_level: "none") }

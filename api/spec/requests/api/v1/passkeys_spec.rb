@@ -65,7 +65,7 @@ RSpec.describe "Passkeys", type: :request do
       produces "application/json"
       security [ bearerAuth: [] ]
 
-      response "200", "the user's passkeys — id, nickname, created_at, last_used_at only" do
+      response "200", "the user's passkeys: id, nickname, created_at, last_used_at only" do
         let(:Authorization) { token }
         before { create(:credential, user: user, nickname: "ubuntu") }
 
@@ -130,7 +130,7 @@ RSpec.describe "Passkeys", type: :request do
         run_test! { expect(user.credentials.count).to eq(0) }
       end
 
-      response "404", "another user's passkey — scoped, never a 403" do
+      response "404", "another user's passkey: scoped, never a 403" do
         let(:Authorization) { token }
         let(:id) { create(:credential).id }
         run_test!
@@ -143,7 +143,7 @@ RSpec.describe "Passkeys", type: :request do
       tags "Auth"
       produces "application/json"
       description <<~DESC
-        Assertion options for passkey sign-in — unauthenticated, usernameless. The
+        Assertion options for passkey sign-in: unauthenticated, usernameless. The
         allow-list is empty (credentials are discoverable; the browser's picker chooses).
         The challenge is single-use and expires in five minutes.
       DESC
@@ -173,7 +173,7 @@ RSpec.describe "Passkeys", type: :request do
         required: %w[challenge credential]
       }
 
-      response "200", "signed in — JWT returned in Authorization header" do
+      response "200", "signed in; JWT returned in Authorization header" do
         let(:body) do
           enroll_passkey!(client: fake_client, headers: { "Authorization" => token })
           post "/api/v1/auth/passkey/options"

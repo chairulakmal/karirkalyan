@@ -69,7 +69,7 @@ RSpec.describe "Dashboard", type: :request do
             },
             user: {
               type: :object,
-              description: "The GET /me payload, folded in — the dashboard was fetching both",
+              description: "The GET /me payload, folded in; the dashboard was fetching both",
               required: %w[id email created_at updated_at],
               properties: {
                 id:         { type: :integer },
@@ -103,7 +103,7 @@ RSpec.describe "Dashboard", type: :request do
       # rswag folds same-code responses into one OpenAPI entry, and the last
       # description wins — so this one has to read as the endpoint's 200, not just
       # as this example's scenario.
-      response "200", "stats aggregation — by_status is empty and total is 0 for a user with no applications" do
+      response "200", "stats aggregation; by_status is empty and total is 0 for a user with no applications" do
         let(:Authorization) { jwt_for(user) }
 
         run_test! do |response|

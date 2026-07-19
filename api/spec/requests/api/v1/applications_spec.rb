@@ -23,14 +23,14 @@ RSpec.describe "Applications", type: :request do
       # blocks only publish it, since rswag emits nothing the spec does not
       # declare.
       parameter name: :status, in: :query, required: false, schema: { type: :string },
-                description: "Comma-separated states, e.g. `applied,offer` — any member matches. " \
+                description: "Comma-separated states, e.g. `applied,offer`; any member matches. " \
                              "Unknown states are dropped, and a list left with none is **unfiltered, " \
                              "not empty**: a query the server understood nothing of has told it nothing, " \
                              "so it must not answer with a blank page dressed as a real result. There is " \
                              "deliberately no query meaning \"show nothing\"."
       parameter name: :company, in: :query, required: false, schema: { type: :string },
                 description: "Exact company name, case-sensitive. Unlike `status`, a name no application " \
-                             "carries is a real filter and legitimately matches nothing — but blank or " \
+                             "carries is a real filter and legitimately matches nothing, but blank or " \
                              "whitespace-only is ignored, like `status`, and returns everything."
       parameter name: :source, in: :query, required: false, schema: { type: :string },
                 description: "Job board, matched as a case-insensitive substring of the URL (e.g. " \
@@ -38,12 +38,12 @@ RSpec.describe "Applications", type: :request do
                              "with no link. Like `company`, an unmatched value legitimately returns nothing, " \
                              "while blank or whitespace-only is ignored."
       parameter name: :japanese_level, in: :query, required: false, schema: { type: :string },
-                description: "Comma-separated levels from `none,conversational,business,n2,n1` — any member " \
+                description: "Comma-separated levels from `none,conversational,business,n2,n1`; any member " \
                              "matches, with `status`'s exact contract: unknown members are dropped and a list " \
-                             "left with none is unfiltered, not empty. Matches the recorded value only — " \
+                             "left with none is unfiltered, not empty. Matches the recorded value only: " \
                              "`none` means a recorded \"no Japanese required\", never a null column."
       parameter name: :after, in: :query, required: false, schema: { type: :string },
-                description: "Cursor from a previous page's `meta.next_cursor` — an opaque Base64 " \
+                description: "Cursor from a previous page's `meta.next_cursor`: an opaque Base64 " \
                              "timestamp. A malformed cursor returns the first page."
       parameter name: :limit, in: :query, required: false,
                 schema: { type: :integer, minimum: 1, maximum: 100, default: 10 },
@@ -95,7 +95,7 @@ RSpec.describe "Applications", type: :request do
               company:      { type: :string, example: "Basecamp" },
               role:         { type: :string, example: "Rails Engineer" },
               status:       { type: :string, enum: ApplicationFSM::ENTRY_STATES, example: "applied",
-                              description: "Initial state — one of the entry states (defaults to draft). Later changes go through /transition." },
+                              description: "Initial state, one of the entry states (defaults to draft). Later changes go through /transition." },
               applied_at:   { type: :string, format: "date-time",
                               description: "Optional; only used when status is 'applied'. Backdates applied_at (defaults to now)." },
               url:          { type: :string },
@@ -106,7 +106,7 @@ RSpec.describe "Applications", type: :request do
               agency_name:  { type: :string, nullable: true,
                               description: "Agency name, resolved server-side to a per-user agencies row (created on first use). Blank clears the agency; the key absent leaves it untouched." },
               japanese_level: { type: :string, enum: Application::JAPANESE_LEVELS, nullable: true,
-                                description: "The posting's Japanese requirement — what it asks, not what the user holds." },
+                                description: "The posting's Japanese requirement: what it asks, not what the user holds." },
               comp_annual_min_yen: { type: :integer, nullable: true, description: "Quoted 年収, low end, in yen." },
               comp_annual_max_yen: { type: :integer, nullable: true, description: "High end; null when one figure is quoted." },
               comp_months_guaranteed: { type: :number, nullable: true, description: "Months of base guaranteed per year (12 + guaranteed bonus)." },
@@ -163,7 +163,7 @@ RSpec.describe "Applications", type: :request do
             "channel" => "agent", "japanese_level" => "business",
             "comp_annual_min_yen" => 6_000_000, "comp_months_guaranteed" => 14.0
           )
-          # The snapshot is persisted but excluded from as_json — #show merges it.
+          # The snapshot is persisted but excluded from as_json; #show merges it.
           expect(payload).not_to have_key("posting_snapshot")
 
           record = user.applications.order(:created_at).last
@@ -281,10 +281,10 @@ RSpec.describe "Applications", type: :request do
                   "`window_months` (~12–18 months; this app assumes 18, the conservative end), and the " \
                   "fee follows the owner even if the candidate later reaches the company another way. " \
                   "A submission is an application to the company with `channel = agent` whose " \
-                  "`applied_at` is inside the window. A warning surface only — nothing blocks."
+                  "`applied_at` is inside the window. A warning surface only; nothing blocks."
       parameter name: :company, in: :query, required: false, schema: { type: :string },
                 description: "Exact company name, the list filter's matching rule. Blank returns an " \
-                             "empty list rather than erroring — the form calls this as the user works."
+                             "empty list rather than erroring, because the form calls this as the user works."
 
       response "200", "open-window agent submissions for the company" do
         let(:Authorization) { jwt_for(user) }
@@ -363,7 +363,7 @@ RSpec.describe "Applications", type: :request do
           text: {
             type:        :string,
             example:     "Backend Engineer at Mercari. Tokyo, full-time. Ruby, Go…",
-            description: "The posting text, already fetched by the user — use when `url` " \
+            description: "The posting text, already fetched by the user; use when `url` " \
                          "came back `prefill_blocked` or `prefill_failed`. Skips the fetch " \
                          "and runs the same extraction. Must be under 12,000 characters " \
                          "(`MAX_TEXT_CHARS`) **once stripped to text**, which is far more " \
@@ -581,7 +581,7 @@ RSpec.describe "Applications", type: :request do
         let(:id)            { record.id }
         run_test! do |response|
           payload = JSON.parse(response.body)
-          # Merged by #show and only #show — the list excludes the snapshot the
+          # Merged by #show and only #show: the list excludes the snapshot the
           # way it excludes the blobs, and never joins the agency.
           expect(payload["agency_name"]).to eq("Robert Half")
           expect(payload["posting_snapshot"]).to eq("stripped posting text")
@@ -645,7 +645,7 @@ RSpec.describe "Applications", type: :request do
         run_test!
       end
 
-      response "409", "stale record — another request updated first; refresh and retry" do
+      response "409", "stale record: another request updated first; refresh and retry" do
         let(:Authorization) { jwt_for(user) }
         let(:record)           { create(:application, :applied, user: user) }
         let(:id)            { record.id }

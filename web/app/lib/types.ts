@@ -17,7 +17,7 @@ export type Status =
   | "archived";
 
 // The Japan-market taxonomies (v1.8.0). Fixed vocabularies mirroring
-// Application::CHANNELS / JAPANESE_LEVELS per this file's header rule — not
+// Application::CHANNELS / JAPANESE_LEVELS per this file's header rule, not
 // FSM sets, which are fetched from /transitions and never mirrored.
 export type Channel = "direct" | "agent" | "referral";
 export const CHANNELS: readonly Channel[] = ["direct", "agent", "referral"];
@@ -102,7 +102,7 @@ export type ApplicationWithDetail = Application & {
   posting_snapshot: string | null;
 };
 
-// GET /applications/ownership_check — open agency-ownership windows on a
+// GET /applications/ownership_check: open agency-ownership windows on a
 // company. A warning surface only; nothing blocks.
 export type OwnershipSubmission = {
   id: number;

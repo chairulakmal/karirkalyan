@@ -23,7 +23,7 @@ RSpec.describe Agency do
       expect(described_class.resolve(user: user, name: nil)).to be_nil
     end
 
-    it "scopes the vocabulary per user — the same name is a different row for a different user" do
+    it "scopes the vocabulary per user: the same name is a different row for a different user" do
       mine   = described_class.resolve(user: user, name: "Robert Half")
       theirs = described_class.resolve(user: create(:user), name: "Robert Half")
 
@@ -44,7 +44,7 @@ RSpec.describe Agency do
 
   describe "OWNERSHIP_WINDOW_MONTHS" do
     # 18 is the conservative end of the researched 12-18: the warning must fire
-    # while the window *may* still be open. A perishable market fact — if this
+    # while the window *may* still be open. A perishable market fact: if this
     # assertion surprises you, re-read SPEC.md § Data model → agencies before
     # changing either side.
     it "is 18 months" do

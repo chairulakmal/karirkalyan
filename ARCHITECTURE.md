@@ -1,6 +1,6 @@
 # Architecture
 
-The technical brief: a guided tour of the seven decisions that carry most of this codebase, each section stating the choice, the reasoning, and the trade-off accepted — with file paths throughout, because the point of the file is that nothing in it asks to be taken on faith. The seven: a state machine in plain Ruby, the transactional write path behind every transition, ghost prediction derived from the audit trail, digest scheduling that defers and never drops, i18n parity as a CI check, one PostgreSQL instance for everything, and a JWT that never reaches the browser. [SPEC.md](SPEC.md) is the full technical spec; this file is the shorter read.
+The technical brief: a guided tour of the seven decisions that carry most of this codebase, each section stating the choice, the reasoning, and the trade-off accepted, with file paths throughout, because the point of the file is that nothing in it asks to be taken on faith. The seven: a state machine in plain Ruby, the transactional write path behind every transition, ghost prediction derived from the audit trail, digest scheduling that defers and never drops, i18n parity as a CI check, one PostgreSQL instance for everything, and a JWT that never reaches the browser. [SPEC.md](SPEC.md) is the full technical spec; this file is the shorter read.
 
 ## The state machine is a plain Ruby module
 

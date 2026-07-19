@@ -160,7 +160,7 @@ export default async function ApplicationDetailPage({
 
       {/* The stripped posting text captured at prefill time. Postings get taken
           down mid-process, usually right when the user preps for the interview
-          they earned with them — this copy is what survives the deletion.
+          they earned with them; this copy is what survives the deletion.
           Collapsed by default: reference material, not the page's subject. */}
       {app.posting_snapshot ? (
         <section className="border border-dune bg-linen p-5">

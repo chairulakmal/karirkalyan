@@ -87,10 +87,10 @@ module Api
         )
       end
 
-      # GET /api/v1/applications/ownership_check?company=… — does an agency
+      # GET /api/v1/applications/ownership_check?company=… : does an agency
       # already have an open ownership window on this company? A warning
       # surface only: nothing here blocks a create, the FSM has no opinion.
-      # Blank company is an empty list, not a 422 — the form calls this as the
+      # Blank company is an empty list, not a 422, because the form calls this as the
       # user works. SPEC.md § API contract → The ownership check.
       def ownership_check
         submissions = current_user.applications
