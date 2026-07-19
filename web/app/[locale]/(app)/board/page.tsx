@@ -1,6 +1,7 @@
 import { getTranslations } from "next-intl/server";
 import { apiFetch } from "@/app/lib/api";
 import type { Application, Paginated, TransitionTable } from "@/app/lib/types";
+import { Phrase } from "@/app/components/phrase";
 import { Board } from "./board";
 
 // A board is a view of *everything*, so the cursor-paginated index is followed
@@ -63,7 +64,9 @@ export default async function BoardPage() {
     <div className="space-y-8">
       <header className="border-b border-dune pb-6">
         <p className="kk-label">{t("eyebrow")}</p>
-        <h1 className="mt-1 text-3xl">{t("title")}</h1>
+        <h1 className="mt-1 text-3xl">
+          <Phrase>{t("title")}</Phrase>
+        </h1>
         <p className="mt-1 font-mono text-xs text-ink-soft">
           {t("tracked", { count: appsRes.applications.length })}
         </p>

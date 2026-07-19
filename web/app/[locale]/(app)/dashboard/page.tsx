@@ -9,6 +9,7 @@ import type {
   TransitionTable,
 } from "@/app/lib/types";
 import { InfoPopover } from "@/app/components/info-popover";
+import { Phrase } from "@/app/components/phrase";
 import { ProfileCard } from "@/app/components/profile-card";
 import { ApplicationsList } from "./applications-list";
 import { GhostRiskCard } from "./ghost-risk-card";
@@ -64,7 +65,9 @@ export default async function Dashboard() {
       <header className="flex flex-wrap items-end justify-between gap-4 border-b border-dune pb-6">
         <div>
           <p className="kk-label">{t("eyebrow")}</p>
-          <h1 className="mt-1 text-3xl">{t("title")}</h1>
+          <h1 className="mt-1 text-3xl">
+            <Phrase>{t("title")}</Phrase>
+          </h1>
           <p className="mt-1 font-mono text-xs text-ink-soft">{t("tracked", { count: total })}</p>
         </div>
         <Link

@@ -5,6 +5,7 @@ import { LocaleSwitcher } from "@/app/components/locale-switcher";
 import { PipelineDiagram } from "@/app/components/pipeline-diagram";
 import { SiteFooter } from "@/app/components/site-footer";
 import { Mark, Wordmark } from "@/app/components/wordmark";
+import { Phrase } from "@/app/components/phrase";
 import { REPO_URL } from "@/app/lib/links";
 
 export default async function Home() {
@@ -82,9 +83,15 @@ export default async function Home() {
           {/* The headline is the only display-scale type on the site. It gets the
               144 optical cut; every other heading keeps the 36 cut from globals. */}
           <h1 className="kk-display mt-5 max-w-4xl text-[2.75rem] md:text-7xl">
-            {t.rich("headline", {
-              accent: (chunks) => <span className="italic text-cobalt">{chunks}</span>,
-            })}
+            <Phrase>
+              {t.rich("headline", {
+                accent: (chunks) => (
+                  <span className="italic text-cobalt">
+                    <Phrase>{chunks}</Phrase>
+                  </span>
+                ),
+              })}
+            </Phrase>
           </h1>
 
           <p className="mt-8 max-w-2xl text-lg leading-relaxed text-ink-soft">
@@ -97,13 +104,13 @@ export default async function Home() {
               href="/about"
               className="inline-flex items-center justify-center bg-cobalt px-6 py-3 text-sm font-medium text-linen transition hover:bg-cobalt-2"
             >
-              {t("ctaAbout")}
+              <Phrase>{t("ctaAbout")}</Phrase>
             </Link>
             <Link
               href="/sign-in"
               className="inline-flex items-center justify-center border border-midnight px-6 py-3 text-sm font-medium text-midnight transition hover:bg-linen"
             >
-              {t("tryDemo")}
+              <Phrase>{t("tryDemo")}</Phrase>
             </Link>
             <Link
               href={REPO_URL}
@@ -112,7 +119,7 @@ export default async function Home() {
               className="ml-1 inline-flex items-center gap-2 px-2 py-3 text-sm text-ink-soft transition hover:text-midnight"
             >
               <GitHubIcon className="h-4 w-4" />
-              {t("sourceCode")}
+              <Phrase>{t("sourceCode")}</Phrase>
             </Link>
           </div>
 
@@ -129,7 +136,9 @@ export default async function Home() {
             ].map(({ n, title, body }) => (
               <li key={n} className="bg-sand p-6 md:p-7">
                 <p className="kk-num">{n}</p>
-                <h2 className="mt-4 text-xl">{title}</h2>
+                <h2 className="mt-4 text-xl">
+                  <Phrase>{title}</Phrase>
+                </h2>
                 <p className="mt-3 text-sm leading-relaxed text-ink-soft">{body}</p>
               </li>
             ))}
