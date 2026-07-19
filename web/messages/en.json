@@ -441,7 +441,7 @@
   },
   "files": {
     "hint": "PDF · max 1 MB",
-    "optional": "(optional · PDF, max 1 MB)",
+    "optional": "(optional)",
     "view": "View · uploaded {ago}",
     "notUploaded": "Not uploaded",
     "uploading": "Uploading…",

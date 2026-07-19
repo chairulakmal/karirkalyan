@@ -540,6 +540,11 @@ function FileField({ name, label }: { name: string; label: string }) {
 
   return (
     <label className="block text-sm">
+      {/* The label stays short: kk-label is tracked uppercase mono, so every
+          character is wide and "Cover letter (optional · PDF, max 1 MB)"
+          wrapped in a half column. The type/size constraint lives in the
+          normal-case hint below instead, the same files.hint string the
+          detail-page uploader shows. */}
       <span className="kk-label">
         {label} <span className="font-normal text-ink-soft">{t("optional")}</span>
       </span>
@@ -550,6 +555,7 @@ function FileField({ name, label }: { name: string; label: string }) {
         onChange={onChange}
         className="mt-1.5 block w-full border border-dune bg-linen px-3 py-2 text-sm text-midnight file:mr-3 file:border-0 file:bg-transparent file:text-sm file:font-medium file:text-cobalt"
       />
+      <p className="mt-1 text-xs text-ink-soft">{t("hint")}</p>
       {error ? <p className="mt-1 text-xs text-danger">{error}</p> : null}
     </label>
   );

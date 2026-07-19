@@ -441,7 +441,7 @@
   },
   "files": {
     "hint": "PDF · 最大 1 MB",
-    "optional": "(任意 · PDF、最大 1 MB)",
+    "optional": "(任意)",
     "view": "表示 · アップロード: {ago}",
     "notUploaded": "未アップロード",
     "uploading": "アップロードしています…",
