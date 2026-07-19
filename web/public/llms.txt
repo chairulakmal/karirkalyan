@@ -1,6 +1,6 @@
 # KarirKalyan
 
-> Full-stack job application tracker — Rails 8 API + Next.js 16 frontend
+> Full-stack job application tracker: Rails 8 API + Next.js 16 frontend
 
 KarirKalyan is a web application for tracking job applications through a finite state machine (FSM)
 pipeline. Built as a portfolio project by Chairul Akmal (https://chairulakmal.com).
@@ -11,12 +11,12 @@ pipeline. Built as a portfolio project by Chairul Akmal (https://chairulakmal.co
   phone_screen → technical → final_round → offer, ending in accepted, declined, rejected,
   ghosted, withdrawn or archived. It is not linear: ghosted, rejected and withdrawn can all
   return to applied. The transition table in api/app/lib/application_fsm.rb is the only
-  authority on which moves are legal — this list is a summary and may lag it.
+  authority on which moves are legal; this list is a summary and may lag it.
 - Writes an immutable TimelineEntry on every status transition (full audit trail)
 - Sends follow-up reminders via idempotent Solid Queue background jobs, batched into one digest
   per user per day rather than one email per application. The digest holds on weekends, Japanese
   national holidays, New Year, Golden Week and Obon, and the held reminders go out on the next
-  business day — deferred, not dropped. With notifications enabled on /settings, the same daily
+  business day: deferred, not dropped. With notifications enabled on /settings, the same daily
   batch also arrives as a Web Push notification on the installed app; a push failure retries
   without re-sending the email.
 - Signs in with passkeys (WebAuthn) as well as a password: discoverable credentials make the
@@ -28,7 +28,7 @@ pipeline. Built as a portfolio project by Chairul Akmal (https://chairulakmal.co
   account.json plus every resume and cover letter you uploaded. Both are downloads from the
   dashboard; the zip is the one that can actually restore an account.
 - Stores resume and cover letter as PostgreSQL bytea per application: 1 MB each, and at most 200
-  applications per account, which is what bounds total storage — a rate limit cannot, since every
+  applications per account, which is what bounds total storage; a rate limit cannot, since every
   window resets. Downloaded PDFs are named after the application they belong to
   (company-role-MMDD-id-kind.pdf), by one method shared with the archive, so a file has the same
   name whether it was downloaded on its own or unzipped out of the account export. Japanese and
@@ -39,6 +39,14 @@ pipeline. Built as a portfolio project by Chairul Akmal (https://chairulakmal.co
   historical reply times for the stage, derived from the timeline audit trail with a window
   function. Below five recorded replies at a stage it falls back to a global default (21 days for
   applied, 14 for phone_screen) and labels the threshold as a default rather than a personal one.
+- Models the Tokyo job market specifically: each application records the recruiter channel
+  (direct / agency / referral) and which agency submitted it, and the app warns before a
+  duplicate submission while an agency's candidate-ownership window (assumed 18 months) is
+  still open; compensation is stored as the nenshu (年収) structure, guaranteed months vs
+  performance-tied bonus months, rather than one number; the posting's Japanese-language
+  requirement (JLPT N1/N2, business, conversational, none) is a filter; and the posting text
+  is snapshotted at pre-fill time so it survives the posting being taken down. These fields
+  are extracted by the same AI pre-fill pass that reads company and role.
 - Offers a Kanban board at /board: one column per active status, and dragging a card between
   columns performs a real FSM transition. The board fetches the legal moves and its column set
   from GET /api/v1/transitions rather than keeping its own copy of the table, and the server
@@ -47,7 +55,7 @@ pipeline. Built as a portfolio project by Chairul Akmal (https://chairulakmal.co
 - Installs as an Android PWA and registers as a share target: share a job posting from any app
   and land in the new-application form with the AI pre-fill already reading it; a share with no
   link in it seeds a paste box instead, and the same paste box is offered when a site refuses
-  the automated fetch. Install goes through Chrome — share-sheet integration lives in the
+  the automated fetch. Install goes through Chrome: share-sheet integration lives in the
   WebAPK, which Brave cannot mint. Once installed it behaves like an app: phone widths get a
   bottom tab bar, long-pressing the launcher icon offers New application and Board shortcuts,
   and a monochrome manifest icon lets Android themed icons tint the monogram.
@@ -55,8 +63,8 @@ pipeline. Built as a portfolio project by Chairul Akmal (https://chairulakmal.co
 
 ## Registration is closed
 
-There is no sign-up form and no sign-up endpoint. The app holds resumes — the most PII-dense
-document most people own — and it is deliberately not built to be anyone's custodian but its
+There is no sign-up form and no sign-up endpoint. The app holds resumes (the most PII-dense
+document most people own) and it is deliberately not built to be anyone's custodian but its
 author's. Visitors sign in to the shared demo account below, which is the full app with twelve
 applications already in it, not a stripped sandbox. Sign-in supports passkeys (WebAuthn)
 alongside the password form; the demo account uses the password. Accounts are created by the
@@ -67,10 +75,10 @@ claim one.
 ## Tech stack
 
 - Backend: Rails 8 API-only, Ruby 3.4.9, PostgreSQL 18, Devise + devise-jwt
-- Jobs & cache: Solid Queue + Solid Cache, both Postgres-backed — no Redis, no Sidekiq.
+- Jobs & cache: Solid Queue + Solid Cache, both Postgres-backed; no Redis, no Sidekiq.
   Workers run inside Puma, so there is no separate worker service.
 - Frontend: Next.js 16 App Router, TypeScript, Tailwind CSS
-- Auth: JWT issued by Rails, stored in httpOnly cookie by Next.js — never reaches client JS
+- Auth: JWT issued by Rails, stored in httpOnly cookie by Next.js; never reaches client JS
 - Deploy: Railway (API service + web service + managed PostgreSQL)
 - Tests: RSpec (unit + request specs against real DB), Playwright E2E, and a CI script that fails
   the build when the en and ja message catalogs disagree about which keys exist

@@ -11,7 +11,7 @@ RSpec.describe "Transitions", type: :request do
       description "The legal status transitions, derived server-side from the FSM. " \
                   "`transitions` maps every state to its valid next states with the " \
                   "archived rule folded in; terminal states map to an empty array. " \
-                  "`active_states` is the stages an application is still in play in — " \
+                  "`active_states` is the stages an application is still in play in, " \
                   "not derivable from the rest of the payload, since rejected, ghosted " \
                   "and withdrawn are non-terminal yet inactive. " \
                   "Clients consume this at runtime instead of hardcoding the table."

@@ -5,9 +5,14 @@ require "uri"
 require "cgi"
 
 module Applications
-  # Turns a job posting into { company, role, notes } with Claude. Returns a plain
-  # hash — the caller (and ultimately the user) reviews the values before anything
-  # is saved.
+  # Turns a job posting into structured fields with Claude: company/role/notes,
+  # plus the Japan-market fields (channel, agency, japanese_level, the four
+  # comp-structure numbers) since v1.8.0 -- one extraction pass owns every
+  # captured field. Returns a plain hash -- the caller (and ultimately the user)
+  # reviews the values before anything is saved. The hash also carries
+  # :posting_text, the stripped capped text sent to Claude, which is how the
+  # form fills posting_snapshot at create time without this service persisting
+  # anything (SPEC.md section UrlPrefillService).
   #
   # The pipeline is fetch -> to_text -> extract, and there are two ways in:
   #   url:  the whole pipeline. The only path that can be refused by a site.
@@ -79,6 +84,9 @@ module Applications
       240.0.0.0/4 ::/128 ::ffff:0:0/96 64:ff9b::/96 2002::/16
     ].map { |cidr| IPAddr.new(cidr) }.freeze
 
+    # Only company/role/notes are required: they are what makes a page a posting.
+    # The market fields are optional, and #extract normalises what comes back
+    # rather than trusting it -- a schema constrains shape, not judgement.
     TOOL = {
       name:        "extract_job_posting",
       description: "Record the structured fields extracted from a job posting page.",
@@ -87,7 +95,20 @@ module Applications
         properties: {
           company: { type: "string", description: "Hiring company name. Empty string if not present." },
           role:    { type: "string", description: "Job title / role. Empty string if not present." },
-          notes:   { type: "string", description: "Start with one line summarising the tech stack and industry/product type (e.g. 'Tech: React, Rails, PostgreSQL | Industry: B2B SaaS / Fintech'). Then 2-4 sentences covering location, employment type, key requirements, and salary if listed. Empty string if not present." }
+          notes:   { type: "string", description: "Start with one line summarising the tech stack and industry/product type (e.g. 'Tech: React, Rails, PostgreSQL | Industry: B2B SaaS / Fintech'). Then 2-4 sentences covering location, employment type, key requirements, and salary if listed. Empty string if not present." },
+          channel: { type: "string", enum: [ "direct", "agent", "" ],
+                     description: "'agent' when the posting is listed by a recruitment agency on behalf of a client company; 'direct' when the hiring company posts its own opening; empty string when unclear." },
+          agency:  { type: "string", description: "Name of the recruitment agency when the posting is an agency listing. Empty string otherwise." },
+          japanese_level: { type: "string", enum: [ "none", "conversational", "business", "n2", "n1", "" ],
+                            description: "Japanese language requirement: 'n1'/'n2' for explicit JLPT levels, 'business' for business-level Japanese, 'conversational' for conversational Japanese, 'none' when the posting says no Japanese is required or is explicitly English-only. Empty string when not stated." },
+          comp_annual_min_yen: { type: "integer",
+                                 description: "Low end of the quoted annual compensation (nensyu) in yen, e.g. 600man-yen is 6000000. 0 if not stated." },
+          comp_annual_max_yen: { type: "integer",
+                                 description: "High end of the quoted annual range in yen. 0 if the posting quotes a single figure or none." },
+          comp_months_guaranteed: { type: "number",
+                                    description: "Months of base salary guaranteed per year: 12 plus any guaranteed bonus months (e.g. base + 2 guaranteed bonus months is 14). 0 if not stated." },
+          comp_months_variable: { type: "number",
+                                  description: "Performance-tied bonus months on top of the guaranteed months. 0 if not stated." }
         },
         required: %w[company role notes]
       }
@@ -97,7 +118,9 @@ module Applications
       You extract structured data from job postings using the extract_job_posting tool.
       The posting may be written in Japanese or English — return the company and role in
       their original language. Keep notes concise. Use an empty string for any field you
-      cannot find on the page; never guess or invent values.
+      cannot find on the page; never guess or invent values. For the compensation fields,
+      年収 quoted in 万円 must be converted to yen (600万 → 6000000); report only figures
+      the posting actually states, and 0 for any it does not.
       For the notes field, the very first line must be a tech-stack and industry summary
       in this format: "Tech: <stack> | Industry: <industry/product type>". Follow it with
       a blank line, then the rest of the summary.
@@ -126,7 +149,9 @@ module Applications
       text = capped(to_text(html))
       raise UnreadableError, "That page had no readable text to work with." if text.blank?
 
-      extract(text).merge(url: uri.to_s)
+      # posting_text is the exact text Claude read; the form carries it into
+      # posting_snapshot at create time. Nothing is persisted here.
+      extract(text).merge(url: uri.to_s, posting_text: text)
     end
 
     private
@@ -163,7 +188,9 @@ module Applications
               "and the limit is #{MAX_TEXT_CHARS}. Trim it and try again."
       end
 
-      extract(text).merge(url: @raw_url)
+      # A pasted posting snapshots exactly as a fetched one does -- a posting
+      # that could never be fetched is the strongest case for keeping a copy.
+      extract(text).merge(url: @raw_url, posting_text: text)
     end
 
     def validated_uri
@@ -393,14 +420,28 @@ module Applications
       fields = {
         company: field(input, :company),
         role:    field(input, :role),
-        notes:   field(input, :notes)
+        notes:   field(input, :notes),
+        # Normalised, not trusted: the schema constrains shape, not judgement.
+        # An enum value outside the model's set becomes nil, a non-positive
+        # number becomes nil -- a hallucinated channel written into the form is
+        # worse than an empty one.
+        channel:                enum_field(input, :channel, Application::CHANNELS),
+        agency:                 field(input, :agency).presence,
+        japanese_level:         enum_field(input, :japanese_level, Application::JAPANESE_LEVELS),
+        comp_annual_min_yen:    positive_number(input, :comp_annual_min_yen)&.round,
+        comp_annual_max_yen:    positive_number(input, :comp_annual_max_yen)&.round,
+        comp_months_guaranteed: positive_number(input, :comp_months_guaranteed),
+        comp_months_variable:   positive_number(input, :comp_months_variable)
       }
 
-      # Every field empty means Claude read the page and found no posting in it —
-      # a challenge interstitial, a login wall, an SPA shell. Returning that as a
-      # 200 hands the user a blank form and calls it success, which is the same
-      # class of lie as the status codes this release untangled.
-      if fields.values.all?(&:blank?)
+      # Keyed to company/role/notes alone, deliberately: a page with a company
+      # and role is a posting even when it names no salary, and the reverse is
+      # not true. All three empty means Claude read the page and found no
+      # posting in it — a challenge interstitial, a login wall, an SPA shell.
+      # Returning that as a 200 hands the user a blank form and calls it
+      # success, which is the same class of lie as the status codes this
+      # taxonomy untangled.
+      if fields.values_at(:company, :role, :notes).all?(&:blank?)
         raise ExtractionError, "That page didn't look like a job posting. Fill the fields in manually."
       end
 
@@ -411,6 +452,18 @@ module Applications
 
     def field(input, key)
       (input[key] || input[key.to_s]).to_s.strip
+    end
+
+    def enum_field(input, key, allowed)
+      value = field(input, key)
+      allowed.include?(value) ? value : nil
+    end
+
+    # nil for absent, non-numeric, and non-positive alike: the schema asks for 0
+    # when a figure is not stated, and a 年収 of zero yen is not a real answer.
+    def positive_number(input, key)
+      value = Float(input[key] || input[key.to_s], exception: false)
+      value&.positive? ? value : nil
     end
 
     def client

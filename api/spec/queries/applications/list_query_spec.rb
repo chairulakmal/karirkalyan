@@ -106,6 +106,34 @@ RSpec.describe Applications::ListQuery do
     end
   end
 
+  # status's exact contract on Application::JAPANESE_LEVELS: OR within the
+  # list, unknown members dropped, nothing left means unfiltered.
+  describe "the japanese_level filter" do
+    let!(:none)       { application_at(0, japanese_level: "none") }
+    let!(:business)   { application_at(1, japanese_level: "business") }
+    let!(:unrecorded) { application_at(2) }
+
+    it "applies a single level" do
+      expect(call(japanese_level: "business")[:records]).to eq([ business ])
+    end
+
+    it "ORs a comma-separated list" do
+      expect(call(japanese_level: "none,business")[:records])
+        .to contain_exactly(none, business)
+    end
+
+    it "ignores a list it understands none of rather than returning none" do
+      expect(call(japanese_level: "fluent")[:records])
+        .to contain_exactly(none, business, unrecorded)
+    end
+
+    # `none` is a recorded "no Japanese required"; null is unrecorded, and
+    # there is deliberately no query for it.
+    it "does not match an unrecorded (null) level with none" do
+      expect(call(japanese_level: "none")[:records]).to eq([ none ])
+    end
+  end
+
   describe "the source filter" do
     it "treats a wildcard in the param as a literal, not a pattern" do
       literal = application_at(0, url: "https://example.com/%/jobs/1")

@@ -5,7 +5,7 @@ import { getLocale, getTranslations } from "next-intl/server";
 import { getPathname, redirect } from "@/i18n/navigation";
 import { apiFetch } from "./api";
 import type { ApiFailure } from "./api";
-import type { Application } from "./types";
+import type { Application, Channel, JapaneseLevel, OwnershipCheck } from "./types";
 
 // next-intl's redirect/getPathname take the locale explicitly — a server action
 // has no component tree to infer it from. Both are unprefixed for `en` and
@@ -91,6 +91,33 @@ export async function createApplication(formData: FormData): Promise<ActionFailu
   const status = formData.get("status")?.toString().trim();
   if (status) body.append("application[status]", status);
 
+  const channel = formData.get("channel")?.toString().trim();
+  if (channel) body.append("application[channel]", channel);
+
+  // Only sent when the user typed one — the API resolves the name to a
+  // per-user agencies row, and an absent key leaves nothing to clear on create.
+  const agencyName = formData.get("agency_name")?.toString().trim();
+  if (agencyName) body.append("application[agency_name]", agencyName);
+
+  const japaneseLevel = formData.get("japanese_level")?.toString().trim();
+  if (japaneseLevel) body.append("application[japanese_level]", japaneseLevel);
+
+  // The form quotes 年収 in 万円, the unit postings use; the API stores yen.
+  const compMin = manToYen(formData.get("comp_annual_min_man")?.toString() ?? "");
+  if (compMin) body.append("application[comp_annual_min_yen]", String(compMin));
+  const compMax = manToYen(formData.get("comp_annual_max_man")?.toString() ?? "");
+  if (compMax) body.append("application[comp_annual_max_yen]", String(compMax));
+
+  const monthsGuaranteed = positiveNumber(formData.get("comp_months_guaranteed")?.toString() ?? "");
+  if (monthsGuaranteed) body.append("application[comp_months_guaranteed]", String(monthsGuaranteed));
+  const monthsVariable = positiveNumber(formData.get("comp_months_variable")?.toString() ?? "");
+  if (monthsVariable) body.append("application[comp_months_variable]", String(monthsVariable));
+
+  // The stripped text prefill returned as posting_text; capture at prefill,
+  // persistence on create (SPEC.md § UrlPrefillService).
+  const postingSnapshot = formData.get("posting_snapshot")?.toString().trim();
+  if (postingSnapshot) body.append("application[posting_snapshot]", postingSnapshot);
+
   // Only meaningful when starting in "applied" — backdates applied_at so the
   // dashboard timing stays accurate for jobs added after the fact.
   const appliedAt = formData.get("applied_at")?.toString().trim();
@@ -120,7 +147,22 @@ export async function createApplication(formData: FormData): Promise<ActionFailu
   redirect({ href: `/applications/${res.data.id}`, locale });
 }
 
-type PrefillFields = { company: string; role: string; notes: string; url: string };
+type PrefillFields = {
+  company: string;
+  role: string;
+  notes: string;
+  url: string;
+  // The market fields, normalised server-side (null when the posting does not
+  // state them), and the stripped text the form carries into posting_snapshot.
+  channel: Channel | null;
+  agency: string | null;
+  japanese_level: JapaneseLevel | null;
+  comp_annual_min_yen: number | null;
+  comp_annual_max_yen: number | null;
+  comp_months_guaranteed: number | null;
+  comp_months_variable: number | null;
+  posting_text: string;
+};
 
 // The failure arm is ActionFailure, not a bare { ok, error }: apiFailure has
 // always returned `code` and `status`, and narrowing them away here threw the
@@ -154,6 +196,23 @@ export async function prefillFromText(text: string, url: string): Promise<Prefil
     body: JSON.stringify({ text: trimmed, url: url.trim() }),
   });
 
+  if (!res.ok) return apiFailure(res);
+  return { ok: true, ...res.data };
+}
+
+// Open agency-ownership windows on a company — the duplicate-submission
+// warning. Called by the new-application form when the company field settles;
+// a warning surface only, so callers render failures as nothing rather than
+// blocking the form.
+export type OwnershipResult = ({ ok: true } & OwnershipCheck) | ActionFailure;
+
+export async function checkOwnership(company: string): Promise<OwnershipResult> {
+  const trimmed = company.trim();
+  if (!trimmed) return { ok: true, window_months: 0, submissions: [] };
+
+  const res = await apiFetch<OwnershipCheck>(
+    `/applications/ownership_check?company=${encodeURIComponent(trimmed)}`,
+  );
   if (!res.ok) return apiFailure(res);
   return { ok: true, ...res.data };
 }
@@ -309,6 +368,13 @@ type ApplicationInput = {
   url?: string | null;
   notes?: string | null;
   follow_up_at?: string | null;
+  channel?: string | null;
+  agency_name?: string;
+  japanese_level?: string | null;
+  comp_annual_min_yen?: number | null;
+  comp_annual_max_yen?: number | null;
+  comp_months_guaranteed?: number | null;
+  comp_months_variable?: number | null;
   lock_version?: number;
 };
 
@@ -323,5 +389,28 @@ function pickApplicationFields(formData: FormData): ApplicationInput {
     url: get("url") || null,
     notes: get("notes") || null,
     follow_up_at: get("follow_up_at") || null,
+    channel: get("channel") || null,
+    // Always sent as a string: the key's presence is what lets a blank clear
+    // the agency server-side, where the name resolves to a row.
+    agency_name: get("agency_name"),
+    japanese_level: get("japanese_level") || null,
+    comp_annual_min_yen: manToYen(get("comp_annual_min_man")),
+    comp_annual_max_yen: manToYen(get("comp_annual_max_man")),
+    comp_months_guaranteed: positiveNumber(get("comp_months_guaranteed")),
+    comp_months_variable: positiveNumber(get("comp_months_variable")),
   };
+}
+
+// The form quotes 年収 in 万円 (the unit postings use); the API stores yen.
+// Null for blank, non-numeric, and non-positive alike: the same normalising
+// contract the API applies to what Claude returns.
+function manToYen(raw: string): number | null {
+  const man = positiveNumber(raw);
+  return man === null ? null : Math.round(man * 10_000);
+}
+
+function positiveNumber(raw: string): number | null {
+  if (!raw.trim()) return null;
+  const value = Number(raw);
+  return Number.isFinite(value) && value > 0 ? value : null;
 }

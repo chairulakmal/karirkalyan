@@ -17,7 +17,7 @@ RSpec.describe "Push subscriptions", type: :request do
       description <<~DESC
         Served rather than duplicated into a web-side env var, so the two services
         cannot drift (SPEC.md § Push notifications). 503 push_unavailable when the
-        server has no VAPID keys — the rest of the app keeps working.
+        server has no VAPID keys; the rest of the app keeps working.
       DESC
 
       response "200", "the public key" do
@@ -76,7 +76,7 @@ RSpec.describe "Push subscriptions", type: :request do
         end
       end
 
-      response "422", "validation failed — blank keys, or the per-user ceiling" do
+      response "422", "validation failed: blank keys, or the per-user ceiling" do
         let(:Authorization) { token }
         let(:body) { { subscription: { endpoint: "https://push.example/abc", keys: {} } } }
 
@@ -92,7 +92,7 @@ RSpec.describe "Push subscriptions", type: :request do
       end
     end
 
-    delete "Unsubscribe this browser — idempotent" do
+    delete "Unsubscribe this browser (idempotent)" do
       tags "Push"
       consumes "application/json"
       security [ bearerAuth: [] ]
@@ -102,7 +102,7 @@ RSpec.describe "Push subscriptions", type: :request do
         required: %w[endpoint]
       }
 
-      response "204", "unsubscribed — a 204 even for an endpoint the server never knew, because the state the caller asked for is the state that obtains" do
+      response "204", "unsubscribed: a 204 even for an endpoint the server never knew, because the state the caller asked for is the state that obtains" do
         let(:Authorization) { token }
         let(:body) { { endpoint: create(:push_subscription, user: user).endpoint } }
 

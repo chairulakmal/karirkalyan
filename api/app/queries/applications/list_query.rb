@@ -15,13 +15,14 @@ module Applications
     MIN_LIMIT     = 1
     MAX_LIMIT     = 100
 
-    def initialize(user:, status: nil, company: nil, source: nil, after: nil, limit: nil)
-      @user    = user
-      @status  = status
-      @company = company
-      @source  = source
-      @after   = after
-      @limit   = limit
+    def initialize(user:, status: nil, company: nil, source: nil, japanese_level: nil, after: nil, limit: nil)
+      @user           = user
+      @status         = status
+      @company        = company
+      @source         = source
+      @japanese_level = japanese_level
+      @after          = after
+      @limit          = limit
     end
 
     # => { records: [Application], next_cursor: String | nil, has_more: Boolean }
@@ -41,13 +42,14 @@ module Applications
 
     private
 
-    attr_reader :user, :status, :company, :source, :after
+    attr_reader :user, :status, :company, :source, :japanese_level, :after
 
     def scope
       relation = user.applications.order(created_at: :desc)
       relation = filter_by_status(relation)
       relation = filter_by_company(relation)
       relation = filter_by_source(relation)
+      relation = filter_by_japanese_level(relation)
       filter_by_cursor(relation)
     end
 
@@ -81,6 +83,18 @@ module Applications
 
       like = "%#{ActiveRecord::Base.sanitize_sql_like(source)}%"
       relation.where("url ILIKE ?", like)
+    end
+
+    # `status`'s exact contract on Application::JAPANESE_LEVELS: OR within the
+    # list, AND against the rest, and a list the server understands none of has
+    # told it nothing. Matches the *recorded* value only: `none` selects
+    # postings recorded as requiring no Japanese, not rows with a null column;
+    # null means unrecorded, and there is deliberately no query for it.
+    def filter_by_japanese_level(relation)
+      levels = japanese_level.to_s.split(",").map(&:strip) & Application::JAPANESE_LEVELS
+      return relation if levels.empty?
+
+      relation.where(japanese_level: levels)
     end
 
     def filter_by_cursor(relation)

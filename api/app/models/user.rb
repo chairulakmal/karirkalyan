@@ -8,6 +8,7 @@ class User < ApplicationRecord
   has_many :applications, dependent: :destroy
   has_many :timeline_entries, foreign_key: :actor_id, dependent: :destroy, inverse_of: :actor
   has_many :credentials, dependent: :destroy
+  has_many :agencies, dependent: :destroy
   has_many :push_subscriptions, dependent: :destroy
 
   def as_json(options = {})

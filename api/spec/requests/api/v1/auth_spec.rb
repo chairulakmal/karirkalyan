@@ -21,7 +21,7 @@ RSpec.describe "Auth", type: :request do
         required: %w[user]
       }
 
-      response "200", "signed in — JWT returned in Authorization header" do
+      response "200", "signed in; JWT returned in Authorization header" do
         let(:user) { create(:user) }
         let(:body) { { user: { email: user.email, password: "password123" } } }
 
@@ -40,7 +40,7 @@ RSpec.describe "Auth", type: :request do
   end
 
   path "/api/v1/auth/sign_out" do
-    delete "Sign out — rotates JTI to invalidate the token" do
+    delete "Sign out (rotates JTI to invalidate the token)" do
       tags "Auth"
       security [ bearerAuth: [] ]
 
@@ -69,7 +69,7 @@ RSpec.describe "Auth", type: :request do
         because there is no longer a user to look its `sub` up against.
 
         There is no self-service button for this in the UI, and no sign-up endpoint to undo it
-        with — see SPEC.md § Registration is closed. The shared demo account is exempt: its
+        with; see SPEC.md § Registration is closed. The shared demo account is exempt: its
         credentials are public, so anyone could otherwise erase it.
       DESC
 

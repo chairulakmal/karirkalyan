@@ -4,7 +4,7 @@
 
 ## Why
 
-<!-- The motivation — bug, feature, refactor, why now. Link issues if relevant. -->
+<!-- The motivation: bug, feature, refactor, why now. Link issues if relevant. -->
 
 ## How tested
 
@@ -15,5 +15,5 @@
 - [ ] Tests added or updated
 - [ ] `bundle exec rspec` passes locally (api changes)
 - [ ] `npm run lint && npm run lint:i18n && npx tsc --noEmit` passes locally (web changes)
-- [ ] `SPEC.md` updated **first** if behaviour changed — it is the technical source of truth
+- [ ] `SPEC.md` updated **first** if behaviour changed: it is the technical source of truth
 - [ ] Other docs updated if behaviour changed (README, README.ja, swagger)

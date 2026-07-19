@@ -3,23 +3,23 @@
     {
       "warning_type": "Mass Assignment",
       "warning_code": 70,
-      "fingerprint": "09fbd2d71b03c06a206dbdfd86f178a572ba9295c15747dae95a1fc3bdff7f55",
+      "fingerprint": "270682b16e11c835c84631c5c94e4c98034a5e2737cae8fad84c2557abf1b839",
       "check_name": "PermitAttributes",
       "message": "Potentially dangerous key allowed for mass assignment",
       "file": "app/controllers/api/v1/applications_controller.rb",
-      "line": 83,
+      "line": 181,
       "link": "https://brakemanscanner.org/docs/warning_types/mass_assignment/",
-      "code": "params.require(:application).permit(:company, :role, :url, :notes, :follow_up_at, :lock_version)",
+      "code": "params.require(:application).permit(:company, :role, :url, :notes, :follow_up_at, :lock_version, :channel, :japanese_level, :posting_snapshot, :comp_annual_min_yen, :comp_annual_max_yen, :comp_months_guaranteed, :comp_months_variable)",
       "render_path": null,
       "location": {
         "type": "method",
         "class": "Api::V1::ApplicationsController",
         "method": "application_params"
       },
-      "user_input": ":lock_version",
+      "user_input": ":role",
       "confidence": "Medium",
       "cwe_id": [915],
-      "note": "lock_version is intentionally permitted. The optimistic locking pattern requires the client to send back the version it last saw so Rails can detect concurrent writes and raise StaleObjectError → 409 Conflict. See SPEC.md, Security → 'Optimistic locking'."
+      "note": "Both keys brakeman guesses at are false positives here: `role` is a job title string on the user's own application, not an authorization role, and `lock_version` is intentionally permitted: optimistic locking requires the client to send back the version it last saw so Rails can raise StaleObjectError → 409 Conflict. See SPEC.md, Security → 'Optimistic locking'."
     }
   ],
   "brakeman_version": "8.0.4"

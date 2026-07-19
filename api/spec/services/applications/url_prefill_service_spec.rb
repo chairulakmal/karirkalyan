@@ -38,8 +38,76 @@ RSpec.describe Applications::UrlPrefillService do
           company: "Mercari",
           role:    "Backend Engineer",
           notes:   "Tokyo, full-time. Ruby/Go backend.",
-          url:     "https://example.com/jobs/42"
+          # Market fields the tool block above does not carry come back nil,
+          # never invented.
+          channel:                nil,
+          agency:                 nil,
+          japanese_level:         nil,
+          comp_annual_min_yen:    nil,
+          comp_annual_max_yen:    nil,
+          comp_months_guaranteed: nil,
+          comp_months_variable:   nil,
+          url:                    "https://example.com/jobs/42",
+          # The stripped text as it was sent to Claude; the form carries it
+          # into posting_snapshot at create time.
+          posting_text: "Mercari — Backend Engineer"
         )
+      end
+    end
+
+    # One extraction pass owns every captured field (v1.8.0), and the service
+    # normalises what comes back rather than trusting it: the schema constrains
+    # shape, not judgement.
+    context "market-field extraction" do
+      subject(:service) { described_class.new("https://example.com/jobs/42", client: client) }
+
+      before do
+        allow(service).to receive(:fetch).and_return("<html>Mercari — Backend Engineer</html>")
+      end
+
+      def with_input(extra)
+        allow(tool_block).to receive(:input).and_return({
+          company: "Mercari", role: "Backend Engineer", notes: "Tokyo."
+        }.merge(extra))
+      end
+
+      it "passes through valid market fields" do
+        with_input(
+          channel: "agent", agency: "Robert Half", japanese_level: "n2",
+          comp_annual_min_yen: 6_000_000, comp_annual_max_yen: 9_000_000,
+          comp_months_guaranteed: 14, comp_months_variable: 2
+        )
+
+        expect(service.call).to include(
+          channel: "agent", agency: "Robert Half", japanese_level: "n2",
+          comp_annual_min_yen: 6_000_000, comp_annual_max_yen: 9_000_000,
+          comp_months_guaranteed: 14.0, comp_months_variable: 2.0
+        )
+      end
+
+      it "nils an enum value outside the model's set rather than passing it on" do
+        with_input(channel: "headhunter", japanese_level: "fluent")
+
+        expect(service.call).to include(channel: nil, japanese_level: nil)
+      end
+
+      it "nils the zero the schema uses for 'not stated', and any non-positive number" do
+        with_input(comp_annual_min_yen: 0, comp_annual_max_yen: -1, comp_months_guaranteed: "junk")
+
+        expect(service.call).to include(
+          comp_annual_min_yen: nil, comp_annual_max_yen: nil, comp_months_guaranteed: nil
+        )
+      end
+
+      # A page with a company and role is a posting even when it names no
+      # salary; the all-empty ExtractionError check stays keyed to
+      # company/role/notes alone, so market fields cannot rescue a non-posting.
+      it "still raises ExtractionError when only market fields came back" do
+        allow(tool_block).to receive(:input).and_return(
+          company: "", role: "", notes: "", comp_annual_min_yen: 6_000_000
+        )
+
+        expect { service.call }.to raise_error(described_class::ExtractionError)
       end
     end
 

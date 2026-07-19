@@ -33,6 +33,7 @@ Rails.application.routes.draw do
       resources :applications do
         collection do
           post :prefill
+          get  :ownership_check
         end
         member do
           patch :transition

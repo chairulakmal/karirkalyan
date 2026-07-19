@@ -1,10 +1,21 @@
 class Application < ApplicationRecord
   belongs_to :user
+  belongs_to :agency, optional: true
   has_many :timeline_entries, dependent: :destroy
 
   self.locking_column = "lock_version"
 
   MAX_FILE_SIZE = 1.megabyte
+
+  # How the application reached the company. Hiring in Japan is heavily
+  # agent-mediated, and `agent` is the value the ownership check keys on.
+  CHANNELS = %w[direct agent referral].freeze
+
+  # The posting's Japanese requirement, on the market's own taxonomy (TokyoDev
+  # and Japan Dev tag every posting with these buckets). What the posting asks,
+  # not what the user holds. Null means unrecorded, and there is no filter
+  # value for it; `none` is a recorded "no Japanese required".
+  JAPANESE_LEVELS = %w[none conversational business n2 n1].freeze
 
   # The ceiling that bounds storage. A Rack::Attack throttle cannot do this job — it bounds a
   # rate over a window, and every window resets, so any positive rate integrates to unbounded
@@ -18,8 +29,26 @@ class Application < ApplicationRecord
   # allowed to be short or to vanish entirely. Counted in codepoints — one per kanji.
   SLUG_MAX_LENGTH = 20
 
+  # An agent submission to a company opens an ownership window; the check reads
+  # them back per company. SPEC.md § API contract → The ownership check.
+  scope :open_ownership_submissions, ->(company) {
+    where(company: company, channel: "agent")
+      .where(applied_at: Agency::OWNERSHIP_WINDOW_MONTHS.months.ago..)
+  }
+
   validates :company, :role, :status, presence: true
   validates :status, inclusion: { in: ->(_) { ApplicationFSM::VALID_STATES } }
+  validates :channel,        inclusion: { in: CHANNELS },        allow_nil: true
+  validates :japanese_level, inclusion: { in: JAPANESE_LEVELS }, allow_nil: true
+  validates :comp_annual_min_yen, :comp_annual_max_yen,
+            numericality: { greater_than: 0, only_integer: true }, allow_nil: true
+  validates :comp_months_guaranteed, :comp_months_variable,
+            numericality: { greater_than_or_equal_to: 0 }, allow_nil: true
+  # The same cap the prefill pipeline truncates extraction at, one constant
+  # owned by the service; this only stops a client persisting past it.
+  validates :posting_snapshot,
+            length: { maximum: Applications::UrlPrefillService::MAX_TEXT_CHARS },
+            allow_nil: true
   validates :resume,       length: { maximum: MAX_FILE_SIZE, message: "must be under 1 MB" }, allow_nil: true
   validates :cover_letter, length: { maximum: MAX_FILE_SIZE, message: "must be under 1 MB" }, allow_nil: true
   validate :resume_must_be_pdf,       if: -> { resume.present? && will_save_change_to_resume? }
@@ -29,8 +58,11 @@ class Application < ApplicationRecord
   before_save :touch_resume_timestamp,       if: :will_save_change_to_resume?
   before_save :touch_cover_letter_timestamp, if: :will_save_change_to_cover_letter?
 
+  # posting_snapshot is excluded the way the blobs are: index and board fetch
+  # every row, and 12k of text per row is blob weight in a text costume.
+  # ApplicationsController#show merges it back explicitly.
   def as_json(options = {})
-    super(options.merge(except: %i[resume cover_letter]))
+    super(options.merge(except: %i[resume cover_letter posting_snapshot]))
   end
 
   # The one place a downloaded PDF gets its name — both the per-application endpoints and the
