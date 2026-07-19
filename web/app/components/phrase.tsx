@@ -6,10 +6,12 @@ import { Parser, jaModel } from "budoux";
  * running BudouX in RSC exists to avoid. SPEC.md § Japanese line breaking. */
 const parser = new Parser(jaModel);
 
-/* Hiragana, katakana, CJK ideographs: the scripts the Japanese model segments.
- * Latin-only strings (every `en` catalog string) fail this test and pass
- * through untouched, so call sites need no locale check. */
-const JAPANESE = /[ぁ-ヿ㐀-䶿一-鿿豈-﫿]/;
+/* Hiragana, katakana, kanji: the scripts the Japanese model segments. Script
+ * properties, not codepoint ranges: Katakana includes the half-width block and
+ * Han covers the astral-plane extensions, both of which hand-copied BMP ranges
+ * silently miss. Latin-only strings (every `en` catalog string) fail this test
+ * and pass through untouched, so call sites need no locale check. */
+const JAPANESE = /[\p{sc=Hiragana}\p{sc=Katakana}\p{sc=Han}]/u;
 
 function annotate(text: string) {
   const phrases = parser.parse(text);
@@ -26,7 +28,7 @@ function annotate(text: string) {
  * `overflow-wrap` is the escape valve for a phrase wider than its container.
  * Element children are not recursed into: a t.rich call site that wants its
  * chunks segmented wraps them inside the tag renderer. */
-export function Phrase({ children }: { children: ReactNode }) {
+export function Phrase({ children }: { children: ReactNode }): ReactNode {
   const nodes = Array.isArray(children) ? children : [children];
   if (!nodes.some((node) => typeof node === "string" && JAPANESE.test(node))) {
     return children;
