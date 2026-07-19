@@ -39,6 +39,14 @@ pipeline. Built as a portfolio project by Chairul Akmal (https://chairulakmal.co
   historical reply times for the stage, derived from the timeline audit trail with a window
   function. Below five recorded replies at a stage it falls back to a global default (21 days for
   applied, 14 for phone_screen) and labels the threshold as a default rather than a personal one.
+- Models the Tokyo job market specifically: each application records the recruiter channel
+  (direct / agency / referral) and which agency submitted it, and the app warns before a
+  duplicate submission while an agency's candidate-ownership window (assumed 18 months) is
+  still open; compensation is stored as the nenshu (年収) structure, guaranteed months vs
+  performance-tied bonus months, rather than one number; the posting's Japanese-language
+  requirement (JLPT N1/N2, business, conversational, none) is a filter; and the posting text
+  is snapshotted at pre-fill time so it survives the posting being taken down. These fields
+  are extracted by the same AI pre-fill pass that reads company and role.
 - Offers a Kanban board at /board: one column per active status, and dragging a card between
   columns performs a real FSM transition. The board fetches the legal moves and its column set
   from GET /api/v1/transitions rather than keeping its own copy of the table, and the server

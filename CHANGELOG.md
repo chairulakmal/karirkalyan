@@ -1,6 +1,27 @@
 # Changelog
 
-The history: shipped work, newest first — `v1.7.0` back through `v1.0.0` — with branch/PR names noting where each change landed, and each release since `v1.3.1` naming its patch/minor level against the versioning policy's mechanical test. The most important section is the one that is not a release: § Decisions records the settled decisions-not-to-build, so that [`TODO.md`](TODO.md) — where open work lives — can stay plan-only without the reasoning getting lost.
+The history: shipped work, newest first — `v1.8.0` back through `v1.0.0` — with branch/PR names noting where each change landed, and each release since `v1.3.1` naming its patch/minor level against the versioning policy's mechanical test. The most important section is the one that is not a release: § Decisions records the settled decisions-not-to-build, so that [`TODO.md`](TODO.md) — where open work lives — can stay plan-only without the reasoning getting lost.
+
+---
+
+## v1.8.0 — 2026-07-19
+
+The Japan market layer: the four items `TODO.md` planned as one release because a single `UrlPrefillService` pass captures them all, so this was one extraction pass, one migration pass, one form pass. A minor by the mechanical test: the `agencies` table is purely additive and every new `applications` column is nullable, so the `v1.7.0` image boots and serves against this database unchanged.
+
+### Recruiter channel + agencies, with the ownership warning *(feat/japan-market-layer, #78)*
+
+- **Each application records how it reached the company** (`channel`: direct / agent / referral) **and which agency submitted it.** Agencies are a per-user vocabulary resolved lazily by name (`Agency.resolve`, a find-or-create with the unique-index race handled), never a management page: the rows exist to be grouped by, not curated.
+- **`GET /api/v1/applications/ownership_check` warns before a duplicate submission.** The mechanism has a name, candidate **ownership**: the first agency to submit you to a company owns that candidacy for roughly 12–18 months, and the fee follows the owner even if you later reach the company another way, so a second submission is damaging rather than merely wasteful. `Agency::OWNERSHIP_WINDOW_MONTHS` is 18, the conservative end, because the warning's one job is to fire while the window *may* still be open (a perishable market fact under `TODO.md`'s refresh rule). The new-application form checks when the company field settles and warns on any second submission, whatever channel the new application uses. Nothing blocks: the FSM has no opinion and the create endpoint accepts regardless.
+
+### 年収 as a structure, and the Japanese-level filter *(feat/japan-market-layer, #78)*
+
+- **Compensation is four nullable columns, not one number**: the quoted range in yen, plus the guaranteed vs performance-tied months split, the axis two same-total 600万 offers actually differ on. The form quotes 万円 (the unit postings use); the API stores yen, so the stored number is unambiguous.
+- **`japanese_level` records the posting's demand on the market's own taxonomy** (none / conversational / business / N2 / N1, the buckets TokyoDev and Japan Dev tag every posting with) and joins `Applications::ListQuery` as a comma-list filter with `status`'s exact ignore-bad-input contract. It records what the posting asks, never what the user holds; the gap is the career-growth JLPT item. The dashboard dropdown is deliberately count-less: counts would reshape the `facets` payload, whose next change `v1.10.0`'s stat-cards item already owns.
+
+### Posting snapshot *(feat/japan-market-layer, #78)*
+
+- **The stripped posting text is captured at prefill and persisted at create.** Prefill returns `posting_text` beside the extracted fields, and the form carries it invisibly into `posting_snapshot`, so a posting taken down mid-process stays readable for interview prep and every extraction this release added is re-runnable against dead links. There is no row to write at prefill time, which is how the capture keeps "prefill persists nothing" true; the user's review still stands between extraction and persistence. Both entry points fill it, so a pasted posting snapshots exactly as a fetched one does. Excluded from `as_json` the way the blobs are (index and board fetch every row); `#show` merges it, and the detail page renders it behind a disclosure.
+- **Extraction stays one pass.** The tool schema grows the market fields with only company/role/notes still required, and the service normalises what comes back rather than trusting it: enum values outside the model's sets and non-positive numbers become nil, because a schema constrains shape, not judgement, and a hallucinated channel written into the form is worse than an empty one.
 
 ---
 
