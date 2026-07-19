@@ -10,20 +10,36 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[8.1].define(version: 2026_07_18_000002) do
+ActiveRecord::Schema[8.1].define(version: 2026_07_19_000002) do
   # These are extensions that must be enabled in order to support this database
   enable_extension "pg_catalog.plpgsql"
   enable_extension "pgcrypto"
 
+  create_table "agencies", force: :cascade do |t|
+    t.datetime "created_at", null: false
+    t.string "name", null: false
+    t.datetime "updated_at", null: false
+    t.bigint "user_id", null: false
+    t.index ["user_id", "name"], name: "index_agencies_on_user_id_and_name", unique: true
+  end
+
   create_table "applications", force: :cascade do |t|
+    t.bigint "agency_id"
     t.datetime "applied_at"
+    t.string "channel"
+    t.bigint "comp_annual_max_yen"
+    t.bigint "comp_annual_min_yen"
+    t.float "comp_months_guaranteed"
+    t.float "comp_months_variable"
     t.string "company", null: false
     t.binary "cover_letter"
     t.datetime "cover_letter_updated_at"
     t.datetime "created_at", null: false
     t.datetime "follow_up_at"
+    t.string "japanese_level"
     t.integer "lock_version", default: 0, null: false
     t.text "notes"
+    t.text "posting_snapshot"
     t.binary "resume"
     t.datetime "resume_updated_at"
     t.string "role", null: false
@@ -31,6 +47,7 @@ ActiveRecord::Schema[8.1].define(version: 2026_07_18_000002) do
     t.datetime "updated_at", null: false
     t.string "url"
     t.bigint "user_id", null: false
+    t.index ["agency_id"], name: "index_applications_on_agency_id"
     t.index ["follow_up_at"], name: "index_applications_on_follow_up_at"
     t.index ["status"], name: "index_applications_on_status"
     t.index ["user_id", "created_at"], name: "index_applications_on_user_id_and_created_at", order: { created_at: :desc }
@@ -217,6 +234,8 @@ ActiveRecord::Schema[8.1].define(version: 2026_07_18_000002) do
     t.index ["jti"], name: "index_users_on_jti", unique: true
   end
 
+  add_foreign_key "agencies", "users"
+  add_foreign_key "applications", "agencies"
   add_foreign_key "applications", "users"
   add_foreign_key "credentials", "users"
   add_foreign_key "push_subscriptions", "users"

@@ -37,6 +37,11 @@ RSpec.describe "Applications", type: :request do
                              "`linkedin.com`); there is no `source` column. Pass `(none)` for applications " \
                              "with no link. Like `company`, an unmatched value legitimately returns nothing, " \
                              "while blank or whitespace-only is ignored."
+      parameter name: :japanese_level, in: :query, required: false, schema: { type: :string },
+                description: "Comma-separated levels from `none,conversational,business,n2,n1` — any member " \
+                             "matches, with `status`'s exact contract: unknown members are dropped and a list " \
+                             "left with none is unfiltered, not empty. Matches the recorded value only — " \
+                             "`none` means a recorded \"no Japanese required\", never a null column."
       parameter name: :after, in: :query, required: false, schema: { type: :string },
                 description: "Cursor from a previous page's `meta.next_cursor` — an opaque Base64 " \
                              "timestamp. A malformed cursor returns the first page."
@@ -95,7 +100,19 @@ RSpec.describe "Applications", type: :request do
                               description: "Optional; only used when status is 'applied'. Backdates applied_at (defaults to now)." },
               url:          { type: :string },
               notes:        { type: :string },
-              follow_up_at: { type: :string, format: "date-time" }
+              follow_up_at: { type: :string, format: "date-time" },
+              channel:      { type: :string, enum: Application::CHANNELS, nullable: true,
+                              description: "How this application reached the company. `agent` is what the ownership check keys on." },
+              agency_name:  { type: :string, nullable: true,
+                              description: "Agency name, resolved server-side to a per-user agencies row (created on first use). Blank clears the agency; the key absent leaves it untouched." },
+              japanese_level: { type: :string, enum: Application::JAPANESE_LEVELS, nullable: true,
+                                description: "The posting's Japanese requirement — what it asks, not what the user holds." },
+              comp_annual_min_yen: { type: :integer, nullable: true, description: "Quoted 年収, low end, in yen." },
+              comp_annual_max_yen: { type: :integer, nullable: true, description: "High end; null when one figure is quoted." },
+              comp_months_guaranteed: { type: :number, nullable: true, description: "Months of base guaranteed per year (12 + guaranteed bonus)." },
+              comp_months_variable:   { type: :number, nullable: true, description: "Performance-tied bonus months on top." },
+              posting_snapshot: { type: :string, nullable: true,
+                                  description: "Stripped posting text, as prefill's `posting_text` returned it. Capped at 12,000 characters. Excluded from list payloads; GET /applications/{id} returns it." }
             },
             required: %w[company role]
           }
@@ -126,6 +143,43 @@ RSpec.describe "Applications", type: :request do
         let(:body) { { application: { company: "Cookpad", role: "SRE" } } }
         run_test! do |response|
           expect(JSON.parse(response.body)["status"]).to eq("draft")
+        end
+      end
+
+      response "201", "created with the Japan-market fields; agency_name resolves to an agencies row" do
+        let(:Authorization) { jwt_for(user) }
+        let(:body) do
+          { application: {
+            company: "Mercari", role: "Backend Engineer", status: "applied",
+            channel: "agent", agency_name: "  Robert Half ", japanese_level: "business",
+            comp_annual_min_yen: 6_000_000, comp_annual_max_yen: 9_000_000,
+            comp_months_guaranteed: 14, comp_months_variable: 2,
+            posting_snapshot: "stripped posting text"
+          } }
+        end
+        run_test! do |response|
+          payload = JSON.parse(response.body)
+          expect(payload).to include(
+            "channel" => "agent", "japanese_level" => "business",
+            "comp_annual_min_yen" => 6_000_000, "comp_months_guaranteed" => 14.0
+          )
+          # The snapshot is persisted but excluded from as_json — #show merges it.
+          expect(payload).not_to have_key("posting_snapshot")
+
+          record = user.applications.order(:created_at).last
+          expect(record.posting_snapshot).to eq("stripped posting text")
+          expect(record.agency.name).to eq("Robert Half")
+          expect(record.agency.user).to eq(user)
+        end
+      end
+
+      response "422", "rejects a market field outside its taxonomy" do
+        let(:Authorization) { jwt_for(user) }
+        let(:body) { { application: { company: "Mercari", role: "SRE", channel: "headhunter" } } }
+        run_test! do |response|
+          payload = JSON.parse(response.body)
+          expect(payload["code"]).to eq("validation_failed")
+          expect(payload["details"]).to include("field" => "channel", "code" => "inclusion")
         end
       end
 
@@ -164,6 +218,17 @@ RSpec.describe "Applications", type: :request do
 
   describe "GET /api/v1/applications — filtering" do
     let(:headers) { { "Authorization" => jwt_for(user) } }
+
+    it "filters by japanese_level through the query string" do
+      create(:application, company: "Mercari", japanese_level: "business", user: user)
+      create(:application, company: "Cookpad", japanese_level: "n1", user: user)
+      create(:application, company: "DeNA", user: user)
+
+      get "/api/v1/applications", params: { japanese_level: "business,n2" }, headers: headers
+
+      companies = JSON.parse(response.body)["data"].map { |row| row["company"] }
+      expect(companies).to eq([ "Mercari" ])
+    end
 
     it "filters by company (exact match)" do
       create(:application, company: "Mercari", user: user)
@@ -204,6 +269,77 @@ RSpec.describe "Applications", type: :request do
       data = JSON.parse(response.body)["data"]
       expect(data.length).to eq(1)
       expect(data.first["url"]).to include("tokyodev.com")
+    end
+  end
+
+  path "/api/v1/applications/ownership_check" do
+    get "Check whether an agency already has an open ownership window on a company" do
+      tags "Applications"
+      security [ bearerAuth: [] ]
+      produces "application/json"
+      description "The first agency to submit a candidate to a company owns that candidacy for " \
+                  "`window_months` (~12–18 months; this app assumes 18, the conservative end), and the " \
+                  "fee follows the owner even if the candidate later reaches the company another way. " \
+                  "A submission is an application to the company with `channel = agent` whose " \
+                  "`applied_at` is inside the window. A warning surface only — nothing blocks."
+      parameter name: :company, in: :query, required: false, schema: { type: :string },
+                description: "Exact company name, the list filter's matching rule. Blank returns an " \
+                             "empty list rather than erroring — the form calls this as the user works."
+
+      response "200", "open-window agent submissions for the company" do
+        let(:Authorization) { jwt_for(user) }
+        let(:company)       { "Mercari" }
+        let(:agency)        { create(:agency, user: user, name: "Robert Half") }
+
+        before do
+          create(:application, :applied, user: user, company: "Mercari", channel: "agent",
+            agency: agency, applied_at: 6.months.ago)
+          # Outside the window, wrong channel, wrong company: all invisible.
+          create(:application, :applied, user: user, company: "Mercari", channel: "agent",
+            agency: agency, applied_at: 20.months.ago)
+          create(:application, :applied, user: user, company: "Mercari", channel: "direct")
+          create(:application, :applied, user: user, company: "Cookpad", channel: "agent", agency: agency)
+        end
+
+        run_test! do |response|
+          payload = JSON.parse(response.body)
+          expect(payload["window_months"]).to eq(Agency::OWNERSHIP_WINDOW_MONTHS)
+          expect(payload["submissions"].length).to eq(1)
+          expect(payload["submissions"].first).to include("agency_name" => "Robert Half")
+          expect(payload["submissions"].first["window_ends_on"]).to be_present
+        end
+      end
+
+      response "200", "an agent submission with no agency recorded still counts" do
+        let(:Authorization) { jwt_for(user) }
+        let(:company)       { "Mercari" }
+
+        before do
+          create(:application, :applied, user: user, company: "Mercari", channel: "agent")
+        end
+
+        run_test! do |response|
+          submissions = JSON.parse(response.body)["submissions"]
+          expect(submissions.length).to eq(1)
+          # Someone owns it, and not knowing who is the more dangerous case.
+          expect(submissions.first["agency_name"]).to be_nil
+        end
+      end
+
+      response "200", "blank company reads as an empty list, never an error" do
+        let(:Authorization) { jwt_for(user) }
+        let(:company)       { "" }
+
+        run_test! do |response|
+          expect(JSON.parse(response.body)["submissions"]).to eq([])
+        end
+      end
+
+      response "401", "not authenticated" do
+        let(:Authorization) { nil }
+        let(:company)       { "Mercari" }
+        run_test!
+      end
     end
   end
 
@@ -249,14 +385,22 @@ RSpec.describe "Applications", type: :request do
             instance_double(
               Applications::UrlPrefillService,
               call: { company: "Mercari", role: "Backend Engineer",
-                      notes: "Tokyo, full-time.", url: "https://example.com/jobs/42" }
+                      notes: "Tokyo, full-time.",
+                      channel: "agent", agency: "Robert Half", japanese_level: "business",
+                      comp_annual_min_yen: 6_000_000, comp_annual_max_yen: 9_000_000,
+                      comp_months_guaranteed: 14.0, comp_months_variable: 2.0,
+                      url: "https://example.com/jobs/42",
+                      posting_text: "Mercari — Backend Engineer. Tokyo, full-time." }
             )
           )
         end
 
         run_test! do |response|
           payload = JSON.parse(response.body)
-          expect(payload).to include("company" => "Mercari", "role" => "Backend Engineer")
+          expect(payload).to include("company" => "Mercari", "role" => "Backend Engineer",
+                                     "channel" => "agent", "japanese_level" => "business")
+          # posting_text is what the form submits back as posting_snapshot.
+          expect(payload["posting_text"]).to be_present
         end
       end
 
@@ -427,11 +571,21 @@ RSpec.describe "Applications", type: :request do
       security [ bearerAuth: [] ]
       produces "application/json"
 
-      response "200", "application found" do
+      response "200", "application found (+ valid_next_states, timeline_entries, agency_name, posting_snapshot)" do
         let(:Authorization) { jwt_for(user) }
-        let(:record)           { create(:application, :applied, user: user) }
+        let(:record) do
+          create(:application, :applied, user: user,
+            agency: create(:agency, user: user, name: "Robert Half"),
+            posting_snapshot: "stripped posting text")
+        end
         let(:id)            { record.id }
-        run_test!
+        run_test! do |response|
+          payload = JSON.parse(response.body)
+          # Merged by #show and only #show — the list excludes the snapshot the
+          # way it excludes the blobs, and never joins the agency.
+          expect(payload["agency_name"]).to eq("Robert Half")
+          expect(payload["posting_snapshot"]).to eq("stripped posting text")
+        end
       end
 
       response "404", "not found or belongs to another user" do
@@ -466,6 +620,15 @@ RSpec.describe "Applications", type: :request do
               url:          { type: :string },
               notes:        { type: :string },
               follow_up_at: { type: :string, format: "date-time" },
+              channel:        { type: :string, enum: Application::CHANNELS, nullable: true },
+              agency_name:    { type: :string, nullable: true,
+                                description: "Resolved server-side to a per-user agencies row. Blank clears; key absent leaves untouched." },
+              japanese_level: { type: :string, enum: Application::JAPANESE_LEVELS, nullable: true },
+              comp_annual_min_yen:    { type: :integer, nullable: true },
+              comp_annual_max_yen:    { type: :integer, nullable: true },
+              comp_months_guaranteed: { type: :number, nullable: true },
+              comp_months_variable:   { type: :number, nullable: true },
+              posting_snapshot:       { type: :string, nullable: true },
               lock_version: { type: :integer,
                               description: "Must match current record version to prevent concurrent overwrites" }
             }

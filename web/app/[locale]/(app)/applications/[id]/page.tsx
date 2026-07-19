@@ -132,6 +132,13 @@ export default async function ApplicationDetailPage({
           followUpAt={app.follow_up_at}
           appliedAt={app.applied_at}
           createdAt={app.created_at}
+          channel={app.channel}
+          agencyName={app.agency_name}
+          japaneseLevel={app.japanese_level}
+          compAnnualMinYen={app.comp_annual_min_yen}
+          compAnnualMaxYen={app.comp_annual_max_yen}
+          compMonthsGuaranteed={app.comp_months_guaranteed}
+          compMonthsVariable={app.comp_months_variable}
         />
 
         <div className="border border-dune bg-linen p-5">
@@ -150,6 +157,24 @@ export default async function ApplicationDetailPage({
           />
         </div>
       </section>
+
+      {/* The stripped posting text captured at prefill time. Postings get taken
+          down mid-process, usually right when the user preps for the interview
+          they earned with them — this copy is what survives the deletion.
+          Collapsed by default: reference material, not the page's subject. */}
+      {app.posting_snapshot ? (
+        <section className="border border-dune bg-linen p-5">
+          <details>
+            <summary className="kk-label cursor-pointer select-none">
+              {t("postingSnapshot")}
+            </summary>
+            <p className="mt-1 text-xs text-ink-soft">{t("postingSnapshotHint")}</p>
+            <p className="mt-3 whitespace-pre-wrap text-sm text-midnight">
+              {app.posting_snapshot}
+            </p>
+          </details>
+        </section>
+      ) : null}
 
       <section className="border border-dune bg-linen p-5">
         <p className="kk-label">{t("timeline")}</p>

@@ -16,6 +16,21 @@ export type Status =
   | "withdrawn"
   | "archived";
 
+// The Japan-market taxonomies (v1.8.0). Fixed vocabularies mirroring
+// Application::CHANNELS / JAPANESE_LEVELS per this file's header rule — not
+// FSM sets, which are fetched from /transitions and never mirrored.
+export type Channel = "direct" | "agent" | "referral";
+export const CHANNELS: readonly Channel[] = ["direct", "agent", "referral"];
+
+export type JapaneseLevel = "none" | "conversational" | "business" | "n2" | "n1";
+export const JAPANESE_LEVELS: readonly JapaneseLevel[] = [
+  "none",
+  "conversational",
+  "business",
+  "n2",
+  "n1",
+];
+
 // Cursor-pagination envelope returned by the list endpoints.
 export type PageMeta = { next_cursor: string | null; has_more: boolean };
 
@@ -52,6 +67,15 @@ export type Application = {
   notes: string | null;
   resume_updated_at: string | null;
   cover_letter_updated_at: string | null;
+  channel: Channel | null;
+  agency_id: number | null;
+  japanese_level: JapaneseLevel | null;
+  // The 年収 structure: quoted range in yen, and the guaranteed vs
+  // performance-tied months split. All null when unrecorded.
+  comp_annual_min_yen: number | null;
+  comp_annual_max_yen: number | null;
+  comp_months_guaranteed: number | null;
+  comp_months_variable: number | null;
   lock_version: number;
   created_at: string;
   updated_at: string;
@@ -72,6 +96,24 @@ export type TimelineEntry = {
 export type ApplicationWithDetail = Application & {
   valid_next_states: Status[];
   timeline_entries: TimelineEntry[];
+  // Merged by #show and only #show: the list never joins the agency, and the
+  // snapshot is excluded from as_json so index rows stay lean.
+  agency_name: string | null;
+  posting_snapshot: string | null;
+};
+
+// GET /applications/ownership_check — open agency-ownership windows on a
+// company. A warning surface only; nothing blocks.
+export type OwnershipSubmission = {
+  id: number;
+  agency_name: string | null;
+  submitted_at: string;
+  window_ends_on: string;
+};
+
+export type OwnershipCheck = {
+  window_months: number;
+  submissions: OwnershipSubmission[];
 };
 
 // GET /transitions — the FSM read endpoint. `transitions` is the *effective*

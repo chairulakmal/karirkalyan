@@ -6,7 +6,8 @@ import { useRouter } from "@/i18n/navigation";
 import { updateApplication } from "@/app/lib/actions";
 import { formatDate, isOverdue } from "@/app/lib/format";
 import { Field } from "@/app/components/field";
-import type { Status } from "@/app/lib/types";
+import type { Channel, JapaneseLevel, Status } from "@/app/lib/types";
+import { CHANNELS, JAPANESE_LEVELS } from "@/app/lib/types";
 
 type Props = {
   id: number;
@@ -20,16 +21,43 @@ type Props = {
   followUpAt: string | null;
   appliedAt: string | null;
   createdAt: string;
+  channel: Channel | null;
+  agencyName: string | null;
+  japaneseLevel: JapaneseLevel | null;
+  compAnnualMinYen: number | null;
+  compAnnualMaxYen: number | null;
+  compMonthsGuaranteed: number | null;
+  compMonthsVariable: number | null;
 };
+
+// Yen from the API, 万円 on screen and in the inputs — the unit postings use.
+function yenToMan(yen: number | null): string {
+  return yen === null ? "" : String(yen / 10_000);
+}
 
 export function DetailsEditor(props: Props) {
   const t = useTranslations("details");
+  const tc = useTranslations("channel");
+  const tj = useTranslations("japaneseLevel");
   const tErrors = useTranslations("errors");
   const locale = useLocale();
   const router = useRouter();
   const [editing, setEditing] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [pending, startTransition] = useTransition();
+  // Controlled (unlike the other edit fields) because the agency input only
+  // renders on the agent channel, and that choice can change mid-edit.
+  const [channel, setChannel] = useState<Channel | "">(props.channel ?? "");
+
+  const compRange =
+    props.compAnnualMinYen === null
+      ? null
+      : props.compAnnualMaxYen === null
+        ? t("compSingle", { min: (props.compAnnualMinYen / 10_000).toLocaleString(locale) })
+        : t("compRange", {
+            min: (props.compAnnualMinYen / 10_000).toLocaleString(locale),
+            max: (props.compAnnualMaxYen / 10_000).toLocaleString(locale),
+          });
 
   function onSubmit(formData: FormData) {
     setError(null);
@@ -91,6 +119,25 @@ export function DetailsEditor(props: Props) {
             }
           />
           <Row label={t("created")} value={formatDate(props.createdAt, locale)} />
+          <Row label={t("channel")} value={props.channel ? tc(props.channel) : t("blank")} />
+          {/* Only meaningful on the agent channel, so only shown there — a
+              "(none)" agency row on a direct application is noise. */}
+          {props.channel === "agent" ? (
+            <Row label={t("agency")} value={props.agencyName ?? t("blank")} />
+          ) : null}
+          <Row
+            label={t("japaneseLevel")}
+            value={props.japaneseLevel ? tj(props.japaneseLevel) : t("blank")}
+          />
+          <Row label={t("comp")} value={compRange ?? t("blank")} />
+          <Row
+            label={t("compMonthsGuaranteed")}
+            value={props.compMonthsGuaranteed ?? t("blank")}
+          />
+          <Row
+            label={t("compMonthsVariable")}
+            value={props.compMonthsVariable ?? t("blank")}
+          />
         </dl>
         {props.notes ? (
           <>
@@ -121,6 +168,82 @@ export function DetailsEditor(props: Props) {
           type="date"
           defaultValue={props.followUpAt ? props.followUpAt.slice(0, 10) : ""}
         />
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+          <label className="block text-sm">
+            <span className="kk-label">{t("channel")}</span>
+            <select
+              name="channel"
+              value={channel}
+              onChange={(e) => setChannel(e.target.value as Channel | "")}
+              className="mt-1.5 block w-full border border-dune bg-linen px-3 py-2 text-sm text-midnight"
+            >
+              <option value="">{t("blank")}</option>
+              {CHANNELS.map((c) => (
+                <option key={c} value={c}>
+                  {tc(c)}
+                </option>
+              ))}
+            </select>
+          </label>
+          <label className="block text-sm">
+            <span className="kk-label">{t("japaneseLevel")}</span>
+            <select
+              name="japanese_level"
+              defaultValue={props.japaneseLevel ?? ""}
+              className="mt-1.5 block w-full border border-dune bg-linen px-3 py-2 text-sm text-midnight"
+            >
+              <option value="">{t("blank")}</option>
+              {JAPANESE_LEVELS.map((l) => (
+                <option key={l} value={l}>
+                  {tj(l)}
+                </option>
+              ))}
+            </select>
+          </label>
+        </div>
+        {channel === "agent" ? (
+          <Field
+            name="agency_name"
+            label={t("agency")}
+            defaultValue={props.agencyName ?? ""}
+          />
+        ) : null}
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+          <Field
+            name="comp_annual_min_man"
+            label={t("compMinMan")}
+            type="number"
+            min="0"
+            step="1"
+            defaultValue={yenToMan(props.compAnnualMinYen)}
+          />
+          <Field
+            name="comp_annual_max_man"
+            label={t("compMaxMan")}
+            type="number"
+            min="0"
+            step="1"
+            defaultValue={yenToMan(props.compAnnualMaxYen)}
+          />
+        </div>
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+          <Field
+            name="comp_months_guaranteed"
+            label={t("compMonthsGuaranteed")}
+            type="number"
+            min="0"
+            step="0.5"
+            defaultValue={props.compMonthsGuaranteed ?? ""}
+          />
+          <Field
+            name="comp_months_variable"
+            label={t("compMonthsVariable")}
+            type="number"
+            min="0"
+            step="0.5"
+            defaultValue={props.compMonthsVariable ?? ""}
+          />
+        </div>
         <label className="block text-sm">
           <span className="kk-label">{t("notes")}</span>
           <textarea

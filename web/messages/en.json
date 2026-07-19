@@ -54,6 +54,18 @@
     "en": "English",
     "ja": "日本語"
   },
+  "channel": {
+    "direct": "Direct",
+    "agent": "Agency",
+    "referral": "Referral"
+  },
+  "japaneseLevel": {
+    "none": "No Japanese required",
+    "conversational": "Conversational",
+    "business": "Business level",
+    "n2": "JLPT N2",
+    "n1": "JLPT N1"
+  },
   "errors": {
     "401": "Your session is no longer valid. Sign in again to continue.",
     "403": "You don't have access to that.",
@@ -336,6 +348,8 @@
     "jobBoard": "Job board",
     "allBoards": "All boards",
     "noBoard": "No link",
+    "japaneseLevel": "Japanese level",
+    "allLevels": "All levels",
     "clearFilters": "Clear filters",
     "all": "All",
     "stages": "Stages",
@@ -366,7 +380,9 @@
     "coverLetter": "Cover letter",
     "timeline": "Timeline",
     "noTransitions": "No transitions yet.",
-    "failedToLoad": "Failed to load: {message}"
+    "failedToLoad": "Failed to load: {message}",
+    "postingSnapshot": "Posting snapshot",
+    "postingSnapshotHint": "The posting's text, saved when the AI pre-fill read it. It survives the posting being taken down."
   },
   "details": {
     "title": "Details",
@@ -384,7 +400,17 @@
     "followUpDate": "Follow-up date",
     "saving": "Saving…",
     "save": "Save changes",
-    "cancel": "Cancel"
+    "cancel": "Cancel",
+    "channel": "Channel",
+    "agency": "Agency",
+    "japaneseLevel": "Japanese requirement",
+    "comp": "年収",
+    "compSingle": "{min}万円",
+    "compRange": "{min}–{max}万円",
+    "compMinMan": "Annual comp from (万円)",
+    "compMaxMan": "Annual comp to (万円)",
+    "compMonthsGuaranteed": "Guaranteed months",
+    "compMonthsVariable": "Performance-tied months"
   },
   "transitions": {
     "goTo": "→ {label}",
@@ -451,7 +477,28 @@
     "resume": "Resume",
     "coverLetter": "Cover letter",
     "creating": "Creating…",
-    "submit": "Create application"
+    "submit": "Create application",
+    "market": {
+      "title": "Japan market",
+      "optional": "(optional)",
+      "unset": "Not recorded",
+      "channel": "Channel",
+      "japaneseLevel": "Japanese requirement",
+      "agency": "Agency",
+      "agencyPlaceholder": "e.g. Robert Half",
+      "agencyHint": "The agency submitting you. The first agency to submit you to a company owns that candidacy for a year or more, so recording it is what powers the duplicate-submission warning.",
+      "compMin": "Annual comp from (万円)",
+      "compMax": "Annual comp to (万円)",
+      "monthsGuaranteed": "Guaranteed months",
+      "monthsVariable": "Performance-tied months",
+      "compHint": "Japanese offers quote 年収 as a yearly figure that folds in bonus, often as months of base: 12 months plus a 2-month guaranteed bonus is 14. Two 600万 offers with the same total can differ a lot in how much of it is guaranteed."
+    },
+    "ownership": {
+      "title": "An agency may already own your candidacy at {company}",
+      "entry": "{agency} submitted you on {date}; the ownership window runs until about {until}.",
+      "unknownAgency": "An agency (not recorded)",
+      "hint": "The first agency to submit you to a company owns that candidacy for roughly {months} months, and the fee follows the owner even if you reach the company another way. A second submission while the window is open can hurt your case, so check with the agency first. Nothing here is blocked."
+    }
   },
   "delete": {
     "confirmPrompt": "Delete permanently? This cannot be undone.",

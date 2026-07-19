@@ -156,4 +156,78 @@ RSpec.describe Application do
       expect(described_class.download_slug("   ")).to eq("")
     end
   end
+
+  # The Japan-market columns (v1.8.0). All nullable — a blank record must stay
+  # valid, or the standing additive-migration rule is broken at the model layer.
+  describe "the market columns" do
+    it "accepts a record with none of them set" do
+      expect(build(:application)).to be_valid
+    end
+
+    it "refuses a channel outside CHANNELS" do
+      expect(build(:application, channel: "headhunter")).not_to be_valid
+      expect(build(:application, channel: "agent")).to be_valid
+    end
+
+    it "refuses a japanese_level outside JAPANESE_LEVELS" do
+      expect(build(:application, japanese_level: "fluent")).not_to be_valid
+      expect(build(:application, japanese_level: "n1")).to be_valid
+    end
+
+    it "refuses non-positive compensation figures" do
+      expect(build(:application, comp_annual_min_yen: 0)).not_to be_valid
+      expect(build(:application, comp_annual_min_yen: 6_000_000)).to be_valid
+    end
+
+    it "refuses negative month splits but allows zero" do
+      expect(build(:application, comp_months_variable: -1)).not_to be_valid
+      expect(build(:application, comp_months_variable: 0)).to be_valid
+    end
+
+    it "caps posting_snapshot at the prefill pipeline's MAX_TEXT_CHARS" do
+      cap = Applications::UrlPrefillService::MAX_TEXT_CHARS
+
+      expect(build(:application, posting_snapshot: "あ" * cap)).to be_valid
+      expect(build(:application, posting_snapshot: "あ" * (cap + 1))).not_to be_valid
+    end
+
+    # Excluded the way the blobs are: index and board fetch every row, and 12k
+    # of text per row is blob weight in a text costume. #show merges it back.
+    it "excludes posting_snapshot from as_json" do
+      record = create(:application, posting_snapshot: "stripped posting text")
+
+      expect(record.as_json).not_to have_key("posting_snapshot")
+    end
+  end
+
+  describe ".open_ownership_submissions" do
+    let(:user)   { create(:user) }
+    let(:agency) { create(:agency, user: user) }
+
+    def submission(**attrs)
+      create(:application, :applied, user: user, company: "Mercari", channel: "agent",
+        agency: agency, **attrs)
+    end
+
+    it "returns an agent submission inside the window" do
+      inside = submission(applied_at: 6.months.ago)
+
+      expect(user.applications.open_ownership_submissions("Mercari")).to eq([ inside ])
+    end
+
+    it "excludes a submission whose window has expired" do
+      submission(applied_at: (Agency::OWNERSHIP_WINDOW_MONTHS + 1).months.ago)
+
+      expect(user.applications.open_ownership_submissions("Mercari")).to be_empty
+    end
+
+    it "excludes other companies, other channels, and never-submitted rows" do
+      submission(company: "Cookpad")
+      create(:application, :applied, user: user, company: "Mercari", channel: "direct")
+      # wishlist: no applied_at, never submitted — no window starts.
+      create(:application, user: user, company: "Mercari", channel: "agent", agency: agency)
+
+      expect(user.applications.open_ownership_submissions("Mercari")).to be_empty
+    end
+  end
 end

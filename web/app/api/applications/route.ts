@@ -10,12 +10,14 @@ export async function GET(request: NextRequest) {
   const status = searchParams.get("status");
   const company = searchParams.get("company");
   const source = searchParams.get("source");
+  const japaneseLevel = searchParams.get("japanese_level");
 
   const qs = new URLSearchParams({ limit });
   if (after) qs.set("after", after);
   if (status) qs.set("status", status);
   if (company) qs.set("company", company);
   if (source) qs.set("source", source);
+  if (japaneseLevel) qs.set("japanese_level", japaneseLevel);
 
   const result = await apiFetch<Paginated<Application>>(`/applications?${qs}`);
 

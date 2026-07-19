@@ -24,12 +24,13 @@ module Api
 
       def index
         page = Applications::ListQuery.new(
-          user:    current_user,
-          status:  params[:status],
-          company: params[:company],
-          source:  params[:source],
-          after:   params[:after],
-          limit:   params[:limit]
+          user:           current_user,
+          status:         params[:status],
+          company:        params[:company],
+          source:         params[:source],
+          japanese_level: params[:japanese_level],
+          after:          params[:after],
+          limit:          params[:limit]
         ).call
 
         render json: {
@@ -75,10 +76,39 @@ module Api
       end
 
       def show
+        # agency_name and posting_snapshot are merged here and only here: the
+        # name saves the client re-deriving a row it cannot see, and the
+        # snapshot is excluded from as_json so index rows stay lean.
         render json: @application.as_json.merge(
           valid_next_states: ApplicationFSM.valid_next_states(@application.status),
-          timeline_entries:  @application.timeline_entries.order(created_at: :asc)
+          timeline_entries:  @application.timeline_entries.order(created_at: :asc),
+          agency_name:       @application.agency&.name,
+          posting_snapshot:  @application.posting_snapshot
         )
+      end
+
+      # GET /api/v1/applications/ownership_check?company=… — does an agency
+      # already have an open ownership window on this company? A warning
+      # surface only: nothing here blocks a create, the FSM has no opinion.
+      # Blank company is an empty list, not a 422 — the form calls this as the
+      # user works. SPEC.md § API contract → The ownership check.
+      def ownership_check
+        submissions = current_user.applications
+          .open_ownership_submissions(params[:company].to_s.strip.presence)
+          .includes(:agency)
+          .order(applied_at: :desc)
+
+        render json: {
+          window_months: Agency::OWNERSHIP_WINDOW_MONTHS,
+          submissions: submissions.map do |application|
+            {
+              id:            application.id,
+              agency_name:   application.agency&.name,
+              submitted_at:  application.applied_at,
+              window_ends_on: (application.applied_at + Agency::OWNERSHIP_WINDOW_MONTHS.months).to_date
+            }
+          end
+        }
       end
 
       def create
@@ -148,10 +178,22 @@ module Api
 
       def application_params
         attrs = params.require(:application).permit(
-          :company, :role, :url, :notes, :follow_up_at, :lock_version
+          :company, :role, :url, :notes, :follow_up_at, :lock_version,
+          :channel, :japanese_level, :posting_snapshot,
+          :comp_annual_min_yen, :comp_annual_max_yen,
+          :comp_months_guaranteed, :comp_months_variable
         )
         attrs[:resume]       = read_upload(:resume)       if params.dig(:application, :resume).respond_to?(:read)
         attrs[:cover_letter] = read_upload(:cover_letter) if params.dig(:application, :cover_letter).respond_to?(:read)
+
+        # The agency arrives as a name, never an id: the client cannot know row
+        # ids for a vocabulary that is created lazily. Only touched when the key
+        # is present, so updates that don't carry it leave the agency alone; a
+        # blank name clears it.
+        if params[:application].key?(:agency_name)
+          attrs[:agency] = Agency.resolve(user: current_user, name: params.dig(:application, :agency_name))
+        end
+
         attrs
       end
 

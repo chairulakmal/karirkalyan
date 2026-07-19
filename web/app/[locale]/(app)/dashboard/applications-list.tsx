@@ -10,12 +10,18 @@ import {
   statusBadgeClass,
   timeAgo,
 } from "@/app/lib/format";
-import type { Application, PageMeta, Status } from "@/app/lib/types";
+import type { Application, JapaneseLevel, PageMeta, Status } from "@/app/lib/types";
+import { JAPANESE_LEVELS } from "@/app/lib/types";
 
 // `statuses` is a subset of the *rendered* chips, held in chip order. Baymard:
 // values within one filter type OR together, and still AND against company /
 // source — which is what a list means to the server.
-type Filters = { statuses: Status[]; company: string | null; source: string | null };
+type Filters = {
+  statuses: Status[];
+  company: string | null;
+  source: string | null;
+  japaneseLevel: JapaneseLevel | null;
+};
 
 const STATUS_PRIORITY: Record<Status, number> = {
   phone_screen: 0,
@@ -70,6 +76,7 @@ export function ApplicationsList({
   const t = useTranslations("list");
   const ts = useTranslations("status");
   const tg = useTranslations("dashboard.ghostRisk");
+  const tl = useTranslations("japaneseLevel");
   const locale = useLocale();
   const atRisk = new Set(atRiskIds);
   const rendered = statusBuckets.map(([status]) => status);
@@ -82,6 +89,7 @@ export function ApplicationsList({
     statuses: rendered,
     company: null,
     source: null,
+    japaneseLevel: null,
   }));
   const [loading, setLoading] = useState(false);
 
@@ -99,6 +107,7 @@ export function ApplicationsList({
     if (f.statuses.length < rendered.length) qs.set("status", f.statuses.join(","));
     if (f.company) qs.set("company", f.company);
     if (f.source) qs.set("source", f.source);
+    if (f.japaneseLevel) qs.set("japanese_level", f.japaneseLevel);
     const res = await fetch(`/api/applications?${qs}`);
     if (!res.ok) return null;
     return (await res.json()) as { data: Application[]; meta: PageMeta };
@@ -149,8 +158,17 @@ export function ApplicationsList({
     }
   }
 
-  const hasActiveFilter = !allStages || filters.company !== null || filters.source !== null;
-  const noFilters: Filters = { statuses: rendered, company: null, source: null };
+  const hasActiveFilter =
+    !allStages ||
+    filters.company !== null ||
+    filters.source !== null ||
+    filters.japaneseLevel !== null;
+  const noFilters: Filters = {
+    statuses: rendered,
+    company: null,
+    source: null,
+    japaneseLevel: null,
+  };
 
   // Each dropdown's options reflect the OTHER active filter, so picking a board
   // narrows the company list and vice versa; counts reflect the narrowed set.
@@ -205,6 +223,32 @@ export function ApplicationsList({
             }))}
             onChange={(value) => changeSource(value || null)}
           />
+          {/* Deliberately the dumbest filter here: the fixed taxonomy, no counts
+              and no faceting — counts would need the level in the facets
+              payload, whose next reshape v1.10.0's stat-cards item already owns
+              (SPEC.md § Dashboard filters). A level with no rows just matches
+              nothing, which the no-matches state renders honestly. */}
+          <label className="block text-sm">
+            <span className="kk-label">{t("japaneseLevel")}</span>
+            <select
+              value={filters.japaneseLevel ?? ""}
+              disabled={loading}
+              onChange={(e) =>
+                applyFilters({
+                  ...filters,
+                  japaneseLevel: (e.target.value || null) as JapaneseLevel | null,
+                })
+              }
+              className="mt-1.5 block min-w-44 border border-dune bg-linen px-3 py-1.5 text-sm text-midnight disabled:opacity-50"
+            >
+              <option value="">{t("allLevels")}</option>
+              {JAPANESE_LEVELS.map((l) => (
+                <option key={l} value={l}>
+                  {tl(l)}
+                </option>
+              ))}
+            </select>
+          </label>
           {hasActiveFilter && (
             <button
               onClick={() => applyFilters(noFilters)}

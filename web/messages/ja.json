@@ -54,6 +54,18 @@
     "en": "English",
     "ja": "日本語"
   },
+  "channel": {
+    "direct": "直接応募",
+    "agent": "エージェント",
+    "referral": "リファラル"
+  },
+  "japaneseLevel": {
+    "none": "日本語不要",
+    "conversational": "日常会話レベル",
+    "business": "ビジネスレベル",
+    "n2": "JLPT N2",
+    "n1": "JLPT N1"
+  },
   "errors": {
     "401": "セッションの有効期限が切れました。もう一度ログインしてください。",
     "403": "この操作を行う権限がありません。",
@@ -336,6 +348,8 @@
     "jobBoard": "求人サイト",
     "allBoards": "すべての求人サイト",
     "noBoard": "リンクなし",
+    "japaneseLevel": "日本語レベル",
+    "allLevels": "すべてのレベル",
     "clearFilters": "絞り込みを解除",
     "all": "すべて",
     "stages": "ステージ",
@@ -366,7 +380,9 @@
     "coverLetter": "カバーレター",
     "timeline": "タイムライン",
     "noTransitions": "まだ変更履歴はありません。",
-    "failedToLoad": "読み込みに失敗しました: {message}"
+    "failedToLoad": "読み込みに失敗しました: {message}",
+    "postingSnapshot": "求人票のスナップショット",
+    "postingSnapshotHint": "AI読み取り時に保存された求人票の本文です。求人が取り下げられても残ります。"
   },
   "details": {
     "title": "詳細",
@@ -384,7 +400,17 @@
     "followUpDate": "フォローアップ日",
     "saving": "保存しています…",
     "save": "変更を保存",
-    "cancel": "キャンセル"
+    "cancel": "キャンセル",
+    "channel": "応募チャネル",
+    "agency": "エージェント",
+    "japaneseLevel": "日本語要件",
+    "comp": "年収",
+    "compSingle": "{min}万円",
+    "compRange": "{min}〜{max}万円",
+    "compMinMan": "年収（下限・万円）",
+    "compMaxMan": "年収（上限・万円）",
+    "compMonthsGuaranteed": "保証月数",
+    "compMonthsVariable": "業績連動賞与（月数）"
   },
   "transitions": {
     "goTo": "→ {label}",
@@ -451,7 +477,28 @@
     "resume": "履歴書",
     "coverLetter": "カバーレター",
     "creating": "作成しています…",
-    "submit": "応募を作成"
+    "submit": "応募を作成",
+    "market": {
+      "title": "日本市場の情報",
+      "optional": "（任意）",
+      "unset": "未記録",
+      "channel": "応募チャネル",
+      "japaneseLevel": "日本語要件",
+      "agency": "エージェント名",
+      "agencyPlaceholder": "例: ロバート・ハーフ",
+      "agencyHint": "推薦してくれるエージェント。最初に企業へ推薦したエージェントがその候補を1年以上「保有」するため、記録しておくと二重推薦の警告に使われます。",
+      "compMin": "年収（下限・万円）",
+      "compMax": "年収（上限・万円）",
+      "monthsGuaranteed": "保証月数",
+      "monthsVariable": "業績連動賞与（月数）",
+      "compHint": "日本のオファーは賞与込みの年収で提示され、基本給の◯ヶ月分と表現されることが多いです（基本給12ヶ月+保証賞与2ヶ月=14）。同じ600万でも、保証されている割合は大きく異なります。"
+    },
+    "ownership": {
+      "title": "{company} には既にエージェント経由の推薦があるかもしれません",
+      "entry": "{agency} が {date} に推薦済み。保有期間はおよそ {until} までです。",
+      "unknownAgency": "エージェント（未記録）",
+      "hint": "最初に企業へ推薦したエージェントが約{months}ヶ月間その候補を保有し、別ルートで入社しても紹介料は保有者に支払われます。期間中の二重推薦は選考に不利に働くことがあるため、進める前にエージェントへ確認してください。作成自体はブロックされません。"
+    }
   },
   "delete": {
     "confirmPrompt": "完全に削除しますか? 取り消せません。",

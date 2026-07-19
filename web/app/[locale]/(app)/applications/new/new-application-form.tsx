@@ -1,13 +1,20 @@
 "use client";
 
 import { useEffect, useRef, useState, useTransition } from "react";
-import { useTranslations } from "next-intl";
-import { createApplication, prefillFromText, prefillFromUrl } from "@/app/lib/actions";
+import { useLocale, useTranslations } from "next-intl";
+import {
+  checkOwnership,
+  createApplication,
+  prefillFromText,
+  prefillFromUrl,
+} from "@/app/lib/actions";
 import type { PrefillResult } from "@/app/lib/actions";
 import { fileSizeMb, MAX_FILE_BYTES } from "@/app/lib/files";
+import { formatDate } from "@/app/lib/format";
 import type { SharedCapture } from "@/app/lib/share";
 import { Field } from "@/app/components/field";
-import type { Status } from "@/app/lib/types";
+import type { Channel, JapaneseLevel, OwnershipCheck, Status } from "@/app/lib/types";
+import { CHANNELS, JAPANESE_LEVELS } from "@/app/lib/types";
 
 /* The two failure codes a paste actually cures, and the reason the error
    taxonomy was typed in the first place. `prefill_blocked` is a site refusing an
@@ -44,6 +51,9 @@ export function NewApplicationForm({
   share?: SharedCapture | null;
 }) {
   const t = useTranslations("newApplication");
+  const tc = useTranslations("channel");
+  const tj = useTranslations("japaneseLevel");
+  const locale = useLocale();
   const [error, setError] = useState<string | null>(null);
   const [pending, startTransition] = useTransition();
 
@@ -70,6 +80,38 @@ export function NewApplicationForm({
     entryStates.includes("draft") ? "draft" : (entryStates[0] ?? ""),
   );
   const [appliedAt, setAppliedAt] = useState(todayISO());
+
+  // The Japan-market fields (SPEC.md § Data model). All optional; the prefill
+  // fills them when the posting states them, and comp is quoted in 万円 here
+  // (the unit postings use) with the server storing yen.
+  const [channel, setChannel] = useState<Channel | "">("");
+  const [agencyName, setAgencyName] = useState("");
+  const [japaneseLevel, setJapaneseLevel] = useState<JapaneseLevel | "">("");
+  const [compMin, setCompMin] = useState("");
+  const [compMax, setCompMax] = useState("");
+  const [monthsGuaranteed, setMonthsGuaranteed] = useState("");
+  const [monthsVariable, setMonthsVariable] = useState("");
+
+  // The stripped posting text prefill returned; submitted as posting_snapshot.
+  // Capture at prefill, persistence on create — never shown as a form field.
+  const [postingText, setPostingText] = useState("");
+
+  /* The ownership warning: open agency windows on the typed company, checked
+     when the field settles (blur or prefill) rather than per keystroke. A
+     failed check renders as nothing — this is a warning surface, and a form
+     that errors because a warning could not be fetched has the priorities
+     backwards. */
+  const [ownership, setOwnership] = useState<OwnershipCheck | null>(null);
+  function runOwnershipCheck(name: string) {
+    const trimmed = name.trim();
+    if (!trimmed) {
+      setOwnership(null);
+      return;
+    }
+    void checkOwnership(trimmed).then((result) => {
+      setOwnership(result.ok ? result : null);
+    });
+  }
 
   const [prefilling, startPrefill] = useTransition();
   const [prefillError, setPrefillError] = useState<string | null>(null);
@@ -101,6 +143,17 @@ export function NewApplicationForm({
     if (result.role) setRole(result.role);
     if (result.notes) setNotes(result.notes);
     if (result.url) setUrl(result.url);
+    if (result.channel) setChannel(result.channel);
+    if (result.agency) setAgencyName(result.agency);
+    if (result.japanese_level) setJapaneseLevel(result.japanese_level);
+    // Yen from the API, 万円 in the form — the one place the conversion runs
+    // this direction.
+    if (result.comp_annual_min_yen) setCompMin(String(result.comp_annual_min_yen / 10_000));
+    if (result.comp_annual_max_yen) setCompMax(String(result.comp_annual_max_yen / 10_000));
+    if (result.comp_months_guaranteed) setMonthsGuaranteed(String(result.comp_months_guaranteed));
+    if (result.comp_months_variable) setMonthsVariable(String(result.comp_months_variable));
+    if (result.posting_text) setPostingText(result.posting_text);
+    if (result.company) runOwnershipCheck(result.company);
     setPrefilled(true);
   }
 
@@ -256,6 +309,7 @@ export function NewApplicationForm({
           required
           value={company}
           onChange={(e) => setCompany(e.target.value)}
+          onBlur={(e) => runOwnershipCheck(e.target.value)}
         />
         <Field
           name="role"
@@ -265,6 +319,28 @@ export function NewApplicationForm({
           onChange={(e) => setRole(e.target.value)}
         />
       </Row>
+      {/* Fires on ANY second submission while a window is open, whatever channel
+          this application uses — the fee rule bites regardless. Warning only:
+          nothing blocks, the user makes the call knowing the rule exists. */}
+      {ownership && ownership.submissions.length > 0 ? (
+        <div role="alert" className="border border-saffron bg-saffron-2/20 p-4 text-sm">
+          <p className="font-medium text-midnight">{t("ownership.title", { company })}</p>
+          <ul className="mt-2 space-y-1 text-ink-soft">
+            {ownership.submissions.map((s) => (
+              <li key={s.id}>
+                {t("ownership.entry", {
+                  agency: s.agency_name ?? t("ownership.unknownAgency"),
+                  date: formatDate(s.submitted_at, locale),
+                  until: formatDate(s.window_ends_on, locale),
+                })}
+              </li>
+            ))}
+          </ul>
+          <p className="mt-2 text-xs text-ink-soft">
+            {t("ownership.hint", { months: ownership.window_months })}
+          </p>
+        </div>
+      ) : null}
       {/* No entry set means the table failed or predates the field — not that
           there are no entry states, which the FSM never allows. Dropping the
           picker sends no `status`, so the API applies its own default; offering
@@ -298,6 +374,117 @@ export function NewApplicationForm({
           onChange={(e) => setAppliedAt(e.target.value)}
         />
       ) : null}
+
+      {/* The Japan-market fields. All optional — prefill fills what the posting
+          states, and an untouched section costs nothing to submit. */}
+      <fieldset className="space-y-4 border border-dune bg-sand/30 p-4">
+        <legend className="kk-label px-1">
+          {t("market.title")}{" "}
+          <span className="font-normal text-ink-soft">{t("market.optional")}</span>
+        </legend>
+        <Row>
+          <label className="block text-sm">
+            <span className="kk-label">{t("market.channel")}</span>
+            <select
+              name="channel"
+              value={channel}
+              onChange={(e) => setChannel(e.target.value as Channel | "")}
+              className="mt-1.5 block w-full border border-dune bg-linen px-3 py-2 text-sm text-midnight"
+            >
+              <option value="">{t("market.unset")}</option>
+              {CHANNELS.map((c) => (
+                <option key={c} value={c}>
+                  {tc(c)}
+                </option>
+              ))}
+            </select>
+          </label>
+          <label className="block text-sm">
+            <span className="kk-label">{t("market.japaneseLevel")}</span>
+            <select
+              name="japanese_level"
+              value={japaneseLevel}
+              onChange={(e) => setJapaneseLevel(e.target.value as JapaneseLevel | "")}
+              className="mt-1.5 block w-full border border-dune bg-linen px-3 py-2 text-sm text-midnight"
+            >
+              <option value="">{t("market.unset")}</option>
+              {JAPANESE_LEVELS.map((l) => (
+                <option key={l} value={l}>
+                  {tj(l)}
+                </option>
+              ))}
+            </select>
+          </label>
+        </Row>
+        {/* Only the agent channel has an agency; the field appears with it. The
+            name resolves server-side to a per-user agencies row, so the same
+            agency typed twice is one row — which is what the ownership check
+            groups by. */}
+        {channel === "agent" ? (
+          <div>
+            <Field
+              name="agency_name"
+              label={t("market.agency")}
+              value={agencyName}
+              onChange={(e) => setAgencyName(e.target.value)}
+              placeholder={t("market.agencyPlaceholder")}
+            />
+            <p className="mt-1 text-xs text-ink-soft">{t("market.agencyHint")}</p>
+          </div>
+        ) : null}
+        <Row>
+          <Field
+            name="comp_annual_min_man"
+            label={t("market.compMin")}
+            type="number"
+            min="0"
+            step="1"
+            value={compMin}
+            onChange={(e) => setCompMin(e.target.value)}
+            placeholder="600"
+          />
+          <Field
+            name="comp_annual_max_man"
+            label={t("market.compMax")}
+            type="number"
+            min="0"
+            step="1"
+            value={compMax}
+            onChange={(e) => setCompMax(e.target.value)}
+            placeholder="900"
+          />
+        </Row>
+        <Row>
+          <Field
+            name="comp_months_guaranteed"
+            label={t("market.monthsGuaranteed")}
+            type="number"
+            min="0"
+            step="0.5"
+            value={monthsGuaranteed}
+            onChange={(e) => setMonthsGuaranteed(e.target.value)}
+            placeholder="14"
+          />
+          <Field
+            name="comp_months_variable"
+            label={t("market.monthsVariable")}
+            type="number"
+            min="0"
+            step="0.5"
+            value={monthsVariable}
+            onChange={(e) => setMonthsVariable(e.target.value)}
+            placeholder="2"
+          />
+        </Row>
+        <p className="text-xs text-ink-soft">{t("market.compHint")}</p>
+      </fieldset>
+
+      {/* Capture at prefill, persistence on create: the stripped posting text
+          rides the form invisibly, so interview prep survives the posting's
+          deletion. Never a visible field — the user already vouched for the
+          posting by reviewing the extracted fields above. */}
+      <input type="hidden" name="posting_snapshot" value={postingText} />
+
       <Field name="follow_up_at" label={t("followUpDate")} type="date" />
       <label className="block text-sm">
         <span className="kk-label">{t("notes")}</span>

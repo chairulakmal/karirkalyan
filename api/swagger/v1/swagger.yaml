@@ -52,6 +52,16 @@ paths:
           (e.g. `linkedin.com`); there is no `source` column. Pass `(none)` for applications
           with no link. Like `company`, an unmatched value legitimately returns nothing,
           while blank or whitespace-only is ignored.
+      - name: japanese_level
+        in: query
+        required: false
+        schema:
+          type: string
+        description: 'Comma-separated levels from `none,conversational,business,n2,n1`
+          — any member matches, with `status`''s exact contract: unknown members are
+          dropped and a list left with none is unfiltered, not empty. Matches the
+          recorded value only — `none` means a recorded "no Japanese required", never
+          a null column.'
       - name: after
         in: query
         required: false
@@ -83,7 +93,8 @@ paths:
       parameters: []
       responses:
         '201':
-          description: defaults to draft when status is omitted
+          description: created with the Japan-market fields; agency_name resolves
+            to an agencies row
         '422':
           description: validation failed (blank company or role)
         '401':
@@ -124,11 +135,86 @@ paths:
                     follow_up_at:
                       type: string
                       format: date-time
+                    channel:
+                      type: string
+                      enum:
+                      - direct
+                      - agent
+                      - referral
+                      nullable: true
+                      description: How this application reached the company. `agent`
+                        is what the ownership check keys on.
+                    agency_name:
+                      type: string
+                      nullable: true
+                      description: Agency name, resolved server-side to a per-user
+                        agencies row (created on first use). Blank clears the agency;
+                        the key absent leaves it untouched.
+                    japanese_level:
+                      type: string
+                      enum:
+                      - none
+                      - conversational
+                      - business
+                      - n2
+                      - n1
+                      nullable: true
+                      description: The posting's Japanese requirement — what it asks,
+                        not what the user holds.
+                    comp_annual_min_yen:
+                      type: integer
+                      nullable: true
+                      description: Quoted 年収, low end, in yen.
+                    comp_annual_max_yen:
+                      type: integer
+                      nullable: true
+                      description: High end; null when one figure is quoted.
+                    comp_months_guaranteed:
+                      type: number
+                      nullable: true
+                      description: Months of base guaranteed per year (12 + guaranteed
+                        bonus).
+                    comp_months_variable:
+                      type: number
+                      nullable: true
+                      description: Performance-tied bonus months on top.
+                    posting_snapshot:
+                      type: string
+                      nullable: true
+                      description: Stripped posting text, as prefill's `posting_text`
+                        returned it. Capped at 12,000 characters. Excluded from list
+                        payloads; GET /applications/{id} returns it.
                   required:
                   - company
                   - role
               required:
               - application
+  "/api/v1/applications/ownership_check":
+    get:
+      summary: Check whether an agency already has an open ownership window on a company
+      tags:
+      - Applications
+      security:
+      - bearerAuth: []
+      description: The first agency to submit a candidate to a company owns that candidacy
+        for `window_months` (~12–18 months; this app assumes 18, the conservative
+        end), and the fee follows the owner even if the candidate later reaches the
+        company another way. A submission is an application to the company with `channel
+        = agent` whose `applied_at` is inside the window. A warning surface only —
+        nothing blocks.
+      parameters:
+      - name: company
+        in: query
+        required: false
+        schema:
+          type: string
+        description: Exact company name, the list filter's matching rule. Blank returns
+          an empty list rather than erroring — the form calls this as the user works.
+      responses:
+        '200':
+          description: blank company reads as an empty list, never an error
+        '401':
+          description: not authenticated
   "/api/v1/applications/prefill":
     post:
       summary: Pre-fill application fields from a job posting (AI extraction)
@@ -187,7 +273,8 @@ paths:
       - bearerAuth: []
       responses:
         '200':
-          description: application found
+          description: application found (+ valid_next_states, timeline_entries, agency_name,
+            posting_snapshot)
         '404':
           description: not found or belongs to another user
         '401':
@@ -228,6 +315,42 @@ paths:
                     follow_up_at:
                       type: string
                       format: date-time
+                    channel:
+                      type: string
+                      enum:
+                      - direct
+                      - agent
+                      - referral
+                      nullable: true
+                    agency_name:
+                      type: string
+                      nullable: true
+                      description: Resolved server-side to a per-user agencies row.
+                        Blank clears; key absent leaves untouched.
+                    japanese_level:
+                      type: string
+                      enum:
+                      - none
+                      - conversational
+                      - business
+                      - n2
+                      - n1
+                      nullable: true
+                    comp_annual_min_yen:
+                      type: integer
+                      nullable: true
+                    comp_annual_max_yen:
+                      type: integer
+                      nullable: true
+                    comp_months_guaranteed:
+                      type: number
+                      nullable: true
+                    comp_months_variable:
+                      type: number
+                      nullable: true
+                    posting_snapshot:
+                      type: string
+                      nullable: true
                     lock_version:
                       type: integer
                       description: Must match current record version to prevent concurrent
