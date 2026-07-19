@@ -1,8 +1,8 @@
 # TODO
 
-The plan: open work only, grouped by the release that ships it. The most important thing about this file is what it may not hold: shipped work lives in [`CHANGELOG.md`](CHANGELOG.md), and so do the settled decisions-not-to-build (dark mode, document version history, client-side error tracking; see its § Decisions); what each shipped release contained is `CHANGELOG.md`'s job to say, not this file's. Contents: the release plan `v1.8.1` → `v1.10.0` and its standing rules, then the conditional items tagged to no release, the maintenance items tied to no release, and the `2.0.0` career-growth cluster whose trigger is a date in the user's life, not a release number.
+The plan: open work only, grouped by the release that ships it. The most important thing about this file is what it may not hold: shipped work lives in [`CHANGELOG.md`](CHANGELOG.md), and so do the settled decisions-not-to-build (dark mode, document version history, client-side error tracking; see its § Decisions); what each shipped release contained is `CHANGELOG.md`'s job to say, not this file's. Contents: the release plan `v1.9.0` → `v1.10.0` and its standing rules, then the conditional items tagged to no release, the maintenance items tied to no release, and the `2.0.0` career-growth cluster whose trigger is a date in the user's life, not a release number.
 
-**Current release: `v1.8.0`, tagged 2026-07-19.** The Japan market layer (PR #78); what it contained is `CHANGELOG.md` § v1.8.0's job to say. The production VAPID keypair is set on the `api` service (verified 2026-07-18), so push delivery is live, not degraded. Next up: `v1.8.1`, Japanese phrase-based line breaking.
+**Current release: `v1.8.1`, merged 2026-07-19 (PR #79); the tag and GitHub release are the remaining ritual.** Japanese phrase-based line breaking; what it contained is `CHANGELOG.md` § v1.8.1's job to say. The production VAPID keypair is set on the `api` service (verified 2026-07-18), so push delivery is live, not degraded. Next up: `v1.9.0`, "can you actually take this job?".
 
 **North star: be the best career app for its one loyal user: myself (the author).** Portfolio value follows from that, not the other way round: a reviewer can tell a tool with a real user from a feature showcase. Two consequences for sequencing: items are ordered by **when in the user's life they pay off** (search-time items while the search is active; the `positions` entity is triggered by accepting an offer, not by finishing a prior release), and the worst-day operations work (backups, export, abuse throttles) earns its place without passing any feature admission test, because nothing else in the repo defends the data.
 
@@ -10,13 +10,12 @@ The plan: open work only, grouped by the release that ships it. The most importa
 
 ---
 
-## The plan: `v1.8.1` → `v1.10.0`
+## The plan: `v1.9.0` → `v1.10.0`
 
 **The whole backlog fits under 1.x.** Only one item forces a major, and `SPEC.md` § Versioning & releases already names it: the **`positions` entity**, because it adds a table *and* changes what `accepted` means in `ApplicationFSM`. Everything else here is an additive migration or has no schema at all, so the previous image would still boot against the database the release leaves behind, which is the whole of the major test.
 
 | Release | Level | Contents |
 | --- | --- | --- |
-| `v1.8.1` | patch | Japanese phrase-based line breaking |
 | `v1.9.0` | minor | Hiring entity, timezone overlap + `.ics`, visa / status of residence |
 | `v1.10.0` | minor | The follow-through: dashboard stat cards, filter state in the URL, board triage cards, cover-letter talking points, push interview/deadline alerts, public HSP calculator, interview stage notes |
 
@@ -29,14 +28,6 @@ Each item below carries its release tag; the table is the summary of those tags,
 - **The trap that would break this plan: every new column in `v1.9.0`–`v1.10.0` must be nullable or defaulted.** A `NOT NULL` column with no default means the previous image's `INSERT`s fail against the new database, and by the mechanical test that quietly turns a minor into a **major**. It is the only way this plan accidentally violates its own versioning. `v1.6.0`'s two new tables (`credentials`, `push_subscriptions`) were purely additive and passed for free, and `v1.8.0`'s eight `applications` columns all shipped nullable under this rule; the rule bites on columns added to tables the previous image writes to.
 - **Field admission test, for any new per-application column** (channel, agency, comp structure, language level, hiring entity, timezone, all of them): it must be **captured at prefill time by `UrlPrefillService`, or cost near-zero manual entry**. The app has one user, and a field he stops filling in after the fifth application is dead schema plus form friction.
 - **Perishable-facts refresh rule, for every Japan-market item.** Each embeds perishable external facts: fee schedules, processing times, survey medians. A career tool that confidently states last year's rules is worse than one that says nothing, so each such item must state its **annual refresh cost** when it is scoped, and the sum of those lines is a real cap on how many of these a solo maintainer can ship. The career-intelligence item already budgets this way ("one data-entry session a year"); that is the pattern.
-
----
-
-## `v1.8.1`: patch. Japanese phrase-based line breaking
-
-No new capability, so it cannot be a minor, but it is worth the most **right after `v1.8.0`**, which is the release that fills the UI with the Japanese compound nouns (agency names, comp structures, JLPT levels) that wrap mid-word today.
-
-- [ ] **文節単位の改行.** Japanese has no spaces, so the browser breaks lines at almost any character boundary and compound words wrap mid-word (`東京オリン` / `ピック`). Two-layer fix, both cheap: (1) `word-break: auto-phrase` in CSS: [Chromium 119+ only](https://caniuse.com/mdn-css_properties_word-break_auto-phrase), needs `lang="ja"` on an ancestor (the i18n layout already sets it), degrades to today's behaviour elsewhere, so it is a one-line progressive enhancement; (2) [BudouX](https://github.com/google/budoux) (`budoux` on npm, ~15 KB, zero deps; the same model that powers `auto-phrase`) run **server-side in RSC** on headings, buttons, and card titles, where a bad break is most visible; long body text mostly self-corrects. BudouX inserts break opportunities and pairs with `word-break: keep-all`; prefer `<wbr>` output over zero-width spaces, which survive copy-paste. `Intl.Segmenter` is not a substitute: it segments dictionary words, not phrases, and breaks choppier. **Researched 2026-07-11.** Ecosystem note: the segmentation problem is solved (BudouX + the CSS property absorbing it); the only open niche is integration glue (a next-intl-aware wrapper or a remark/rehype plugin), better spent as a blog post than an npm package.
 
 ---
 

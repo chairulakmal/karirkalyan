@@ -4,6 +4,19 @@ The history: shipped work, newest first (`v1.8.0` back through `v1.0.0`) with br
 
 ---
 
+## v1.8.1 (2026-07-20)
+
+Japanese phrase-based line breaking (文節単位の改行), scheduled by `TODO.md` for right after `v1.8.0`, the release that filled the UI with the compound nouns (agency names, comp structures, JLPT levels) that wrapped mid-word (`東京オリン` / `ピック`). A patch by the mechanical test: no migration, no new capability, purely presentation. The design is owned by `SPEC.md` § Japanese line breaking.
+
+### Lines break at phrase boundaries, not mid-word *(fix/ja-phrase-line-breaking, #79)*
+
+- **CSS carries the broad layer**: `word-break: auto-phrase` under `:lang(ja)` in `globals.css`. Chromium 119+ breaks every Japanese line phrase-wise; every other engine drops the unknown value at parse time and keeps its old behaviour, so the rule is a one-line progressive enhancement with no fallback code.
+- **A `<Phrase>` server component carries the targeted layer**: [BudouX](https://github.com/google/budoux) runs in RSC over the server-rendered wrapping surfaces (home hero, feature-card titles, CTA labels, `/about` and `/docs` headings, the dashboard and board `h1`s, and the detail page's role line), re-emitting Japanese strings as phrase segments separated by `<wbr>` inside a `keep-all` span. `<wbr>` over zero-width spaces because ZWSPs survive copy-paste. Children without Japanese pass through untouched, so English markup is byte-identical to before and the same component segments a Japanese company name even on an English page.
+- **Card titles are exempt on the record.** `TODO.md` named board and list card titles as targets, but both render with `truncate` and never wrap, so the annotation would be dead markup: a scope reduction discovered at the code, written into the spec so it does not read as an omission.
+- **One research note corrected**: `budoux` is no longer the zero-dependency package the 2026-07-11 note recorded; since 0.8.0 it declares `linkedom`, `commander`, and `google-artifactregistry-auth`, serving its CLI and HTML-processing halves. The set rides in the server bundle only, because only a server component may import the module. The note's other half stands: the segmentation problem itself is solved upstream, and the remaining open niche (next-intl-aware integration glue) is better spent as a blog post than an npm package.
+
+---
+
 ## v1.8.0 (2026-07-19)
 
 The Japan market layer: the four items `TODO.md` planned as one release because a single `UrlPrefillService` pass captures them all, so this was one extraction pass, one migration pass, one form pass. A minor by the mechanical test: the `agencies` table is purely additive and every new `applications` column is nullable, so the `v1.7.0` image boots and serves against this database unchanged.
