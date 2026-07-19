@@ -53,7 +53,12 @@ h1, h2, h3 {
 /* Japanese phrase-based line breaking (文節). Chromium 119+ breaks Japanese
  * lines at phrase boundaries instead of mid-word; every other engine drops the
  * unknown value at parse time and keeps its default behaviour. The targeted
- * <wbr> layer for non-Chromium engines lives in app/components/phrase.tsx. */
+ * <wbr> layer for non-Chromium engines lives in app/components/phrase.tsx.
+ *
+ * This rule must stay unlayered. Unlayered declarations outrank Tailwind's
+ * layered utilities, so on Chromium `auto-phrase` beats <Phrase>'s `break-keep`
+ * span; elsewhere the invalid value is discarded and `keep-all` wins, making
+ * the <wbr>s the only break points. Wrapping it in @layer flips that order. */
 :lang(ja) {
   word-break: auto-phrase;
 }
