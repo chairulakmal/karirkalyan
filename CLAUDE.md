@@ -73,6 +73,8 @@ CI is path-aware so a docs commit doesn't pay for a full Rails suite and Next bu
 
 **Which digit moves** is decided by one mechanical test, not by how big the release feels: *could the previous release's image boot and serve against the database this release leaves behind?* If **no**, it is a **major**: an irreversible migration, `/api/v1` → `/api/v2`, an `ApplicationFSM` state removed or renamed, a required env var dropped. If yes and the release adds a user-visible capability, it is a **minor**; if it adds none (fixes, security, dependency bumps, performance), it is a **patch**. The reasoning, and why SemVer's own definition of major cannot fire on this project, is in `SPEC.md` § Versioning & releases. The `docs-auditor` subagent exists for exactly this post-feature sweep.
 
+**The tag is not the last step: `gh release create` closes the release**, with notes drawn from the `CHANGELOG.md` entry. `SPEC.md` § Versioning & releases has always named it as part of the ritual, but `v1.7.0` still shipped tagged and release-less for a day because this list did not, so it now does.
+
 ## Subagents
 
 Delegate to a subagent when the task genuinely warrants it: a wide search whose file dumps you don't need, or a review that benefits from a cold read of the diff:
