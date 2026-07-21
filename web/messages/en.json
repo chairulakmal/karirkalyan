@@ -125,7 +125,7 @@
   "hsp": {
     "home": "Home",
     "eyebrow": "Japan visa tool",
-    "title": "Highly Skilled Professional points calculator",
+    "title": "HSP Visa Points Calculator",
     "lede": "Japan's 高度専門職 (Highly Skilled Professional) visa turns on a points table: reach 70 and you qualify, with a fast track to permanent residence. This estimates your score on the engineering track.",
     "profileTitle": "Your details",
     "degree": "Highest degree",
@@ -145,7 +145,7 @@
       "none": "None / below N2"
     },
     "bonusTitle": "Bonus points",
-    "bonusHint": "Only bonuses engineers can claim. Info icons quote the wording from the MOJ announcement.",
+    "bonusHint": "Only bonuses engineers can claim. Info icons quote from the MOJ announcement.",
     "infoAria": "Show the MOJ note",
     "multipleDegrees": "Degrees in multiple fields (+5)",
     "researchAchievements": "Patents, papers, or funded research (+15)",
