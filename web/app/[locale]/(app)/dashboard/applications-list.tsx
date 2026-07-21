@@ -48,6 +48,17 @@ function sortByImportance(apps: Application[]): Application[] {
   return [...apps].sort((a, b) => STATUS_PRIORITY[a.status] - STATUS_PRIORITY[b.status]);
 }
 
+// archived never appears on the dashboard (SPEC.md § Dashboard). The server is
+// already asked only for non-archived stages, but drop any archived row
+// defensively so nothing leaks even in the /transitions-failed fallback where
+// the default degrades to the server's unfiltered set.
+const notArchived = (a: Application) => a.status !== "archived";
+
+// Two stage selections are the same view when they hold the same statuses,
+// regardless of order. Used to tell the default (active) view from the rest.
+const sameStages = (a: Status[], b: Status[]) =>
+  a.length === b.length && a.every((s) => b.includes(s));
+
 interface Props {
   initialItems: Application[];
   initialMeta: PageMeta;
@@ -92,21 +103,26 @@ export function ApplicationsList({
   const pathname = usePathname();
   const atRisk = new Set(atRiskIds);
   const rendered = statusBuckets.map(([status]) => status);
-  const [items, setItems] = useState(() => sortByImportance(initialItems));
+  // The dashboard's default view and the "Active" preset are the same set: the
+  // in-play stages that actually have rows. Empty when /transitions failed (no
+  // active set known), so the default falls back to the full non-archived row
+  // rather than to nothing.
+  const activeRendered = rendered.filter((s) => activeStates.includes(s));
+  const defaultStages = activeRendered.length > 0 ? activeRendered : rendered;
+  const [items, setItems] = useState(() => sortByImportance(initialItems.filter(notArchived)));
   const [meta, setMeta] = useState(initialMeta);
-  // Every chip starts lit: the user subtracts stages from a closed set they
-  // already have a mental model of, rather than opting in one at a time. The
-  // list still first appears unfiltered — all of them selected *is* unfiltered.
-  // Seeded from the URL the page arrived with, validated against what this list
-  // actually renders: an absent status param is all chips lit, and a status
-  // param whose members are all junk intersects to nothing and so also reads as
-  // unfiltered, matching how ListQuery ignored the same junk on the first paint.
+  // The chips start on the active stages, the dashboard's default view (SPEC.md
+  // § Dashboard): the user narrows or expands from what's in play rather than
+  // from the full row. Seeded from the URL the page arrived with, validated
+  // against what this list actually renders: an absent status param is the active
+  // default, and a status param whose members are all junk intersects to nothing
+  // and so also falls back to the default, matching how the server first-painted.
   const [filters, setFilters] = useState<Filters>(() => {
     const wanted = initialFilters.status?.split(",").map((s) => s.trim());
     const fromUrl = wanted ? rendered.filter((s) => wanted.includes(s)) : [];
     const jlpt = initialFilters.japaneseLevel;
     return {
-      statuses: fromUrl.length > 0 ? fromUrl : rendered,
+      statuses: fromUrl.length > 0 ? fromUrl : defaultStages,
       company: initialFilters.company || null,
       source: initialFilters.source || null,
       japaneseLevel: jlpt && (JAPANESE_LEVELS as readonly string[]).includes(jlpt)
@@ -119,13 +135,14 @@ export function ApplicationsList({
   // Mirror the applied filters into the URL so a filtered view is linkable,
   // reload-survivable, and back-button-correct. `replace`, not `push`: filtering
   // is refining one view, not navigating, so it should not stack history. The
-  // wire rules carry over exactly: a full chip row (unfiltered) and a zero chip
-  // row (a client-only "show nothing", deliberately not shareable: it reads as
-  // unfiltered on reload) both send no `status`, so the default view keeps a
-  // bare URL. Routed through i18n/navigation so the locale prefix is preserved.
+  // default (active) view keeps a bare URL; every other stage selection is
+  // encoded, "All" (the full non-archived row) included, so it is shareable and
+  // survives reload. The zero-chip "show nothing" transient also stays bare and
+  // reads as the default on reload. Routed through i18n/navigation so the locale
+  // prefix is preserved.
   function syncUrl(f: Filters) {
     const qs = new URLSearchParams();
-    if (f.statuses.length > 0 && f.statuses.length < rendered.length) {
+    if (f.statuses.length > 0 && !sameStages(f.statuses, defaultStages)) {
       qs.set("status", f.statuses.join(","));
     }
     if (f.company) qs.set("company", f.company);
@@ -135,18 +152,21 @@ export function ApplicationsList({
     router.replace(query ? `${pathname}?${query}` : pathname, { scroll: false });
   }
 
-  const allStages = filters.statuses.length === rendered.length;
+  // The default (active) view reads as unfiltered: no "Clear filters", bare URL.
+  const isDefaultStages = sameStages(filters.statuses, defaultStages);
   // Zero chips is a UI state, not a query — see applyFilters. An account with no
   // applications renders no chips either, and that is `empty`, not hidden.
   const noStages = rendered.length > 0 && filters.statuses.length === 0;
-  const activeRendered = rendered.filter((s) => activeStates.includes(s));
 
   async function fetchPage(f: Filters, after?: string) {
     const qs = new URLSearchParams({ limit: "10" });
     if (after) qs.set("after", after);
-    // Every rendered chip lit is the unfiltered list, so send nothing at all —
-    // byte-identical to the request this list has always made for "All".
-    if (f.statuses.length < rendered.length) qs.set("status", f.statuses.join(","));
+    // Always send the stages explicitly. "All" here is the non-archived row,
+    // which is NOT the server's unfiltered set (that includes archived), so the
+    // old "send nothing when every chip is lit" shortcut would leak archived onto
+    // the dashboard. applyFilters early-returns on zero chips, so `f.statuses` is
+    // never the empty list here.
+    if (f.statuses.length > 0) qs.set("status", f.statuses.join(","));
     if (f.company) qs.set("company", f.company);
     if (f.source) qs.set("source", f.source);
     if (f.japaneseLevel) qs.set("japanese_level", f.japaneseLevel);
@@ -172,7 +192,7 @@ export function ApplicationsList({
       if (!body) return;
       setFilters(next);
       syncUrl(next);
-      setItems(sortByImportance(body.data));
+      setItems(sortByImportance(body.data.filter(notArchived)));
       setMeta(body.meta);
     } finally {
       setLoading(false);
@@ -195,7 +215,7 @@ export function ApplicationsList({
       const body = await fetchPage(filters, meta.next_cursor);
       if (!body) return;
       // Append in server (cursor) order — do not re-sort the accumulated list.
-      setItems((prev) => [...prev, ...body.data]);
+      setItems((prev) => [...prev, ...body.data.filter(notArchived)]);
       setMeta(body.meta);
     } finally {
       setLoading(false);
@@ -203,12 +223,13 @@ export function ApplicationsList({
   }
 
   const hasActiveFilter =
-    !allStages ||
+    !isDefaultStages ||
     filters.company !== null ||
     filters.source !== null ||
     filters.japaneseLevel !== null;
+  // "Clear filters" returns to the default (active) view, not to "All".
   const noFilters: Filters = {
-    statuses: rendered,
+    statuses: defaultStages,
     company: null,
     source: null,
     japaneseLevel: null,

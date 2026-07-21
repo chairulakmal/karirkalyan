@@ -33,19 +33,59 @@ export default async function Dashboard({
     source: str(sp.source),
     japaneseLevel: str(sp.japanese_level),
   };
-  const appsQs = new URLSearchParams({ limit: "10" });
-  if (urlFilters.status) appsQs.set("status", urlFilters.status);
-  if (urlFilters.company) appsQs.set("company", urlFilters.company);
-  if (urlFilters.source) appsQs.set("source", urlFilters.source);
-  if (urlFilters.japaneseLevel) appsQs.set("japanese_level", urlFilters.japaneseLevel);
-
-  // /dashboard carries the user, so there is no second /me request: <ProfileCard>
-  // takes `stats.user` as a prop rather than fetching one.
-  const [appsRes, statsRes, tableRes] = await Promise.all([
-    apiFetch<Paginated<Application>>(`/applications?${appsQs}`),
+  // The dashboard defaults to active applications (SPEC.md § Dashboard), so the
+  // status the first paint fetches has to be chosen from two things it must learn
+  // first: which stages are active (/transitions) and whether the account has any
+  // active rows (/dashboard's by_status). Both are awaited before the apps fetch,
+  // so the server returns exactly the default view with no client refetch, and
+  // neither FSM set is mirrored in TypeScript. /dashboard also carries the user,
+  // so there is still no second /me request (<ProfileCard> takes it as a prop).
+  const [statsRes, tableRes] = await Promise.all([
     apiFetch<DashboardStats>("/dashboard"),
     apiFetch<TransitionTable>("/transitions"),
   ]);
+  // `ok` does not imply a populated `data` (apiFetch returns `null as T` for a
+  // 204 or a non-JSON 200), and a 200 does not imply *this* payload: web and api
+  // are separate Railway services, so during a deploy window /transitions can
+  // answer from the release before active_states existed. Missing reads as
+  // absent, which is already the failure path (it drops the default to
+  // unfiltered below).
+  const activeStates = tableRes.ok ? (tableRes.data?.active_states ?? []) : [];
+  const states = tableRes.ok ? (tableRes.data?.states ?? []) : [];
+  const byStatus: Partial<Record<Status, number>> = statsRes.ok ? (statsRes.data?.by_status ?? {}) : {};
+
+  const appsQs = new URLSearchParams({ limit: "10" });
+  if (urlFilters.company) appsQs.set("company", urlFilters.company);
+  if (urlFilters.source) appsQs.set("source", urlFilters.source);
+  if (urlFilters.japaneseLevel) appsQs.set("japanese_level", urlFilters.japaneseLevel);
+  // The default status, sent explicitly (never the empty "unfiltered" request, so
+  // ListQuery's wire meaning stays the board's: absent = everything): a URL that
+  // names a status wins; else the active stages when the account has any active
+  // rows; else the full non-archived row, so an all-closed account sees its
+  // applications rather than an empty screen; else (table failed) the non-archived
+  // statuses /dashboard reports as having rows, or unfiltered only if that also
+  // failed. The point is to fetch exactly the set the chips will claim (or a
+  // row-equivalent superset), so the client's matching selection never renders a
+  // "no matches" beside applications it simply did not fetch.
+  const hasActiveRows = statsRes.ok && activeStates.some((s) => (byStatus[s] ?? 0) > 0);
+  const nonArchived = states.filter((s) => s !== "archived");
+  // /transitions failed, so the active set is unknown; but /dashboard's by_status
+  // still names every status that has rows, and that is exactly what the client's
+  // chip row is built from. Fetch those (minus archived) rather than the whole
+  // unfiltered set, which would pull archived rows the client then has to drop.
+  const nonArchivedWithRows = Object.keys(byStatus).filter((s) => s !== "archived");
+  const defaultStatus =
+    activeStates.length === 0
+      ? statsRes.ok && nonArchivedWithRows.length > 0
+        ? nonArchivedWithRows.join(",")
+        : null
+      : statsRes.ok && !hasActiveRows
+        ? nonArchived.join(",")
+        : activeStates.join(",");
+  const statusParam = urlFilters.status ?? defaultStatus;
+  if (statusParam) appsQs.set("status", statusParam);
+
+  const appsRes = await apiFetch<Paginated<Application>>(`/applications?${appsQs}`);
 
   if (!appsRes.ok) {
     return (
@@ -58,21 +98,28 @@ export default async function Dashboard({
   const { data: applications, meta } = appsRes.data;
   const stats = statsRes.ok ? statsRes.data : null;
   const me = stats?.user ?? null;
-  const facets = stats?.facets ?? [];
-  const total = stats?.total ?? applications.length;
-  // Powers the "Active" preset and the overdue marker only, so a failed table
-  // drops the preset rather than the list — the same tolerance this page
-  // already extends to /dashboard itself.
-  //
-  // `ok` does not imply a populated `data` (apiFetch returns `null as T` for a
-  // 204 or a non-JSON 200), and a 200 does not imply *this* payload: web and api
-  // are separate Railway services, so during a deploy window /transitions can
-  // answer from the release before active_states existed. Missing reads as
-  // absent, which is already the failure path.
-  const activeStates = tableRes.ok ? (tableRes.data?.active_states ?? []) : [];
-  const states = tableRes.ok ? (tableRes.data?.states ?? []) : [];
+  // archived is excluded from the dashboard entirely (SPEC.md § Dashboard): no
+  // chip, never in "All", never counted. Drop it from the facets here, at the one
+  // choke point, so every facet-derived count downstream (company/board/level
+  // options, the "All" total, the stage-chip counts) is non-archived by
+  // construction; row[2] is the status column of the facet tuple.
+  const facets = (stats?.facets ?? []).filter((row) => row[2] !== "archived");
+  // Non-archived tally, matching every other count on the page: archived is
+  // excluded from the dashboard entirely, so the header must not count it either
+  // (the ja label reads 「管理中」/"currently managing", which archived is not).
+  const total = stats
+    ? (Object.entries(stats.by_status) as [Status, number][]).reduce(
+        (n, [s, c]) => (s === "archived" ? n : n + c),
+        0,
+      )
+    : applications.length;
 
-  const statusBuckets = stats ? (Object.entries(stats.by_status) as [Status, number][]) : [];
+  // Same exclusion for the chip set: one chip renders per non-archived status
+  // that has rows, so dropping the archived bucket removes the chip and, since
+  // `rendered` is derived from this, its place in "All" too.
+  const statusBuckets = stats
+    ? (Object.entries(stats.by_status) as [Status, number][]).filter(([s]) => s !== "archived")
+    : [];
   // `by_status` is `group(:status).count` — GROUP BY with no ORDER BY, so its
   // order is the query plan's, not a promise. Sorted against the FSM's own state
   // list so the chip row reads wishlist→archived and, more to the point, sits

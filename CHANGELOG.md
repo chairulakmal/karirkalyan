@@ -1,6 +1,22 @@
 # Changelog
 
-The history: shipped work, newest first (`v1.10.0`, tagged 2026-07-21, back through `v1.0.0`), with `v1.9.0` remaining an unreleased head between `v1.10.0` and `v1.8.1`. The two were built together in one batched PR (`feat/v1.9-and-v1.10`); `v1.10.0` was tagged first, by the author's explicit choice, leaving `v1.9.0` to be tagged separately. Branch/PR names note where each change landed, and each release since `v1.3.1` names its patch/minor level against the versioning policy's mechanical test. The most important section is the one that is not a release: § Decisions records the settled decisions-not-to-build, so that [`TODO.md`](TODO.md) (where open work lives) can stay plan-only without the reasoning getting lost.
+The history: shipped work, newest first (`v1.10.0`, tagged 2026-07-21, back through `v1.0.0`), with `v1.11.0` and `v1.9.0` both remaining unreleased heads (`v1.11.0` at the top, above the tagged `v1.10.0`; `v1.9.0` between `v1.10.0` and `v1.8.1`). The two were built together in one batched PR (`feat/v1.9-and-v1.10`); `v1.10.0` was tagged first, by the author's explicit choice, leaving `v1.9.0` to be tagged separately. Branch/PR names note where each change landed, and each release since `v1.3.1` names its patch/minor level against the versioning policy's mechanical test. The most important section is the one that is not a release: § Decisions records the settled decisions-not-to-build, so that [`TODO.md`](TODO.md) (where open work lives) can stay plan-only without the reasoning getting lost.
+
+---
+
+## v1.11.0 (unreleased)
+
+The dashboard opens on the work in play, with an HSP calculator copy fix batched alongside. A minor by the mechanical test: `web/`-only presentation and copy changes, no schema and no API touch, so the previous image boots against this database unchanged.
+
+### The dashboard defaults to active applications, and hides archived *(feat/dashboard-active-default)*
+
+- **A bare `/dashboard` now shows only the active stages** (the seven in-play `active_states`), not every status. The working list answers "what is still in play" by default; "All" is one preset click away, and "Clear filters" returns to the active default rather than to everything. The bare URL is the active view; every other stage selection (including "All") is encoded, so it stays shareable and reload-stable.
+- **`archived` is excluded from the dashboard entirely: no chip, never inside "All", never fetched.** Archiving is housekeeping, so an archived application drops off the working list; it stays reachable on the Board's closed rail, which is its home. `dashboard/page.tsx` strips it from `by_status` and `facets` at one choke point (so the chip set and every disjunctive count are non-archived by construction), and the client filters any archived row out of the rendered items defensively.
+- **The wire contract is unchanged.** `ListQuery` still treats an absent `status` as unfiltered, which the board relies on (it fetches `/applications` with no `status` and needs the whole set). The active default is a `web/` layer: the dashboard sends an **explicit** `status` on every request rather than leaning on the empty "unfiltered" one, so it never asks the server for archived.
+
+### The HSP calculator title *(fix/hsp-calculator-title)*
+
+- **The public HSP calculator is retitled "HSP Visa Points Calculator"** (from "Highly Skilled Professional points calculator") and its bonus-points hint tightened, in both locales. A copy-only i18n change, batched into this PR rather than shipped on its own.
 
 ---
 
