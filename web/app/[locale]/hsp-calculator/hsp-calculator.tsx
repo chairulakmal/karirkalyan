@@ -47,6 +47,9 @@ export function HspCalculator() {
   // or two or more (2 → +10). Two checkboxes, mutually exclusive through the
   // shared count.
   const [nationalQualifications, setNationalQualifications] = useState(0);
+  // Bonus 4 / Note 3: an innovation-support employer that is also an SME scores
+  // +10 more. Dependent on innovationOrg, so kept out of the BONUS_ORDER record.
+  const [innovationSme, setInnovationSme] = useState(false);
   const [bonuses, setBonuses] = useState<Record<BonusKey, boolean>>(
     () => Object.fromEntries(BONUS_ORDER.map((k) => [k, false])) as Record<BonusKey, boolean>,
   );
@@ -63,6 +66,7 @@ export function HspCalculator() {
     multipleDegrees: bonuses.multipleDegrees,
     researchAchievements: bonuses.researchAchievements,
     innovationOrg: bonuses.innovationOrg,
+    innovationSme,
     smeRnd: bonuses.smeRnd,
     foreignQualification: bonuses.foreignQualification,
     japaneseDegree: bonuses.japaneseDegree,
@@ -72,19 +76,44 @@ export function HspCalculator() {
     hswOrg: bonuses.hswOrg,
   });
 
-  const bonusItem = (key: BonusKey) => (
-    <BonusItem
-      key={key}
-      label={t(key)}
-      note={t(`notes.${key}`)}
-      infoLabel={t("infoAria")}
-      checked={bonuses[key]}
-      onChange={(v) => setBonus(key, v)}
-    />
-  );
+  const bonusItem = (key: BonusKey) => {
+    if (key === "innovationOrg") {
+      // Bonus 4 carries a dependent +10 (Note 3) when the employer is an SME:
+      // revealed only while the parent is checked, and cleared when it is not.
+      return (
+        <div key={key}>
+          <BonusItem
+            label={t(key)}
+            note={t(`notes.${key}`)}
+            infoLabel={t("infoAria")}
+            checked={bonuses.innovationOrg}
+            onChange={(v) => {
+              setBonus("innovationOrg", v);
+              if (!v) setInnovationSme(false);
+            }}
+          />
+          {bonuses.innovationOrg ? (
+            <div className="mt-2 pl-6">
+              <Check label={t("innovationSme")} checked={innovationSme} onChange={setInnovationSme} />
+            </div>
+          ) : null}
+        </div>
+      );
+    }
+    return (
+      <BonusItem
+        key={key}
+        label={t(key)}
+        note={t(`notes.${key}`)}
+        infoLabel={t("infoAria")}
+        checked={bonuses[key]}
+        onChange={(v) => setBonus(key, v)}
+      />
+    );
+  };
 
   return (
-    <div className="mt-8 grid items-start gap-6 lg:grid-cols-5">
+    <div className="hsp-lg mt-8 grid items-start gap-6 lg:grid-cols-5">
       <form
         className="space-y-8 border border-dune bg-linen p-6 lg:col-span-3 lg:p-8"
         onSubmit={(e) => e.preventDefault()}
@@ -107,9 +136,9 @@ export function HspCalculator() {
             options={["n1", "n2", "none"].map((v) => ({ value: v, label: t(`japaneseLevels.${v}`) }))}
           />
         </fieldset>
-        <fieldset className="space-y-3 border-t border-dune pt-6">
+        <fieldset className="space-y-3 border-t border-dune pt-4">
           <legend className="kk-label">{t("bonusTitle")}</legend>
-          <p className="text-xs leading-relaxed text-ink-soft">{t("bonusHint")}</p>
+          <p className="text-sm leading-relaxed text-ink-soft">{t("bonusHint")}</p>
           <NationalQualifications value={nationalQualifications} onChange={setNationalQualifications} />
           {BONUS_ORDER.map(bonusItem)}
         </fieldset>
@@ -122,14 +151,14 @@ export function HspCalculator() {
           }`}
         >
           <p className="kk-label">{t("total")}</p>
-          <p className="mt-1 font-mono text-5xl text-midnight">
+          <p className="mt-1 font-mono text-6xl text-midnight">
             {result.total}
-            <span className="ml-1 text-xl text-ink-soft">/ {HSP_THRESHOLD}</span>
+            <span className="ml-1 text-2xl text-ink-soft">/ {HSP_THRESHOLD}</span>
           </p>
           {result.incomeDisqualified ? (
-            <p className="mt-3 text-sm font-medium text-danger">{t("incomeFloor")}</p>
+            <p className="mt-3 text-base font-medium text-danger">{t("incomeFloor")}</p>
           ) : result.qualifies ? (
-            <p className="mt-3 text-sm font-medium text-cobalt">
+            <p className="mt-3 text-base font-medium text-cobalt">
               {t("qualifies")}{" "}
               {result.prYears ? t("prTrack", { years: result.prYears }) : null}
             </p>
@@ -137,17 +166,17 @@ export function HspCalculator() {
             // Suppressed when J-Skip qualifies: the J-Skip line below is then the
             // positive verdict, so "you need N more points" beside it would
             // contradict it (J-Skip is a separate path, independent of the total).
-            <p className="mt-3 text-sm text-ink-soft">{t("belowThreshold", { short: HSP_THRESHOLD - result.total })}</p>
+            <p className="mt-3 text-base text-ink-soft">{t("belowThreshold", { short: HSP_THRESHOLD - result.total })}</p>
           )}
           {result.jSkip ? (
-            <p className="mt-3 border-t border-cobalt/30 pt-3 text-sm font-medium text-midnight">{t("jSkip")}</p>
+            <p className="mt-3 border-t border-cobalt/30 pt-3 text-base font-medium text-midnight">{t("jSkip")}</p>
           ) : null}
         </div>
 
         <div className="border border-dune bg-linen p-6">
           <p className="kk-label">{t("breakdown")}</p>
           {result.breakdown.length > 0 ? (
-            <dl className="mt-3 space-y-1.5 text-sm">
+            <dl className="mt-3 space-y-1.5 text-base">
               {result.breakdown.map((row) => (
                 <div key={row.key} className="flex justify-between gap-4">
                   <dt className="text-ink-soft">{t(`rows.${row.key}`)}</dt>
@@ -156,11 +185,11 @@ export function HspCalculator() {
               ))}
             </dl>
           ) : (
-            <p className="mt-3 text-sm text-ink-soft">{t("breakdownEmpty")}</p>
+            <p className="mt-3 text-base text-ink-soft">{t("breakdownEmpty")}</p>
           )}
         </div>
 
-        <div className="space-y-1 text-xs text-ink-soft">
+        <div className="space-y-1 text-sm text-ink-soft">
           <p>{t("privacyNote")}</p>
           <p>{t("disclaimer")}</p>
         </div>
@@ -186,7 +215,7 @@ function Select({
       <select
         value={value}
         onChange={(e) => onChange(e.target.value)}
-        className="mt-2 block w-full border border-dune bg-linen px-3 py-2.5 text-base text-midnight transition hover:border-ink-soft"
+        className="mt-2 block w-full border border-dune bg-linen px-3 py-2.5 text-lg text-midnight transition hover:border-ink-soft"
       >
         {options.map((o) => (
           <option key={o.value} value={o.value}>
@@ -259,7 +288,7 @@ function NumberField({
         step={step}
         onChange={(e) => handleChange(e.target.value)}
         onBlur={handleBlur}
-        className="mt-2 block w-full border border-dune bg-linen px-3 py-2.5 text-base text-midnight transition hover:border-ink-soft placeholder:text-dune"
+        className="mt-2 block w-full border border-dune bg-linen px-3 py-2.5 text-lg text-midnight transition hover:border-ink-soft placeholder:text-dune"
       />
     </label>
   );
@@ -275,7 +304,7 @@ function Check({
   onChange: (v: boolean) => void;
 }) {
   return (
-    <label className="flex cursor-pointer items-start gap-2 text-sm text-midnight">
+    <label className="flex cursor-pointer items-start gap-2 text-base text-midnight">
       <input
         type="checkbox"
         checked={checked}
@@ -321,7 +350,7 @@ function InfoButton({
 
 function NotePanel({ id, children }: { id?: string; children: React.ReactNode }) {
   return (
-    <p id={id} className="mt-1.5 ml-6 border-l-2 border-cobalt/40 pl-3 text-xs leading-relaxed text-ink-soft">
+    <p id={id} className="mt-1.5 ml-6 border-l-2 border-cobalt/40 pl-3 text-sm leading-relaxed text-ink-soft">
       {children}
     </p>
   );
@@ -347,7 +376,7 @@ function BonusItem({
   const noteId = `${uid}-note`;
   return (
     <div>
-      <div className="flex items-start gap-2 text-sm text-midnight">
+      <div className="flex items-start gap-2 text-base text-midnight">
         <input
           id={`${uid}-cb`}
           type="checkbox"
@@ -358,7 +387,7 @@ function BonusItem({
         <label htmlFor={`${uid}-cb`} className="cursor-pointer">
           {label}
         </label>
-        <InfoButton open={open} onClick={() => setOpen((o) => !o)} label={infoLabel} controls={noteId} />
+        <InfoButton open={open} onClick={() => setOpen((o) => !o)} label={infoLabel} controls={open ? noteId : undefined} />
       </div>
       {open ? <NotePanel id={noteId}>{note}</NotePanel> : null}
     </div>
@@ -370,18 +399,29 @@ function BonusItem({
 function NationalQualifications({ value, onChange }: { value: number; onChange: (v: number) => void }) {
   const t = useTranslations("hsp");
   const [open, setOpen] = useState(false);
-  const noteId = `${useId()}-note`;
+  const uid = useId();
+  const noteId = `${uid}-note`;
+  const labelId = `${uid}-label`;
+  // A fieldset named by the explainer, so a screen reader announces what the
+  // "1" / "2+" boxes below choose between rather than two context-free toggles.
   return (
-    <div>
+    <fieldset aria-labelledby={labelId}>
       <div className="flex items-start gap-2">
-        <p className="text-sm text-midnight">{t("nationalQualExplainer")}</p>
-        <InfoButton open={open} onClick={() => setOpen((o) => !o)} label={t("infoAria")} controls={noteId} />
+        <p id={labelId} className="text-base text-midnight">
+          {t("nationalQualExplainer")}
+        </p>
+        <InfoButton
+          open={open}
+          onClick={() => setOpen((o) => !o)}
+          label={t("infoAria")}
+          controls={open ? noteId : undefined}
+        />
       </div>
       <div className="mt-2 flex gap-8 pl-6">
         <Check label={t("nationalQual1")} checked={value === 1} onChange={(v) => onChange(v ? 1 : 0)} />
         <Check label={t("nationalQual2")} checked={value === 2} onChange={(v) => onChange(v ? 2 : 0)} />
       </div>
       {open ? <NotePanel id={noteId}>{t("notes.nationalQual")}</NotePanel> : null}
-    </div>
+    </fieldset>
   );
 }

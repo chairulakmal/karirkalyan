@@ -68,10 +68,10 @@ export default async function HspCalculatorPage({
         </div>
       </header>
 
-      <main className="px-6 py-16 md:px-8 md:py-20">
+      <main className="hsp-system px-6 py-16 md:px-8 md:py-20">
         <div className="mx-auto w-full max-w-5xl">
           <p className="kk-label">{t("eyebrow")}</p>
-          <h1 className="kk-display mt-4 max-w-3xl text-4xl md:text-5xl">
+          <h1 className="mt-4 max-w-3xl text-4xl leading-tight md:text-5xl">
             <Phrase>{t("title")}</Phrase>
           </h1>
           <p className="mt-6 max-w-2xl text-lg leading-relaxed text-ink-soft">{t("lede")}</p>
@@ -81,9 +81,9 @@ export default async function HspCalculatorPage({
           {/* Primary sources, so a stranger can verify the numbers themselves.
               External links open in a new tab (rel=noopener). The ↗ marks the
               hop off-site. */}
-          <section className="mt-12 border-t border-dune pt-6">
+          <section className="hsp-lg mt-12 border-t border-dune pt-6">
             <p className="kk-label">{t("sourcesTitle")}</p>
-            <ul className="mt-3 space-y-2 text-sm">
+            <ul className="mt-3 space-y-2 text-base">
               {sources.map((source) => (
                 <li key={source.href}>
                   <a

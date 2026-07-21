@@ -37,6 +37,7 @@ export type HspInputs = {
   researchAchievements: boolean; // Bonus 1: patents / papers / grants (+15)
   nationalQualifications: number; // Bonus 3: 5 each, capped at 10
   innovationOrg: boolean; // Bonus 4: employer under innovation-support measures (+10)
+  innovationSme: boolean; // Bonus 4 / Note 3: that employer is also an SME (+10 more)
   smeRnd: boolean; // Bonus 5: SME spending >3% of revenue on R&D (+5)
   foreignQualification: boolean; // Bonus 6: a foreign qualification for the work (+5)
   japaneseDegree: boolean; // Bonus 7: a degree from a Japanese university (+10)
@@ -80,6 +81,9 @@ function experiencePoints(years: number): number {
 }
 
 function agePoints(age: number): number {
+  // Guard the low end: an empty field is NaN and a mistyped "0" or "-5" must not
+  // score the "up to 29" band. Only a real, positive age earns age points.
+  if (!(age > 0)) return 0;
   if (age <= 29) return 15;
   if (age <= 34) return 10;
   if (age <= 39) return 5;
@@ -127,6 +131,7 @@ export function computeHsp(inputs: HspInputs): HspResult {
     { key: "nationalQualification", points: nationalQualificationPoints(inputs.nationalQualifications) },
     { key: "multipleDegrees", points: inputs.multipleDegrees ? 5 : 0 },
     { key: "innovationOrg", points: inputs.innovationOrg ? 10 : 0 },
+    { key: "innovationSme", points: inputs.innovationOrg && inputs.innovationSme ? 10 : 0 },
     { key: "smeRnd", points: inputs.smeRnd ? 5 : 0 },
     { key: "foreignQualification", points: inputs.foreignQualification ? 5 : 0 },
     { key: "japaneseDegree", points: inputs.japaneseDegree ? 10 : 0 },

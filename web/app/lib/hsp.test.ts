@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { computeHsp, type HspInputs } from "./hsp";
+import { computeHsp, HSP_THRESHOLD, type HspInputs } from "./hsp";
 
 const base: HspInputs = {
   degree: "bachelor",
@@ -11,6 +11,7 @@ const base: HspInputs = {
   researchAchievements: false,
   nationalQualifications: 0,
   innovationOrg: false,
+  innovationSme: false,
   smeRnd: false,
   foreignQualification: false,
   japaneseDegree: false,
@@ -98,6 +99,62 @@ describe("computeHsp", () => {
     expect(points(computeHsp({ ...base, topUniversity: true }), "topUniversity")).toBe(10);
     expect(points(computeHsp({ ...base, training: true }), "training")).toBe(5);
     expect(points(computeHsp({ ...base, hswOrg: true }), "hswOrg")).toBe(10);
+  });
+
+  it("awards the SME +10 (Note 3) only when the innovation-support employer is set", () => {
+    // Bonus 4 alone is +10; with the SME add-on, +20. The add-on is dead weight
+    // without its parent, matching the dependent checkbox in the UI.
+    expect(points(computeHsp({ ...base, innovationOrg: true }), "innovationSme")).toBeUndefined();
+    expect(points(computeHsp({ ...base, innovationOrg: true, innovationSme: true }), "innovationSme")).toBe(10);
+    expect(points(computeHsp({ ...base, innovationOrg: false, innovationSme: true }), "innovationSme")).toBeUndefined();
+    const withSme = computeHsp({ ...base, innovationOrg: true, innovationSme: true });
+    const without = computeHsp({ ...base, innovationOrg: true });
+    expect(withSme.total - without.total).toBe(10);
+  });
+
+  it("scores no age points for zero, negative, or empty age", () => {
+    // A mistyped 0 or -5 must not land in the 'up to 29' band (15 points).
+    expect(points(computeHsp({ ...base, age: 0 }), "age")).toBeUndefined();
+    expect(points(computeHsp({ ...base, age: -5 }), "age")).toBeUndefined();
+    expect(points(computeHsp({ ...base, age: NaN }), "age")).toBeUndefined();
+    expect(points(computeHsp({ ...base, age: 29 }), "age")).toBe(15);
+  });
+
+  it("lets the income floor override a qualifying total", () => {
+    // A strong profile (well past 70) still fails outright below ¥3M: the floor
+    // is not a points question.
+    const r = computeHsp({
+      ...base, degree: "doctorate", japanese: "n1", researchAchievements: true,
+      experienceYears: 10, age: 28, annualIncomeYen: 2_000_000,
+    });
+    expect(r.total).toBeGreaterThanOrEqual(70);
+    expect(r.incomeDisqualified).toBe(true);
+    expect(r.qualifies).toBe(false);
+    expect(r.prYears).toBeNull();
+  });
+
+  it("flags J-Skip independently of the point total (a sub-70 case)", () => {
+    // 10 years + ¥20M opens J-Skip, but degree none / age 45 keeps the total
+    // under 70, so this pins independence rather than co-qualifying on points.
+    const r = computeHsp({
+      ...base, degree: "none", experienceYears: 10, age: 45,
+      annualIncomeYen: 20_000_000, japanese: "none",
+    });
+    expect(r.jSkip).toBe(true);
+    expect(r.total).toBeLessThan(HSP_THRESHOLD);
+    expect(r.qualifies).toBe(false);
+  });
+
+  it("locks the PR and floor boundaries", () => {
+    // Exactly 80 is the 1-year track; exactly ¥3M is not disqualified (floor is <).
+    // doctorate 30 + income ¥10M 40 + age 30 (<=34) 10 = 80, experience 0.
+    const at80 = computeHsp({
+      ...base, degree: "doctorate", experienceYears: 0, annualIncomeYen: 10_000_000, age: 30,
+    });
+    expect(at80.total).toBe(80);
+    expect(at80.prYears).toBe(1);
+    expect(computeHsp({ ...base, annualIncomeYen: 3_000_000 }).incomeDisqualified).toBe(false);
+    expect(computeHsp({ ...base, annualIncomeYen: 2_999_999 }).incomeDisqualified).toBe(true);
   });
 
   it("scores national qualifications at 5 each, capped at 10", () => {
