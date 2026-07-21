@@ -7,12 +7,21 @@
 // 専門職 status page, and the J-Skip gate from the ISA 特別高度人材制度 page.
 // Verified against those primary sources 2026-07-21; re-confirm on the annual
 // visa-research pass (SPEC.md § HSP calculator, TODO.md perishable-facts rule).
+//
+// This models the engineer's column only. Of the table's bonus points, the three
+// that live purely in the 経営・管理 (management) column are out of scope: position
+// held (Bonus 2), a ¥100M business investment (Bonus 13), and investment-
+// management work (Bonus 14). Every other bonus an engineer can claim is here.
 export const HSP_THRESHOLD = 70;
 // J-Skip (特別高度人材制度) grants HSP-1 directly, bypassing the points, at this
 // income with a degree-or-experience gate.
 export const JSKIP_INCOME_YEN = 20_000_000;
 // Below this annual income an applicant is disqualified regardless of points.
 export const INCOME_FLOOR_YEN = 3_000_000;
+// Bonus 3: a Japan national qualification is worth 5 points each, capped at 10
+// (i.e. two or more qualifications).
+export const NATIONAL_QUAL_POINTS_EACH = 5;
+export const NATIONAL_QUAL_POINTS_MAX = 10;
 
 export type Degree = "doctorate" | "master" | "bachelor" | "none";
 export type JapaneseLevel = "n1" | "n2" | "none";
@@ -23,10 +32,18 @@ export type HspInputs = {
   annualIncomeYen: number;
   age: number;
   japanese: JapaneseLevel;
-  // Bonus points, the ones that most often apply to an engineer.
-  japaneseDegree: boolean; // a degree from a Japanese university (+10)
-  researchAchievements: boolean; // patents / papers / grants (+15, technical track)
-  nationalQualification: boolean; // a Japan national qualification for the work (+10)
+  // Bonus points, every one an engineer (technical track) can claim.
+  multipleDegrees: boolean; // degrees in multiple fields (+5)
+  researchAchievements: boolean; // Bonus 1: patents / papers / grants (+15)
+  nationalQualifications: number; // Bonus 3: 5 each, capped at 10
+  innovationOrg: boolean; // Bonus 4: employer under innovation-support measures (+10)
+  smeRnd: boolean; // Bonus 5: SME spending >3% of revenue on R&D (+5)
+  foreignQualification: boolean; // Bonus 6: a foreign qualification for the work (+5)
+  japaneseDegree: boolean; // Bonus 7: a degree from a Japanese university (+10)
+  growthField: boolean; // Bonus 10: advanced project in a designated growth field (+10)
+  topUniversity: boolean; // Bonus 11: graduate of a university designated by Japan (+10)
+  training: boolean; // Bonus 12: completed a training course designated by Japan (+5)
+  hswOrg: boolean; // Bonus 15: employer supports accepting highly skilled workers (+10)
 };
 
 export type HspBreakdownRow = { key: string; points: number };
@@ -69,10 +86,20 @@ function agePoints(age: number): number {
   return 0;
 }
 
-function japanesePoints(level: JapaneseLevel): number {
+// Bonus 8 (N1, +15) and Bonus 9 (N2, +10). N2's points are excluded when a
+// Japanese-university degree (Bonus 7) is already claimed, per the table note.
+function japanesePoints(level: JapaneseLevel, japaneseDegree: boolean): number {
   if (level === "n1") return 15;
-  if (level === "n2") return 10;
+  if (level === "n2") return japaneseDegree ? 0 : 10;
   return 0;
+}
+
+// Bonus 3: 5 points per Japan national qualification for the work, capped at 10.
+// An empty field arrives as NaN (nothing entered): score it as zero.
+function nationalQualificationPoints(count: number): number {
+  if (!Number.isFinite(count)) return 0;
+  const n = Math.max(0, Math.floor(count));
+  return Math.min(n * NATIONAL_QUAL_POINTS_EACH, NATIONAL_QUAL_POINTS_MAX);
 }
 
 // The income table is age-adjusted: the higher bands score for everyone, the
@@ -95,10 +122,18 @@ export function computeHsp(inputs: HspInputs): HspResult {
     { key: "experience", points: experiencePoints(inputs.experienceYears) },
     { key: "income", points: incomePoints(inputs.annualIncomeYen, inputs.age) },
     { key: "age", points: agePoints(inputs.age) },
-    { key: "japanese", points: japanesePoints(inputs.japanese) },
-    { key: "japaneseDegree", points: inputs.japaneseDegree ? 10 : 0 },
+    { key: "japanese", points: japanesePoints(inputs.japanese, inputs.japaneseDegree) },
     { key: "research", points: inputs.researchAchievements ? 15 : 0 },
-    { key: "nationalQualification", points: inputs.nationalQualification ? 10 : 0 },
+    { key: "nationalQualification", points: nationalQualificationPoints(inputs.nationalQualifications) },
+    { key: "multipleDegrees", points: inputs.multipleDegrees ? 5 : 0 },
+    { key: "innovationOrg", points: inputs.innovationOrg ? 10 : 0 },
+    { key: "smeRnd", points: inputs.smeRnd ? 5 : 0 },
+    { key: "foreignQualification", points: inputs.foreignQualification ? 5 : 0 },
+    { key: "japaneseDegree", points: inputs.japaneseDegree ? 10 : 0 },
+    { key: "growthField", points: inputs.growthField ? 10 : 0 },
+    { key: "topUniversity", points: inputs.topUniversity ? 10 : 0 },
+    { key: "training", points: inputs.training ? 5 : 0 },
+    { key: "hswOrg", points: inputs.hswOrg ? 10 : 0 },
   ].filter((row) => row.points > 0);
 
   const total = breakdown.reduce((sum, row) => sum + row.points, 0);

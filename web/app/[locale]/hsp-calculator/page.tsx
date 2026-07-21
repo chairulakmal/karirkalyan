@@ -9,11 +9,20 @@ import { HspCalculator } from "./hsp-calculator";
 
 // The primary MOJ / ISA sources the point values and gates come from, verified
 // 2026-07-21. Labels are translated; the URLs are the authorities themselves.
-const HSP_SOURCES = [
-  { key: "sourcePoints", href: "https://www.moj.go.jp/isa/content/930001657.pdf" },
-  { key: "sourceStatus", href: "https://www.moj.go.jp/isa/applications/status/designatedactivities02_00004.html" },
-  { key: "sourceJskip", href: "https://www.moj.go.jp/isa/applications/resources/nyuukokukanri01_00009.html" },
-] as const;
+// The points table exists in both languages: link a reader to the one they can
+// read, the MOJ's own English translation on /en, the Japanese original on /ja.
+const POINTS_TABLE_PDF: Record<string, string> = {
+  en: "https://www.moj.go.jp/isa/content/001398882.pdf",
+  ja: "https://www.moj.go.jp/isa/content/930001657.pdf",
+};
+
+function hspSources(locale: string) {
+  return [
+    { key: "sourcePoints", href: POINTS_TABLE_PDF[locale] ?? POINTS_TABLE_PDF.en },
+    { key: "sourceStatus", href: "https://www.moj.go.jp/isa/applications/status/designatedactivities02_00004.html" },
+    { key: "sourceJskip", href: "https://www.moj.go.jp/isa/applications/resources/nyuukokukanri01_00009.html" },
+  ] as const;
+}
 
 export async function generateMetadata({
   params,
@@ -33,13 +42,19 @@ export async function generateMetadata({
  * the same annual visa-research pass as the in-app residence guidance
  * (SPEC.md § HSP calculator).
  */
-export default async function HspCalculatorPage() {
+export default async function HspCalculatorPage({
+  params,
+}: {
+  params: Promise<{ locale: string }>;
+}) {
+  const { locale } = await params;
   const t = await getTranslations("hsp");
+  const sources = hspSources(locale);
 
   return (
     <div className="flex flex-1 flex-col">
       <header className="border-b border-dune/60">
-        <div className="mx-auto flex max-w-4xl items-center justify-between px-6 py-6">
+        <div className="mx-auto flex max-w-5xl items-center justify-between px-6 py-6 md:px-8">
           <Link href="/" className="flex items-center gap-3">
             <Mark size={32} />
             <Wordmark size="md" />
@@ -53,10 +68,10 @@ export default async function HspCalculatorPage() {
         </div>
       </header>
 
-      <main className="px-6 py-16 md:py-20">
-        <div className="mx-auto w-full max-w-4xl">
+      <main className="px-6 py-16 md:px-8 md:py-20">
+        <div className="mx-auto w-full max-w-5xl">
           <p className="kk-label">{t("eyebrow")}</p>
-          <h1 className="mt-4 text-4xl leading-tight md:text-5xl">
+          <h1 className="kk-display mt-4 max-w-3xl text-4xl md:text-5xl">
             <Phrase>{t("title")}</Phrase>
           </h1>
           <p className="mt-6 max-w-2xl text-lg leading-relaxed text-ink-soft">{t("lede")}</p>
@@ -64,19 +79,21 @@ export default async function HspCalculatorPage() {
           <HspCalculator />
 
           {/* Primary sources, so a stranger can verify the numbers themselves.
-              External links open in a new tab (rel=noopener). */}
-          <section className="mt-10 border-t border-dune pt-6">
+              External links open in a new tab (rel=noopener). The ↗ marks the
+              hop off-site. */}
+          <section className="mt-12 border-t border-dune pt-6">
             <p className="kk-label">{t("sourcesTitle")}</p>
-            <ul className="mt-3 space-y-1.5 text-sm">
-              {HSP_SOURCES.map((source) => (
+            <ul className="mt-3 space-y-2 text-sm">
+              {sources.map((source) => (
                 <li key={source.href}>
                   <a
                     href={source.href}
                     target="_blank"
                     rel="noopener noreferrer"
-                    className="text-cobalt underline underline-offset-4 hover:text-cobalt-2"
+                    className="inline-flex items-baseline gap-1 text-cobalt underline underline-offset-4 hover:text-cobalt-2"
                   >
                     {t(source.key)}
+                    <span aria-hidden="true" className="text-xs">↗</span>
                   </a>
                 </li>
               ))}
@@ -85,7 +102,7 @@ export default async function HspCalculatorPage() {
         </div>
       </main>
 
-      <SiteFooter />
+      <SiteFooter wide />
     </div>
   );
 }
