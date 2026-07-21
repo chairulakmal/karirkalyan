@@ -6,8 +6,11 @@ import { REPO_URL } from "@/app/lib/links";
 /**
  * Shared footer for the public pages (home, about, docs). `wide` matches the
  * homepage's 5xl measure; the prose pages keep the 2xl measure of their text.
+ * `minimal` drops the app-specific links (API docs, privacy, terms) and keeps
+ * only author, license, and GitHub: for the HSP calculator, a browser-only tool
+ * whose data story and legal surface are not the resume-holding app's.
  */
-export async function SiteFooter({ wide = false }: { wide?: boolean }) {
+export async function SiteFooter({ wide = false, minimal = false }: { wide?: boolean; minimal?: boolean }) {
   const t = await getTranslations("footer");
 
   return (
@@ -32,17 +35,21 @@ export async function SiteFooter({ wide = false }: { wide?: boolean }) {
           })}
         </p>
         <p className="flex items-center gap-4">
-          {/* Points at the in-app docs page, not the raw Swagger UI: the
-              reference is one click further, framed rather than dumped. */}
-          <Link href="/docs" className="underline underline-offset-4 hover:text-midnight">
-            {t("apiDocs")}
-          </Link>
-          <Link href="/privacy" className="underline underline-offset-4 hover:text-midnight">
-            {t("privacy")}
-          </Link>
-          <Link href="/terms" className="underline underline-offset-4 hover:text-midnight">
-            {t("terms")}
-          </Link>
+          {minimal ? null : (
+            <>
+              {/* Points at the in-app docs page, not the raw Swagger UI: the
+                  reference is one click further, framed rather than dumped. */}
+              <Link href="/docs" className="underline underline-offset-4 hover:text-midnight">
+                {t("apiDocs")}
+              </Link>
+              <Link href="/privacy" className="underline underline-offset-4 hover:text-midnight">
+                {t("privacy")}
+              </Link>
+              <Link href="/terms" className="underline underline-offset-4 hover:text-midnight">
+                {t("terms")}
+              </Link>
+            </>
+          )}
           <Link
             href={`${REPO_URL}/blob/main/LICENSE`}
             target="_blank"

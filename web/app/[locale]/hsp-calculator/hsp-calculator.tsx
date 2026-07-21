@@ -160,7 +160,10 @@ export function HspCalculator() {
           )}
         </div>
 
-        <p className="text-xs text-ink-soft">{t("disclaimer")}</p>
+        <div className="space-y-1 text-xs text-ink-soft">
+          <p>{t("privacyNote")}</p>
+          <p>{t("disclaimer")}</p>
+        </div>
       </div>
     </div>
   );

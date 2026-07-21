@@ -102,7 +102,7 @@ export default async function HspCalculatorPage({
         </div>
       </main>
 
-      <SiteFooter wide />
+      <SiteFooter wide minimal />
     </div>
   );
 }
