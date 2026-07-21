@@ -44,9 +44,31 @@ pipeline. Built as a portfolio project by Chairul Akmal (https://chairulakmal.co
   duplicate submission while an agency's candidate-ownership window (assumed 18 months) is
   still open; compensation is stored as the nenshu (年収) structure, guaranteed months vs
   performance-tied bonus months, rather than one number; the posting's Japanese-language
-  requirement (JLPT N1/N2, business, conversational, none) is a filter; and the posting text
-  is snapshotted at pre-fill time so it survives the posting being taken down. These fields
-  are extracted by the same AI pre-fill pass that reads company and role.
+  requirement (JLPT N1/N2, business, conversational, none) is a filter; each application also
+  records whether the employer sponsors a work visa (defaulting to unknown, itself a
+  decision-relevant risk flag for a foreign engineer) and which status of residence a sponsored
+  role falls under; it records how the company can actually employ a Japan resident (own Japan
+  entity, employer-of-record, contractor-only, or cannot hire in Japan), the filter that
+  silently kills most global-remote applications from Japan; and the posting text is snapshotted
+  at pre-fill time so it survives the posting being taken down. These fields, sponsorship and
+  hiring entity included, are extracted by the same AI pre-fill pass that reads company and
+  role. The one exception is the status of residence, a manual one-tap field, since postings
+  rarely name the exact status.
+- Answers "is this remote role survivable from JST?": stores the company's home timezone and the
+  daily overlap it requires, maps the workday into the user's clock, flags an antisocial (1am)
+  start before applying, exports a timezone-correct .ics for a scheduled interview, and pushes a
+  reminder the morning before it. Tracks the user's own status of residence and its expiry
+  (days-remaining warning, plus the Certificate-of-Eligibility lead time a job change needs,
+  sourced to current MOJ processing statistics), and a residence-expiry push as the countdown
+  crosses thresholds.
+- Publishes a public, no-auth Highly Skilled Professional (高度専門職) points calculator at
+  /hsp-calculator: estimates the visa score on the engineering track from the MOJ points table
+  (70-point threshold, J-Skip gate), unit-tested pure logic, with links out to the primary sources.
+- Turns the dashboard and board into a career read over the same audit trail: response rate, ghost
+  rate, and average time-in-stage stat cards; disjunctively-faceted filters whose state lives in the
+  URL (a filtered view is linkable and reload-survivable); triage cards on the two candidate-side
+  board columns (notes excerpt, source, days-in-stage, stalest-first); and cover-letter talking
+  points extracted as bullets from the resume against the posting (bullets, not a draft).
 - Offers a Kanban board at /board: one column per active status, and dragging a card between
   columns performs a real FSM transition. The board fetches the legal moves and its column set
   from GET /api/v1/transitions rather than keeping its own copy of the table, and the server
@@ -80,8 +102,9 @@ claim one.
 - Frontend: Next.js 16 App Router, TypeScript, Tailwind CSS
 - Auth: JWT issued by Rails, stored in httpOnly cookie by Next.js; never reaches client JS
 - Deploy: Railway (API service + web service + managed PostgreSQL)
-- Tests: RSpec (unit + request specs against real DB), Playwright E2E, and a CI script that fails
-  the build when the en and ja message catalogs disagree about which keys exist
+- Tests: RSpec (unit + request specs against real DB), Vitest (pure client logic, no DOM),
+  Playwright E2E, and a CI script that fails the build when the en and ja message catalogs
+  disagree about which keys exist
 
 ## Live
 

@@ -18,7 +18,7 @@ const PUBLIC_PATHS = ["/", "/sign-in"];
 // read them. `/privacy` and `/terms` are open for a sharper reason: they concern
 // the people already holding data in the system, and a privacy policy you cannot
 // reach while signed in is not a privacy policy.
-const OPEN_PATHS = ["/about", "/docs", "/privacy", "/terms"];
+const OPEN_PATHS = ["/about", "/docs", "/privacy", "/terms", "/hsp-calculator"];
 
 const isDev = process.env.NODE_ENV === "development";
 

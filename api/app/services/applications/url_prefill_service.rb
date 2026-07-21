@@ -7,7 +7,8 @@ require "cgi"
 module Applications
   # Turns a job posting into structured fields with Claude: company/role/notes,
   # plus the Japan-market fields (channel, agency, japanese_level, the four
-  # comp-structure numbers) since v1.8.0 -- one extraction pass owns every
+  # comp-structure numbers, and since v1.9.0 sponsorship, hiring_entity,
+  # company_timezone, and overlap_hours_required) -- one extraction pass owns every
   # captured field. Returns a plain hash -- the caller (and ultimately the user)
   # reviews the values before anything is saved. The hash also carries
   # :posting_text, the stripped capped text sent to Claude, which is how the
@@ -101,6 +102,15 @@ module Applications
           agency:  { type: "string", description: "Name of the recruitment agency when the posting is an agency listing. Empty string otherwise." },
           japanese_level: { type: "string", enum: [ "none", "conversational", "business", "n2", "n1", "" ],
                             description: "Japanese language requirement: 'n1'/'n2' for explicit JLPT levels, 'business' for business-level Japanese, 'conversational' for conversational Japanese, 'none' when the posting says no Japanese is required or is explicitly English-only. Empty string when not stated." },
+          sponsorship: { type: "string", enum: [ "available", "unavailable", "" ],
+                         description: "Work-visa sponsorship: 'available' when the posting says it sponsors a visa or supports relocation to Japan; 'unavailable' when it explicitly requires existing work authorization / no sponsorship. Empty string when not stated." },
+          hiring_entity: { type: "string", enum: [ "own_entity", "eor", "contractor", "unsupported", "" ],
+                           description: "How a Japan-resident hire would be employed: 'own_entity' if the company has a Japan legal entity and hires directly; 'eor' if it employs through an employer-of-record / relocation partner; 'contractor' if it offers only an independent-contractor arrangement; 'unsupported' if it cannot employ someone resident in Japan (Japan not a supported location). Empty string when not stated." },
+          company_timezone: { type: "string",
+                              enum: [ "America/Los_Angeles", "America/Denver", "America/Chicago", "America/New_York", "America/Sao_Paulo", "Europe/London", "Europe/Berlin", "Asia/Kolkata", "Asia/Singapore", "Australia/Sydney", "Asia/Tokyo", "" ],
+                              description: "The company's home timezone as an IANA identifier, mapped from the posting's stated location or HQ (e.g. San Francisco -> America/Los_Angeles, London -> Europe/London). Pick the closest listed zone. Empty string when the location is not stated." },
+          overlap_hours_required: { type: "number",
+                                    description: "Hours of daily working-hours overlap with the company the role requires, when stated (e.g. '4 hours overlap with PST' is 4). 0 if not stated." },
           comp_annual_min_yen: { type: "integer",
                                  description: "Low end of the quoted annual compensation (nensyu) in yen, e.g. 600man-yen is 6000000. 0 if not stated." },
           comp_annual_max_yen: { type: "integer",
@@ -428,6 +438,12 @@ module Applications
         channel:                enum_field(input, :channel, Application::CHANNELS),
         agency:                 field(input, :agency).presence,
         japanese_level:         enum_field(input, :japanese_level, Application::JAPANESE_LEVELS),
+        # Empty string (unstated) falls through to nil here, and the form leaves
+        # sponsorship at its "unknown" default: unknown is signal, not absence.
+        sponsorship:            enum_field(input, :sponsorship, Application::SPONSORSHIP),
+        hiring_entity:          enum_field(input, :hiring_entity, Application::HIRING_ENTITIES),
+        company_timezone:       enum_field(input, :company_timezone, Application::COMPANY_TIMEZONES),
+        overlap_hours_required: positive_number(input, :overlap_hours_required),
         comp_annual_min_yen:    positive_number(input, :comp_annual_min_yen)&.round,
         comp_annual_max_yen:    positive_number(input, :comp_annual_max_yen)&.round,
         comp_months_guaranteed: positive_number(input, :comp_months_guaranteed),

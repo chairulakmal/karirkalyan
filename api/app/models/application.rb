@@ -17,6 +17,51 @@ class Application < ApplicationRecord
   # value for it; `none` is a recorded "no Japanese required".
   JAPANESE_LEVELS = %w[none conversational business n2 n1].freeze
 
+  # Does the employer sponsor a work visa? The single most decision-relevant
+  # fact for a foreign engineer, and the one column here that defaults to a
+  # value rather than null: `unknown` is decision-relevant signal (a role whose
+  # sponsor status is unknown is a visible risk flag), not missing data. Stays
+  # nullable by design, never tightened to NOT NULL, even in the 2.0.0 schema
+  # pass. SPEC.md § Data model.
+  SPONSORSHIP = %w[unknown available unavailable].freeze
+
+  # Which 在留資格 a sponsored role falls under. A stable legal taxonomy (no
+  # perishable figures), null-means-unrecorded like japanese_level, and only
+  # meaningful when sponsorship is "available". `engineer_specialist` is
+  # 技術・人文知識・国際業務, the usual status for software; `highly_skilled` is
+  # 高度専門職.
+  STATUSES_OF_RESIDENCE = %w[engineer_specialist highly_skilled other].freeze
+
+  # How a Japan-resident hire is actually employed: the filter that silently
+  # kills most global-remote applications from Japan. A four-value enum, not a
+  # boolean, because each is a different employment reality. `own_entity`: the
+  # company has a Japan legal entity and employs directly. `eor`: an
+  # employer-of-record is the legal employer, not the company you interviewed
+  # with. `contractor`: an independent-contractor arrangement only.
+  # `unsupported`: Japan is not a supported location at all. Null-means-
+  # unrecorded like japanese_level. SPEC.md § Data model.
+  HIRING_ENTITIES = %w[own_entity eor contractor unsupported].freeze
+
+  # The company's home timezone, for the "is this remote role survivable from
+  # JST?" arithmetic. A curated set of IANA zone identifiers (the markets a
+  # Tokyo-based engineer actually targets), not a free 400-zone list: a curated
+  # set validates trivially and the survivability question needs no more. IANA
+  # identifiers rather than fixed offsets, so DST is handled by the zone
+  # database, not frozen at record time. SPEC.md § Data model.
+  COMPANY_TIMEZONES = %w[
+    America/Los_Angeles
+    America/Denver
+    America/Chicago
+    America/New_York
+    America/Sao_Paulo
+    Europe/London
+    Europe/Berlin
+    Asia/Kolkata
+    Asia/Singapore
+    Australia/Sydney
+    Asia/Tokyo
+  ].freeze
+
   # The ceiling that bounds storage. A Rack::Attack throttle cannot do this job — it bounds a
   # rate over a window, and every window resets, so any positive rate integrates to unbounded
   # total. 200 x 2 MB of blobs caps the worst case around 400 MB, on a database whose whole
@@ -40,6 +85,12 @@ class Application < ApplicationRecord
   validates :status, inclusion: { in: ->(_) { ApplicationFSM::VALID_STATES } }
   validates :channel,        inclusion: { in: CHANNELS },        allow_nil: true
   validates :japanese_level, inclusion: { in: JAPANESE_LEVELS }, allow_nil: true
+  validates :sponsorship,    inclusion: { in: SPONSORSHIP },     allow_nil: true
+  validates :status_of_residence, inclusion: { in: STATUSES_OF_RESIDENCE }, allow_nil: true
+  validates :hiring_entity,   inclusion: { in: HIRING_ENTITIES },   allow_nil: true
+  validates :company_timezone, inclusion: { in: COMPANY_TIMEZONES }, allow_nil: true
+  validates :overlap_hours_required,
+            numericality: { greater_than_or_equal_to: 0, less_than_or_equal_to: 24 }, allow_nil: true
   validates :comp_annual_min_yen, :comp_annual_max_yen,
             numericality: { greater_than: 0, only_integer: true }, allow_nil: true
   validates :comp_months_guaranteed, :comp_months_variable,
@@ -63,6 +114,16 @@ class Application < ApplicationRecord
   # ApplicationsController#show merges it back explicitly.
   def as_json(options = {})
     super(options.merge(except: %i[resume cover_letter posting_snapshot]))
+      .merge("source" => source)
+  end
+
+  # The job board this came from, derived from the URL through the one
+  # JobBoard.from_url rule (SPEC.md § JobBoard). Server-derived on purpose: a
+  # TypeScript copy would be a second implementation of the www-strip/downcase.
+  # Cheap (no query), so it rides every serialization; `days_in_stage`, which
+  # needs the timeline, does not and is added per endpoint.
+  def source
+    JobBoard.from_url(url) || JobBoard::NONE
   end
 
   # The one place a downloaded PDF gets its name — both the per-application endpoints and the

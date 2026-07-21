@@ -161,6 +161,56 @@ paths:
                       nullable: true
                       description: 'The posting''s Japanese requirement: what it asks,
                         not what the user holds.'
+                    sponsorship:
+                      type: string
+                      enum:
+                      - unknown
+                      - available
+                      - unavailable
+                      nullable: true
+                      description: Does the employer sponsor a work visa. Defaults
+                        to `unknown` (decision-relevant signal, not absence).
+                    status_of_residence:
+                      type: string
+                      enum:
+                      - engineer_specialist
+                      - highly_skilled
+                      - other
+                      nullable: true
+                      description: Which 在留資格 a sponsored role falls under. Null when
+                        unrecorded; only meaningful with sponsorship = available.
+                    hiring_entity:
+                      type: string
+                      enum:
+                      - own_entity
+                      - eor
+                      - contractor
+                      - unsupported
+                      nullable: true
+                      description: 'How a Japan-resident hire is employed: own_entity
+                        / eor / contractor / unsupported. Null when unrecorded.'
+                    company_timezone:
+                      type: string
+                      enum:
+                      - America/Los_Angeles
+                      - America/Denver
+                      - America/Chicago
+                      - America/New_York
+                      - America/Sao_Paulo
+                      - Europe/London
+                      - Europe/Berlin
+                      - Asia/Kolkata
+                      - Asia/Singapore
+                      - Australia/Sydney
+                      - Asia/Tokyo
+                      nullable: true
+                      description: The company's home timezone as a curated IANA identifier.
+                        Drives the JST-survivability read. Null when unrecorded.
+                    overlap_hours_required:
+                      type: number
+                      nullable: true
+                      description: Daily working-hours overlap the role requires,
+                        0..24. Null when unrecorded.
                     comp_annual_min_yen:
                       type: integer
                       nullable: true
@@ -337,6 +387,52 @@ paths:
                       - n2
                       - n1
                       nullable: true
+                    sponsorship:
+                      type: string
+                      enum:
+                      - unknown
+                      - available
+                      - unavailable
+                      nullable: true
+                    status_of_residence:
+                      type: string
+                      enum:
+                      - engineer_specialist
+                      - highly_skilled
+                      - other
+                      nullable: true
+                    hiring_entity:
+                      type: string
+                      enum:
+                      - own_entity
+                      - eor
+                      - contractor
+                      - unsupported
+                      nullable: true
+                    company_timezone:
+                      type: string
+                      enum:
+                      - America/Los_Angeles
+                      - America/Denver
+                      - America/Chicago
+                      - America/New_York
+                      - America/Sao_Paulo
+                      - Europe/London
+                      - Europe/Berlin
+                      - Asia/Kolkata
+                      - Asia/Singapore
+                      - Australia/Sydney
+                      - Asia/Tokyo
+                      nullable: true
+                    overlap_hours_required:
+                      type: number
+                      nullable: true
+                    interview_at:
+                      type: string
+                      format: date-time
+                      nullable: true
+                      description: The upcoming interview instant. A naive value is
+                        parsed in JST; stored UTC.
                     comp_annual_min_yen:
                       type: integer
                       nullable: true
@@ -460,6 +556,46 @@ paths:
           description: no cover letter uploaded
         '401':
           description: not authenticated
+  "/api/v1/applications/{id}/interview":
+    parameters:
+    - name: id
+      in: path
+      required: true
+      schema:
+        type: integer
+    get:
+      summary: Download the upcoming interview as an .ics calendar event
+      tags:
+      - Applications
+      security:
+      - bearerAuth: []
+      responses:
+        '200':
+          description: iCalendar event (text/calendar attachment, named -interview.ics)
+        '404':
+          description: no interview scheduled for this application
+        '401':
+          description: not authenticated
+  "/api/v1/applications/{id}/talking_points":
+    parameters:
+    - name: id
+      in: path
+      required: true
+      schema:
+        type: integer
+    post:
+      summary: Generate cover-letter talking points from the resume and posting
+      tags:
+      - Applications
+      security:
+      - bearerAuth: []
+      responses:
+        '200':
+          description: match-point bullets, generated on demand (not persisted)
+        '422':
+          description: no resume or no saved posting to compare (talking_points_missing_input)
+        '401':
+          description: not authenticated
   "/api/v1/auth/sign_in":
     post:
       summary: Sign in
@@ -543,6 +679,9 @@ paths:
                 - facets
                 - total
                 - avg_days_to_offer
+                - response_rate
+                - ghost_rate
+                - avg_days_in_stage
                 - ghost_risk
                 - user
                 properties:
@@ -553,20 +692,35 @@ paths:
                     description: Application count per status
                   facets:
                     type: array
-                    description: "[company, job-board host] per application"
+                    description: "[company, job-board host, status, japanese_level]
+                      per application; the frontend cross-narrows every filter from
+                      it"
                     items:
                       type: array
-                      items:
-                        type: string
-                      minItems: 2
-                      maxItems: 2
+                      minItems: 4
+                      maxItems: 4
                   total:
                     type: integer
                   avg_days_to_offer:
                     type: number
                     nullable: true
-                    description: Applied date → offer timeline entry; null until one
-                      reaches offer
+                    description: Applied date to offer timeline entry; null until
+                      one reaches offer
+                  response_rate:
+                    type: integer
+                    nullable: true
+                    description: Percent of applied applications the company replied
+                      to (advanced or rejected); null when none applied
+                  ghost_rate:
+                    type: integer
+                    nullable: true
+                    description: Percent of applied applications that were ghosted;
+                      null when none applied
+                  avg_days_in_stage:
+                    type: number
+                    nullable: true
+                    description: Average days in-stage across in-flight applications;
+                      null when none active
                   ghost_risk:
                     type: object
                     required:
@@ -688,9 +842,49 @@ paths:
       - bearerAuth: []
       responses:
         '200':
-          description: current user profile
+          description: current user profile (residence fields, days-remaining, and
+            the visa reference)
         '401':
           description: not authenticated
+    patch:
+      summary: Update the authenticated user's residence status
+      tags:
+      - Me
+      security:
+      - bearerAuth: []
+      parameters: []
+      responses:
+        '200':
+          description: a permanent resident has no clock, so days-remaining is null
+            even with a date
+        '422':
+          description: an unknown residence status is rejected
+        '401':
+          description: not authenticated
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                user:
+                  type: object
+                  properties:
+                    residence_status:
+                      type: string
+                      enum:
+                      - engineer_specialist
+                      - highly_skilled
+                      - permanent_resident
+                      - spouse_or_dependent
+                      - other
+                      nullable: true
+                    residence_expires_on:
+                      type: string
+                      format: date
+                      nullable: true
+              required:
+              - user
   "/api/v1/passkeys/options":
     post:
       summary: WebAuthn registration options

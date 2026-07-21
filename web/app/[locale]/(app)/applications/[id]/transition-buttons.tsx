@@ -5,7 +5,7 @@ import { useTranslations } from "next-intl";
 import { useRouter } from "@/i18n/navigation";
 import { transitionStatus } from "@/app/lib/actions";
 import { statusBadgeClass } from "@/app/lib/format";
-import { CONFIRM_REQUIRED, REVIVAL_STATES } from "@/app/lib/transitions";
+import { CONFIRM_REQUIRED, STAGE_NOTE_STATES } from "@/app/lib/transitions";
 import type { Status } from "@/app/lib/types";
 
 /**
@@ -20,12 +20,17 @@ export function TransitionButtons({
   validNextStates,
   currentStatus,
   terminalStates,
+  revivable,
 }: {
   id: number;
   lockVersion: number;
   validNextStates: Status[];
   currentStatus: Status;
   terminalStates: Status[];
+  // Whether the current status re-opens to `applied` (derived from the fetched
+  // table by the page via canRevive, not a hardcoded set). Gates the reason
+  // prompt; false when the table did not arrive, so the prompt is simply absent.
+  revivable: boolean;
 }) {
   const t = useTranslations("transitions");
   const ts = useTranslations("status");
@@ -34,12 +39,14 @@ export function TransitionButtons({
   const [error, setError] = useState<string | null>(null);
   const [confirming, setConfirming] = useState<Status | null>(null);
   const [reversalReason, setReversalReason] = useState("");
+  const [stageNote, setStageNote] = useState("");
   const [pending, startTransition] = useTransition();
 
   function go(to: Status, note?: string) {
     setError(null);
     setConfirming(null);
     setReversalReason("");
+    setStageNote("");
     startTransition(async () => {
       const result = await transitionStatus(id, to, lockVersion, note);
       if (result.ok) return;
@@ -55,9 +62,13 @@ export function TransitionButtons({
   }
 
   function handleClick(status: Status) {
-    if (REVIVAL_STATES.has(currentStatus) && status === "applied") {
+    if (revivable && status === "applied") {
       setConfirming("applied");
       setReversalReason("");
+    } else if (STAGE_NOTE_STATES.has(status)) {
+      // An interview stage: offer an optional note before advancing.
+      setConfirming(status);
+      setStageNote("");
     } else if (CONFIRM_REQUIRED.has(status)) {
       setConfirming(status);
     } else {
@@ -68,11 +79,12 @@ export function TransitionButtons({
   function cancelConfirm() {
     setConfirming(null);
     setReversalReason("");
+    setStageNote("");
   }
 
   // Catalog entries under `transitions.reasons` are JSON arrays, so they are
   // read with `t.raw` rather than `t`; only the three revival states have any.
-  const presets: string[] = REVIVAL_STATES.has(currentStatus)
+  const presets: string[] = revivable
     ? t.raw(`reasons.${currentStatus}`)
     : [];
 
@@ -80,7 +92,7 @@ export function TransitionButtons({
     <div>
       <div className="mt-3 flex flex-wrap gap-2">
         {validNextStates.map((status) => {
-          const isRevivalButton = REVIVAL_STATES.has(currentStatus) && status === "applied";
+          const isRevivalButton = revivable && status === "applied";
 
           if (confirming === status && isRevivalButton) {
             return (
@@ -117,6 +129,43 @@ export function TransitionButtons({
                     className="inline-flex min-h-10 items-center px-4 py-1.5 text-xs font-medium bg-cobalt text-linen transition hover:bg-cobalt-2 disabled:opacity-40 disabled:cursor-not-allowed"
                   >
                     {t("confirm")}
+                  </button>
+                  <button
+                    type="button"
+                    onClick={cancelConfirm}
+                    disabled={pending}
+                    className="inline-flex min-h-10 items-center px-4 py-1.5 text-xs font-medium ring-1 ring-inset ring-midnight/20 bg-sand/60 text-ink-soft transition hover:text-midnight disabled:opacity-50"
+                  >
+                    {t("cancel")}
+                  </button>
+                </div>
+              </div>
+            );
+          }
+
+          if (confirming === status && STAGE_NOTE_STATES.has(status)) {
+            return (
+              <div key={status} className="w-full space-y-3">
+                <p className="text-xs font-medium text-ink-soft">
+                  {t("stageNotePrompt", { label: ts(`label.${status}`) })}
+                </p>
+                {/* Optional: Advance works with an empty note. "who you met,
+                    what they asked" attaches to this exact transition. */}
+                <textarea
+                  value={stageNote}
+                  onChange={(e) => setStageNote(e.target.value)}
+                  placeholder={t("stageNotePlaceholder")}
+                  rows={3}
+                  className="w-full border border-dune bg-linen px-3 py-1.5 text-xs text-midnight placeholder:text-ink-soft/50"
+                />
+                <div className="flex gap-2">
+                  <button
+                    type="button"
+                    onClick={() => go(status, stageNote.trim() || undefined)}
+                    disabled={pending}
+                    className="inline-flex min-h-10 items-center px-4 py-1.5 text-xs font-medium bg-cobalt text-linen transition hover:bg-cobalt-2 disabled:opacity-50"
+                  >
+                    {t("advance")}
                   </button>
                   <button
                     type="button"

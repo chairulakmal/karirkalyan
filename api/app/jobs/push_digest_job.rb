@@ -11,18 +11,12 @@
 class PushDigestJob < ApplicationJob
   queue_as :default
 
-  # Failures that plausibly pass on a later attempt: network-level errors the
-  # web-push gem does not wrap, plus the push service's own 429. Collected
-  # per-subscription and re-raised AFTER the loop (see #perform), then retried
-  # with backoff. Retry is declared, not assumed — Solid Queue has no implicit
-  # retry; an uncaught raise parks in solid_queue_failed_executions.
-  TRANSIENT_ERRORS = [
-    WebPush::TooManyRequests,
-    Net::OpenTimeout, Net::ReadTimeout, SocketError,
-    OpenSSL::SSL::SSLError, Errno::ECONNRESET, Errno::ECONNREFUSED
-  ].freeze
-
-  retry_on(*TRANSIENT_ERRORS, wait: :polynomially_longer, attempts: 3)
+  # The delivery loop, retry list, and pruning now live in Push::Notifier, shared
+  # with the interview-reminder channel. Retry is declared, not assumed: Solid
+  # Queue has no implicit retry; an uncaught raise parks in
+  # solid_queue_failed_executions. The retry list keys on Notifier's own so the
+  # two cannot drift.
+  retry_on(*Push::Notifier::TRANSIENT_ERRORS, wait: :polynomially_longer, attempts: 3)
 
   # A digest that could not be delivered today is superseded by tomorrow's,
   # not queued behind it.
@@ -34,19 +28,11 @@ class PushDigestJob < ApplicationJob
     applications = user.applications.where(id: application_ids).order(:follow_up_at).to_a
     return if applications.empty?
 
-    payload = payload_for(applications).to_json
-
-    first_transient = nil
-    user.push_subscriptions.find_each do |subscription|
-      error = deliver(subscription, payload)
-      first_transient ||= error
-    end
-
-    # Raised only after every subscription got its attempt, so one flaky
-    # endpoint cannot cost the user's other devices their notification —
-    # retry_on then re-runs the whole job, and the notification tag makes the
-    # re-send a visual no-op on devices that already showed it.
-    raise first_transient if first_transient
+    # Notifier delivers to every subscription and returns the first transient
+    # error; re-raised here so retry_on re-runs the whole job, and the notification
+    # tag makes the re-send a visual no-op on devices that already showed it.
+    transient = Push::Notifier.new(user).deliver(payload_for(applications), ttl: TTL)
+    raise transient if transient
   end
 
   private
@@ -70,36 +56,5 @@ class PushDigestJob < ApplicationJob
         url:   "/dashboard"
       }
     end
-  end
-
-  # Returns nil on success and on terminally-failed endpoints; returns the
-  # exception (without raising) for transient failures, so the loop can finish
-  # the other subscriptions before #perform re-raises it.
-  def deliver(subscription, payload)
-    WebPush.payload_send(
-      message:  payload,
-      endpoint: subscription.endpoint,
-      p256dh:   subscription.p256dh,
-      auth:     subscription.auth,
-      ttl:      TTL,
-      vapid:    PushVapid.vapid_options
-    )
-    nil
-  rescue WebPush::ExpiredSubscription, WebPush::InvalidSubscription
-    # The push service's 404/410: the browser revoked this subscription, and
-    # pushsubscriptionchange is not reliably fired — pruning here is the only
-    # dependable cleanup.
-    Rails.logger.info("[push_digest] pruning revoked subscription #{subscription.id}")
-    subscription.destroy!
-    nil
-  rescue *TRANSIENT_ERRORS => e
-    Rails.logger.warn("[push_digest] transient failure for subscription #{subscription.id}: #{e.class}: #{e.message}")
-    e
-  rescue WebPush::ResponseError => e
-    # Any other push-service refusal is terminal for this attempt: log and
-    # move on, keeping the row — a systemic version of this shows up in the
-    # logs, not as the user's other devices going silent.
-    Rails.logger.warn("[push_digest] delivery failed for subscription #{subscription.id}: #{e.class}: #{e.message}")
-    nil
   end
 end

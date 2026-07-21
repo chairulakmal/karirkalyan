@@ -6,8 +6,26 @@ import { useRouter } from "@/i18n/navigation";
 import { updateApplication } from "@/app/lib/actions";
 import { formatDate, isOverdue } from "@/app/lib/format";
 import { Field } from "@/app/components/field";
-import type { Channel, JapaneseLevel, Status } from "@/app/lib/types";
-import { CHANNELS, JAPANESE_LEVELS } from "@/app/lib/types";
+import type {
+  Channel,
+  CompanyTimezone,
+  HiringEntity,
+  JapaneseLevel,
+  Sponsorship,
+  StatusOfResidence,
+  Status,
+} from "@/app/lib/types";
+import {
+  CHANNELS,
+  COMPANY_TIMEZONES,
+  HIRING_ENTITIES,
+  JAPANESE_LEVELS,
+  SPONSORSHIPS,
+  STATUSES_OF_RESIDENCE,
+  TIMEZONE_LABEL_KEY,
+} from "@/app/lib/types";
+import type { TimezoneOverlap } from "@/app/lib/timezone";
+import { formatJstDateTime, interviewIsAntisocial, toJstInputValue } from "@/app/lib/timezone";
 
 type Props = {
   id: number;
@@ -24,6 +42,15 @@ type Props = {
   channel: Channel | null;
   agencyName: string | null;
   japaneseLevel: JapaneseLevel | null;
+  sponsorship: Sponsorship | null;
+  statusOfResidence: StatusOfResidence | null;
+  hiringEntity: HiringEntity | null;
+  companyTimezone: CompanyTimezone | null;
+  overlapHoursRequired: number | null;
+  // Computed server-side (page.tsx) so DST is current and there is no client
+  // time-dependent render to mismatch on hydration. Null when no zone is set.
+  timezoneOverlap: TimezoneOverlap | null;
+  interviewAt: string | null;
   compAnnualMinYen: number | null;
   compAnnualMaxYen: number | null;
   compMonthsGuaranteed: number | null;
@@ -35,10 +62,25 @@ function yenToMan(yen: number | null): string {
   return yen === null ? "" : String(yen / 10_000);
 }
 
+// A JST hour (0-23, fractional for half-hour zones like India) as HH:MM.
+function fmtJst(hour: number): string {
+  let h = Math.floor(hour);
+  let m = Math.round((hour - h) * 60);
+  if (m === 60) {
+    h = (h + 1) % 24;
+    m = 0;
+  }
+  return `${String(h).padStart(2, "0")}:${String(m).padStart(2, "0")}`;
+}
+
 export function DetailsEditor(props: Props) {
   const t = useTranslations("details");
   const tc = useTranslations("channel");
   const tj = useTranslations("japaneseLevel");
+  const ts = useTranslations("sponsorship");
+  const tsor = useTranslations("statusOfResidence");
+  const thire = useTranslations("hiringEntity");
+  const ttz = useTranslations("companyTimezone");
   const tErrors = useTranslations("errors");
   const locale = useLocale();
   const router = useRouter();
@@ -48,6 +90,10 @@ export function DetailsEditor(props: Props) {
   // Controlled (unlike the other edit fields) because the agency input only
   // renders on the agent channel, and that choice can change mid-edit.
   const [channel, setChannel] = useState<Channel | "">(props.channel ?? "");
+  // Same reason: the 在留資格 select only renders while sponsorship is
+  // "available", and that can change mid-edit. Falls back to "unknown" (the
+  // server default) if the column is somehow null.
+  const [sponsorship, setSponsorship] = useState<Sponsorship>(props.sponsorship ?? "unknown");
 
   const compRange =
     props.compAnnualMinYen === null
@@ -129,6 +175,74 @@ export function DetailsEditor(props: Props) {
             label={t("japaneseLevel")}
             value={props.japaneseLevel ? tj(props.japaneseLevel) : t("blank")}
           />
+          <Row
+            label={t("sponsorship")}
+            value={ts(props.sponsorship ?? "unknown")}
+          />
+          {/* The 在留資格 is only meaningful when a role sponsors, so it shows
+              only there: a status row on a role that will not sponsor is noise,
+              the same reasoning as the agency row under a non-agent channel. */}
+          {props.sponsorship === "available" ? (
+            <Row
+              label={t("statusOfResidence")}
+              value={props.statusOfResidence ? tsor(props.statusOfResidence) : t("blank")}
+            />
+          ) : null}
+          <Row
+            label={t("hiringEntity")}
+            value={props.hiringEntity ? thire(props.hiringEntity) : t("blank")}
+          />
+          <Row
+            label={t("timezone")}
+            value={props.companyTimezone ? ttz(TIMEZONE_LABEL_KEY[props.companyTimezone]) : t("blank")}
+          />
+          {/* Derived, not stored: the company's workday mapped into JST, plus a
+              flag when the required overlap forces antisocial hours. Computed
+              server-side, so DST is current. */}
+          {props.timezoneOverlap ? (
+            <Row
+              label={t("jstOverlap")}
+              value={
+                <span
+                  className={
+                    props.timezoneOverlap.survivable
+                      ? "text-midnight"
+                      : "font-medium text-danger"
+                  }
+                >
+                  {t("jstCore", {
+                    start: fmtJst(props.timezoneOverlap.jstWorkdayStart),
+                    end:
+                      fmtJst(props.timezoneOverlap.jstWorkdayEnd) +
+                      (props.timezoneOverlap.crossesMidnight ? ` ${t("nextDay")}` : ""),
+                  })}
+                  {props.overlapHoursRequired
+                    ? ` · ${t("overlapNeed", { hours: props.overlapHoursRequired })}`
+                    : ""}
+                  {props.timezoneOverlap.survivable ? "" : ` · ${t("antisocial")}`}
+                </span>
+              }
+            />
+          ) : null}
+          <Row
+            label={t("interview")}
+            value={
+              props.interviewAt ? (
+                <span
+                  className={
+                    interviewIsAntisocial(props.interviewAt)
+                      ? "font-medium text-danger"
+                      : "text-midnight"
+                  }
+                >
+                  {t("interviewJst", { when: formatJstDateTime(props.interviewAt) })}
+                  {interviewIsAntisocial(props.interviewAt) ? ` · ${t("antisocial")}` : ""}
+                </span>
+              ) : (
+                t("blank")
+              )
+            }
+          />
           <Row label={t("comp")} value={compRange ?? t("blank")} />
           <Row
             label={t("compMonthsGuaranteed")}
@@ -139,6 +253,17 @@ export function DetailsEditor(props: Props) {
             value={props.compMonthsVariable ?? t("blank")}
           />
         </dl>
+        {/* A plain <a> to the API route (not the i18n Link): it is a download
+            proxy, not a localized page, and Rails sets the attachment filename.
+            Same reasoning as the export links (SPEC.md § Exports). */}
+        {props.interviewAt ? (
+          <a
+            href={`/api/applications/${props.id}/interview`}
+            className="mt-3 inline-block text-xs font-medium text-cobalt underline underline-offset-4 hover:text-cobalt-2"
+          >
+            {t("addToCalendar")}
+          </a>
+        ) : null}
         {props.notes ? (
           <>
             <p className="kk-label mt-5">{t("notes")}</p>
@@ -208,6 +333,100 @@ export function DetailsEditor(props: Props) {
             defaultValue={props.agencyName ?? ""}
           />
         ) : null}
+        {/* sponsorship has no blank option: "unknown" is the value, not the
+            absence. The 在留資格 select rides the "available" branch, and an
+            unmounted select sends nothing, so switching away clears it. */}
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+          <label className="block text-sm">
+            <span className="kk-label">{t("sponsorship")}</span>
+            <select
+              name="sponsorship"
+              value={sponsorship}
+              onChange={(e) => setSponsorship(e.target.value as Sponsorship)}
+              className="mt-1.5 block w-full border border-dune bg-linen px-3 py-2 text-sm text-midnight"
+            >
+              {SPONSORSHIPS.map((s) => (
+                <option key={s} value={s}>
+                  {ts(s)}
+                </option>
+              ))}
+            </select>
+          </label>
+          {sponsorship === "available" ? (
+            <label className="block text-sm">
+              <span className="kk-label">{t("statusOfResidence")}</span>
+              {/* Uncontrolled (defaultValue), unlike the new-application form
+                  where this select is controlled state. The choice is deliberate:
+                  sponsorship must be controlled because it gates this select's
+                  visibility, but the 在留資格 itself gates nothing, so on this
+                  edit surface a re-mount should restore the persisted value, not
+                  a mid-edit choice. hiring_entity below is uncontrolled for the
+                  same reason. */}
+              <select
+                name="status_of_residence"
+                defaultValue={props.statusOfResidence ?? ""}
+                className="mt-1.5 block w-full border border-dune bg-linen px-3 py-2 text-sm text-midnight"
+              >
+                <option value="">{t("blank")}</option>
+                {STATUSES_OF_RESIDENCE.map((s) => (
+                  <option key={s} value={s}>
+                    {tsor(s)}
+                  </option>
+                ))}
+              </select>
+            </label>
+          ) : null}
+        </div>
+        <label className="block text-sm">
+          <span className="kk-label">{t("hiringEntity")}</span>
+          <select
+            name="hiring_entity"
+            defaultValue={props.hiringEntity ?? ""}
+            className="mt-1.5 block w-full border border-dune bg-linen px-3 py-2 text-sm text-midnight"
+          >
+            <option value="">{t("blank")}</option>
+            {HIRING_ENTITIES.map((h) => (
+              <option key={h} value={h}>
+                {thire(h)}
+              </option>
+            ))}
+          </select>
+        </label>
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+          <label className="block text-sm">
+            <span className="kk-label">{t("timezone")}</span>
+            <select
+              name="company_timezone"
+              defaultValue={props.companyTimezone ?? ""}
+              className="mt-1.5 block w-full border border-dune bg-linen px-3 py-2 text-sm text-midnight"
+            >
+              <option value="">{t("blank")}</option>
+              {COMPANY_TIMEZONES.map((z) => (
+                <option key={z} value={z}>
+                  {ttz(TIMEZONE_LABEL_KEY[z])}
+                </option>
+              ))}
+            </select>
+          </label>
+          <Field
+            name="overlap_hours_required"
+            label={t("overlapHours")}
+            type="number"
+            min="0"
+            max="24"
+            step="0.5"
+            defaultValue={props.overlapHoursRequired ?? ""}
+          />
+        </div>
+        {/* datetime-local is a naive JST wall-clock; the server parses it in
+            Time.zone (Tokyo) and stores UTC, and the value is rendered back in
+            JST. Blank clears it. */}
+        <Field
+          name="interview_at"
+          label={t("interview")}
+          type="datetime-local"
+          defaultValue={props.interviewAt ? toJstInputValue(props.interviewAt) : ""}
+        />
         <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
           <Field
             name="comp_annual_min_man"

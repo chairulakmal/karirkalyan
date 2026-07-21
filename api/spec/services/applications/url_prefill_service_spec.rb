@@ -43,6 +43,10 @@ RSpec.describe Applications::UrlPrefillService do
           channel:                nil,
           agency:                 nil,
           japanese_level:         nil,
+          sponsorship:            nil,
+          hiring_entity:          nil,
+          company_timezone:       nil,
+          overlap_hours_required: nil,
           comp_annual_min_yen:    nil,
           comp_annual_max_yen:    nil,
           comp_months_guaranteed: nil,
@@ -74,21 +78,32 @@ RSpec.describe Applications::UrlPrefillService do
       it "passes through valid market fields" do
         with_input(
           channel: "agent", agency: "Robert Half", japanese_level: "n2",
+          sponsorship: "available", hiring_entity: "eor",
+          company_timezone: "America/Los_Angeles", overlap_hours_required: 4,
           comp_annual_min_yen: 6_000_000, comp_annual_max_yen: 9_000_000,
           comp_months_guaranteed: 14, comp_months_variable: 2
         )
 
         expect(service.call).to include(
           channel: "agent", agency: "Robert Half", japanese_level: "n2",
+          sponsorship: "available", hiring_entity: "eor",
+          company_timezone: "America/Los_Angeles", overlap_hours_required: 4.0,
           comp_annual_min_yen: 6_000_000, comp_annual_max_yen: 9_000_000,
           comp_months_guaranteed: 14.0, comp_months_variable: 2.0
         )
       end
 
       it "nils an enum value outside the model's set rather than passing it on" do
-        with_input(channel: "headhunter", japanese_level: "fluent")
+        # status_of_residence is not extracted at all, so a value Claude would
+        # never be asked for is the cleanest thing to reject alongside the others.
+        with_input(channel: "headhunter", japanese_level: "fluent",
+                   sponsorship: "maybe", hiring_entity: "staffing",
+                   company_timezone: "Mars/Olympus")
 
-        expect(service.call).to include(channel: nil, japanese_level: nil)
+        expect(service.call).to include(
+          channel: nil, japanese_level: nil, sponsorship: nil, hiring_entity: nil,
+          company_timezone: nil
+        )
       end
 
       it "nils the zero the schema uses for 'not stated', and any non-positive number" do
