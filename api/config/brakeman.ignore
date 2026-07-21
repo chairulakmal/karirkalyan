@@ -3,13 +3,13 @@
     {
       "warning_type": "Mass Assignment",
       "warning_code": 70,
-      "fingerprint": "270682b16e11c835c84631c5c94e4c98034a5e2737cae8fad84c2557abf1b839",
+      "fingerprint": "0fdb23acb3ba1cfe0a902f6467eb459572f0f6a8ca02604d65d210b81c19f951",
       "check_name": "PermitAttributes",
       "message": "Potentially dangerous key allowed for mass assignment",
       "file": "app/controllers/api/v1/applications_controller.rb",
-      "line": 181,
+      "line": 241,
       "link": "https://brakemanscanner.org/docs/warning_types/mass_assignment/",
-      "code": "params.require(:application).permit(:company, :role, :url, :notes, :follow_up_at, :lock_version, :channel, :japanese_level, :posting_snapshot, :comp_annual_min_yen, :comp_annual_max_yen, :comp_months_guaranteed, :comp_months_variable)",
+      "code": "params.require(:application).permit(:company, :role, :url, :notes, :follow_up_at, :lock_version, :channel, :japanese_level, :sponsorship, :status_of_residence, :hiring_entity, :company_timezone, :overlap_hours_required, :interview_at, :posting_snapshot, :comp_annual_min_yen, :comp_annual_max_yen, :comp_months_guaranteed, :comp_months_variable)",
       "render_path": null,
       "location": {
         "type": "method",

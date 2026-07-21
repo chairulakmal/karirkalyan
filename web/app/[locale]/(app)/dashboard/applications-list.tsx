@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { useLocale, useTranslations } from "next-intl";
-import { Link } from "@/i18n/navigation";
+import { Link, usePathname, useRouter } from "@/i18n/navigation";
 import {
   formatDate,
   isOverdue,
@@ -57,11 +57,21 @@ interface Props {
   // ApplicationFSM::ACTIVE_STATES, fetched from /transitions. Empty when that
   // fetch failed, which drops the "Active" preset.
   activeStates: Status[];
-  facets: [string, string][]; // [company, board-host] per application
-  total: number;
+  // [company, board-host, status, japanese_level] per application (v1.10.0), the
+  // source for every filter's counts, cross-narrowing disjunctively.
+  facets: [string, string, Status, JapaneseLevel | null][];
   // Every at-risk id, not just the ones on the first page — the ghost-risk query
   // is not paginated, so rows appended by "load more" get the marker too.
   atRiskIds: number[];
+  // The filters the URL arrived with (v1.10.0), already used server-side for the
+  // first paint. Raw strings; the client validates them against what it renders,
+  // so junk degrades to unfiltered here the same way ListQuery ignores it there.
+  initialFilters: {
+    status: string | null;
+    company: string | null;
+    source: string | null;
+    japaneseLevel: string | null;
+  };
 }
 
 export function ApplicationsList({
@@ -70,14 +80,16 @@ export function ApplicationsList({
   statusBuckets,
   activeStates,
   facets,
-  total,
   atRiskIds,
+  initialFilters,
 }: Props) {
   const t = useTranslations("list");
   const ts = useTranslations("status");
   const tg = useTranslations("dashboard.ghostRisk");
   const tl = useTranslations("japaneseLevel");
   const locale = useLocale();
+  const router = useRouter();
+  const pathname = usePathname();
   const atRisk = new Set(atRiskIds);
   const rendered = statusBuckets.map(([status]) => status);
   const [items, setItems] = useState(() => sortByImportance(initialItems));
@@ -85,13 +97,43 @@ export function ApplicationsList({
   // Every chip starts lit: the user subtracts stages from a closed set they
   // already have a mental model of, rather than opting in one at a time. The
   // list still first appears unfiltered — all of them selected *is* unfiltered.
-  const [filters, setFilters] = useState<Filters>(() => ({
-    statuses: rendered,
-    company: null,
-    source: null,
-    japaneseLevel: null,
-  }));
+  // Seeded from the URL the page arrived with, validated against what this list
+  // actually renders: an absent status param is all chips lit, and a status
+  // param whose members are all junk intersects to nothing and so also reads as
+  // unfiltered, matching how ListQuery ignored the same junk on the first paint.
+  const [filters, setFilters] = useState<Filters>(() => {
+    const wanted = initialFilters.status?.split(",").map((s) => s.trim());
+    const fromUrl = wanted ? rendered.filter((s) => wanted.includes(s)) : [];
+    const jlpt = initialFilters.japaneseLevel;
+    return {
+      statuses: fromUrl.length > 0 ? fromUrl : rendered,
+      company: initialFilters.company || null,
+      source: initialFilters.source || null,
+      japaneseLevel: jlpt && (JAPANESE_LEVELS as readonly string[]).includes(jlpt)
+        ? (jlpt as JapaneseLevel)
+        : null,
+    };
+  });
   const [loading, setLoading] = useState(false);
+
+  // Mirror the applied filters into the URL so a filtered view is linkable,
+  // reload-survivable, and back-button-correct. `replace`, not `push`: filtering
+  // is refining one view, not navigating, so it should not stack history. The
+  // wire rules carry over exactly: a full chip row (unfiltered) and a zero chip
+  // row (a client-only "show nothing", deliberately not shareable: it reads as
+  // unfiltered on reload) both send no `status`, so the default view keeps a
+  // bare URL. Routed through i18n/navigation so the locale prefix is preserved.
+  function syncUrl(f: Filters) {
+    const qs = new URLSearchParams();
+    if (f.statuses.length > 0 && f.statuses.length < rendered.length) {
+      qs.set("status", f.statuses.join(","));
+    }
+    if (f.company) qs.set("company", f.company);
+    if (f.source) qs.set("source", f.source);
+    if (f.japaneseLevel) qs.set("japanese_level", f.japaneseLevel);
+    const query = qs.toString();
+    router.replace(query ? `${pathname}?${query}` : pathname, { scroll: false });
+  }
 
   const allStages = filters.statuses.length === rendered.length;
   // Zero chips is a UI state, not a query — see applyFilters. An account with no
@@ -121,6 +163,7 @@ export function ApplicationsList({
     // back everything. Hold it client-side and render the reason instead.
     if (next.statuses.length === 0) {
       setFilters(next);
+      syncUrl(next);
       return;
     }
     setLoading(true);
@@ -128,6 +171,7 @@ export function ApplicationsList({
       const body = await fetchPage(next);
       if (!body) return;
       setFilters(next);
+      syncUrl(next);
       setItems(sortByImportance(body.data));
       setMeta(body.meta);
     } finally {
@@ -170,20 +214,49 @@ export function ApplicationsList({
     japaneseLevel: null,
   };
 
-  // Each dropdown's options reflect the OTHER active filter, so picking a board
-  // narrows the company list and vice versa; counts reflect the narrowed set.
-  function buckets(pick: "company" | "board", constrainTo: string | null): [string, number][] {
-    const counts = new Map<string, number>();
-    for (const [company, board] of facets) {
-      if (constrainTo && (pick === "company" ? board : company) !== constrainTo) continue;
-      const key = pick === "company" ? company : board;
+  // Disjunctive faceting across all four filters (v1.10.0): each facet's counts
+  // reflect the OTHER active filters, never its own selection, so picking a
+  // company narrows the board list, the stage-chip counts, and the Japanese-
+  // level counts alike. The stage filter constrains the others only when it is a
+  // real subset (all chips lit is unfiltered), so a full chip row narrows nothing.
+  type FacetRow = [string, string, Status, JapaneseLevel | null];
+  type FacetDim = "company" | "board" | "status" | "jlpt";
+  function matchesExcept(row: FacetRow, except: FacetDim): boolean {
+    if (except !== "company" && filters.company && row[0] !== filters.company) return false;
+    if (except !== "board" && filters.source && row[1] !== filters.source) return false;
+    if (except !== "jlpt" && filters.japaneseLevel && row[3] !== filters.japaneseLevel) return false;
+    if (
+      except !== "status" &&
+      filters.statuses.length < rendered.length &&
+      !filters.statuses.includes(row[2])
+    ) {
+      return false;
+    }
+    return true;
+  }
+  function countBy<K>(except: FacetDim, keyOf: (r: FacetRow) => K | null): Map<K, number> {
+    const counts = new Map<K, number>();
+    for (const row of facets) {
+      if (!matchesExcept(row, except)) continue;
+      const key = keyOf(row);
+      if (key === null) continue;
       counts.set(key, (counts.get(key) ?? 0) + 1);
     }
-    return [...counts.entries()].sort((a, b) => b[1] - a[1]);
+    return counts;
   }
 
-  const companyOptions = buckets("company", filters.source);
-  const boardOptions = buckets("board", filters.company);
+  const companyOptions = [...countBy("company", (r) => r[0]).entries()].sort((a, b) => b[1] - a[1]);
+  const boardOptions = [...countBy("board", (r) => r[1]).entries()].sort((a, b) => b[1] - a[1]);
+  // Stage-chip and Japanese-level counts, narrowed by the other filters. The
+  // chips render from `rendered` (which stages exist at all); these supply the
+  // in-context number each shows.
+  const statusCounts = countBy("status", (r) => r[2]);
+  const jlptCounts = countBy("jlpt", (r) => r[3]);
+  const narrowedTotal = [...statusCounts.values()].reduce((n, c) => n + c, 0);
+  const activeCount = rendered.reduce(
+    (n, s) => (activeStates.includes(s) ? n + (statusCounts.get(s) ?? 0) : n),
+    0,
+  );
 
   // When a change makes the other selection impossible (no app has both), drop
   // it so the dropdown value can never point at an option that isn't shown.
@@ -223,32 +296,24 @@ export function ApplicationsList({
             }))}
             onChange={(value) => changeSource(value || null)}
           />
-          {/* Deliberately the dumbest filter here: the fixed taxonomy, no counts
-              and no faceting, because counts would need the level in the facets
-              payload, whose next reshape v1.10.0's stat-cards item already owns
-              (SPEC.md § Dashboard filters). A level with no rows just matches
-              nothing, which the no-matches state renders honestly. */}
-          <label className="block text-sm">
-            <span className="kk-label">{t("japaneseLevel")}</span>
-            <select
-              value={filters.japaneseLevel ?? ""}
-              disabled={loading}
-              onChange={(e) =>
-                applyFilters({
-                  ...filters,
-                  japaneseLevel: (e.target.value || null) as JapaneseLevel | null,
-                })
-              }
-              className="mt-1.5 block min-w-44 border border-dune bg-linen px-3 py-1.5 text-sm text-midnight disabled:opacity-50"
-            >
-              <option value="">{t("allLevels")}</option>
-              {JAPANESE_LEVELS.map((l) => (
-                <option key={l} value={l}>
-                  {tl(l)}
-                </option>
-              ))}
-            </select>
-          </label>
+          {/* Now cross-narrowed and counted like the other two (v1.10.0): the
+              facets payload carries japanese_level, so this reads the same
+              disjunctive count. The fixed taxonomy still renders every level;
+              a level with no matching rows shows 0, which is honest. */}
+          <FilterSelect
+            label={t("japaneseLevel")}
+            value={filters.japaneseLevel ?? ""}
+            disabled={loading}
+            allLabel={t("allLevels")}
+            options={JAPANESE_LEVELS.map((l) => ({
+              value: l,
+              label: tl(l),
+              count: jlptCounts.get(l) ?? 0,
+            }))}
+            onChange={(value) =>
+              applyFilters({ ...filters, japaneseLevel: (value || null) as JapaneseLevel | null })
+            }
+          />
           {hasActiveFilter && (
             <button
               onClick={() => applyFilters(noFilters)}
@@ -289,23 +354,20 @@ export function ApplicationsList({
                   would drop a company the user never asked to lose. */}
               <Preset
                 label={t("all")}
-                count={total}
+                count={narrowedTotal}
                 onClick={() => applyFilters({ ...filters, statuses: rendered })}
               />
               {activeRendered.length > 0 && (
                 <Preset
                   label={t("activeStages")}
-                  count={statusBuckets.reduce(
-                    (n, [status, count]) => (activeStates.includes(status) ? n + count : n),
-                    0,
-                  )}
+                  count={activeCount}
                   onClick={() => applyFilters({ ...filters, statuses: activeRendered })}
                 />
               )}
               <Preset label={t("noStages")} onClick={() => applyFilters({ ...filters, statuses: [] })} />
             </div>
 
-            {statusBuckets.map(([status, count]) => {
+            {statusBuckets.map(([status]) => {
               const on = filters.statuses.includes(status);
               return (
                 <label
@@ -326,7 +388,8 @@ export function ApplicationsList({
                     onChange={() => toggleStatus(status)}
                     className="size-3.5 accent-current"
                   />
-                  {ts(`label.${status}`)} <span className="font-mono">{count}</span>
+                  {ts(`label.${status}`)}{" "}
+                  <span className="font-mono">{statusCounts.get(status) ?? 0}</span>
                 </label>
               );
             })}
@@ -356,9 +419,13 @@ export function ApplicationsList({
         </div>
       ) : items.length === 0 ? (
         <div className="border border-dashed border-dune bg-linen p-12 text-center">
-          {hasActiveFilter ? (
-            <p className="text-ink-soft">{t("noMatches")}</p>
-          ) : (
+          {/* "Add your first" only when the account genuinely has no rows, read
+              from the unfiltered `rendered` (by_status), NOT from hasActiveFilter:
+              a URL like ?status=accepted is a real filter the server answers with
+              zero rows for a user who has applications but none accepted, and the
+              client can seed it as all-lit (no chip exists for it). Keying on
+              rendered means that case reads as "no matches", not "empty account". */}
+          {rendered.length === 0 ? (
             <>
               <p className="text-ink-soft">{t("empty")}</p>
               <Link
@@ -368,6 +435,8 @@ export function ApplicationsList({
                 {t("addFirst")}
               </Link>
             </>
+          ) : (
+            <p className="text-ink-soft">{t("noMatches")}</p>
           )}
         </div>
       ) : (

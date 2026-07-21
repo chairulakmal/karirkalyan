@@ -1,12 +1,18 @@
 "use client";
 
 import { useOptimistic, useState, useTransition } from "react";
-import { useTranslations } from "next-intl";
+import { useLocale, useTranslations } from "next-intl";
 import { Link, useRouter } from "@/i18n/navigation";
 import { transitionStatus } from "@/app/lib/actions";
-import { statusBadgeClass } from "@/app/lib/format";
-import { CONFIRM_REQUIRED, REVIVAL_STATES } from "@/app/lib/transitions";
+import { jobBoardLabel, stageAge, statusBadgeClass } from "@/app/lib/format";
+import { excerpt } from "@/app/lib/excerpt";
+import { CONFIRM_REQUIRED, canRevive } from "@/app/lib/transitions";
 import type { Application, Status, TransitionTable } from "@/app/lib/types";
+
+// The two candidate-side columns where a stalled item is the user's own to move
+// (past `applied`, the next move is the company's, which ghost risk already
+// watches). Only these get the triage facts and the stalest-first sort.
+const TRIAGE_COLUMNS: ReadonlySet<Status> = new Set(["wishlist", "draft"]);
 
 /*
  * The Kanban board. Columns are the seven active statuses; the six closed
@@ -81,8 +87,11 @@ export function Board({
     });
   }
 
-  // Server (cursor) order within each column — position is not API data, and
-  // inventing a client-side order would be a second source of truth.
+  // Server (cursor) order within each column by default: position is not API
+  // data, and inventing a client-side order would be a second source of truth.
+  // The two triage columns are the exception: they sort stalest-first on
+  // `days_in_stage`, which is itself a server field, so the order is still
+  // derived from server data, not invented here.
   const byStatus = new Map<Status, Application[]>();
   for (const app of optimisticApps) {
     const bucket = byStatus.get(app.status);
@@ -125,7 +134,12 @@ export function Board({
 
       <div className="grid grid-cols-1 gap-3 pb-4 sm:grid-cols-2 lg:grid-cols-4">
         {columns.map((status) => {
-          const cards = byStatus.get(status) ?? [];
+          const isTriage = TRIAGE_COLUMNS.has(status);
+          const cards = [...(byStatus.get(status) ?? [])];
+          // Stalest-first on the server's days_in_stage; a null age sorts last.
+          if (isTriage) {
+            cards.sort((a, b) => (b.days_in_stage ?? -1) - (a.days_in_stage ?? -1));
+          }
           const legal = isLegalTarget(status);
           return (
             <section
@@ -161,6 +175,8 @@ export function Board({
                     app={app}
                     targets={table.transitions[app.status] ?? []}
                     terminalStates={table.terminal_states ?? []}
+                    revivable={canRevive(app.status, table)}
+                    triage={isTriage}
                     draggable
                     dragged={dragging?.id === app.id}
                     onDragStart={() => setDragging({ id: app.id, from: app.status })}
@@ -201,6 +217,7 @@ export function Board({
                         app={app}
                         targets={table.transitions[app.status] ?? []}
                         terminalStates={table.terminal_states ?? []}
+                        revivable={canRevive(app.status, table)}
                         onMove={(to, note) => move(app, to, note)}
                       />
                     ))}
@@ -219,6 +236,8 @@ function Card({
   app,
   targets,
   terminalStates,
+  revivable,
+  triage = false,
   draggable = false,
   dragged = false,
   onDragStart,
@@ -228,12 +247,16 @@ function Card({
   app: Application;
   targets: Status[];
   terminalStates: Status[];
+  revivable: boolean;
+  triage?: boolean;
   draggable?: boolean;
   dragged?: boolean;
   onDragStart?: () => void;
   onDragEnd?: () => void;
   onMove: (to: Status, note?: string) => void;
 }) {
+  const t = useTranslations("board");
+  const locale = useLocale();
   return (
     <li
       draggable={draggable}
@@ -250,9 +273,25 @@ function Card({
       <Link href={`/applications/${app.id}`} className="block px-3 py-2.5 pr-10 transition hover:bg-sand/60">
         <p className="truncate font-serif text-sm font-medium text-midnight">{app.company}</p>
         <p className="mt-0.5 truncate text-xs text-ink-soft">{app.role}</p>
+        {/* Triage facts on the two candidate-side columns only: a notes excerpt,
+            the source it came from, and how long it has sat here: enough to
+            decide the next move without opening the card. */}
+        {triage ? (
+          <>
+            {app.notes ? (
+              <p className="mt-1.5 line-clamp-2 text-xs text-ink-soft/90">{excerpt(app.notes, 100)}</p>
+            ) : null}
+            <div className="mt-1.5 flex items-center justify-between gap-2 text-[11px] text-ink-soft">
+              <span className="truncate">{jobBoardLabel(app.source, t("noBoard"))}</span>
+              {app.days_in_stage !== null ? (
+                <span className="shrink-0 font-mono">{stageAge(app.days_in_stage, locale)}</span>
+              ) : null}
+            </div>
+          </>
+        ) : null}
       </Link>
       {targets.length > 0 && (
-        <CardMenu app={app} targets={targets} terminalStates={terminalStates} onMove={onMove} />
+        <CardMenu app={app} targets={targets} terminalStates={terminalStates} revivable={revivable} onMove={onMove} />
       )}
     </li>
   );
@@ -267,11 +306,13 @@ function CardMenu({
   app,
   targets,
   terminalStates,
+  revivable,
   onMove,
 }: {
   app: Application;
   targets: Status[];
   terminalStates: Status[];
+  revivable: boolean;
   onMove: (to: Status, note?: string) => void;
 }) {
   const t = useTranslations("board");
@@ -281,7 +322,7 @@ function CardMenu({
   const [confirming, setConfirming] = useState<Status | null>(null);
   const [reason, setReason] = useState("");
 
-  const isRevival = REVIVAL_STATES.has(app.status);
+  const isRevival = revivable;
   // Catalog entries under `transitions.reasons` are JSON arrays → t.raw.
   const presets: string[] = isRevival ? tt.raw(`reasons.${app.status}`) : [];
 

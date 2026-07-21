@@ -5,7 +5,15 @@ import { getLocale, getTranslations } from "next-intl/server";
 import { getPathname, redirect } from "@/i18n/navigation";
 import { apiFetch } from "./api";
 import type { ApiFailure } from "./api";
-import type { Application, Channel, JapaneseLevel, OwnershipCheck } from "./types";
+import type {
+  Application,
+  Channel,
+  CompanyTimezone,
+  HiringEntity,
+  JapaneseLevel,
+  OwnershipCheck,
+  Sponsorship,
+} from "./types";
 
 // next-intl's redirect/getPathname take the locale explicitly — a server action
 // has no component tree to infer it from. Both are unprefixed for `en` and
@@ -102,6 +110,24 @@ export async function createApplication(formData: FormData): Promise<ActionFailu
   const japaneseLevel = formData.get("japanese_level")?.toString().trim();
   if (japaneseLevel) body.append("application[japanese_level]", japaneseLevel);
 
+  // The visa fields (v1.9.0). sponsorship always carries a value ("unknown" by
+  // default); status_of_residence rides only when the form rendered it, which
+  // is only on the "available" branch.
+  const sponsorship = formData.get("sponsorship")?.toString().trim();
+  if (sponsorship) body.append("application[sponsorship]", sponsorship);
+  const statusOfResidence = formData.get("status_of_residence")?.toString().trim();
+  if (statusOfResidence) body.append("application[status_of_residence]", statusOfResidence);
+
+  const hiringEntity = formData.get("hiring_entity")?.toString().trim();
+  if (hiringEntity) body.append("application[hiring_entity]", hiringEntity);
+
+  // Timezone overlap (v1.9.0). overlap_hours_required rides positiveNumber, so a
+  // 0 (or blank) reads as unrecorded, the same as the comp-month fields.
+  const companyTimezone = formData.get("company_timezone")?.toString().trim();
+  if (companyTimezone) body.append("application[company_timezone]", companyTimezone);
+  const overlapHours = positiveNumber(formData.get("overlap_hours_required")?.toString() ?? "");
+  if (overlapHours) body.append("application[overlap_hours_required]", String(overlapHours));
+
   // The form quotes 年収 in 万円, the unit postings use; the API stores yen.
   const compMin = manToYen(formData.get("comp_annual_min_man")?.toString() ?? "");
   if (compMin) body.append("application[comp_annual_min_yen]", String(compMin));
@@ -157,6 +183,15 @@ type PrefillFields = {
   channel: Channel | null;
   agency: string | null;
   japanese_level: JapaneseLevel | null;
+  // Extracted (the boards tag visa support); null when the posting is silent,
+  // and the form leaves sponsorship at its "unknown" default. status_of_residence
+  // is not extracted: a manual one-tap field, so it never rides prefill.
+  sponsorship: Sponsorship | null;
+  // Also extracted (remote postings state their hiring model); null when silent.
+  hiring_entity: HiringEntity | null;
+  // Extracted from the posting's location/HQ and any stated overlap window.
+  company_timezone: CompanyTimezone | null;
+  overlap_hours_required: number | null;
   comp_annual_min_yen: number | null;
   comp_annual_max_yen: number | null;
   comp_months_guaranteed: number | null;
@@ -283,6 +318,40 @@ export async function deleteApplication(id: number): Promise<ActionFailure> {
   redirect({ href: "/dashboard", locale });
 }
 
+// --- Residence status (SPEC.md § Data model, the visa item's global half) ----
+//
+// The user's own 在留資格 and expiry, edited from settings. A blank status or
+// date clears it; the API parses the date and recomputes days-remaining.
+export async function updateResidence(formData: FormData): Promise<ActionResult> {
+  const status = formData.get("residence_status")?.toString().trim() || null;
+  const expiresOn = formData.get("residence_expires_on")?.toString().trim() || null;
+
+  const res = await apiFetch("/me", {
+    method: "PATCH",
+    body: JSON.stringify({
+      user: { residence_status: status, residence_expires_on: expiresOn },
+    }),
+  });
+  if (!res.ok) return apiFailure(res);
+
+  revalidatePath(getPathname({ href: "/settings", locale: await getLocale() }));
+  return { ok: true };
+}
+
+// --- Cover-letter talking points (SPEC.md § TalkingPointsService) ------------
+//
+// Match points between the resume and the posting, generated on demand and not
+// persisted. Bullets, not a draft.
+export type TalkingPointsResult = { ok: true; points: string[] } | ActionFailure;
+
+export async function generateTalkingPoints(id: number): Promise<TalkingPointsResult> {
+  const res = await apiFetch<{ points: string[] }>(`/applications/${id}/talking_points`, {
+    method: "POST",
+  });
+  if (!res.ok) return apiFailure(res);
+  return { ok: true, points: res.data.points };
+}
+
 // --- Passkeys (SPEC.md § Passkeys; § Auth flow) ------------------------------
 //
 // The *authenticated* halves of the enrollment ceremony are ordinary API calls,
@@ -371,6 +440,12 @@ type ApplicationInput = {
   channel?: string | null;
   agency_name?: string;
   japanese_level?: string | null;
+  sponsorship?: string | null;
+  status_of_residence?: string | null;
+  hiring_entity?: string | null;
+  company_timezone?: string | null;
+  overlap_hours_required?: number | null;
+  interview_at?: string | null;
   comp_annual_min_yen?: number | null;
   comp_annual_max_yen?: number | null;
   comp_months_guaranteed?: number | null;
@@ -394,6 +469,16 @@ function pickApplicationFields(formData: FormData): ApplicationInput {
     // the agency server-side, where the name resolves to a row.
     agency_name: get("agency_name"),
     japanese_level: get("japanese_level") || null,
+    // sponsorship always has a select value; status_of_residence clears to null
+    // when its field was not rendered (sponsorship other than "available").
+    sponsorship: get("sponsorship") || null,
+    status_of_residence: get("status_of_residence") || null,
+    hiring_entity: get("hiring_entity") || null,
+    company_timezone: get("company_timezone") || null,
+    overlap_hours_required: positiveNumber(get("overlap_hours_required")),
+    // A datetime-local string (naive JST); the API parses it in Time.zone
+    // (Tokyo) and stores UTC. Blank clears it.
+    interview_at: get("interview_at") || null,
     comp_annual_min_yen: manToYen(get("comp_annual_min_man")),
     comp_annual_max_yen: manToYen(get("comp_annual_max_man")),
     comp_months_guaranteed: positiveNumber(get("comp_months_guaranteed")),

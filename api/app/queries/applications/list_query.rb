@@ -44,8 +44,28 @@ module Applications
 
     attr_reader :user, :status, :company, :source, :japanese_level, :after
 
+    # The board's triage cards need "how long has this sat here", so the index
+    # carries a per-row anchor timestamp: the last stage change, or the applied
+    # date, or creation, the same COALESCE GhostRiskQuery#in_flight uses, and
+    # deliberately not updated_at (which any edit bumps). It is a correlated
+    # subquery in the SELECT, one SQL statement for the whole page, not a per-row
+    # Ruby query: the board fetches up to 10 pages of 100, so a per-row MAX would
+    # be a 1000-query load (SPEC.md § Board view). The controller turns this into
+    # days_in_stage against a Ruby-bound Time.current; it is dropped from the
+    # payload itself.
+    LAST_STAGE_AT = <<~SQL.squish
+      COALESCE(
+        (SELECT MAX(timeline_entries.created_at) FROM timeline_entries
+          WHERE timeline_entries.application_id = applications.id),
+        applications.applied_at,
+        applications.created_at
+      )
+    SQL
+
     def scope
-      relation = user.applications.order(created_at: :desc)
+      relation = user.applications
+                     .select("applications.*", "#{LAST_STAGE_AT} AS last_stage_at")
+                     .order(created_at: :desc)
       relation = filter_by_status(relation)
       relation = filter_by_company(relation)
       relation = filter_by_source(relation)

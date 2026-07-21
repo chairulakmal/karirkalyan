@@ -14,7 +14,7 @@ module Api
         end
       end
 
-      before_action :set_application, only: %i[show update destroy transition resume cover_letter]
+      before_action :set_application, only: %i[show update destroy transition resume cover_letter interview_calendar talking_points]
       before_action :set_nosniff_header, only: %i[resume cover_letter]
 
       rescue_from FileTooLargeError do |error|
@@ -34,7 +34,7 @@ module Api
         ).call
 
         render json: {
-          data: page[:records],
+          data: page[:records].map { |record| index_row(record) },
           meta: { next_cursor: page[:next_cursor], has_more: page[:has_more] }
         }
       end
@@ -83,7 +83,8 @@ module Api
           valid_next_states: ApplicationFSM.valid_next_states(@application.status),
           timeline_entries:  @application.timeline_entries.order(created_at: :asc),
           agency_name:       @application.agency&.name,
-          posting_snapshot:  @application.posting_snapshot
+          posting_snapshot:  @application.posting_snapshot,
+          days_in_stage:     days_in_stage(@application)
         )
       end
 
@@ -166,7 +167,66 @@ module Api
           disposition: "inline"
       end
 
+      # The interview .ics. 404 when nothing is scheduled: the service returns
+      # nil for a blank interview_at, and an empty calendar is not a file worth
+      # handing back.
+      def interview_calendar
+        calendar = Exports::InterviewCalendar.new(@application)
+        ics = calendar.call
+        return head :not_found if ics.nil?
+
+        send_data ics,
+          filename:    calendar.filename,
+          type:        "text/calendar; charset=utf-8",
+          disposition: "attachment"
+      end
+
+      # Cover-letter talking points: match points between the resume and the
+      # posting, generated on demand and not persisted. The error taxonomy is
+      # small: the input is missing, the AI is off, or it returned nothing.
+      def talking_points
+        points = Applications::TalkingPointsService.new(@application).call
+        render json: { points: points }
+      rescue Applications::TalkingPointsService::ConfigError => e
+        render_error(e.message, code: "talking_points_unavailable", status: :service_unavailable)
+      rescue Applications::TalkingPointsService::MissingInputError
+        render_error("Add a resume and save the posting text first.",
+          code: "talking_points_missing_input", status: :unprocessable_entity)
+      rescue Applications::TalkingPointsService::Error => e
+        render_error(e.message, code: "talking_points_failed", status: :bad_gateway)
+      end
+
       private
+
+      # The board's triage cards need "how long has this sat here". `source` now
+      # rides as_json; only `days_in_stage` is added here, from the query's
+      # batched `last_stage_at` anchor (dropped from the payload, which speaks in
+      # days). The anchor is the last stage change, or applied_at, or creation
+      # (not updated_at, which any edit bumps).
+      def index_row(record)
+        record.as_json.except("last_stage_at").merge("days_in_stage" => days_in_stage(record))
+      end
+
+      # Two call sites, one meaning. On the index the anchor is the SELECTed
+      # `last_stage_at` (one SQL statement for the whole page). On #show there is
+      # a single record, so a fresh MAX is fine and avoids threading the select
+      # through that path.
+      def days_in_stage(record)
+        anchor =
+          if record.has_attribute?(:last_stage_at)
+            record.read_attribute(:last_stage_at)
+          else
+            record.timeline_entries.maximum(:created_at) || record.applied_at || record.created_at
+          end
+        return nil if anchor.blank?
+
+        # An AR-typed column yields a Time; the SELECT alias can come back as a
+        # naive string, which is stored UTC and must be parsed as UTC (not the
+        # app's Tokyo zone, which would shift it nine hours and could flip the
+        # floored day count at a boundary).
+        anchor = anchor.is_a?(Time) ? anchor : Time.find_zone("UTC").parse(anchor.to_s)
+        ((Time.current - anchor) / 1.day).floor
+      end
 
       def set_application
         @application = current_user.applications.find(params[:id])
@@ -179,7 +239,8 @@ module Api
       def application_params
         attrs = params.require(:application).permit(
           :company, :role, :url, :notes, :follow_up_at, :lock_version,
-          :channel, :japanese_level, :posting_snapshot,
+          :channel, :japanese_level, :sponsorship, :status_of_residence, :hiring_entity,
+          :company_timezone, :overlap_hours_required, :interview_at, :posting_snapshot,
           :comp_annual_min_yen, :comp_annual_max_yen,
           :comp_months_guaranteed, :comp_months_variable
         )

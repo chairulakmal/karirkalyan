@@ -3,6 +3,8 @@ import { Link } from "@/i18n/navigation";
 import { notFound } from "next/navigation";
 import { apiFetch } from "@/app/lib/api";
 import { formatDate, prettyUrl, statusBadgeClass, timeAgo } from "@/app/lib/format";
+import { computeOverlap } from "@/app/lib/timezone";
+import { canRevive } from "@/app/lib/transitions";
 import type { ApplicationWithDetail, TransitionTable } from "@/app/lib/types";
 import { Phrase } from "@/app/components/phrase";
 import { StatusHelp } from "@/app/components/status-help";
@@ -10,6 +12,7 @@ import { TransitionButtons } from "./transition-buttons";
 import { FileUpload } from "./file-upload";
 import { DeleteButton } from "./delete-button";
 import { DetailsEditor } from "./details-editor";
+import { TalkingPoints } from "./talking-points";
 
 export default async function ApplicationDetailPage({
   params,
@@ -35,6 +38,15 @@ export default async function ApplicationDetailPage({
   }
   const app = res.data;
   const numId = Number(id);
+
+  // Derived here, on the server, so DST is the zone database's current answer
+  // and the client component has no time-dependent value to mismatch on
+  // hydration (SPEC.md § Data model). Null when the application has no zone set.
+  const timezoneOverlap = computeOverlap(
+    app.company_timezone,
+    app.overlap_hours_required,
+    new Date(),
+  );
 
   /* The two FSM facts this page reads off the fetched table rather than a copy
      (SPEC.md § The transition table). Both degrade to `[]` when the table fails
@@ -115,6 +127,7 @@ export default async function ApplicationDetailPage({
             validNextStates={app.valid_next_states}
             currentStatus={app.status}
             terminalStates={terminalStates}
+            revivable={table ? canRevive(app.status, table) : false}
           />
         )}
       </section>
@@ -138,6 +151,13 @@ export default async function ApplicationDetailPage({
           channel={app.channel}
           agencyName={app.agency_name}
           japaneseLevel={app.japanese_level}
+          sponsorship={app.sponsorship}
+          statusOfResidence={app.status_of_residence}
+          hiringEntity={app.hiring_entity}
+          companyTimezone={app.company_timezone}
+          overlapHoursRequired={app.overlap_hours_required}
+          timezoneOverlap={timezoneOverlap}
+          interviewAt={app.interview_at}
           compAnnualMinYen={app.comp_annual_min_yen}
           compAnnualMaxYen={app.comp_annual_max_yen}
           compMonthsGuaranteed={app.comp_months_guaranteed}
@@ -159,6 +179,8 @@ export default async function ApplicationDetailPage({
             uploadedAt={app.cover_letter_updated_at}
           />
         </div>
+
+        <TalkingPoints id={numId} />
       </section>
 
       {/* The stripped posting text captured at prefill time. Postings get taken

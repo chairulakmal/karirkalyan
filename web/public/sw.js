@@ -30,10 +30,13 @@ self.addEventListener("push", (event) => {
       body: payload.body,
       icon: "/brand/icons/png/icon-primary-192.png",
       badge: "/brand/icons/png/icon-monochrome-512.png",
-      /* One digest, one notification: a re-delivered push (the server job
-         retries transient failures) replaces the copy already showing
-         instead of stacking a duplicate. */
-      tag: "follow-up-digest",
+      /* One notification per subject: a re-delivered push (the server job
+         retries transient failures) replaces the copy already showing instead
+         of stacking a duplicate. The tag comes from the payload so different
+         subjects don't collapse into one -- the follow-up digest sends none and
+         keeps its historical fixed tag; interview and residence reminders each
+         send their own (v1.10.0). */
+      tag: payload.tag || "follow-up-digest",
       renotify: true,
       data: { url: payload.url },
     }),

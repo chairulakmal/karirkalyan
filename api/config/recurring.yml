@@ -8,6 +8,13 @@ production:
     class: FollowUpReminderJob
     schedule: "15 8 * * * Asia/Tokyo"
 
+  # Push reminders for upcoming interviews and residence-expiry thresholds
+  # (v1.10.0). 08:00 JST, just before the follow-up digest, so a morning brings
+  # one wave of notifications rather than two spread out.
+  interview_reminders:
+    class: InterviewReminderJob
+    schedule: "0 8 * * * Asia/Tokyo"
+
   # Keep the jobs table from growing unbounded (single-DB setup — these rows
   # live in the primary Postgres).
   clear_solid_queue_finished_jobs:

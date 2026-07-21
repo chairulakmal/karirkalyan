@@ -14,12 +14,35 @@ import { ProfileCard } from "@/app/components/profile-card";
 import { ApplicationsList } from "./applications-list";
 import { GhostRiskCard } from "./ghost-risk-card";
 
-export default async function Dashboard() {
+export default async function Dashboard({
+  searchParams,
+}: {
+  searchParams: Promise<Record<string, string | string[] | undefined>>;
+}) {
   const t = await getTranslations("dashboard");
+
+  // The URL filters the first paint (v1.10.0): a shared/bookmarked filtered view
+  // must render filtered from the server, not correct itself client-side. Only
+  // string params are honoured; ListQuery ignores any junk among them, so a
+  // hand-edited URL degrades to the unfiltered list rather than erroring.
+  const sp = await searchParams;
+  const str = (v: string | string[] | undefined) => (typeof v === "string" ? v : null);
+  const urlFilters = {
+    status: str(sp.status),
+    company: str(sp.company),
+    source: str(sp.source),
+    japaneseLevel: str(sp.japanese_level),
+  };
+  const appsQs = new URLSearchParams({ limit: "10" });
+  if (urlFilters.status) appsQs.set("status", urlFilters.status);
+  if (urlFilters.company) appsQs.set("company", urlFilters.company);
+  if (urlFilters.source) appsQs.set("source", urlFilters.source);
+  if (urlFilters.japaneseLevel) appsQs.set("japanese_level", urlFilters.japaneseLevel);
+
   // /dashboard carries the user, so there is no second /me request: <ProfileCard>
   // takes `stats.user` as a prop rather than fetching one.
   const [appsRes, statsRes, tableRes] = await Promise.all([
-    apiFetch<Paginated<Application>>("/applications?limit=10"),
+    apiFetch<Paginated<Application>>(`/applications?${appsQs}`),
     apiFetch<DashboardStats>("/dashboard"),
     apiFetch<TransitionTable>("/transitions"),
   ]);
@@ -85,6 +108,28 @@ export default async function Dashboard() {
 
       <ProfileCard user={me} />
 
+      {/* Stat cards (v1.10.0): response rate, time-in-stage, ghost rate, beside
+          the avg-days line rather than on a dedicated /insights page: a new
+          route and nav weight for one user is not worth it (SPEC.md). Each hides
+          until it has data, so a fresh account shows none rather than "0%". */}
+      {stats && (stats.response_rate != null || stats.avg_days_in_stage != null || stats.ghost_rate != null) && (
+        <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
+          {stats.response_rate != null && (
+            <StatCard label={t("responseRate")} value={`${stats.response_rate}%`} />
+          )}
+          {stats.avg_days_in_stage != null && (
+            <StatCard label={t("timeInStage")} value={t("daysValue", { days: stats.avg_days_in_stage })} />
+          )}
+          {stats.ghost_rate != null && (
+            <StatCard
+              label={t("ghostRate")}
+              value={`${stats.ghost_rate}%`}
+              danger={stats.ghost_rate >= 30}
+            />
+          )}
+        </div>
+      )}
+
       {stats?.avg_days_to_offer != null && (
         // <div>, not <p>: InfoPopover renders a <details>, which is flow
         // content and invalid inside a paragraph (React would warn on hydrate).
@@ -106,9 +151,19 @@ export default async function Dashboard() {
         statusBuckets={statusBuckets}
         activeStates={activeStates}
         facets={facets}
-        total={total}
         atRiskIds={stats?.ghost_risk.at_risk.map((a) => a.id) ?? []}
+        initialFilters={urlFilters}
       />
+    </div>
+  );
+}
+
+// A compact stat tile. `danger` tints a bad ghost rate; nothing else changes.
+function StatCard({ label, value, danger = false }: { label: string; value: string; danger?: boolean }) {
+  return (
+    <div className="border border-dune bg-linen p-3">
+      <p className="kk-label">{label}</p>
+      <p className={`mt-1 font-mono text-xl ${danger ? "text-danger" : "text-midnight"}`}>{value}</p>
     </div>
   );
 }

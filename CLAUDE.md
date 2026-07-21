@@ -34,6 +34,8 @@ Consequences:
 
 Do not restate release status, versions, or scope in this file: that is `TODO.md`'s job, and copies here go stale.
 
+**Do not start any `2.0.0` work until Akmal has actually started his next job.** The whole `2.0.0` cluster (the `positions` tenure entity and everything hanging off it, plus the post-job infrastructure items) is gated on that life event, not on finishing `v1.10.0`: treat it as out of scope until Akmal says the job has begun. This is a standing guardrail, not a scope restatement; `TODO.md`'s `2.0.0` cluster owns the what and the why.
+
 ## Invariants most worth knowing
 
 One line each; the full rules and their reasoning live in `SPEC.md` at the named section.

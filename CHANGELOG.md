@@ -1,6 +1,80 @@
 # Changelog
 
-The history: shipped work, newest first (`v1.8.0` back through `v1.0.0`) with branch/PR names noting where each change landed, and each release since `v1.3.1` naming its patch/minor level against the versioning policy's mechanical test. The most important section is the one that is not a release: § Decisions records the settled decisions-not-to-build, so that [`TODO.md`](TODO.md) (where open work lives) can stay plan-only without the reasoning getting lost.
+The history: shipped work, newest first (`v1.8.1` back through `v1.0.0`), preceded by the `v1.10.0` and `v1.9.0` unreleased heads that carry the two releases built together in one batched PR (`feat/v1.9-and-v1.10`), by the author's explicit choice, until they are tagged. Branch/PR names note where each change landed, and each release since `v1.3.1` names its patch/minor level against the versioning policy's mechanical test. The most important section is the one that is not a release: § Decisions records the settled decisions-not-to-build, so that [`TODO.md`](TODO.md) (where open work lives) can stay plan-only without the reasoning getting lost.
+
+---
+
+## v1.10.0 (unreleased)
+
+The follow-through: each item harvests machinery an earlier release built (the FSM + timeline, the prefill pipeline, the push channel, the `.ics` event data, `v1.9.0`'s visa research). A minor by the mechanical test: every schema touch is a nullable column or none at all, so the previous image boots against this database unchanged. Built in one batched PR with `v1.9.0` (all `*(feat/v1.9-and-v1.10)*`).
+
+### Interview stage notes, on the timeline *(feat/v1.9-and-v1.10)*
+
+- **Advancing into an interview stage** (`phone_screen`, `technical`, `final_round`, `offer`) **now offers an optional note** ("who you met, what they asked"), recorded as that transition's `note` and shown on the timeline. **No migration:** `TODO.md` scoped this as a new `timeline_entries` column, but the column already existed (it carries the revival reason a re-open records), so the release added only the affordance the column was waiting for. The prompt is the detail page's alone; the board's card menu stays a one-gesture move.
+
+### A web unit-test seam *(feat/v1.9-and-v1.10)*
+
+- **`web/` gains Vitest**, the no-DB, no-browser layer beside Playwright's e2e, settling a `TODO.md` conditional whose trigger (the triage-card excerpt logic) arrived. Config is `node`-environment with the `@/*` alias mirrored from `tsconfig` and `include` scoped to `app/**/*.test.ts` so it never picks up the Playwright specs; it runs in the `web` CI job's `verify` step, so a PR sees it. It backfills the timezone survivability arithmetic and covers the new excerpt, `canRevive`, and HSP-points logic.
+
+### Dashboard stat cards, and the facet cross-narrow fix *(feat/v1.9-and-v1.10)*
+
+- **Response rate, ghost rate, and average time-in-stage as cards** beside the existing `avg_days_to_offer` line, not a dedicated `/insights` route (a new page and nav weight for one user is not worth it). All are queries over the FSM + `timeline_entries` read from the timeline so a later revival does not erase that a reply happened; each hides until it has data rather than showing a misleading `0%`.
+- **The dashboard `facets` payload widened from a `[company, board]` pair to a `[company, board, status, japanese_level]` tuple** (`STATS_CACHE_VERSION` bumped once), and the client now does **disjunctive faceting across all four filters**: each facet's counts reflect the other active filters, so a stage chip's count finally narrows when you pick a company ("12 phone screens" no longer stays 12) and the Japanese-level dropdown finally has counts. This closed two same-shape debts at once, the second of which `v1.8.0` had deliberately deferred to exactly this reshape.
+
+### Filter state in the URL *(feat/v1.9-and-v1.10)*
+
+- **The four dashboard filters become query params**, so a filtered view is linkable, reload-survivable, and back-button-correct. Three wire rules carry over rather than being invented: an absent param is the unfiltered list (a full chip row sends no `status`), a pasted URL filters the first paint (`dashboard/page.tsx` reads `searchParams` into its initial fetch), and junk degrades to unfiltered (`ListQuery`'s existing contract server-side, an intersect-against-rendered-chips client-side). Routed through `i18n/navigation` (never the `next/navigation` originals) with `replace`, not `push`. The zero-chips "show nothing" state is deliberately not shareable: it reads as unfiltered on the server, so it grows no wire encoding.
+
+### Board triage cards, and the reopenable fold *(feat/v1.9-and-v1.10)*
+
+- **The two candidate-side columns** (`wishlist`, `draft`) **grow three facts so a decision needs no card open**: a `notes` excerpt, the job-board `source`, and how long the item has sat there, sorted stalest-first. `source` is server-derived (`JobBoard.from_url`, now on every `as_json`, because a TypeScript copy would re-implement the www-strip rule) and `days_in_stage` is a **correlated subquery in `ListQuery`'s `SELECT`**, one statement for the whole page rather than the thousand-query load a per-row `MAX` would be across the board's fetch-to-exhaustion. `DashboardController` stays untouched, its aggregate cache key cannot see per-row content.
+- **`REVIVAL_STATES` is gone, replaced by `canRevive(status, table)` derived from the fetched table.** The naive `transitions[status].includes("applied")` is not enough because `draft` has a *forward* edge to `applied`; the correct test gates on the state being closed too (`!active_states.includes(status)`), which yields exactly `ghosted`/`rejected`/`withdrawn`. It degrades to `false` when the table did not arrive, so the reason prompt is simply not offered rather than wrongly demanded.
+
+### Cover-letter talking points, bullets not a draft *(feat/v1.9-and-v1.10)*
+
+- **`POST /applications/:id/talking_points` extracts the concrete overlaps between the user's resume and the posting as bullets**, reusing the Claude pipeline `UrlPrefillService` established and adding the one new thing: it reads both documents at once, the resume as a base64 PDF document block and the posting text beside it. Bullets, not a draft, by decision: a generic AI voice is the real risk in a market where the letter is the signal. Nothing is persisted; the points are generated on demand.
+
+### Push interview and deadline alerts *(feat/v1.9-and-v1.10)*
+
+- **`InterviewReminderJob`, a daily push channel** for the events the pages already show: an interview coming up within 24 hours (fed by `interview_at`) and a residence-expiry warning as the days-remaining countdown crosses a threshold (`90/60/30/14/7`), carrying the same CoE lead-time guidance the settings page shows. The delivery loop (send to every subscription, prune the revoked, collect the first transient error) is now `Push::Notifier`, extracted from `PushDigestJob` so both channels share it rather than a drifting copy. The service worker's notification `tag` is now payload-driven, so the digest, each interview, and the residence warning stay distinct notifications rather than collapsing into one.
+
+### Public HSP points calculator *(feat/v1.9-and-v1.10)*
+
+- **A public, no-auth `/hsp-calculator`** estimating a 高度専門職 (Highly Skilled Professional) score on the engineering track, the one page in the app that serves strangers rather than its one loyal user: the trade is portfolio/SEO value. The scoring is pure TypeScript in `app/lib/hsp.ts`, unit-tested (the point table, the age-gated income bands, the 70-point threshold, the PR fast-track years, the J-Skip gate, every bonus value, the national-qualification cap, the N2 exclusion, and the empty-form path), with the point values sourced to the MOJ ポイント計算表 and **verified against the source PDF** (`博士 30 / 修士 20 / 大学卒業 10`, the 30 cell spanning both the academic and technical columns).
+- **It models the technical column in full**: every bonus point an engineer can claim, all but the three that live purely in the 経営・管理 column (position, a ¥100M investment, investment-management work). National qualifications score 5 each capped at 10 (two "1"/"2+" checkboxes); an innovation-support employer that is also an SME adds a dependent +10 (Note 3); and the N2 language bonus drops when a Japanese-university degree is claimed. Each bonus discloses the **verbatim MOJ wording** behind an info button.
+- **All scoring is client-side**: nothing entered is sent or stored, said inline beside the disclaimer. The page renders in the visitor's **system fonts** and wears a **minimal footer** (author, license, GitHub) rather than the account app's `/privacy` and `/terms`, which describe a system it is not. The "primary sources" links resolve per locale: the MOJ English points-table PDF on `/en`, the Japanese original on `/ja`. Its refresh rides the same annual visa-research pass as the in-app residence guidance.
+
+---
+
+## v1.9.0 (unreleased)
+
+"Can you actually take this job?" is the release whose theme is the constraints that decide whether an offer is even takeable. A minor by the mechanical test: every schema touch is additive, so the `v1.8.1` image boots and serves against this database unchanged.
+
+### Visa sponsorship + status of residence, per application *(feat/v1.9-and-v1.10)*
+
+- **Each application records whether the employer sponsors a work visa** (`sponsorship`: unknown / available / unavailable) **and, when it does, which 在留資格 the role falls under** (`status_of_residence`: 技術・人文知識・国際業務, 高度専門職, other). For a foreign engineer this is the single most decision-relevant fact about a posting, and no generic tracker models it.
+- **`sponsorship` is the one column in this table that defaults to a value rather than null.** `unknown` is decision-relevant signal, not missing data: a role whose sponsor status is unknown is a visible risk flag, so the column carries `"unknown"` even when nothing is sent, and stays nullable by design (never tightened to `NOT NULL`, even in the `2.0.0` schema pass, where `TODO.md` records the exception). `status_of_residence` is null-means-unrecorded like `japanese_level`, and only shown while sponsorship is `available`, the same appear/disappear shape the agency field has under the `agent` channel.
+- **`sponsorship` joins the AI pre-fill pass; `status_of_residence` does not.** The boards this project targets (TokyoDev, Japan Dev) tag visa support on every listing, so extraction fills sponsorship for free on the user's actual sources. Postings rarely name the exact 在留資格, so that stays a manual one-tap field: a hallucinated status is worse than none. This is the per-application half of the visa item; the global half (your own status and its expiry) ships below.
+
+### Hiring entity: can they actually employ you? *(feat/v1.9-and-v1.10)*
+
+- **Each application records how a Japan-resident hire would be employed** (`hiring_entity`: own Japan entity / EOR / contractor-only / cannot hire in Japan). This is the filter that silently kills most global-remote applications from Japan (not salary, but that many companies simply cannot employ someone resident here), and it is the remote-work analogue of the visa question, just as underserved by generic trackers.
+- **A four-value enum, not a boolean, because each value is a different employment reality:** an EOR contract is with the employer-of-record, not the company you interviewed with; a contractor-only arrangement is not employment at all; and `unsupported` means Japan is off the table whatever the role. Null-means-unrecorded like `japanese_level` (no default). The enum encodes a stable legal structure, so its annual refresh cost is near zero: what is perishable (EOR fee ranges, onboarding times) informs the plan but never ships in the product.
+- **It joins the AI pre-fill pass**, because remote postings usually state their hiring model (unlike the exact 在留資格). Some EORs now also sponsor visas, which is why it sits beside `sponsorship` in the form rather than apart from it.
+
+### Timezone overlap: is this remote role survivable from JST? *(feat/v1.9-and-v1.10)*
+
+- **Each application stores the company's home timezone** (`company_timezone`, a curated enum of IANA zone identifiers, not a free 400-zone list) **and the daily overlap the role demands** (`overlap_hours_required`). A US-West role demanding four hours of overlap means a 1am start, and no generic tracker does the arithmetic that surfaces it before you apply. IANA identifiers rather than fixed offsets, so DST is the zone database's current answer. Both are nullable and prefilled (postings state a company's location far more reliably than they state sponsorship).
+- **The survivability read is derived, never stored** (`web/app/lib/timezone.ts`): the company's workday mapped into JST, a "(+1 day)" cue when the window wraps midnight, and a flag when the required overlap forces antisocial hours. Computed server-side so DST is current and there is no client time-dependent render to mismatch on hydration; unit-tested against fixed summer/winter instants.
+
+### Interview scheduling with .ics export *(feat/v1.9-and-v1.10)*
+
+- **`interview_at` records the upcoming interview instant**, the one source both the `.ics` export and the push reminders read. `GET /api/v1/applications/:id/interview` serves a hand-written RFC 5545 `VEVENT` (no gem: CRLF-delimited lines, UTF-8-safe line folding, a UTC `DTSTART` so the user's own calendar renders it in their zone with no timezone math on our side). An invite whose JST time falls before 07:00 is flagged rather than quietly accepted, the antisocial-hour warning the timezone item promised.
+
+### Visa, the global half: your own status of residence *(feat/v1.9-and-v1.10)*
+
+- **The `users` table gains your own 在留資格 and its expiry** (`residence_status`, `residence_expires_on`), edited from settings, which drive a days-remaining warning (danger once lapsed, saffron inside a 90-day window). A permanent resident is read as "no clock." `PATCH /me` sets them; `GET /me` returns the derived days-remaining plus a `reference` block.
+- **The CoE lead-time guidance a job change implies** is a derived read over `Visa::COE_LEAD_TIME_DAYS`, a perishable constant **sourced to the MOJ processing statistics** (62.9 days for 技術・人文知識・国際業務, May 2026). The research pass this rode corrected two facts `TODO.md` had wrong: the permanent-residence application fee is **¥10,000** today (the ¥300,000 is only a statutory ceiling; a draft ¥200,000 Cabinet Order is still in public comment), and **J-Skip grants HSP-1, not HSP-2**.
 
 ---
 

@@ -1,4 +1,4 @@
-import type { Status } from "./types";
+import type { Status, TransitionTable } from "./types";
 
 /*
  * Interaction semantics for status transitions, shared by the two surfaces
@@ -32,10 +32,32 @@ export const CONFIRM_REQUIRED: ReadonlySet<Status> = new Set([
   "archived",
 ]);
 
-// Closed states that can re-open to `applied`; doing so requires a reason,
-// recorded as the transition's note.
-export const REVIVAL_STATES: ReadonlySet<Status> = new Set([
-  "ghosted",
-  "rejected",
-  "withdrawn",
+// Can this status re-open to `applied`? True for the closed states with an edge
+// back (ghosted, rejected, withdrawn), and re-opening records a reason as the
+// transition's note. Derived from the fetched table rather than a hardcoded set
+// (the old REVIVAL_STATES), which is the affordance-from-an-FSM-fact the spec
+// wanted folded away. `transitions[status].includes("applied")` alone is not
+// enough: `draft` also has a forward edge to applied, so it is gated on the
+// state being closed (not an active column), which leaves exactly the three
+// revival states. Degrades to false when the table did not arrive (an empty
+// active_states makes every state read as "not closed"), so the reason prompt
+// is simply not offered rather than wrongly demanded.
+export function canRevive(status: Status, table: TransitionTable): boolean {
+  if (table.active_states.length === 0) return false;
+  return (
+    !table.active_states.includes(status) &&
+    (table.transitions[status] ?? []).includes("applied")
+  );
+}
+
+// Interview stages worth an optional note when you advance into them ("who you
+// met, what they asked"), recorded as the transition's note the same way a
+// revival reason is. Pure affordance judgement, like the sets above: the note
+// is optional, so skipping it is a plain move. Offered on the detail page only,
+// not the board's quick-move menu, which stays a one-gesture drag.
+export const STAGE_NOTE_STATES: ReadonlySet<Status> = new Set([
+  "phone_screen",
+  "technical",
+  "final_round",
+  "offer",
 ]);

@@ -16,20 +16,33 @@ RSpec.describe "Dashboard", type: :request do
         # the one that earns a response schema. `ghost_risk` in particular is a
         # derived read model with no table behind it — see SPEC.md § Query layer.
         schema type: :object,
-          required: %w[by_status facets total avg_days_to_offer ghost_risk user],
+          required: %w[by_status facets total avg_days_to_offer response_rate ghost_rate avg_days_in_stage ghost_risk user],
           properties: {
             by_status: {
               type: :object, additionalProperties: { type: :integer },
               description: "Application count per status"
             },
             facets: {
-              type: :array, description: "[company, job-board host] per application",
-              items: { type: :array, items: { type: :string }, minItems: 2, maxItems: 2 }
+              type: :array,
+              description: "[company, job-board host, status, japanese_level] per application; the frontend cross-narrows every filter from it",
+              items: { type: :array, minItems: 4, maxItems: 4 }
             },
             total: { type: :integer },
             avg_days_to_offer: {
               type: :number, nullable: true,
-              description: "Applied date → offer timeline entry; null until one reaches offer"
+              description: "Applied date to offer timeline entry; null until one reaches offer"
+            },
+            response_rate: {
+              type: :integer, nullable: true,
+              description: "Percent of applied applications the company replied to (advanced or rejected); null when none applied"
+            },
+            ghost_rate: {
+              type: :integer, nullable: true,
+              description: "Percent of applied applications that were ghosted; null when none applied"
+            },
+            avg_days_in_stage: {
+              type: :number, nullable: true,
+              description: "Average days in-stage across in-flight applications; null when none active"
             },
             ghost_risk: {
               type: :object,
@@ -123,19 +136,35 @@ RSpec.describe "Dashboard", type: :request do
   describe "filter facets" do
     let(:headers) { { "Authorization" => jwt_for(user) } }
 
-    it "returns a [company, board-host] pair for every application" do
-      create(:application, company: "Mercari", url: "https://www.linkedin.com/jobs/1", user: user)
-      create(:application, company: "Mercari", url: "https://tokyodev.com/jobs/2", user: user)
-      create(:application, company: "Cookpad", url: nil, user: user)
+    it "returns a [company, board-host, status, japanese_level] tuple for every application" do
+      create(:application, company: "Mercari", url: "https://www.linkedin.com/jobs/1",
+             status: "applied", japanese_level: "business", user: user)
+      create(:application, company: "Mercari", url: "https://tokyodev.com/jobs/2",
+             status: "wishlist", japanese_level: nil, user: user)
+      create(:application, company: "Cookpad", url: nil, status: "draft", japanese_level: "n1", user: user)
 
       get "/api/v1/dashboard", headers: headers
       facets = JSON.parse(response.body)["facets"]
 
       expect(facets).to contain_exactly(
-        [ "Mercari", "linkedin.com" ],
-        [ "Mercari", "tokyodev.com" ],
-        [ "Cookpad", "(none)" ]
+        [ "Mercari", "linkedin.com", "applied", "business" ],
+        [ "Mercari", "tokyodev.com", "wishlist", nil ],
+        [ "Cookpad", "(none)", "draft", "n1" ]
       )
+    end
+
+    it "reports response and ghost rates over the applied denominator" do
+      applied = create(:application, :applied, company: "A", user: user)
+      Applications::TransitionService.new(application: applied, to: "phone_screen", actor: user).call
+      ghosted = create(:application, :applied, company: "B", user: user)
+      Applications::TransitionService.new(application: ghosted, to: "ghosted", actor: user).call
+      create(:application, company: "C", status: "wishlist", user: user) # not applied: excluded
+
+      get "/api/v1/dashboard", headers: headers
+      body = JSON.parse(response.body)
+
+      expect(body["response_rate"]).to eq(50)
+      expect(body["ghost_rate"]).to eq(50)
     end
   end
 

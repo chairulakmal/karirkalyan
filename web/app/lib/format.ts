@@ -86,6 +86,18 @@ export function timeAgo(iso: string | null | undefined, locale: string): string 
   return r.format(Math.round(diffSec / 31536000), "year");
 }
 
+/**
+ * How long the board's triage card has sat where it is, from the server's
+ * `days_in_stage`. Reuses `relative` (the same Intl.RelativeTimeFormat engine
+ * timeAgo uses) rather than inventing a second duration format; it just takes
+ * the day count directly, since the API already did the COALESCE-against-now
+ * arithmetic server-side (the sort key must be that server field, not a client
+ * guess). `numeric: "auto"` gives "today"/"yesterday" for 0 and 1.
+ */
+export function stageAge(days: number, locale: string): string {
+  return relative(locale).format(-days, "day");
+}
+
 export function formatDate(iso: string | null | undefined, locale: string): string {
   if (!iso) return "";
   return new Date(iso).toLocaleDateString(locale, {

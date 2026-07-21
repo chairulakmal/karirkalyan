@@ -119,6 +119,27 @@ h1, h2, h3 {
   outline-offset: 2px;
 }
 
+/* HSP calculator: render in the visitor's system fonts, scoped to that page.
+ * It is a standalone public tool where dependency-free, instantly-painted text
+ * beats brand typography, and the mono labels read poorly at small sizes. Within
+ * this scope --font-serif and --font-mono collapse onto the system sans, so the
+ * headings and the old mono labels (kk-label, font-mono) match the plain form
+ * text. The rest of the app is untouched; the header wordmark and footer, which
+ * sit outside the scoped element, keep the brand faces. */
+.hsp-system {
+  --font-sans: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+  --font-serif: var(--font-sans);
+  --font-mono: var(--font-sans);
+  font-family: var(--font-sans);
+}
+
+/* HSP calculator, one step up in type size (the form, results, and sources, but
+ * not the hero, which lives outside .hsp-lg). The two-class selector outranks the
+ * unlayered .kk-label so the mono labels grow with the rest of the form. */
+.hsp-lg .kk-label {
+  font-size: 12px;
+}
+
 @media (prefers-reduced-motion: reduce) {
   *,
   *::before,

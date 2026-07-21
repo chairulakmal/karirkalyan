@@ -107,6 +107,16 @@ RSpec.describe "Applications", type: :request do
                               description: "Agency name, resolved server-side to a per-user agencies row (created on first use). Blank clears the agency; the key absent leaves it untouched." },
               japanese_level: { type: :string, enum: Application::JAPANESE_LEVELS, nullable: true,
                                 description: "The posting's Japanese requirement: what it asks, not what the user holds." },
+              sponsorship:    { type: :string, enum: Application::SPONSORSHIP, nullable: true,
+                                description: "Does the employer sponsor a work visa. Defaults to `unknown` (decision-relevant signal, not absence)." },
+              status_of_residence: { type: :string, enum: Application::STATUSES_OF_RESIDENCE, nullable: true,
+                                     description: "Which 在留資格 a sponsored role falls under. Null when unrecorded; only meaningful with sponsorship = available." },
+              hiring_entity: { type: :string, enum: Application::HIRING_ENTITIES, nullable: true,
+                               description: "How a Japan-resident hire is employed: own_entity / eor / contractor / unsupported. Null when unrecorded." },
+              company_timezone: { type: :string, enum: Application::COMPANY_TIMEZONES, nullable: true,
+                                  description: "The company's home timezone as a curated IANA identifier. Drives the JST-survivability read. Null when unrecorded." },
+              overlap_hours_required: { type: :number, nullable: true,
+                                        description: "Daily working-hours overlap the role requires, 0..24. Null when unrecorded." },
               comp_annual_min_yen: { type: :integer, nullable: true, description: "Quoted 年収, low end, in yen." },
               comp_annual_max_yen: { type: :integer, nullable: true, description: "High end; null when one figure is quoted." },
               comp_months_guaranteed: { type: :number, nullable: true, description: "Months of base guaranteed per year (12 + guaranteed bonus)." },
@@ -146,12 +156,25 @@ RSpec.describe "Applications", type: :request do
         end
       end
 
+      response "201", "sponsorship defaults to unknown when omitted" do
+        let(:Authorization) { jwt_for(user) }
+        let(:body) { { application: { company: "Cookpad", role: "SRE" } } }
+        run_test! do |response|
+          # unknown is signal, not absence: the column carries a value even when
+          # the client sends none, which is why it may stay nullable forever.
+          expect(JSON.parse(response.body)["sponsorship"]).to eq("unknown")
+        end
+      end
+
       response "201", "created with the Japan-market fields; agency_name resolves to an agencies row" do
         let(:Authorization) { jwt_for(user) }
         let(:body) do
           { application: {
             company: "Mercari", role: "Backend Engineer", status: "applied",
             channel: "agent", agency_name: "  Robert Half ", japanese_level: "business",
+            sponsorship: "available", status_of_residence: "engineer_specialist",
+            hiring_entity: "eor",
+            company_timezone: "America/Los_Angeles", overlap_hours_required: 4,
             comp_annual_min_yen: 6_000_000, comp_annual_max_yen: 9_000_000,
             comp_months_guaranteed: 14, comp_months_variable: 2,
             posting_snapshot: "stripped posting text"
@@ -161,6 +184,9 @@ RSpec.describe "Applications", type: :request do
           payload = JSON.parse(response.body)
           expect(payload).to include(
             "channel" => "agent", "japanese_level" => "business",
+            "sponsorship" => "available", "status_of_residence" => "engineer_specialist",
+            "hiring_entity" => "eor",
+            "company_timezone" => "America/Los_Angeles", "overlap_hours_required" => 4.0,
             "comp_annual_min_yen" => 6_000_000, "comp_months_guaranteed" => 14.0
           )
           # The snapshot is persisted but excluded from as_json; #show merges it.
@@ -213,6 +239,46 @@ RSpec.describe "Applications", type: :request do
         let(:body) { { application: { company: "Basecamp", role: "Rails Engineer" } } }
         run_test!
       end
+    end
+  end
+
+  describe "GET /api/v1/applications (triage fields)" do
+    let(:headers) { { "Authorization" => jwt_for(user) } }
+
+    it "carries server-derived source and days_in_stage, and drops the raw anchor" do
+      # No timeline rows and a null applied_at, so days_in_stage COALESCEs to
+      # created_at: a wishlist item's real age, which is exactly what the board's
+      # stalest-first sort needs.
+      create(:application, company: "No Link", url: nil, status: "wishlist",
+             user: user, created_at: 9.days.ago)
+
+      get "/api/v1/applications", headers: headers
+
+      row = JSON.parse(response.body)["data"].first
+      expect(row["source"]).to eq(JobBoard::NONE)
+      expect(row["days_in_stage"]).to eq(9)
+      # The payload speaks in days, not the raw timestamp.
+      expect(row).not_to have_key("last_stage_at")
+    end
+
+    it "derives source from the URL through JobBoard, not a client copy" do
+      create(:application, company: "Via LinkedIn", url: "https://www.linkedin.com/jobs/1", user: user)
+
+      get "/api/v1/applications", headers: headers
+
+      expect(JSON.parse(response.body)["data"].first["source"]).to eq("linkedin.com")
+    end
+
+    it "anchors days_in_stage to the last stage change, not updated_at" do
+      # An edit bumps updated_at; the age must still read from the timeline.
+      application = create(:application, :applied, user: user, created_at: 40.days.ago, applied_at: 40.days.ago)
+      Applications::TransitionService.new(application: application, to: "phone_screen", actor: user).call
+      application.timeline_entries.last.update_column(:created_at, 3.days.ago)
+      application.update!(notes: "edited just now")
+
+      get "/api/v1/applications", headers: headers
+
+      expect(JSON.parse(response.body)["data"].first["days_in_stage"]).to eq(3)
     end
   end
 
@@ -624,6 +690,13 @@ RSpec.describe "Applications", type: :request do
               agency_name:    { type: :string, nullable: true,
                                 description: "Resolved server-side to a per-user agencies row. Blank clears; key absent leaves untouched." },
               japanese_level: { type: :string, enum: Application::JAPANESE_LEVELS, nullable: true },
+              sponsorship:         { type: :string, enum: Application::SPONSORSHIP, nullable: true },
+              status_of_residence: { type: :string, enum: Application::STATUSES_OF_RESIDENCE, nullable: true },
+              hiring_entity:       { type: :string, enum: Application::HIRING_ENTITIES, nullable: true },
+              company_timezone:    { type: :string, enum: Application::COMPANY_TIMEZONES, nullable: true },
+              overlap_hours_required: { type: :number, nullable: true },
+              interview_at:        { type: :string, format: "date-time", nullable: true,
+                                     description: "The upcoming interview instant. A naive value is parsed in JST; stored UTC." },
               comp_annual_min_yen:    { type: :integer, nullable: true },
               comp_annual_max_yen:    { type: :integer, nullable: true },
               comp_months_guaranteed: { type: :number, nullable: true },
@@ -637,6 +710,37 @@ RSpec.describe "Applications", type: :request do
         required: %w[application]
       }
 
+      # This edge-case 200 is placed BEFORE the generic "application updated" 200
+      # on purpose: rswag keeps the LAST response block for a status code as
+      # swagger.yaml's description, so the generic summary has to stay last among
+      # the 200s or the OpenAPI doc describes update's success as this corner
+      # case. Do not reorder these two.
+      #
+      # The contract the web form leans on when sponsorship flips away from
+      # "available": the 在留資格 select unmounts, drops out of FormData, and the
+      # server action sends an explicit null, which must clear the column. A
+      # refactor that stopped sending null (or stopped permitting it) would leave
+      # a stale status_of_residence on a role that no longer sponsors, and this
+      # is the layer that can catch the server half of that.
+      response "200", "an explicit null clears status_of_residence" do
+        let(:Authorization) { jwt_for(user) }
+        let(:record) do
+          create(:application, :applied, user: user,
+                 sponsorship: "available", status_of_residence: "highly_skilled")
+        end
+        let(:id)   { record.id }
+        let(:body) do
+          { application: { sponsorship: "unavailable", status_of_residence: nil,
+                           lock_version: record.lock_version } }
+        end
+        run_test! do
+          record.reload
+          expect(record.sponsorship).to eq("unavailable")
+          expect(record.status_of_residence).to be_nil
+        end
+      end
+
+      # Stays last among the 200s so its description is the one rswag publishes.
       response "200", "application updated" do
         let(:Authorization) { jwt_for(user) }
         let(:record)           { create(:application, :applied, user: user) }
@@ -817,6 +921,86 @@ RSpec.describe "Applications", type: :request do
       response "401", "not authenticated" do
         let(:Authorization) { nil }
         let(:record)           { create(:application, :with_cover_letter, user: user) }
+        let(:id)            { record.id }
+        run_test!
+      end
+    end
+  end
+
+  path "/api/v1/applications/{id}/interview" do
+    parameter name: :id, in: :path, type: :integer
+
+    get "Download the upcoming interview as an .ics calendar event" do
+      tags "Applications"
+      security [ bearerAuth: [] ]
+      produces "text/calendar"
+
+      response "200", "iCalendar event (text/calendar attachment, named -interview.ics)" do
+        let(:Authorization) { jwt_for(user) }
+        let(:record) do
+          create(:application, user: user, company: "Mercari",
+                 interview_at: Time.zone.local(2026, 7, 25, 15, 0, 0))
+        end
+        let(:id) { record.id }
+        run_test! do |response|
+          expect(response.content_type).to include("text/calendar")
+          expect(response.headers["Content-Disposition"])
+            .to match(/\Aattachment; filename="Mercari-interview\.ics"/)
+          expect(response.body).to include("DTSTART:20260725T060000Z")
+        end
+      end
+
+      response "404", "no interview scheduled for this application" do
+        let(:Authorization) { jwt_for(user) }
+        let(:record)        { create(:application, user: user, interview_at: nil) }
+        let(:id)            { record.id }
+        run_test!
+      end
+
+      response "401", "not authenticated" do
+        let(:Authorization) { nil }
+        let(:record)        { create(:application, user: user) }
+        let(:id)            { record.id }
+        run_test!
+      end
+    end
+  end
+
+  path "/api/v1/applications/{id}/talking_points" do
+    parameter name: :id, in: :path, type: :integer
+
+    post "Generate cover-letter talking points from the resume and posting" do
+      tags "Applications"
+      security [ bearerAuth: [] ]
+      produces "application/json"
+
+      response "200", "match-point bullets, generated on demand (not persisted)" do
+        let(:Authorization) { jwt_for(user) }
+        let(:record)        { create(:application, :with_resume, user: user, posting_snapshot: "Ruby backend role") }
+        let(:id)            { record.id }
+        before do
+          # Mock the service so the request spec never makes a real Claude call.
+          allow(Applications::TalkingPointsService).to receive(:new)
+            .and_return(instance_double(Applications::TalkingPointsService, call: [ "Five years of Ruby" ]))
+        end
+        run_test! do |response|
+          expect(JSON.parse(response.body)["points"]).to eq([ "Five years of Ruby" ])
+        end
+      end
+
+      response "422", "no resume or no saved posting to compare (talking_points_missing_input)" do
+        let(:Authorization) { jwt_for(user) }
+        # No resume attached, so the service raises before any Claude call.
+        let(:record)        { create(:application, user: user, posting_snapshot: "text") }
+        let(:id)            { record.id }
+        run_test! do |response|
+          expect(JSON.parse(response.body)["code"]).to eq("talking_points_missing_input")
+        end
+      end
+
+      response "401", "not authenticated" do
+        let(:Authorization) { nil }
+        let(:record)        { create(:application, user: user) }
         let(:id)            { record.id }
         run_test!
       end

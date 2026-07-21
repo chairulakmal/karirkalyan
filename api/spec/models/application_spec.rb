@@ -174,6 +174,41 @@ RSpec.describe Application do
       expect(build(:application, japanese_level: "n1")).to be_valid
     end
 
+    it "refuses a sponsorship outside SPONSORSHIP" do
+      expect(build(:application, sponsorship: "maybe")).not_to be_valid
+      expect(build(:application, sponsorship: "available")).to be_valid
+    end
+
+    it "defaults sponsorship to unknown rather than null" do
+      # unknown is signal, not absence: the column carries a value even when the
+      # client sends none, which is what lets it stay nullable forever.
+      expect(create(:application).sponsorship).to eq("unknown")
+    end
+
+    it "refuses a status_of_residence outside STATUSES_OF_RESIDENCE" do
+      expect(build(:application, status_of_residence: "tourist")).not_to be_valid
+      expect(build(:application, status_of_residence: "engineer_specialist")).to be_valid
+    end
+
+    it "refuses a hiring_entity outside HIRING_ENTITIES" do
+      expect(build(:application, hiring_entity: "staffing")).not_to be_valid
+      expect(build(:application, hiring_entity: "eor")).to be_valid
+    end
+
+    it "refuses a company_timezone outside COMPANY_TIMEZONES" do
+      # A real IANA zone that is simply not in the curated set is still refused:
+      # the enum is the curated markets, not every zone TZInfo knows.
+      expect(build(:application, company_timezone: "Pacific/Chatham")).not_to be_valid
+      expect(build(:application, company_timezone: "America/Los_Angeles")).to be_valid
+    end
+
+    it "refuses an overlap outside 0..24 but allows the bounds" do
+      expect(build(:application, overlap_hours_required: -1)).not_to be_valid
+      expect(build(:application, overlap_hours_required: 25)).not_to be_valid
+      expect(build(:application, overlap_hours_required: 0)).to be_valid
+      expect(build(:application, overlap_hours_required: 4.5)).to be_valid
+    end
+
     it "refuses non-positive compensation figures" do
       expect(build(:application, comp_annual_min_yen: 0)).not_to be_valid
       expect(build(:application, comp_annual_min_yen: 6_000_000)).to be_valid

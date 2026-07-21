@@ -90,6 +90,11 @@ jobs:
       - name: TypeScript
         run: npx tsc --noEmit
 
+      # Pure-TS unit tests (vitest), no DB and no browser: the seam the
+      # timezone/triage logic needs. Playwright e2e stays its own push-only job.
+      - name: Unit tests
+        run: npm test
+
       - name: Build
         run: npm run build
 

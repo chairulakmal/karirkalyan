@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[8.1].define(version: 2026_07_19_000002) do
+ActiveRecord::Schema[8.1].define(version: 2026_07_21_000005) do
   # These are extensions that must be enabled in order to support this database
   enable_extension "pg_catalog.plpgsql"
   enable_extension "pgcrypto"
@@ -32,18 +32,24 @@ ActiveRecord::Schema[8.1].define(version: 2026_07_19_000002) do
     t.float "comp_months_guaranteed"
     t.float "comp_months_variable"
     t.string "company", null: false
+    t.string "company_timezone"
     t.binary "cover_letter"
     t.datetime "cover_letter_updated_at"
     t.datetime "created_at", null: false
     t.datetime "follow_up_at"
+    t.string "hiring_entity"
+    t.datetime "interview_at"
     t.string "japanese_level"
     t.integer "lock_version", default: 0, null: false
     t.text "notes"
+    t.float "overlap_hours_required"
     t.text "posting_snapshot"
     t.binary "resume"
     t.datetime "resume_updated_at"
     t.string "role", null: false
+    t.string "sponsorship", default: "unknown"
     t.string "status", default: "draft", null: false
+    t.string "status_of_residence"
     t.datetime "updated_at", null: false
     t.string "url"
     t.bigint "user_id", null: false
@@ -228,6 +234,8 @@ ActiveRecord::Schema[8.1].define(version: 2026_07_19_000002) do
     t.string "email", default: "", null: false
     t.string "encrypted_password", default: "", null: false
     t.string "jti", null: false
+    t.date "residence_expires_on"
+    t.string "residence_status"
     t.datetime "updated_at", null: false
     t.string "webauthn_id"
     t.index ["email"], name: "index_users_on_email", unique: true

@@ -39,6 +39,8 @@ Rails.application.routes.draw do
           patch :transition
           get   :resume
           get   :cover_letter
+          get   :interview, action: :interview_calendar
+          post  :talking_points
         end
       end
 
@@ -61,7 +63,8 @@ Rails.application.routes.draw do
 
       get "transitions", to: "transitions#index"
       get "dashboard",   to: "dashboard#index"
-      get "me",          to: "me#show"
+      get   "me", to: "me#show"
+      patch "me", to: "me#update"
     end
   end
 end

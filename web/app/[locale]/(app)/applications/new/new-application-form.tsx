@@ -13,8 +13,25 @@ import { fileSizeMb, MAX_FILE_BYTES } from "@/app/lib/files";
 import { formatDate } from "@/app/lib/format";
 import type { SharedCapture } from "@/app/lib/share";
 import { Field } from "@/app/components/field";
-import type { Channel, JapaneseLevel, OwnershipCheck, Status } from "@/app/lib/types";
-import { CHANNELS, JAPANESE_LEVELS } from "@/app/lib/types";
+import type {
+  Channel,
+  CompanyTimezone,
+  HiringEntity,
+  JapaneseLevel,
+  OwnershipCheck,
+  Sponsorship,
+  StatusOfResidence,
+  Status,
+} from "@/app/lib/types";
+import {
+  CHANNELS,
+  COMPANY_TIMEZONES,
+  HIRING_ENTITIES,
+  JAPANESE_LEVELS,
+  SPONSORSHIPS,
+  STATUSES_OF_RESIDENCE,
+  TIMEZONE_LABEL_KEY,
+} from "@/app/lib/types";
 
 /* The two failure codes a paste actually cures, and the reason the error
    taxonomy was typed in the first place. `prefill_blocked` is a site refusing an
@@ -53,6 +70,10 @@ export function NewApplicationForm({
   const t = useTranslations("newApplication");
   const tc = useTranslations("channel");
   const tj = useTranslations("japaneseLevel");
+  const ts = useTranslations("sponsorship");
+  const tsor = useTranslations("statusOfResidence");
+  const thire = useTranslations("hiringEntity");
+  const ttz = useTranslations("companyTimezone");
   const locale = useLocale();
   const [error, setError] = useState<string | null>(null);
   const [pending, startTransition] = useTransition();
@@ -87,6 +108,18 @@ export function NewApplicationForm({
   const [channel, setChannel] = useState<Channel | "">("");
   const [agencyName, setAgencyName] = useState("");
   const [japaneseLevel, setJapaneseLevel] = useState<JapaneseLevel | "">("");
+  // sponsorship starts at "unknown" (the server default): unknown is signal, not
+  // absence, so there is no blank option. status_of_residence is only shown, and
+  // only submitted, on the "available" branch.
+  const [sponsorship, setSponsorship] = useState<Sponsorship>("unknown");
+  const [statusOfResidence, setStatusOfResidence] = useState<StatusOfResidence | "">("");
+  // Null-means-unrecorded like the channel/level selects, with a blank option;
+  // prefill fills it when the posting states its hiring model.
+  const [hiringEntity, setHiringEntity] = useState<HiringEntity | "">("");
+  // Timezone overlap: the company's home zone (prefilled from location) and the
+  // daily overlap the role demands. Both null-means-unrecorded.
+  const [companyTimezone, setCompanyTimezone] = useState<CompanyTimezone | "">("");
+  const [overlapHours, setOverlapHours] = useState("");
   const [compMin, setCompMin] = useState("");
   const [compMax, setCompMax] = useState("");
   const [monthsGuaranteed, setMonthsGuaranteed] = useState("");
@@ -146,6 +179,12 @@ export function NewApplicationForm({
     if (result.channel) setChannel(result.channel);
     if (result.agency) setAgencyName(result.agency);
     if (result.japanese_level) setJapaneseLevel(result.japanese_level);
+    // Only "available"/"unavailable" ever arrive; a silent posting leaves the
+    // "unknown" default standing.
+    if (result.sponsorship) setSponsorship(result.sponsorship);
+    if (result.hiring_entity) setHiringEntity(result.hiring_entity);
+    if (result.company_timezone) setCompanyTimezone(result.company_timezone);
+    if (result.overlap_hours_required) setOverlapHours(String(result.overlap_hours_required));
     // Yen from the API, 万円 in the form; the one place the conversion runs
     // this direction.
     if (result.comp_annual_min_yen) setCompMin(String(result.comp_annual_min_yen / 10_000));
@@ -432,6 +471,95 @@ export function NewApplicationForm({
             <p className="mt-1 text-xs text-ink-soft">{t("market.agencyHint")}</p>
           </div>
         ) : null}
+        {/* Visa (v1.9.0): sponsorship defaults to "unknown" (signal, not blank),
+            so no unset option. The 在留資格 select is only meaningful, and only
+            rendered, when a role sponsors, so it appears and disappears with the
+            "available" branch, the same shape as the agency field under `agent`.
+            An unmounted select submits nothing, so switching away from "available"
+            drops the status the same way a non-agent channel drops the agency. */}
+        <Row>
+          <label className="block text-sm">
+            <span className="kk-label">{t("market.sponsorship")}</span>
+            <select
+              name="sponsorship"
+              value={sponsorship}
+              onChange={(e) => setSponsorship(e.target.value as Sponsorship)}
+              className="mt-1.5 block w-full border border-dune bg-linen px-3 py-2 text-sm text-midnight"
+            >
+              {SPONSORSHIPS.map((s) => (
+                <option key={s} value={s}>
+                  {ts(s)}
+                </option>
+              ))}
+            </select>
+          </label>
+          {sponsorship === "available" ? (
+            <label className="block text-sm">
+              <span className="kk-label">{t("market.statusOfResidence")}</span>
+              <select
+                name="status_of_residence"
+                value={statusOfResidence}
+                onChange={(e) => setStatusOfResidence(e.target.value as StatusOfResidence | "")}
+                className="mt-1.5 block w-full border border-dune bg-linen px-3 py-2 text-sm text-midnight"
+              >
+                <option value="">{t("market.unset")}</option>
+                {STATUSES_OF_RESIDENCE.map((s) => (
+                  <option key={s} value={s}>
+                    {tsor(s)}
+                  </option>
+                ))}
+              </select>
+            </label>
+          ) : null}
+        </Row>
+        {/* Hiring entity (v1.9.0): can they actually employ a Japan resident?
+            Null-means-unrecorded, so a blank option, and prefill fills it. */}
+        <label className="block text-sm">
+          <span className="kk-label">{t("market.hiringEntity")}</span>
+          <select
+            name="hiring_entity"
+            value={hiringEntity}
+            onChange={(e) => setHiringEntity(e.target.value as HiringEntity | "")}
+            className="mt-1.5 block w-full border border-dune bg-linen px-3 py-2 text-sm text-midnight"
+          >
+            <option value="">{t("market.unset")}</option>
+            {HIRING_ENTITIES.map((h) => (
+              <option key={h} value={h}>
+                {thire(h)}
+              </option>
+            ))}
+          </select>
+        </label>
+        {/* Timezone overlap (v1.9.0): home zone + required daily overlap. The
+            "survivable from JST?" read is derived on the detail page, not here. */}
+        <Row>
+          <label className="block text-sm">
+            <span className="kk-label">{t("market.companyTimezone")}</span>
+            <select
+              name="company_timezone"
+              value={companyTimezone}
+              onChange={(e) => setCompanyTimezone(e.target.value as CompanyTimezone | "")}
+              className="mt-1.5 block w-full border border-dune bg-linen px-3 py-2 text-sm text-midnight"
+            >
+              <option value="">{t("market.unset")}</option>
+              {COMPANY_TIMEZONES.map((z) => (
+                <option key={z} value={z}>
+                  {ttz(TIMEZONE_LABEL_KEY[z])}
+                </option>
+              ))}
+            </select>
+          </label>
+          <Field
+            name="overlap_hours_required"
+            label={t("market.overlapHours")}
+            type="number"
+            min="0"
+            max="24"
+            step="0.5"
+            value={overlapHours}
+            onChange={(e) => setOverlapHours(e.target.value)}
+          />
+        </Row>
         <Row>
           {/* No numeric placeholders on any comp input: beside an AI-fill
               feature, a grey "600" in a number field reads as a value the
