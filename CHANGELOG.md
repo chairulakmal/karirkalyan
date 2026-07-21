@@ -1,10 +1,10 @@
 # Changelog
 
-The history: shipped work, newest first (`v1.8.1` back through `v1.0.0`), preceded by the `v1.10.0` and `v1.9.0` unreleased heads that carry the two releases built together in one batched PR (`feat/v1.9-and-v1.10`), by the author's explicit choice, until they are tagged. Branch/PR names note where each change landed, and each release since `v1.3.1` names its patch/minor level against the versioning policy's mechanical test. The most important section is the one that is not a release: § Decisions records the settled decisions-not-to-build, so that [`TODO.md`](TODO.md) (where open work lives) can stay plan-only without the reasoning getting lost.
+The history: shipped work, newest first (`v1.10.0`, tagged 2026-07-21, back through `v1.0.0`), with `v1.9.0` remaining an unreleased head between `v1.10.0` and `v1.8.1`. The two were built together in one batched PR (`feat/v1.9-and-v1.10`); `v1.10.0` was tagged first, by the author's explicit choice, leaving `v1.9.0` to be tagged separately. Branch/PR names note where each change landed, and each release since `v1.3.1` names its patch/minor level against the versioning policy's mechanical test. The most important section is the one that is not a release: § Decisions records the settled decisions-not-to-build, so that [`TODO.md`](TODO.md) (where open work lives) can stay plan-only without the reasoning getting lost.
 
 ---
 
-## v1.10.0 (unreleased)
+## v1.10.0 (2026-07-21)
 
 The follow-through: each item harvests machinery an earlier release built (the FSM + timeline, the prefill pipeline, the push channel, the `.ics` event data, `v1.9.0`'s visa research). A minor by the mechanical test: every schema touch is a nullable column or none at all, so the previous image boots against this database unchanged. Built in one batched PR with `v1.9.0` (all `*(feat/v1.9-and-v1.10)*`).
 
