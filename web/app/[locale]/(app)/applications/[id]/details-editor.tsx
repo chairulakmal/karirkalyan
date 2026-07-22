@@ -159,7 +159,7 @@ export function DetailsEditor(props: Props) {
                     {t("overdue", { date: formatDate(props.followUpAt, locale) })}
                   </span>
                 ) : (
-                  <span className="font-medium text-saffron">
+                  <span className="font-medium text-saffron-ink">
                     {formatDate(props.followUpAt, locale)}
                   </span>
                 )

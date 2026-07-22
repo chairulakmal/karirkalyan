@@ -598,7 +598,7 @@ export function ApplicationsList({
                         {t("followUpOverdue", { date: formatDate(app.follow_up_at, locale) })}
                       </p>
                     ) : (
-                      <p className="mt-0.5 font-medium text-saffron">
+                      <p className="mt-0.5 font-medium text-saffron-ink">
                         {t("followUp", { date: formatDate(app.follow_up_at, locale) })}
                       </p>
                     )

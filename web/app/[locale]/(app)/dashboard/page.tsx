@@ -202,7 +202,7 @@ export default async function Dashboard({
                           {t("upcoming.overdue")} · {formatDate(item.at, locale)}
                         </span>
                       ) : (
-                        <span className="font-medium text-saffron">{formatDate(item.at, locale)}</span>
+                        <span className="font-medium text-saffron-ink">{formatDate(item.at, locale)}</span>
                       )}
                     </div>
                   </Link>
