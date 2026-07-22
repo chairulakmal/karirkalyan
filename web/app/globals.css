@@ -12,6 +12,7 @@
   --color-ink-soft: #424b65;
   --color-saffron: #e8a04a;
   --color-saffron-2: #f0bc7a;
+  --color-saffron-ink: #7a4d10;
   --color-danger: #96291d;
   --color-linen: #f7f3ea;
   --color-sand: #ece8df;
@@ -48,6 +49,14 @@ h1, h2, h3 {
   font-family: var(--font-serif);
   font-variation-settings: "opsz" 36, "wght" 500;
   letter-spacing: -0.02em;
+}
+
+/* Negative tracking is a Latin display device; kanji and kana are drawn to
+ * full-width boxes, so no heading is tightened under Japanese. The mono eyebrow
+ * (.kk-label) and the hero display cut (.kk-display) set their own tracking and
+ * are excluded, so only the plain serif headings above are reset. */
+:lang(ja) :is(h1, h2, h3):not(.kk-label, .kk-display) {
+  letter-spacing: 0;
 }
 
 /* Japanese phrase-based line breaking (文節). Chromium 119+ breaks Japanese

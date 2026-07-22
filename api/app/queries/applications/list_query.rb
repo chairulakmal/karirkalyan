@@ -15,12 +15,13 @@ module Applications
     MIN_LIMIT     = 1
     MAX_LIMIT     = 100
 
-    def initialize(user:, status: nil, company: nil, source: nil, japanese_level: nil, after: nil, limit: nil)
+    def initialize(user:, status: nil, company: nil, source: nil, japanese_level: nil, q: nil, after: nil, limit: nil)
       @user           = user
       @status         = status
       @company        = company
       @source         = source
       @japanese_level = japanese_level
+      @q              = q
       @after          = after
       @limit          = limit
     end
@@ -42,7 +43,7 @@ module Applications
 
     private
 
-    attr_reader :user, :status, :company, :source, :japanese_level, :after
+    attr_reader :user, :status, :company, :source, :japanese_level, :q, :after
 
     # The board's triage cards need "how long has this sat here", so the index
     # carries a per-row anchor timestamp: the last stage change, or the applied
@@ -70,6 +71,7 @@ module Applications
       relation = filter_by_company(relation)
       relation = filter_by_source(relation)
       relation = filter_by_japanese_level(relation)
+      relation = filter_by_query(relation)
       filter_by_cursor(relation)
     end
 
@@ -115,6 +117,24 @@ module Applications
       return relation if levels.empty?
 
       relation.where(japanese_level: levels)
+    end
+
+    # Free-text search (v1.11.0): a partial, case-insensitive match over the
+    # fields a half-remembered application lives in: company, role, notes. The
+    # one filter the structured dropdowns cannot express, because the match is
+    # fuzzy by nature. Blank or whitespace-only is ignored like `company`/`source`
+    # (v1.5.1), case-insensitive via ILIKE like `source` rather than exact like
+    # `company`, and it ANDs against every active facet filter. The `%`/`_`
+    # wildcards inside the term are escaped so a literal one matches itself.
+    def filter_by_query(relation)
+      term = q.to_s.strip
+      return relation if term.empty?
+
+      like = "%#{ActiveRecord::Base.sanitize_sql_like(term)}%"
+      relation.where(
+        "applications.company ILIKE :like OR applications.role ILIKE :like OR applications.notes ILIKE :like",
+        like: like
+      )
     end
 
     def filter_by_cursor(relation)

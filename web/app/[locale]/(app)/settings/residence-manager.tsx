@@ -44,7 +44,7 @@ export function ResidenceManager({ profile }: { profile: Profile }) {
             <span className="font-medium text-danger">{t("expiredAgo", { days: -days })}</span>
           ) : (
             <span
-              className={days <= warnAt ? "font-medium text-saffron" : "font-medium text-midnight"}
+              className={days <= warnAt ? "font-medium text-saffron-ink" : "font-medium text-midnight"}
             >
               {t("daysRemaining", { days })}
             </span>

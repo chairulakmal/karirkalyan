@@ -18,7 +18,7 @@ export function InfoPopover({
       <summary
         aria-label={label}
         title={label}
-        className="list-none cursor-help select-none text-ink-soft/50 transition-colors hover:text-ink-soft [&::-webkit-details-marker]:hidden"
+        className="inline-flex size-6 items-center justify-center list-none cursor-help select-none text-ink-soft transition-colors hover:text-cobalt [&::-webkit-details-marker]:hidden"
       >
         ⓘ
       </summary>

@@ -7,14 +7,62 @@ module Api
       # cached payload from Solid Cache (prod) or the in-process memory store (dev).
       STATS_CACHE_VERSION = 4
 
+      # The Upcoming agenda (v1.11.0): how many dated items to surface, and how far
+      # out a residence-expiry clock has to be before it counts as "upcoming".
+      AGENDA_LIMIT = 8
+      AGENDA_RESIDENCE_WINDOW_DAYS = 90
+
       def index
-        # `user` rides outside the cached block: it is a cheap read, and keying
-        # application stats on a user record would be a category error. It is here
-        # at all so the dashboard stops making a second /me request for it.
-        render json: cached_stats.merge(user: current_user)
+        # `user` and `upcoming` ride outside the cached block: both are cheap reads,
+        # and keying application stats on a user record would be a category error.
+        # `user` is here so the dashboard stops making a second /me request; the
+        # agenda is here because it also reads the user's residence field, which is
+        # not in the stats cache key, so caching it could serve a stale clock.
+        render json: cached_stats.merge(user: current_user, upcoming: upcoming_agenda)
       end
 
       private
+
+      # The dated commitments that answer "what do I need to do?", merged from
+      # where they already live and sorted chronologically: follow-ups and
+      # upcoming interviews across the active applications, plus the user's own
+      # residence-expiry clock when it is close enough to matter. Overdue-but-
+      # active follow-ups sort to the front (earliest date first) and the client
+      # colours them; interviews are future-only, so a finished one drops off.
+      # Gated on ACTIVE_STATES for the same reason `isOverdue` is on the list: a
+      # dated fact on a closed application is not actionable. A light read (the
+      # follow_up_at leg is indexed; the interview_at leg is a small status-scoped
+      # scan), capped at AGENDA_LIMIT, rendered as a dashboard section, never a route.
+      def upcoming_agenda
+        items = []
+
+        current_user.applications
+          .where(status: ApplicationFSM::ACTIVE_STATES)
+          .where.not(follow_up_at: nil)
+          .select(:id, :company, :role, :status, :follow_up_at)
+          .each { |app| items << agenda_item("follow_up", app.follow_up_at, app) }
+
+        current_user.applications
+          .where(status: ApplicationFSM::ACTIVE_STATES)
+          .where("interview_at >= ?", Time.current)
+          .select(:id, :company, :role, :status, :interview_at)
+          .each { |app| items << agenda_item("interview", app.interview_at, app) }
+
+        if (expiry = current_user.residence_expires_on) &&
+           expiry <= AGENDA_RESIDENCE_WINDOW_DAYS.days.from_now.to_date
+          items << { type: "residence", at: expiry.to_time, application_id: nil,
+                     company: nil, role: nil, status: nil }
+        end
+
+        items.sort_by { |item| item[:at] }
+             .first(AGENDA_LIMIT)
+             .map { |item| item.merge(at: item[:at].iso8601) }
+      end
+
+      def agenda_item(type, at, app)
+        { type: type, at: at, application_id: app.id,
+          company: app.company, role: app.role, status: app.status }
+      end
 
       # The aggregation below is the heaviest work in the app and runs on every
       # dashboard load. Cache it, keyed on the user's application count + latest

@@ -125,7 +125,7 @@
   "hsp": {
     "home": "ホーム",
     "eyebrow": "日本のビザツール",
-    "title": "高度専門職ポイント計算機",
+    "title": "高度専門職ビザ ポイント計算機",
     "lede": "日本の高度専門職ビザはポイント制です。70点に達すると資格を満たし、永住権への近道もあります。技術分野でのスコアを概算します。",
     "profileTitle": "基本情報",
     "degree": "最終学歴",
@@ -145,7 +145,7 @@
       "none": "なし・N2未満"
     },
     "bonusTitle": "加点項目",
-    "bonusHint": "エンジニアが取得できる加点のみ。情報アイコンには法務省告示の文言を掲載しています。",
+    "bonusHint": "エンジニアが取得できる加点のみ。情報アイコンは法務省告示からの引用です。",
     "infoAria": "法務省の注記を表示",
     "multipleDegrees": "複数分野の学位（+5）",
     "researchAchievements": "特許・論文・研究資金（+15）",
@@ -478,6 +478,16 @@
         "personal": "{stage}: {days}日 — 返信{count}件から算出した90パーセンタイル",
         "default": "{stage}: {days}日 — 初期値（返信は5件中{count}件のみ）"
       }
+    },
+    "upcoming": {
+      "title": "予定",
+      "type": {
+        "interview": "面接",
+        "follow_up": "フォローアップ",
+        "residence": "在留期限"
+      },
+      "residenceLabel": "在留資格の期限",
+      "overdue": "期限超過"
     }
   },
   "board": {
@@ -502,6 +512,8 @@
     "noBoard": "リンクなし",
     "japaneseLevel": "日本語レベル",
     "allLevels": "すべてのレベル",
+    "search": "検索",
+    "searchPlaceholder": "企業名・職種・メモ…",
     "clearFilters": "絞り込みを解除",
     "all": "すべて",
     "stages": "ステージ",
@@ -510,6 +522,8 @@
     "noStages": "なし",
     "allStagesHidden": "すべてのステージを非表示にしているため、表示できる応募がありません。",
     "showAllStages": "すべてのステージを表示",
+    "showClosedStages": "終了したステージ（{count}）",
+    "showFewerStages": "閉じる",
     "option": "{label} ({count})",
     "noMatches": "条件に一致する応募はありません。",
     "empty": "まだ応募がありません。",
@@ -585,10 +599,13 @@
     "reopenPrompt": "この応募を再開する理由は?",
     "stageNotePrompt": "{label}へ進みます。メモを追加（任意）：誰と会ったか、何を聞かれたか。",
     "stageNotePlaceholder": "例：エンジニアリングマネージャーと面談。システム設計ラウンド、スケーリング重視…",
+    "closeNotePrompt": "メモを追加（任意）：フィードバック、オファー内容、理由など。",
+    "closeNotePlaceholder": "例：最終面接後に不採用。Goの経験をより重視とのこと…",
     "advance": "進める",
     "customReason": "または理由を入力…",
     "confirm": "確定",
     "cancel": "キャンセル",
+    "moved": "{label}に変更しました",
     "reasons": {
       "ghosted": [
         "企業から再度連絡があった",
@@ -606,6 +623,11 @@
         "誤って記録した"
       ]
     }
+  },
+  "toast": {
+    "dismiss": "閉じる",
+    "saved": "保存しました",
+    "deleted": "応募を削除しました"
   },
   "files": {
     "hint": "PDF · 最大 1 MB",

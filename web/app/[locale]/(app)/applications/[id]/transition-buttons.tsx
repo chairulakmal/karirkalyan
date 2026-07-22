@@ -5,6 +5,7 @@ import { useTranslations } from "next-intl";
 import { useRouter } from "@/i18n/navigation";
 import { transitionStatus } from "@/app/lib/actions";
 import { statusBadgeClass } from "@/app/lib/format";
+import { useToast } from "@/app/components/toast";
 import { CONFIRM_REQUIRED, STAGE_NOTE_STATES } from "@/app/lib/transitions";
 import type { Status } from "@/app/lib/types";
 
@@ -36,6 +37,7 @@ export function TransitionButtons({
   const ts = useTranslations("status");
   const tErrors = useTranslations("errors");
   const router = useRouter();
+  const toast = useToast();
   const [error, setError] = useState<string | null>(null);
   const [confirming, setConfirming] = useState<Status | null>(null);
   const [reversalReason, setReversalReason] = useState("");
@@ -49,7 +51,10 @@ export function TransitionButtons({
     setStageNote("");
     startTransition(async () => {
       const result = await transitionStatus(id, to, lockVersion, note);
-      if (result.ok) return;
+      if (result.ok) {
+        toast.success(t("moved", { label: ts(`label.${to}`) }));
+        return;
+      }
       if (result.status === 409) {
         // Stale optimistic lock: refresh so a fresh lockVersion prop flows in
         // and the retry can succeed without a manual reload.
@@ -70,7 +75,11 @@ export function TransitionButtons({
       setConfirming(status);
       setStageNote("");
     } else if (CONFIRM_REQUIRED.has(status)) {
+      // A closing move: confirm, and offer an optional note (rejection feedback,
+      // offer terms) attached to this exact transition, the same textarea an
+      // interview stage gets. Skipping it is a plain confirm.
       setConfirming(status);
+      setStageNote("");
     } else {
       go(status);
     }
@@ -183,7 +192,7 @@ export function TransitionButtons({
           if (confirming === status) {
             const permanence = terminalStates.length === 0 ? null : terminalStates.includes(status);
             return (
-              <div key={status} className="space-y-2">
+              <div key={status} className="w-full space-y-3">
                 <p className="text-xs text-ink-soft">
                   {t.rich("confirmMark", {
                     label: ts(`label.${status}`),
@@ -197,10 +206,22 @@ export function TransitionButtons({
                     <span className="text-ink-soft/70">{t("reopenable")}</span>
                   ) : null}
                 </p>
+                {/* Optional note on the way out: a closing move often carries a
+                    reason worth keeping (rejection feedback, offer terms),
+                    recorded as this transition's note the same way a stage note
+                    is. Confirm works with it empty. */}
+                <textarea
+                  value={stageNote}
+                  onChange={(e) => setStageNote(e.target.value)}
+                  placeholder={t("closeNotePlaceholder")}
+                  aria-label={t("closeNotePrompt")}
+                  rows={2}
+                  className="w-full border border-dune bg-linen px-3 py-1.5 text-xs text-midnight placeholder:text-ink-soft/50"
+                />
                 <div className="flex gap-2">
                   <button
                     type="button"
-                    onClick={() => go(status)}
+                    onClick={() => go(status, stageNote.trim() || undefined)}
                     disabled={pending}
                     className="inline-flex min-h-10 items-center px-3 py-1 text-xs font-medium ring-1 ring-inset bg-danger/10 text-danger ring-danger/30 transition hover:bg-danger/20 disabled:opacity-50"
                   >

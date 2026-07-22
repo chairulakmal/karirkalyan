@@ -26,7 +26,7 @@ const STATUS_CLASS: Record<Status, string> = {
   phone_screen: "bg-cobalt/10 text-cobalt ring-cobalt/30",
   technical: "bg-cobalt/10 text-cobalt ring-cobalt/30",
   final_round: "bg-cobalt/10 text-cobalt ring-cobalt/30",
-  offer: "bg-saffron-2/40 text-[#7a4d10] ring-saffron",
+  offer: "bg-saffron-2/40 text-saffron-ink ring-saffron",
   accepted: "bg-saffron text-midnight ring-saffron",
   rejected: "bg-danger/15 text-danger ring-danger/30",
   ghosted: "bg-danger/10 text-danger ring-danger/30",

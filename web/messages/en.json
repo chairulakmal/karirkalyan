@@ -125,7 +125,7 @@
   "hsp": {
     "home": "Home",
     "eyebrow": "Japan visa tool",
-    "title": "Highly Skilled Professional points calculator",
+    "title": "HSP Visa Points Calculator",
     "lede": "Japan's 高度専門職 (Highly Skilled Professional) visa turns on a points table: reach 70 and you qualify, with a fast track to permanent residence. This estimates your score on the engineering track.",
     "profileTitle": "Your details",
     "degree": "Highest degree",
@@ -145,7 +145,7 @@
       "none": "None / below N2"
     },
     "bonusTitle": "Bonus points",
-    "bonusHint": "Only bonuses engineers can claim. Info icons quote the wording from the MOJ announcement.",
+    "bonusHint": "Only bonuses engineers can claim. Info icons quote from the MOJ announcement.",
     "infoAria": "Show the MOJ note",
     "multipleDegrees": "Degrees in multiple fields (+5)",
     "researchAchievements": "Patents, papers, or funded research (+15)",
@@ -478,6 +478,16 @@
         "personal": "{stage}: {days} days — your 90th percentile, from {count} replies",
         "default": "{stage}: {days} days — default, only {count} of the 5 replies needed"
       }
+    },
+    "upcoming": {
+      "title": "Upcoming",
+      "type": {
+        "interview": "Interview",
+        "follow_up": "Follow-up",
+        "residence": "Residence"
+      },
+      "residenceLabel": "Status of residence expires",
+      "overdue": "Overdue"
     }
   },
   "board": {
@@ -502,6 +512,8 @@
     "noBoard": "No link",
     "japaneseLevel": "Japanese level",
     "allLevels": "All levels",
+    "search": "Search",
+    "searchPlaceholder": "Company, role, or notes…",
     "clearFilters": "Clear filters",
     "all": "All",
     "stages": "Stages",
@@ -510,6 +522,8 @@
     "noStages": "None",
     "allStagesHidden": "Every stage is hidden, so there is nothing to list.",
     "showAllStages": "Show every stage",
+    "showClosedStages": "Closed stages ({count})",
+    "showFewerStages": "Show fewer",
     "option": "{label} ({count})",
     "noMatches": "No applications match these filters.",
     "empty": "No applications yet.",
@@ -585,10 +599,13 @@
     "reopenPrompt": "Why re-opening this application?",
     "stageNotePrompt": "Advancing to {label}. Add a note (optional): who you met, what they asked.",
     "stageNotePlaceholder": "e.g. Met the eng manager; system-design round, focus on scaling…",
+    "closeNotePrompt": "Add a note (optional): their feedback, offer details, or why.",
+    "closeNotePlaceholder": "e.g. Rejected after final round; wanted more Go experience…",
     "advance": "Advance",
     "customReason": "Or type a custom reason…",
     "confirm": "Confirm",
     "cancel": "Cancel",
+    "moved": "Moved to {label}",
     "reasons": {
       "ghosted": [
         "Company reached back out",
@@ -606,6 +623,11 @@
         "Recorded in error"
       ]
     }
+  },
+  "toast": {
+    "dismiss": "Dismiss",
+    "saved": "Saved",
+    "deleted": "Application deleted"
   },
   "files": {
     "hint": "PDF · max 1 MB",

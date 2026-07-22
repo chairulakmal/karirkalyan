@@ -82,7 +82,7 @@ export default async function HspCalculatorPage({
               External links open in a new tab (rel=noopener). The ↗ marks the
               hop off-site. */}
           <section className="hsp-lg mt-12 border-t border-dune pt-6">
-            <p className="kk-label">{t("sourcesTitle")}</p>
+            <h2 className="kk-label">{t("sourcesTitle")}</h2>
             <ul className="mt-3 space-y-2 text-base">
               {sources.map((source) => (
                 <li key={source.href}>

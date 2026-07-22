@@ -281,6 +281,19 @@ export type GhostRisk = {
   at_risk: GhostRiskEntry[];
 };
 
+// One dated commitment on the Upcoming agenda (v1.11.0), merged server-side from
+// follow-ups, upcoming interviews, and the residence-expiry clock, then sorted
+// chronologically. `at` is an ISO instant; a `residence` item carries no
+// application refs (it deep-links to /settings instead).
+export type AgendaItem = {
+  type: "follow_up" | "interview" | "residence";
+  at: string;
+  application_id: number | null;
+  company: string | null;
+  role: string | null;
+  status: Status | null;
+};
+
 export type DashboardStats = {
   by_status: Partial<Record<Status, number>>;
   // [company, board-host, status, japanese_level] for every application (v1.10.0).
@@ -298,4 +311,7 @@ export type DashboardStats = {
   ghost_risk: GhostRisk;
   // Folded in from GET /me, which the dashboard used to fetch separately.
   user: User;
+  // The Upcoming agenda (v1.11.0): dated commitments, chronological, computed
+  // fresh (outside the stats cache) so the residence clock is never stale.
+  upcoming: AgendaItem[];
 };

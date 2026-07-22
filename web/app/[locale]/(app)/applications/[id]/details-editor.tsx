@@ -5,6 +5,7 @@ import { useLocale, useTranslations } from "next-intl";
 import { useRouter } from "@/i18n/navigation";
 import { updateApplication } from "@/app/lib/actions";
 import { formatDate, isOverdue } from "@/app/lib/format";
+import { useToast } from "@/app/components/toast";
 import { Field } from "@/app/components/field";
 import type {
   Channel,
@@ -82,8 +83,10 @@ export function DetailsEditor(props: Props) {
   const thire = useTranslations("hiringEntity");
   const ttz = useTranslations("companyTimezone");
   const tErrors = useTranslations("errors");
+  const tToast = useTranslations("toast");
   const locale = useLocale();
   const router = useRouter();
+  const toast = useToast();
   const [editing, setEditing] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [pending, startTransition] = useTransition();
@@ -113,6 +116,7 @@ export function DetailsEditor(props: Props) {
       const result = await updateApplication(props.id, formData);
       if (result.ok) {
         setEditing(false);
+        toast.success(tToast("saved"));
         router.refresh(); // pull fresh values + bumped lock_version
       } else if (result.status === 409) {
         // Stale optimistic lock: refresh so fresh props (new lock_version)
@@ -155,7 +159,7 @@ export function DetailsEditor(props: Props) {
                     {t("overdue", { date: formatDate(props.followUpAt, locale) })}
                   </span>
                 ) : (
-                  <span className="font-medium text-saffron">
+                  <span className="font-medium text-saffron-ink">
                     {formatDate(props.followUpAt, locale)}
                   </span>
                 )

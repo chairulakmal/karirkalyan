@@ -6,6 +6,7 @@ import { LocaleSwitcher } from "@/app/components/locale-switcher";
 import { Mark, Wordmark } from "@/app/components/wordmark";
 import { ServiceWorkerRegistrar } from "@/app/components/service-worker-registrar";
 import { TabBar } from "@/app/components/tab-bar";
+import { ToastProvider } from "@/app/components/toast";
 import { AccountMenu } from "./account-menu";
 import { ACCOUNT_EMAIL_COOKIE_NAME } from "@/app/lib/api";
 import { REPO_URL } from "@/app/lib/links";
@@ -20,7 +21,7 @@ export default async function AppLayout({ children }: { children: React.ReactNod
   const email = (await cookies()).get(ACCOUNT_EMAIL_COOKIE_NAME)?.value ?? null;
 
   return (
-    <>
+    <ToastProvider>
       <header className="border-b border-dune bg-linen">
         <div className="mx-auto flex max-w-5xl items-center justify-between px-6 py-4">
           <Link href="/dashboard" className="flex items-center gap-3">
@@ -76,7 +77,7 @@ export default async function AppLayout({ children }: { children: React.ReactNod
       </footer>
       <TabBar />
       <ServiceWorkerRegistrar />
-    </>
+    </ToastProvider>
   );
 }
 

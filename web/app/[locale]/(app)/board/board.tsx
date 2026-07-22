@@ -6,6 +6,7 @@ import { Link, useRouter } from "@/i18n/navigation";
 import { transitionStatus } from "@/app/lib/actions";
 import { jobBoardLabel, stageAge, statusBadgeClass } from "@/app/lib/format";
 import { excerpt } from "@/app/lib/excerpt";
+import { useToast } from "@/app/components/toast";
 import { CONFIRM_REQUIRED, canRevive } from "@/app/lib/transitions";
 import type { Application, Status, TransitionTable } from "@/app/lib/types";
 
@@ -31,6 +32,7 @@ type Move = { id: number; to: Status };
 // or done interviewing) instead of funnel order. Membership still comes from
 // the fetched `active_states`; a status missing here sorts after the ranked
 // ones instead of disappearing.
+// fsm-allow: board display order only; membership comes from fetched active_states.
 const COLUMN_ORDER: readonly Status[] = [
   "applied",
   "phone_screen",
@@ -55,9 +57,10 @@ export function Board({
 }) {
   const t = useTranslations("board");
   const ts = useTranslations("status");
+  const tt = useTranslations("transitions");
   const tErrors = useTranslations("errors");
   const router = useRouter();
-  const [notice, setNotice] = useState<string | null>(null);
+  const toast = useToast();
   const [dragging, setDragging] = useState<{ id: number; from: Status } | null>(null);
   const [, startMove] = useTransition();
 
@@ -71,18 +74,25 @@ export function Board({
   );
 
   function move(app: Application, to: Status, note?: string) {
-    setNotice(null);
     startMove(async () => {
       applyMove({ id: app.id, to });
       const result = await transitionStatus(app.id, to, app.lock_version, note);
-      if (result.ok) return;
+      if (result.ok) {
+        // The optimistic move already showed; confirm it, so a successful drag
+        // is no longer silent.
+        toast.success(tt("moved", { label: ts(`label.${to}`) }));
+        return;
+      }
+      // The optimistic card snaps back on its own when the action settles; the
+      // toast is where its reason finally gets spoken (it used to be an inline
+      // notice only the board had).
       if (result.status === 409) {
         // Stale optimistic lock: this board's copy of the row is out of date
         // by definition, so refresh to pull fresh lock_versions in.
-        setNotice(tErrors("refreshingStale"));
+        toast.error(tErrors("refreshingStale"));
         router.refresh();
       } else {
-        setNotice(result.error);
+        toast.error(result.error);
       }
     });
   }
@@ -126,12 +136,6 @@ export function Board({
 
   return (
     <div className="space-y-10">
-      {notice && (
-        <p role="alert" className="border border-danger/40 bg-danger/10 p-3 text-sm text-danger">
-          {notice}
-        </p>
-      )}
-
       <div className="grid grid-cols-1 gap-3 pb-4 sm:grid-cols-2 lg:grid-cols-4">
         {columns.map((status) => {
           const isTriage = TRIAGE_COLUMNS.has(status);

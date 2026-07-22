@@ -42,6 +42,11 @@ RSpec.describe "Applications", type: :request do
                              "matches, with `status`'s exact contract: unknown members are dropped and a list " \
                              "left with none is unfiltered, not empty. Matches the recorded value only: " \
                              "`none` means a recorded \"no Japanese required\", never a null column."
+      parameter name: :q, in: :query, required: false, schema: { type: :string },
+                description: "Free-text search, matched as a case-insensitive substring over company, role, " \
+                             "and notes at once: the one filter the structured params cannot express, because " \
+                             "the match is partial. Blank or whitespace-only is ignored like `company`; a `%` or " \
+                             "`_` in the term is a literal, not a wildcard. ANDs against the other filters."
       parameter name: :after, in: :query, required: false, schema: { type: :string },
                 description: "Cursor from a previous page's `meta.next_cursor`: an opaque Base64 " \
                              "timestamp. A malformed cursor returns the first page."
@@ -72,6 +77,21 @@ RSpec.describe "Applications", type: :request do
 
         run_test! do |response|
           expect(JSON.parse(response.body)["data"].length).to eq(1)
+        end
+      end
+
+      response "200", "q filters over company, role, and notes" do
+        let(:Authorization) { jwt_for(user) }
+        let(:q) { "osaka" }
+        before do
+          create(:application, :applied, user: user, company: "Acme", notes: "Osaka office, remote-ok")
+          create(:application, :applied, user: user, company: "Globex", notes: nil)
+        end
+
+        run_test! do |response|
+          body = JSON.parse(response.body)
+          expect(body["data"].length).to eq(1)
+          expect(body["data"].first["company"]).to eq("Acme")
         end
       end
 

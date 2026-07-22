@@ -21,6 +21,9 @@ type Filters = {
   company: string | null;
   source: string | null;
   japaneseLevel: JapaneseLevel | null;
+  // Free-text search (v1.11.0): a `q` param the server ILIKEs over company/role/
+  // notes. Null when empty; ANDs against the structured filters like the rest.
+  q: string | null;
 };
 
 const STATUS_PRIORITY: Record<Status, number> = {
@@ -48,6 +51,17 @@ function sortByImportance(apps: Application[]): Application[] {
   return [...apps].sort((a, b) => STATUS_PRIORITY[a.status] - STATUS_PRIORITY[b.status]);
 }
 
+// archived never appears on the dashboard (SPEC.md § Dashboard). The server is
+// already asked only for non-archived stages, but drop any archived row
+// defensively so nothing leaks even in the /transitions-failed fallback where
+// the default degrades to the server's unfiltered set.
+const notArchived = (a: Application) => a.status !== "archived";
+
+// Two stage selections are the same view when they hold the same statuses,
+// regardless of order. Used to tell the default (active) view from the rest.
+const sameStages = (a: Status[], b: Status[]) =>
+  a.length === b.length && a.every((s) => b.includes(s));
+
 interface Props {
   initialItems: Application[];
   initialMeta: PageMeta;
@@ -71,6 +85,7 @@ interface Props {
     company: string | null;
     source: string | null;
     japaneseLevel: string | null;
+    q: string | null;
   };
 }
 
@@ -92,64 +107,83 @@ export function ApplicationsList({
   const pathname = usePathname();
   const atRisk = new Set(atRiskIds);
   const rendered = statusBuckets.map(([status]) => status);
-  const [items, setItems] = useState(() => sortByImportance(initialItems));
+  // The dashboard's default view and the "Active" preset are the same set: the
+  // in-play stages that actually have rows. Empty when /transitions failed (no
+  // active set known), so the default falls back to the full non-archived row
+  // rather than to nothing.
+  const activeRendered = rendered.filter((s) => activeStates.includes(s));
+  const defaultStages = activeRendered.length > 0 ? activeRendered : rendered;
+  const [items, setItems] = useState(() => sortByImportance(initialItems.filter(notArchived)));
   const [meta, setMeta] = useState(initialMeta);
-  // Every chip starts lit: the user subtracts stages from a closed set they
-  // already have a mental model of, rather than opting in one at a time. The
-  // list still first appears unfiltered — all of them selected *is* unfiltered.
-  // Seeded from the URL the page arrived with, validated against what this list
-  // actually renders: an absent status param is all chips lit, and a status
-  // param whose members are all junk intersects to nothing and so also reads as
-  // unfiltered, matching how ListQuery ignored the same junk on the first paint.
+  // The chips start on the active stages, the dashboard's default view (SPEC.md
+  // § Dashboard): the user narrows or expands from what's in play rather than
+  // from the full row. Seeded from the URL the page arrived with, validated
+  // against what this list actually renders: an absent status param is the active
+  // default, and a status param whose members are all junk intersects to nothing
+  // and so also falls back to the default, matching how the server first-painted.
   const [filters, setFilters] = useState<Filters>(() => {
     const wanted = initialFilters.status?.split(",").map((s) => s.trim());
     const fromUrl = wanted ? rendered.filter((s) => wanted.includes(s)) : [];
     const jlpt = initialFilters.japaneseLevel;
     return {
-      statuses: fromUrl.length > 0 ? fromUrl : rendered,
+      statuses: fromUrl.length > 0 ? fromUrl : defaultStages,
       company: initialFilters.company || null,
       source: initialFilters.source || null,
       japaneseLevel: jlpt && (JAPANESE_LEVELS as readonly string[]).includes(jlpt)
         ? (jlpt as JapaneseLevel)
         : null,
+      q: initialFilters.q || null,
     };
   });
   const [loading, setLoading] = useState(false);
+  // The search box's live text, separate from the applied `filters.q`: it filters
+  // on Enter (submit), and clearing it to empty applies immediately so the "x"
+  // works. Seeded from the URL so a shared ?q= view shows its term.
+  const [qInput, setQInput] = useState(initialFilters.q ?? "");
+  // The closed-stage chips collapse behind a disclosure (v1.11.0); see the split
+  // derived below. Starts collapsed; a selected closed chip forces it open.
+  const [showClosed, setShowClosed] = useState(false);
 
   // Mirror the applied filters into the URL so a filtered view is linkable,
   // reload-survivable, and back-button-correct. `replace`, not `push`: filtering
   // is refining one view, not navigating, so it should not stack history. The
-  // wire rules carry over exactly: a full chip row (unfiltered) and a zero chip
-  // row (a client-only "show nothing", deliberately not shareable: it reads as
-  // unfiltered on reload) both send no `status`, so the default view keeps a
-  // bare URL. Routed through i18n/navigation so the locale prefix is preserved.
+  // default (active) view keeps a bare URL; every other stage selection is
+  // encoded, "All" (the full non-archived row) included, so it is shareable and
+  // survives reload. The zero-chip "show nothing" transient also stays bare and
+  // reads as the default on reload. Routed through i18n/navigation so the locale
+  // prefix is preserved.
   function syncUrl(f: Filters) {
     const qs = new URLSearchParams();
-    if (f.statuses.length > 0 && f.statuses.length < rendered.length) {
+    if (f.statuses.length > 0 && !sameStages(f.statuses, defaultStages)) {
       qs.set("status", f.statuses.join(","));
     }
     if (f.company) qs.set("company", f.company);
     if (f.source) qs.set("source", f.source);
     if (f.japaneseLevel) qs.set("japanese_level", f.japaneseLevel);
+    if (f.q) qs.set("q", f.q);
     const query = qs.toString();
     router.replace(query ? `${pathname}?${query}` : pathname, { scroll: false });
   }
 
-  const allStages = filters.statuses.length === rendered.length;
+  // The default (active) view reads as unfiltered: no "Clear filters", bare URL.
+  const isDefaultStages = sameStages(filters.statuses, defaultStages);
   // Zero chips is a UI state, not a query — see applyFilters. An account with no
   // applications renders no chips either, and that is `empty`, not hidden.
   const noStages = rendered.length > 0 && filters.statuses.length === 0;
-  const activeRendered = rendered.filter((s) => activeStates.includes(s));
 
   async function fetchPage(f: Filters, after?: string) {
     const qs = new URLSearchParams({ limit: "10" });
     if (after) qs.set("after", after);
-    // Every rendered chip lit is the unfiltered list, so send nothing at all —
-    // byte-identical to the request this list has always made for "All".
-    if (f.statuses.length < rendered.length) qs.set("status", f.statuses.join(","));
+    // Always send the stages explicitly. "All" here is the non-archived row,
+    // which is NOT the server's unfiltered set (that includes archived), so the
+    // old "send nothing when every chip is lit" shortcut would leak archived onto
+    // the dashboard. applyFilters early-returns on zero chips, so `f.statuses` is
+    // never the empty list here.
+    if (f.statuses.length > 0) qs.set("status", f.statuses.join(","));
     if (f.company) qs.set("company", f.company);
     if (f.source) qs.set("source", f.source);
     if (f.japaneseLevel) qs.set("japanese_level", f.japaneseLevel);
+    if (f.q) qs.set("q", f.q);
     const res = await fetch(`/api/applications?${qs}`);
     if (!res.ok) return null;
     return (await res.json()) as { data: Application[]; meta: PageMeta };
@@ -172,7 +206,7 @@ export function ApplicationsList({
       if (!body) return;
       setFilters(next);
       syncUrl(next);
-      setItems(sortByImportance(body.data));
+      setItems(sortByImportance(body.data.filter(notArchived)));
       setMeta(body.meta);
     } finally {
       setLoading(false);
@@ -195,7 +229,7 @@ export function ApplicationsList({
       const body = await fetchPage(filters, meta.next_cursor);
       if (!body) return;
       // Append in server (cursor) order — do not re-sort the accumulated list.
-      setItems((prev) => [...prev, ...body.data]);
+      setItems((prev) => [...prev, ...body.data.filter(notArchived)]);
       setMeta(body.meta);
     } finally {
       setLoading(false);
@@ -203,16 +237,30 @@ export function ApplicationsList({
   }
 
   const hasActiveFilter =
-    !allStages ||
+    !isDefaultStages ||
     filters.company !== null ||
     filters.source !== null ||
-    filters.japaneseLevel !== null;
+    filters.japaneseLevel !== null ||
+    filters.q !== null;
+  // "Clear filters" returns to the default (active) view, not to "All".
   const noFilters: Filters = {
-    statuses: rendered,
+    statuses: defaultStages,
     company: null,
     source: null,
     japaneseLevel: null,
+    q: null,
   };
+
+  // Enter (or the "x") applies the search; clearing to empty applies at once so
+  // it does not sit as an active-but-invisible filter. Also resets the local box
+  // whenever the applied term is cleared (e.g. by "Clear filters").
+  function submitSearch() {
+    applyFilters({ ...filters, q: qInput.trim() || null });
+  }
+  function clearAllFilters() {
+    setQInput("");
+    applyFilters(noFilters);
+  }
 
   // Disjunctive faceting across all four filters (v1.10.0): each facet's counts
   // reflect the OTHER active filters, never its own selection, so picking a
@@ -258,6 +306,43 @@ export function ApplicationsList({
     0,
   );
 
+  // Chip disclosure (v1.11.0): the active stages sit inline, the closed ones
+  // collapse behind a "Closed stages" toggle: thirteen chips is past the ~10
+  // Baymard found scannable, and v1.11.0's active-default only hides them until
+  // "All" or a closed stage is picked, which is the row this trims. The split is
+  // the fetched `active_states`, so nothing here enumerates the FSM. When that
+  // set is unknown (/transitions failed, `activeRendered` empty) there is no
+  // split to make and every chip renders inline as before. A selected closed
+  // chip (a shared ?status=rejected URL, or "All") forces the group open and
+  // cannot be collapsed away, so a lit chip is never hidden behind the toggle.
+  const inlineChips = activeRendered.length > 0 ? activeRendered : rendered;
+  const closedChips = activeRendered.length > 0 ? rendered.filter((s) => !activeStates.includes(s)) : [];
+  const closedSelected = closedChips.some((s) => filters.statuses.includes(s));
+  const closedOpen = showClosed || closedSelected;
+
+  // One chip, rendered inline or inside the disclosure: a real checkbox so the
+  // mark is structural, not a colour alone (WCAG 1.4.1); the status tint drops
+  // when unselected, a redundant scan aid on a wide row rather than the signal.
+  function StageChip(status: Status) {
+    const on = filters.statuses.includes(status);
+    return (
+      <label
+        key={status}
+        title={ts(`description.${status}`)}
+        className={`inline-flex min-h-10 cursor-pointer items-center gap-2 px-3 py-1 text-xs font-medium ring-1 ring-inset transition ${on ? statusBadgeClass(status) : "bg-sand/40 text-ink-soft ring-midnight/20 hover:text-midnight"
+          }`}
+      >
+        <input
+          type="checkbox"
+          checked={on}
+          onChange={() => toggleStatus(status)}
+          className="size-3.5 accent-current"
+        />
+        {ts(`label.${status}`)} <span className="font-mono">{statusCounts.get(status) ?? 0}</span>
+      </label>
+    );
+  }
+
   // When a change makes the other selection impossible (no app has both), drop
   // it so the dropdown value can never point at an option that isn't shown.
   function changeCompany(company: string | null) {
@@ -276,6 +361,36 @@ export function ApplicationsList({
     <div className="space-y-4">
       {facets.length > 0 && (
         <div className="flex flex-wrap items-end gap-3">
+          {/* Free-text search (v1.11.0): the one filter that is not a dropdown,
+              because the match is partial. Enter (or clearing the box) applies
+              it; a server `q` param, so it sees every page, not only loaded ones. */}
+          <form
+            role="search"
+            onSubmit={(e) => {
+              e.preventDefault();
+              submitSearch();
+            }}
+            className="block text-sm"
+          >
+            <label className="kk-label" htmlFor="list-search">
+              {t("search")}
+            </label>
+            <input
+              id="list-search"
+              type="search"
+              value={qInput}
+              disabled={loading}
+              onChange={(e) => {
+                const v = e.target.value;
+                setQInput(v);
+                // Clearing the box (the "x", or erasing it) applies at once;
+                // typing waits for Enter so each keystroke is not a refetch.
+                if (v === "" && filters.q) applyFilters({ ...filters, q: null });
+              }}
+              placeholder={t("searchPlaceholder")}
+              className="mt-1.5 block min-w-44 border border-dune bg-linen px-3 py-1.5 text-sm text-midnight placeholder:text-ink-soft/50 disabled:opacity-50"
+            />
+          </form>
           <FilterSelect
             label={t("company")}
             value={filters.company ?? ""}
@@ -316,7 +431,7 @@ export function ApplicationsList({
           />
           {hasActiveFilter && (
             <button
-              onClick={() => applyFilters(noFilters)}
+              onClick={clearAllFilters}
               disabled={loading}
               className="px-2 py-1.5 text-xs text-ink-soft underline underline-offset-4 transition hover:text-midnight disabled:opacity-50"
             >
@@ -367,32 +482,32 @@ export function ApplicationsList({
               <Preset label={t("noStages")} onClick={() => applyFilters({ ...filters, statuses: [] })} />
             </div>
 
-            {statusBuckets.map(([status]) => {
-              const on = filters.statuses.includes(status);
-              return (
-                <label
-                  key={status}
-                  title={ts(`description.${status}`)}
-                  // Selection is carried by the checkbox — a real one, so the
-                  // mark is structural rather than a dimmed brand colour, which
-                  // would be colour alone (WCAG 1.4.1) and drag the label toward
-                  // failing contrast besides. Dropping the status tint when
-                  // unselected is a redundant scan aid on a thirteen-wide row,
-                  // not the signal.
-                  className={`inline-flex min-h-10 cursor-pointer items-center gap-2 px-3 py-1 text-xs font-medium ring-1 ring-inset transition ${on ? statusBadgeClass(status) : "bg-sand/40 text-ink-soft ring-midnight/20 hover:text-midnight"
-                    }`}
+            {inlineChips.map(StageChip)}
+            {closedChips.length > 0 &&
+              (closedOpen ? (
+                <>
+                  {closedChips.map(StageChip)}
+                  {/* Only a collapse control when nothing closed is selected;
+                      a lit closed chip keeps the group open on purpose. */}
+                  {!closedSelected && (
+                    <button
+                      type="button"
+                      onClick={() => setShowClosed(false)}
+                      className="inline-flex min-h-10 items-center px-3 py-1 text-xs text-ink-soft underline underline-offset-4 transition hover:text-midnight"
+                    >
+                      {t("showFewerStages")}
+                    </button>
+                  )}
+                </>
+              ) : (
+                <button
+                  type="button"
+                  onClick={() => setShowClosed(true)}
+                  className="inline-flex min-h-10 items-center gap-1 border border-dashed border-dune bg-linen px-3 py-1 text-xs font-medium text-ink-soft transition hover:bg-sand hover:text-midnight"
                 >
-                  <input
-                    type="checkbox"
-                    checked={on}
-                    onChange={() => toggleStatus(status)}
-                    className="size-3.5 accent-current"
-                  />
-                  {ts(`label.${status}`)}{" "}
-                  <span className="font-mono">{statusCounts.get(status) ?? 0}</span>
-                </label>
-              );
-            })}
+                  {t("showClosedStages", { count: closedChips.length })}
+                </button>
+              ))}
           </div>
         </fieldset>
       )}
@@ -483,7 +598,7 @@ export function ApplicationsList({
                         {t("followUpOverdue", { date: formatDate(app.follow_up_at, locale) })}
                       </p>
                     ) : (
-                      <p className="mt-0.5 font-medium text-saffron">
+                      <p className="mt-0.5 font-medium text-saffron-ink">
                         {t("followUp", { date: formatDate(app.follow_up_at, locale) })}
                       </p>
                     )
