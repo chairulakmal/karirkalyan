@@ -47,6 +47,11 @@ The daily driver: the dashboard opens on the work in play and grows an Upcoming 
 
 - **`.github/dependabot.yml` adopts monthly, grouped dependency updates** for `api` (bundler), `web` (npm), and GitHub Actions, settling the long-open question of whether to automate the manual per-release refresh. Minor and patch bumps are grouped into one PR per ecosystem so a normal month is at most three PRs, not one per package; majors still open individually.
 
+### Accessibility and contrast polish, from a frontend audit *(fix)*
+
+- **Saffron as *text* now uses a darker cut.** A new `--color-saffron-ink` token (`#7A4D10`, ~6.5:1 on linen) replaces `text-saffron` (`#E8A04A`, ~2:1) everywhere saffron carries words rather than fills: the follow-up and agenda dates, the offer badge, and the residence days-remaining warning. Saffron itself is unchanged for backgrounds and rings, where it never failed contrast; the offer badge's previously hard-coded hex now routes through the token, so there is one home for accent-as-text. `design/assets/tokens.css` is the token's brand-book home (gitignored); `SPEC.md` § Design system documents it so the palette is complete without the brand book.
+- **A sweep of smaller a11y gaps on the three public surfaces.** The pipeline-source caption and the homepage stack line go to full `ink-soft` (both were sub-AA at their type sizes) and the `InfoPopover` trigger from `ink-soft/50` (2.4:1) to full `ink-soft`; `InfoButton` and the `InfoPopover` summary gain a 24px hit area (WCAG 2.5.8), the info button having been a 16px glyph beside a checkbox; the HSP results, breakdown, and sources labels become `<h2>` so a heading scan finds more than the page title; the HSP score gains an `aria-live` region so a recalculated total is announced; the app-group route skeleton announces a polite `role="status"` instead of a silent `aria-hidden` page; and a `:lang(ja)` rule drops the Latin negative letter-spacing from plain serif headings, since kanji and kana are drawn to full-width boxes.
+
 ---
 
 ## v1.10.0 (2026-07-21)
