@@ -39,7 +39,7 @@ gem "anthropic", "~> 1.56"
 # Japanese national holidays for FollowUpReminderJob's dead zones. A gem rather than a
 # hardcoded list because 春分の日/秋分の日 move with the equinoxes and 振替休日 is a rule,
 # not a date — see SPEC.md § JapanCalendar.
-gem "holidays", "~> 8.8"
+gem "holidays", "~> 11.1"
 
 # Zips the full-account export in memory (Zip::OutputStream.write_buffer).
 gem "rubyzip", "~> 3.2", require: "zip"
