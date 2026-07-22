@@ -58,9 +58,11 @@ export function ToastProvider({ children }: { children: React.ReactNode }) {
         className="pointer-events-none fixed inset-x-0 bottom-16 z-50 flex flex-col items-center gap-2 px-4 sm:bottom-4"
       >
         {toasts.map((toast) => (
+          // No per-toast role here: the parent already declares one polite live
+          // region, and nesting a second (role="status" is implicitly polite)
+          // double-announces on some screen readers.
           <div
             key={toast.id}
-            role="status"
             className={`pointer-events-auto flex max-w-md items-center gap-3 border px-4 py-2.5 text-sm shadow-lg ${
               toast.tone === "error"
                 ? "border-danger/40 bg-danger/10 text-danger"

@@ -30,8 +30,9 @@ module Api
       # active follow-ups sort to the front (earliest date first) and the client
       # colours them; interviews are future-only, so a finished one drops off.
       # Gated on ACTIVE_STATES for the same reason `isOverdue` is on the list: a
-      # dated fact on a closed application is not actionable. A light indexed read,
-      # capped at AGENDA_LIMIT, rendered as a dashboard section, never a route.
+      # dated fact on a closed application is not actionable. A light read (the
+      # follow_up_at leg is indexed; the interview_at leg is a small status-scoped
+      # scan), capped at AGENDA_LIMIT, rendered as a dashboard section, never a route.
       def upcoming_agenda
         items = []
 
