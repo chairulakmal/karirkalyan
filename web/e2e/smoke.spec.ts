@@ -18,7 +18,7 @@ test("create an application and transition its status", async ({ page }) => {
   await page.getByRole("link", { name: /new application/i }).first().click();
   await page.waitForURL("/applications/new");
 
-  await page.getByLabel("Company").fill(company);
+  await page.getByLabel("Company", { exact: true }).fill(company);
   await page.getByLabel("Role").fill("Backend Engineer");
   await page.getByRole("button", { name: /create application/i }).click();
 
@@ -47,7 +47,7 @@ test("create an application with a resume attached at creation", async ({ page }
   const company = `Sansan ${Date.now()}`;
 
   await page.goto("/applications/new");
-  await page.getByLabel("Company").fill(company);
+  await page.getByLabel("Company", { exact: true }).fill(company);
   await page.getByLabel("Role").fill("Ruby Engineer");
 
   // Attach a minimal valid PDF (magic bytes + padding to satisfy the validator)

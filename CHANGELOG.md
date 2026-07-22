@@ -6,7 +6,11 @@ The history: shipped work, newest first (`v1.10.0`, tagged 2026-07-21, back thro
 
 ## v1.11.1 (unreleased)
 
-The patch above the daily-driver batch: bug fixes a review of the merged `v1.11.0` and the shipped `v1.10.0` code turned up, all of one shape, timezone correctness and keyboard/IME accessibility on the surfaces the daily driver just grew. A patch by the mechanical test: no migration, no `v1` contract broken, no new capability, each item makes something the app already does work correctly. Its bug-fix spine is scoped in [`TODO.md`](TODO.md) § v1.11.1 and lands here entry by entry as each fix is written, so nothing in this section claims a fix the code does not yet hold; the one piece already on `main` is the Dependabot pause below.
+The patch above the daily-driver batch: correctness fixes a review of the merged `v1.11.0` and the shipped `v1.10.0` code turned up. Its spine is of one shape, timezone correctness and keyboard/IME accessibility on the surfaces the daily driver just grew, and it is scoped in [`TODO.md`](TODO.md) § v1.11.1, landing here entry by entry as each fix is written, so nothing in this section claims a fix the code does not yet hold. A patch by the mechanical test: no migration, no `v1` contract broken, no new capability, each item makes something the app already does work correctly. Two pieces are already on `main`, both restoring hygiene the recent batches let slip: the E2E locator fix and the Dependabot pause below.
+
+### Fixed: the E2E smoke test's ambiguous `Company` locator
+
+- **`web/e2e/smoke.spec.ts` located the company field with `getByLabel("Company")`, a substring match that began resolving to two elements once `v1.9.0` added the `company_timezone` `<select>`** (its label, "Company timezone", contains "Company"). Playwright strict mode refused the ambiguous locator, so the **Playwright E2E job has been red on `main` since #82** and nobody was stopped: the job is path-filtered (a docs-only push skips it and reports green, which masked the breakage) and it is not one of the two required checks, so a red run never blocked a merge. The locator is now `getByLabel("Company", { exact: true })` at both call sites, binding it to the input alone. A test-only fix, no product change, no `web/` runtime touched; the point is the signal, a globally-red E2E run cannot catch a real regression, so the value is restoring one that had gone silently dark.
 
 ### Chore: Dependabot paused after its first run opened nine PRs at once
 
