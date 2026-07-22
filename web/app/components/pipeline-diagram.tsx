@@ -159,7 +159,7 @@ export async function PipelineDiagram() {
 
         <div className="mt-8 max-w-md md:mt-0">
           <p className="text-sm leading-relaxed text-ink-soft">{t("pipelineNote")}</p>
-          <p className="mt-5 font-mono text-[11px] leading-relaxed text-ink-soft/70">
+          <p className="mt-5 font-mono text-[11px] leading-relaxed text-ink-soft">
             {t("pipelineSource")}
           </p>
         </div>

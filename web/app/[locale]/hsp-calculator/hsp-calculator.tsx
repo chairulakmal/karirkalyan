@@ -150,8 +150,8 @@ export function HspCalculator() {
             result.qualifies ? "border-cobalt bg-cobalt/5" : "border-dune bg-sand/30"
           }`}
         >
-          <p className="kk-label">{t("total")}</p>
-          <p className="mt-1 font-mono text-6xl text-midnight">
+          <h2 className="kk-label">{t("total")}</h2>
+          <p className="mt-1 font-mono text-6xl text-midnight" aria-live="polite" aria-atomic="true">
             {result.total}
             <span className="ml-1 text-2xl text-ink-soft">/ {HSP_THRESHOLD}</span>
           </p>
@@ -174,7 +174,7 @@ export function HspCalculator() {
         </div>
 
         <div className="border border-dune bg-linen p-6">
-          <p className="kk-label">{t("breakdown")}</p>
+          <h2 className="kk-label">{t("breakdown")}</h2>
           {result.breakdown.length > 0 ? (
             <dl className="mt-3 space-y-1.5 text-base">
               {result.breakdown.map((row) => (
@@ -337,7 +337,7 @@ function InfoButton({
       aria-expanded={open}
       aria-controls={controls}
       aria-label={label}
-      className={`mt-0.5 shrink-0 transition ${open ? "text-cobalt" : "text-ink-soft hover:text-cobalt"}`}
+      className={`flex size-6 shrink-0 items-center justify-center transition ${open ? "text-cobalt" : "text-ink-soft hover:text-cobalt"}`}
     >
       <svg viewBox="0 0 16 16" className="size-4" fill="none" stroke="currentColor" strokeWidth="1.5" aria-hidden="true">
         <circle cx="8" cy="8" r="6.25" />

@@ -97,7 +97,7 @@ export default async function Home() {
           <p className="mt-8 max-w-2xl text-lg leading-relaxed text-ink-soft">
             {t.rich("lede", { em: (chunks) => <em>{chunks}</em> })}
           </p>
-          <p className="mt-5 font-mono text-xs tracking-wide text-ink-soft/80">{t("stack")}</p>
+          <p className="mt-5 font-mono text-xs tracking-wide text-ink-soft">{t("stack")}</p>
 
           <div className="mt-10 flex flex-wrap items-center gap-3">
             <Link
