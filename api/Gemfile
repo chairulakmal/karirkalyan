@@ -34,7 +34,7 @@ gem "lograge"
 
 # AI job-URL pre-fill — extracts company/role/notes from a pasted posting URL.
 # Official Anthropic SDK; key from ANTHROPIC_API_KEY (no-ops/raises cleanly if unset).
-gem "anthropic", "~> 1.44"
+gem "anthropic", "~> 1.56"
 
 # Japanese national holidays for FollowUpReminderJob's dead zones. A gem rather than a
 # hardcoded list because 春分の日/秋分の日 move with the equinoxes and 振替休日 is a rule,
