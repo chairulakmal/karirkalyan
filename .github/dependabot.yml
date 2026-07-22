@@ -1,40 +1,45 @@
-# Dependabot: low-noise dependency updates (v1.11.0). The manual per-release
-# refresh had kept pace, so the risk this settles is a security advisory sitting
-# unnoticed between releases, not a broken cadence. The config is scoped to
-# answer that without drowning the two required checks in PR noise: it runs
-# monthly, and minor/patch bumps are grouped into one PR per ecosystem, so a
-# normal month is at most three PRs rather than one per package. Majors still
-# open individually, because a major can break a boot and deserves its own read.
-version: 2
-updates:
-  - package-ecosystem: bundler
-    directory: /api
-    schedule:
-      interval: monthly
-    open-pull-requests-limit: 5
-    groups:
-      api-minor-patch:
-        update-types:
-          - minor
-          - patch
+# Dependabot: DEACTIVATED 2026-07-22, temporarily.
+#
+# Shipped in v1.11.0, its first monthly run opened nine PRs at once (a grouped
+# api + web pair, four majors held out of the groups, and three Actions bumps),
+# which is exactly the required-check and Railway-deploy noise the config was
+# meant to avoid. Paused until we choose to turn it back on; the majors it
+# surfaced (typescript 7, eslint 10) need code work to adopt and are tracked
+# separately, not by this file.
+#
+# To REACTIVATE: uncomment the block below (it is the original v1.11.0 config,
+# unchanged). Nothing else is needed.
 
-  - package-ecosystem: npm
-    directory: /web
-    schedule:
-      interval: monthly
-    open-pull-requests-limit: 5
-    groups:
-      web-minor-patch:
-        update-types:
-          - minor
-          - patch
-
-  - package-ecosystem: github-actions
-    directory: /
-    schedule:
-      interval: monthly
-    groups:
-      actions:
-        update-types:
-          - minor
-          - patch
+# version: 2
+# updates:
+#   - package-ecosystem: bundler
+#     directory: /api
+#     schedule:
+#       interval: monthly
+#     open-pull-requests-limit: 5
+#     groups:
+#       api-minor-patch:
+#         update-types:
+#           - minor
+#           - patch
+#
+#   - package-ecosystem: npm
+#     directory: /web
+#     schedule:
+#       interval: monthly
+#     open-pull-requests-limit: 5
+#     groups:
+#       web-minor-patch:
+#         update-types:
+#           - minor
+#           - patch
+#
+#   - package-ecosystem: github-actions
+#     directory: /
+#     schedule:
+#       interval: monthly
+#     groups:
+#       actions:
+#         update-types:
+#           - minor
+#           - patch
