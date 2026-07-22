@@ -12,6 +12,7 @@
     "start": "next start -p ${PORT:-3000}",
     "lint": "eslint",
     "lint:i18n": "node scripts/check-i18n-parity.mjs",
+    "lint:fsm": "node scripts/check-fsm-copies.mjs",
     "test": "vitest run",
     "test:watch": "vitest",
     "test:e2e": "playwright test",

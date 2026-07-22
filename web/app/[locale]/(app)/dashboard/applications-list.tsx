@@ -21,6 +21,9 @@ type Filters = {
   company: string | null;
   source: string | null;
   japaneseLevel: JapaneseLevel | null;
+  // Free-text search (v1.11.0): a `q` param the server ILIKEs over company/role/
+  // notes. Null when empty; ANDs against the structured filters like the rest.
+  q: string | null;
 };
 
 const STATUS_PRIORITY: Record<Status, number> = {
@@ -82,6 +85,7 @@ interface Props {
     company: string | null;
     source: string | null;
     japaneseLevel: string | null;
+    q: string | null;
   };
 }
 
@@ -128,9 +132,17 @@ export function ApplicationsList({
       japaneseLevel: jlpt && (JAPANESE_LEVELS as readonly string[]).includes(jlpt)
         ? (jlpt as JapaneseLevel)
         : null,
+      q: initialFilters.q || null,
     };
   });
   const [loading, setLoading] = useState(false);
+  // The search box's live text, separate from the applied `filters.q`: it filters
+  // on Enter (submit), and clearing it to empty applies immediately so the "x"
+  // works. Seeded from the URL so a shared ?q= view shows its term.
+  const [qInput, setQInput] = useState(initialFilters.q ?? "");
+  // The closed-stage chips collapse behind a disclosure (v1.11.0); see the split
+  // derived below. Starts collapsed; a selected closed chip forces it open.
+  const [showClosed, setShowClosed] = useState(false);
 
   // Mirror the applied filters into the URL so a filtered view is linkable,
   // reload-survivable, and back-button-correct. `replace`, not `push`: filtering
@@ -148,6 +160,7 @@ export function ApplicationsList({
     if (f.company) qs.set("company", f.company);
     if (f.source) qs.set("source", f.source);
     if (f.japaneseLevel) qs.set("japanese_level", f.japaneseLevel);
+    if (f.q) qs.set("q", f.q);
     const query = qs.toString();
     router.replace(query ? `${pathname}?${query}` : pathname, { scroll: false });
   }
@@ -170,6 +183,7 @@ export function ApplicationsList({
     if (f.company) qs.set("company", f.company);
     if (f.source) qs.set("source", f.source);
     if (f.japaneseLevel) qs.set("japanese_level", f.japaneseLevel);
+    if (f.q) qs.set("q", f.q);
     const res = await fetch(`/api/applications?${qs}`);
     if (!res.ok) return null;
     return (await res.json()) as { data: Application[]; meta: PageMeta };
@@ -226,14 +240,27 @@ export function ApplicationsList({
     !isDefaultStages ||
     filters.company !== null ||
     filters.source !== null ||
-    filters.japaneseLevel !== null;
+    filters.japaneseLevel !== null ||
+    filters.q !== null;
   // "Clear filters" returns to the default (active) view, not to "All".
   const noFilters: Filters = {
     statuses: defaultStages,
     company: null,
     source: null,
     japaneseLevel: null,
+    q: null,
   };
+
+  // Enter (or the "x") applies the search; clearing to empty applies at once so
+  // it does not sit as an active-but-invisible filter. Also resets the local box
+  // whenever the applied term is cleared (e.g. by "Clear filters").
+  function submitSearch() {
+    applyFilters({ ...filters, q: qInput.trim() || null });
+  }
+  function clearAllFilters() {
+    setQInput("");
+    applyFilters(noFilters);
+  }
 
   // Disjunctive faceting across all four filters (v1.10.0): each facet's counts
   // reflect the OTHER active filters, never its own selection, so picking a
@@ -279,6 +306,43 @@ export function ApplicationsList({
     0,
   );
 
+  // Chip disclosure (v1.11.0): the active stages sit inline, the closed ones
+  // collapse behind a "Closed stages" toggle: thirteen chips is past the ~10
+  // Baymard found scannable, and v1.11.0's active-default only hides them until
+  // "All" or a closed stage is picked, which is the row this trims. The split is
+  // the fetched `active_states`, so nothing here enumerates the FSM. When that
+  // set is unknown (/transitions failed, `activeRendered` empty) there is no
+  // split to make and every chip renders inline as before. A selected closed
+  // chip (a shared ?status=rejected URL, or "All") forces the group open and
+  // cannot be collapsed away, so a lit chip is never hidden behind the toggle.
+  const inlineChips = activeRendered.length > 0 ? activeRendered : rendered;
+  const closedChips = activeRendered.length > 0 ? rendered.filter((s) => !activeStates.includes(s)) : [];
+  const closedSelected = closedChips.some((s) => filters.statuses.includes(s));
+  const closedOpen = showClosed || closedSelected;
+
+  // One chip, rendered inline or inside the disclosure: a real checkbox so the
+  // mark is structural, not a colour alone (WCAG 1.4.1); the status tint drops
+  // when unselected, a redundant scan aid on a wide row rather than the signal.
+  function StageChip(status: Status) {
+    const on = filters.statuses.includes(status);
+    return (
+      <label
+        key={status}
+        title={ts(`description.${status}`)}
+        className={`inline-flex min-h-10 cursor-pointer items-center gap-2 px-3 py-1 text-xs font-medium ring-1 ring-inset transition ${on ? statusBadgeClass(status) : "bg-sand/40 text-ink-soft ring-midnight/20 hover:text-midnight"
+          }`}
+      >
+        <input
+          type="checkbox"
+          checked={on}
+          onChange={() => toggleStatus(status)}
+          className="size-3.5 accent-current"
+        />
+        {ts(`label.${status}`)} <span className="font-mono">{statusCounts.get(status) ?? 0}</span>
+      </label>
+    );
+  }
+
   // When a change makes the other selection impossible (no app has both), drop
   // it so the dropdown value can never point at an option that isn't shown.
   function changeCompany(company: string | null) {
@@ -297,6 +361,36 @@ export function ApplicationsList({
     <div className="space-y-4">
       {facets.length > 0 && (
         <div className="flex flex-wrap items-end gap-3">
+          {/* Free-text search (v1.11.0): the one filter that is not a dropdown,
+              because the match is partial. Enter (or clearing the box) applies
+              it; a server `q` param, so it sees every page, not only loaded ones. */}
+          <form
+            role="search"
+            onSubmit={(e) => {
+              e.preventDefault();
+              submitSearch();
+            }}
+            className="block text-sm"
+          >
+            <label className="kk-label" htmlFor="list-search">
+              {t("search")}
+            </label>
+            <input
+              id="list-search"
+              type="search"
+              value={qInput}
+              disabled={loading}
+              onChange={(e) => {
+                const v = e.target.value;
+                setQInput(v);
+                // Clearing the box (the "x", or erasing it) applies at once;
+                // typing waits for Enter so each keystroke is not a refetch.
+                if (v === "" && filters.q) applyFilters({ ...filters, q: null });
+              }}
+              placeholder={t("searchPlaceholder")}
+              className="mt-1.5 block min-w-44 border border-dune bg-linen px-3 py-1.5 text-sm text-midnight placeholder:text-ink-soft/50 disabled:opacity-50"
+            />
+          </form>
           <FilterSelect
             label={t("company")}
             value={filters.company ?? ""}
@@ -337,7 +431,7 @@ export function ApplicationsList({
           />
           {hasActiveFilter && (
             <button
-              onClick={() => applyFilters(noFilters)}
+              onClick={clearAllFilters}
               disabled={loading}
               className="px-2 py-1.5 text-xs text-ink-soft underline underline-offset-4 transition hover:text-midnight disabled:opacity-50"
             >
@@ -388,32 +482,32 @@ export function ApplicationsList({
               <Preset label={t("noStages")} onClick={() => applyFilters({ ...filters, statuses: [] })} />
             </div>
 
-            {statusBuckets.map(([status]) => {
-              const on = filters.statuses.includes(status);
-              return (
-                <label
-                  key={status}
-                  title={ts(`description.${status}`)}
-                  // Selection is carried by the checkbox — a real one, so the
-                  // mark is structural rather than a dimmed brand colour, which
-                  // would be colour alone (WCAG 1.4.1) and drag the label toward
-                  // failing contrast besides. Dropping the status tint when
-                  // unselected is a redundant scan aid on a thirteen-wide row,
-                  // not the signal.
-                  className={`inline-flex min-h-10 cursor-pointer items-center gap-2 px-3 py-1 text-xs font-medium ring-1 ring-inset transition ${on ? statusBadgeClass(status) : "bg-sand/40 text-ink-soft ring-midnight/20 hover:text-midnight"
-                    }`}
+            {inlineChips.map(StageChip)}
+            {closedChips.length > 0 &&
+              (closedOpen ? (
+                <>
+                  {closedChips.map(StageChip)}
+                  {/* Only a collapse control when nothing closed is selected;
+                      a lit closed chip keeps the group open on purpose. */}
+                  {!closedSelected && (
+                    <button
+                      type="button"
+                      onClick={() => setShowClosed(false)}
+                      className="inline-flex min-h-10 items-center px-3 py-1 text-xs text-ink-soft underline underline-offset-4 transition hover:text-midnight"
+                    >
+                      {t("showFewerStages")}
+                    </button>
+                  )}
+                </>
+              ) : (
+                <button
+                  type="button"
+                  onClick={() => setShowClosed(true)}
+                  className="inline-flex min-h-10 items-center gap-1 border border-dashed border-dune bg-linen px-3 py-1 text-xs font-medium text-ink-soft transition hover:bg-sand hover:text-midnight"
                 >
-                  <input
-                    type="checkbox"
-                    checked={on}
-                    onChange={() => toggleStatus(status)}
-                    className="size-3.5 accent-current"
-                  />
-                  {ts(`label.${status}`)}{" "}
-                  <span className="font-mono">{statusCounts.get(status) ?? 0}</span>
-                </label>
-              );
-            })}
+                  {t("showClosedStages", { count: closedChips.length })}
+                </button>
+              ))}
           </div>
         </fieldset>
       )}

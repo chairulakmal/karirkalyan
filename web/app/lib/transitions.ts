@@ -24,6 +24,7 @@ import type { Status, TransitionTable } from "./types";
  */
 
 // Closed states whose entry is deliberate — the UI asks before moving here.
+// fsm-allow: affordance judgement (which closing moves prompt), never a move gate.
 export const CONFIRM_REQUIRED: ReadonlySet<Status> = new Set([
   "rejected",
   "accepted",
@@ -55,6 +56,7 @@ export function canRevive(status: Status, table: TransitionTable): boolean {
 // revival reason is. Pure affordance judgement, like the sets above: the note
 // is optional, so skipping it is a plain move. Offered on the detail page only,
 // not the board's quick-move menu, which stays a one-gesture drag.
+// fsm-allow: affordance judgement (which stages offer a note), never a move gate.
 export const STAGE_NOTE_STATES: ReadonlySet<Status> = new Set([
   "phone_screen",
   "technical",

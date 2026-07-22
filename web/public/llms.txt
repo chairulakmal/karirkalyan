@@ -34,6 +34,12 @@ pipeline. Built as a portfolio project by Chairul Akmal (https://chairulakmal.co
   name whether it was downloaded on its own or unzipped out of the account export. Japanese and
   other non-ASCII names are preserved rather than transliterated.
 - Exposes a stats dashboard via pure SQL aggregation (no N+1)
+- Surfaces an Upcoming agenda on the dashboard: follow-ups, interviews, and the user's own
+  residence-expiry clock, merged into one chronological read and computed fresh so it never goes stale
+- Searches the list by free text over company/role/notes alongside the structured filters (company,
+  job board, Japanese level, stage), all held in the URL so a filtered or searched view is shareable
+- Records an optional note on any status change (interview details, a rejection's feedback, an
+  offer's terms) against the timeline entry it belongs to; every write is confirmed with one toast
 - Predicts which applications have been ghosted: the dashboard flags any application sitting in
   applied or phone_screen that has been silent longer than the 90th percentile of that user's own
   historical reply times for the stage, derived from the timeline audit trail with a window

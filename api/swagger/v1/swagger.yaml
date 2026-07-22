@@ -62,6 +62,16 @@ paths:
           dropped and a list left with none is unfiltered, not empty. Matches the
           recorded value only: `none` means a recorded "no Japanese required", never
           a null column.'
+      - name: q
+        in: query
+        required: false
+        schema:
+          type: string
+        description: 'Free-text search, matched as a case-insensitive substring over
+          company, role, and notes at once: the one filter the structured params cannot
+          express, because the match is partial. Blank or whitespace-only is ignored
+          like `company`; a `%` or `_` in the term is a literal, not a wildcard. ANDs
+          against the other filters.'
       - name: after
         in: query
         required: false
@@ -684,6 +694,7 @@ paths:
                 - avg_days_in_stage
                 - ghost_risk
                 - user
+                - upcoming
                 properties:
                   by_status:
                     type: object
@@ -803,6 +814,43 @@ paths:
                       updated_at:
                         type: string
                         format: date-time
+                  upcoming:
+                    type: array
+                    description: Dated commitments (follow-ups, upcoming interviews,
+                      residence expiry) merged and sorted chronologically; capped,
+                      computed fresh outside the stats cache
+                    items:
+                      type: object
+                      required:
+                      - type
+                      - at
+                      - application_id
+                      - company
+                      - role
+                      - status
+                      properties:
+                        type:
+                          type: string
+                          enum:
+                          - follow_up
+                          - interview
+                          - residence
+                        at:
+                          type: string
+                          format: date-time
+                        application_id:
+                          type: integer
+                          nullable: true
+                          description: Null for a residence item, which links to /settings
+                        company:
+                          type: string
+                          nullable: true
+                        role:
+                          type: string
+                          nullable: true
+                        status:
+                          type: string
+                          nullable: true
         '401':
           description: not authenticated
   "/api/v1/exports/applications":

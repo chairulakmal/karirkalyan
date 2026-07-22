@@ -315,7 +315,9 @@ export async function deleteApplication(id: number): Promise<ActionFailure> {
   if (!res.ok) return apiFailure(res);
   const locale = await getLocale();
   revalidatePath(getPathname({ href: "/dashboard", locale }));
-  redirect({ href: "/dashboard", locale });
+  // A delete navigates away before it could toast in place, so the confirmation
+  // rides a query param the dashboard reads once and strips (see ToastFromParam).
+  redirect({ href: { pathname: "/dashboard", query: { toast: "deleted" } }, locale });
 }
 
 // --- Residence status (SPEC.md § Data model, the visa item's global half) ----

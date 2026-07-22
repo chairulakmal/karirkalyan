@@ -1,0 +1,40 @@
+# Dependabot: low-noise dependency updates (v1.11.0). The manual per-release
+# refresh had kept pace, so the risk this settles is a security advisory sitting
+# unnoticed between releases, not a broken cadence. The config is scoped to
+# answer that without drowning the two required checks in PR noise: it runs
+# monthly, and minor/patch bumps are grouped into one PR per ecosystem, so a
+# normal month is at most three PRs rather than one per package. Majors still
+# open individually, because a major can break a boot and deserves its own read.
+version: 2
+updates:
+  - package-ecosystem: bundler
+    directory: /api
+    schedule:
+      interval: monthly
+    open-pull-requests-limit: 5
+    groups:
+      api-minor-patch:
+        update-types:
+          - minor
+          - patch
+
+  - package-ecosystem: npm
+    directory: /web
+    schedule:
+      interval: monthly
+    open-pull-requests-limit: 5
+    groups:
+      web-minor-patch:
+        update-types:
+          - minor
+          - patch
+
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: monthly
+    groups:
+      actions:
+        update-types:
+          - minor
+          - patch

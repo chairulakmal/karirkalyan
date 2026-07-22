@@ -143,6 +143,39 @@ RSpec.describe Applications::ListQuery do
     end
   end
 
+  # Free-text search over company/role/notes: partial and case-insensitive,
+  # blank ignored, wildcards literal, ANDed against the other filters (v1.11.0).
+  describe "the q (free-text) filter" do
+    let!(:acme)   { application_at(0, company: "Acme Fintech", role: "Backend Engineer", notes: "Osaka office") }
+    let!(:globex) { application_at(1, company: "Globex", role: "Frontend Developer", notes: nil) }
+
+    it "matches the company, case-insensitively" do
+      expect(call(q: "acme")[:records]).to eq([ acme ])
+    end
+
+    it "matches the role" do
+      expect(call(q: "frontend")[:records]).to eq([ globex ])
+    end
+
+    it "matches the notes" do
+      expect(call(q: "osaka")[:records]).to eq([ acme ])
+    end
+
+    it "ignores a blank or whitespace-only term rather than returning none" do
+      expect(call(q: "   ")[:records]).to contain_exactly(acme, globex)
+    end
+
+    it "ANDs against the other filters" do
+      expect(call(q: "engineer", company: "Globex")[:records]).to be_empty
+      expect(call(q: "backend", company: "Acme Fintech")[:records]).to eq([ acme ])
+    end
+
+    it "treats a wildcard in the term as a literal, not a pattern" do
+      pct = application_at(2, company: "100% Remote Co")
+      expect(call(q: "100%")[:records]).to eq([ pct ])
+    end
+  end
+
   describe "scoping" do
     it "never returns another user's applications" do
       mine = application_at(0)

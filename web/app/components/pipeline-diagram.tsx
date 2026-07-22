@@ -23,6 +23,7 @@ import type { Status } from "@/app/lib/types";
  * Labels and colours come from the `status` catalog and `statusBadgeClass`, so
  * the vocabulary still has one home.
  */
+// fsm-allow: illustration only, not read by the app (see the docstring above).
 const HAPPY_PATH = [
   "wishlist",
   "draft",
@@ -35,6 +36,7 @@ const HAPPY_PATH = [
 ] as const satisfies readonly Status[];
 
 // Closed states that a real job hunt can walk back out of.
+// fsm-allow: illustration only (as HAPPY_PATH); the revival edges are the figure's point.
 const REVIVABLE = ["rejected", "ghosted", "withdrawn"] as const satisfies readonly Status[];
 
 // Where the revival edge re-enters the happy path.

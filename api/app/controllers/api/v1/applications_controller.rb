@@ -29,6 +29,7 @@ module Api
           company:        params[:company],
           source:         params[:source],
           japanese_level: params[:japanese_level],
+          q:              params[:q],
           after:          params[:after],
           limit:          params[:limit]
         ).call

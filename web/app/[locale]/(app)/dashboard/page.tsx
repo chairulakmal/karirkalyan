@@ -1,14 +1,18 @@
-import { getTranslations } from "next-intl/server";
+import { getLocale, getTranslations } from "next-intl/server";
 import { Link } from "@/i18n/navigation";
 import { apiFetch } from "@/app/lib/api";
 import type {
+  AgendaItem,
   Application,
   DashboardStats,
   Paginated,
   Status,
   TransitionTable,
 } from "@/app/lib/types";
+import { formatDate, isOverdue } from "@/app/lib/format";
+import { formatJstDateTime } from "@/app/lib/timezone";
 import { InfoPopover } from "@/app/components/info-popover";
+import { ToastFromParam } from "@/app/components/toast-from-param";
 import { Phrase } from "@/app/components/phrase";
 import { ProfileCard } from "@/app/components/profile-card";
 import { ApplicationsList } from "./applications-list";
@@ -20,6 +24,7 @@ export default async function Dashboard({
   searchParams: Promise<Record<string, string | string[] | undefined>>;
 }) {
   const t = await getTranslations("dashboard");
+  const locale = await getLocale();
 
   // The URL filters the first paint (v1.10.0): a shared/bookmarked filtered view
   // must render filtered from the server, not correct itself client-side. Only
@@ -32,6 +37,7 @@ export default async function Dashboard({
     company: str(sp.company),
     source: str(sp.source),
     japaneseLevel: str(sp.japanese_level),
+    q: str(sp.q),
   };
   // The dashboard defaults to active applications (SPEC.md § Dashboard), so the
   // status the first paint fetches has to be chosen from two things it must learn
@@ -58,6 +64,7 @@ export default async function Dashboard({
   if (urlFilters.company) appsQs.set("company", urlFilters.company);
   if (urlFilters.source) appsQs.set("source", urlFilters.source);
   if (urlFilters.japaneseLevel) appsQs.set("japanese_level", urlFilters.japaneseLevel);
+  if (urlFilters.q) appsQs.set("q", urlFilters.q);
   // The default status, sent explicitly (never the empty "unfiltered" request, so
   // ListQuery's wire meaning stays the board's: absent = everything): a URL that
   // names a status wins; else the active stages when the account has any active
@@ -132,6 +139,7 @@ export default async function Dashboard({
 
   return (
     <div className="space-y-10">
+      <ToastFromParam />
       <header className="flex flex-wrap items-end justify-between gap-4 border-b border-dune pb-6">
         <div>
           <p className="kk-label">{t("eyebrow")}</p>
@@ -152,6 +160,58 @@ export default async function Dashboard({
           that asks the user to do something, and it renders nothing when there
           is nothing to act on. */}
       {stats && <GhostRiskCard risk={stats.ghost_risk} />}
+
+      {/* The Upcoming agenda (v1.11.0): the dated commitments already captured
+          but scattered (follow-ups, interviews, the residence clock), given one
+          chronological read. A dashboard section, not an /upcoming route, for the
+          same reason the stats are cards: a nav slot for one user is not worth it.
+          Renders nothing when there is nothing ahead. */}
+      {stats && stats.upcoming.length > 0 && (
+        <section className="space-y-3">
+          <h2 className="kk-label">{t("upcoming.title")}</h2>
+          <ul className="divide-y divide-dune border border-dune bg-linen">
+            {stats.upcoming.map((item: AgendaItem, i) => {
+              // Interviews are future-only, so never overdue; a stale follow-up or
+              // an expired residence date shouts in danger, an upcoming one in
+              // saffron, the same two colours the list uses for follow-ups.
+              const overdue = item.type !== "interview" && isOverdue(item.at);
+              return (
+                <li key={i}>
+                  <Link
+                    href={item.type === "residence" ? "/settings" : `/applications/${item.application_id}`}
+                    className="flex items-center justify-between gap-4 px-4 py-3 transition hover:bg-sand/60"
+                  >
+                    <div className="min-w-0 flex-1">
+                      <div className="flex items-center gap-2">
+                        <span className="inline-flex items-center px-2 py-0.5 text-xs font-medium text-ink-soft ring-1 ring-inset ring-midnight/20">
+                          {t(`upcoming.type.${item.type}`)}
+                        </span>
+                        <p className="truncate font-serif text-sm font-medium text-midnight">
+                          {item.type === "residence" ? t("upcoming.residenceLabel") : item.company}
+                        </p>
+                      </div>
+                      {item.role ? (
+                        <p className="mt-0.5 truncate text-xs text-ink-soft">{item.role}</p>
+                      ) : null}
+                    </div>
+                    <div className="shrink-0 text-right font-mono text-xs">
+                      {item.type === "interview" ? (
+                        <span className="text-midnight">{formatJstDateTime(item.at)}</span>
+                      ) : overdue ? (
+                        <span className="font-medium text-danger">
+                          {t("upcoming.overdue")} · {formatDate(item.at, locale)}
+                        </span>
+                      ) : (
+                        <span className="font-medium text-saffron">{formatDate(item.at, locale)}</span>
+                      )}
+                    </div>
+                  </Link>
+                </li>
+              );
+            })}
+          </ul>
+        </section>
+      )}
 
       <ProfileCard user={me} />
 

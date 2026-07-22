@@ -16,7 +16,7 @@ RSpec.describe "Dashboard", type: :request do
         # the one that earns a response schema. `ghost_risk` in particular is a
         # derived read model with no table behind it — see SPEC.md § Query layer.
         schema type: :object,
-          required: %w[by_status facets total avg_days_to_offer response_rate ghost_rate avg_days_in_stage ghost_risk user],
+          required: %w[by_status facets total avg_days_to_offer response_rate ghost_rate avg_days_in_stage ghost_risk user upcoming],
           properties: {
             by_status: {
               type: :object, additionalProperties: { type: :integer },
@@ -89,6 +89,22 @@ RSpec.describe "Dashboard", type: :request do
                 email:      { type: :string },
                 created_at: { type: :string, format: :"date-time" },
                 updated_at: { type: :string, format: :"date-time" }
+              }
+            },
+            upcoming: {
+              type: :array,
+              description: "Dated commitments (follow-ups, upcoming interviews, residence expiry) merged and sorted chronologically; capped, computed fresh outside the stats cache",
+              items: {
+                type: :object,
+                required: %w[type at application_id company role status],
+                properties: {
+                  type:           { type: :string, enum: %w[follow_up interview residence] },
+                  at:             { type: :string, format: :"date-time" },
+                  application_id: { type: :integer, nullable: true, description: "Null for a residence item, which links to /settings" },
+                  company:        { type: :string, nullable: true },
+                  role:           { type: :string, nullable: true },
+                  status:         { type: :string, nullable: true }
+                }
               }
             }
           }
@@ -165,6 +181,42 @@ RSpec.describe "Dashboard", type: :request do
 
       expect(body["response_rate"]).to eq(50)
       expect(body["ghost_rate"]).to eq(50)
+    end
+  end
+
+  describe "the upcoming agenda" do
+    let(:headers) { { "Authorization" => jwt_for(user) } }
+
+    it "merges follow-ups, upcoming interviews, and residence expiry, chronologically" do
+      user.update!(residence_expires_on: 20.days.from_now.to_date)
+      create(:application, :applied, company: "Soonest", user: user, follow_up_at: 2.days.from_now)
+      create(:application, :phone_screen, company: "Interviewing", user: user, interview_at: 10.days.from_now)
+
+      get "/api/v1/dashboard", headers: headers
+      upcoming = JSON.parse(response.body)["upcoming"]
+
+      expect(upcoming.map { |item| item["type"] }).to eq(%w[follow_up interview residence])
+      expect(upcoming.first).to include("company" => "Soonest")
+      expect(upcoming.find { |item| item["type"] == "residence" })
+        .to include("application_id" => nil, "company" => nil)
+    end
+
+    it "excludes past interviews and follow-ups on closed applications" do
+      user.update!(residence_expires_on: nil)
+      create(:application, :applied, company: "Past", user: user, interview_at: 2.days.ago)
+      create(:application, company: "Closed", status: "rejected", user: user, follow_up_at: 1.day.from_now)
+
+      get "/api/v1/dashboard", headers: headers
+
+      expect(JSON.parse(response.body)["upcoming"]).to be_empty
+    end
+
+    it "omits a residence date beyond the agenda window" do
+      user.update!(residence_expires_on: 200.days.from_now.to_date)
+
+      get "/api/v1/dashboard", headers: headers
+
+      expect(JSON.parse(response.body)["upcoming"]).to be_empty
     end
   end
 

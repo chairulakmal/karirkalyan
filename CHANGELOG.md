@@ -1,12 +1,12 @@
 # Changelog
 
-The history: shipped work, newest first (`v1.10.0`, tagged 2026-07-21, back through `v1.0.0`), with `v1.11.0` and `v1.9.0` both remaining unreleased heads (`v1.11.0` at the top, above the tagged `v1.10.0`; `v1.9.0` between `v1.10.0` and `v1.8.1`). The two were built together in one batched PR (`feat/v1.9-and-v1.10`); `v1.10.0` was tagged first, by the author's explicit choice, leaving `v1.9.0` to be tagged separately. Branch/PR names note where each change landed, and each release since `v1.3.1` names its patch/minor level against the versioning policy's mechanical test. The most important section is the one that is not a release: § Decisions records the settled decisions-not-to-build, so that [`TODO.md`](TODO.md) (where open work lives) can stay plan-only without the reasoning getting lost.
+The history: shipped work, newest first (`v1.10.0`, tagged 2026-07-21, back through `v1.0.0`). `v1.11.0` is the sole unreleased head, above the tagged `v1.10.0`: the current open batch (`batch/2026-07-22`), tagged when today's PR merges, and it is absorbing the daily-driver work `TODO.md` had briefly split into `v1.12.0`/`v1.12.1`. **`v1.9.0` carries no tag of its own** (decided 2026-07-22): it and `v1.10.0` were built in one batched PR (`feat/v1.9-and-v1.10`, #82), the `v1.10.0` tag already points at the commit that includes the `v1.9.0` work, so a separate tag would relabel already-released code; its section stays below for the record. Branch/PR names note where each change landed, and each release since `v1.3.1` names its patch/minor level against the versioning policy's mechanical test. The most important section is the one that is not a release: § Decisions records the settled decisions-not-to-build, so that [`TODO.md`](TODO.md) (where open work lives) can stay plan-only without the reasoning getting lost.
 
 ---
 
 ## v1.11.0 (unreleased)
 
-The dashboard opens on the work in play, with an HSP calculator copy fix batched alongside. A minor by the mechanical test: `web/`-only presentation and copy changes, no schema and no API touch, so the previous image boots against this database unchanged.
+The daily driver: the dashboard opens on the work in play and grows an Upcoming agenda, the list gains free-text search, every write finally speaks through one toast, transition notes reach the closing moves, and the long stage-chip row collapses; plus two hardening items (a CI check that proves the "no hardcoded FSM sets" claim, and Dependabot) and the HSP copy fix that started the batch. A minor by the mechanical test: every change is `web/` presentation, an additive read-only query param, or a fresh read on an existing endpoint. No migration and no schema touch, so the previous image boots and serves against this database unchanged. The two API additions (`?q=` on the list, `upcoming` on the dashboard) are backward-compatible reads; the previous frontend simply ignores them.
 
 ### The dashboard defaults to active applications, and hides archived *(feat/dashboard-active-default)*
 
@@ -17,6 +17,35 @@ The dashboard opens on the work in play, with an HSP calculator copy fix batched
 ### The HSP calculator title *(fix/hsp-calculator-title)*
 
 - **The public HSP calculator is retitled "HSP Visa Points Calculator"** (from "Highly Skilled Professional points calculator") and its bonus-points hint tightened, in both locales. A copy-only i18n change, batched into this PR rather than shipped on its own.
+
+### The Upcoming agenda, on the dashboard
+
+- **A dashboard section listing the next dated commitments in one chronological read**: follow-ups and upcoming interviews across the active applications, plus the user's own residence-expiry clock when it is within 90 days. Each row carries a type tag and deep-links to the application (or `/settings` for the residence clock); overdue-but-active follow-ups and an expired residence date lead in the danger colour, upcoming ones in saffron, the same two colours the list already uses. Interviews render in JST and are future-only, so a finished one drops off.
+- **`GET /dashboard` grows an `upcoming` array**, computed **outside** the stats cache: it is a light indexed read, and it also reads the user's residence field, which is not in the stats cache key, so caching it could serve a stale clock. Gated on `ACTIVE_STATES` for the same reason `isOverdue` is: a dated fact on a closed application is not actionable. A dashboard section, not an `/upcoming` route, for the same reason the stats are cards.
+
+### Free-text search over the list
+
+- **A search box that ILIKEs `?q=` over company, role, and notes at once**: the one filter the structured dropdowns cannot express, because the match is partial. It joins `Applications::ListQuery` beside the existing filters, inheriting its contract exactly: blank or whitespace-only is ignored, a `%`/`_` in the term is a literal, and it ANDs against every active facet filter. A **server** param, not a client-side scan, so it sees every page rather than only the ones "load more" has fetched; it rides the URL-filter contract, so a searched view is linkable and reload-stable. Enter (or clearing the box) applies it.
+
+### Notes on every deliberate move, not just the interview stages
+
+- **The optional transition-note textarea now appears on the closing moves too** (`rejected`, `accepted`, `declined`, `withdrawn`, `archived`), on the detail page's transition buttons where the interview-stage note already lives, so a rejection carries its feedback and an offer its terms on the exact transition they belong to rather than in the single `applications.notes` blob. **No migration:** `TransitionService` already accepted a `note` on any transition and `timeline_entries.note` already existed; this is the affordance reaching the moves that already stop for a confirm. As with the stage note, the prompt is the detail page's alone: the board's card menu and its drag stay promptless.
+
+### Stage chips collapse behind a disclosure
+
+- **The status chip row shows the active stages inline and folds the closed ones behind a "Closed stages" toggle**: thirteen chips is past the ~10 Baymard found scannable, and the active-default only hid them until "All" or a closed stage is picked. The split is the fetched `active_states`, so nothing new enumerates the FSM; a selected closed chip (a shared `?status=rejected` URL, or "All") forces the group open and cannot be collapsed away, so a lit chip is never hidden.
+
+### One toast for every write *(feat)*
+
+- **A single polite live region replaces the board's hand-rolled `role="alert"` notice** and gives silent successes a voice: a successful drag or transition now says "Moved to Applied", and the board's **optimistic-revert** path finally speaks its reason in the same place every other write reports, instead of in a notice only the board had. A detail-page save now toasts "Saved" and a delete "Application deleted" (the delete navigates away, so its confirmation rides a one-shot `?toast=` query the dashboard reads once and strips). Polite not assertive (a result of the user's own action), auto-dismissing, and with no entrance animation, so there is nothing for `prefers-reduced-motion` to fight. Both locales.
+
+### The "no hardcoded FSM sets" claim is now proven in CI *(chore)*
+
+- **`web/scripts/check-fsm-copies.mjs`, wired into the `web` CI verify step**, fails the build on a cluster of FSM state-name string literals outside an allow-list, the copy-of-the-transition-table bug the README claim had been wrong about twice. The allow-list is justified line by line in the code itself: a legitimate affordance set (board display order, which moves prompt, the homepage illustration) carries an inline `fsm-allow: <reason>` marker, read in review. `Record<Status, …>` maps are exempt because TypeScript already forces them complete.
+
+### Dependabot, scoped low-noise *(chore)*
+
+- **`.github/dependabot.yml` adopts monthly, grouped dependency updates** for `api` (bundler), `web` (npm), and GitHub Actions, settling the long-open question of whether to automate the manual per-release refresh. Minor and patch bumps are grouped into one PR per ecosystem so a normal month is at most three PRs, not one per package; majors still open individually.
 
 ---
 
@@ -62,9 +91,9 @@ The follow-through: each item harvests machinery an earlier release built (the F
 
 ---
 
-## v1.9.0 (unreleased)
+## v1.9.0 (shipped under the v1.10.0 tag, 2026-07-21; not separately tagged)
 
-"Can you actually take this job?" is the release whose theme is the constraints that decide whether an offer is even takeable. A minor by the mechanical test: every schema touch is additive, so the `v1.8.1` image boots and serves against this database unchanged.
+"Can you actually take this job?" is the release whose theme is the constraints that decide whether an offer is even takeable. A minor by the mechanical test: every schema touch is additive, so the `v1.8.1` image boots and serves against this database unchanged. **It carries no tag of its own** (decided 2026-07-22): it and `v1.10.0` were built in one PR (`feat/v1.9-and-v1.10`, #82), the `v1.10.0` tag points at the commit that includes this work, and a second tag on already-released code would buy nothing. The section stays for the record of what the takeability layer was.
 
 ### Visa sponsorship + status of residence, per application *(feat/v1.9-and-v1.10)*
 
@@ -358,6 +387,7 @@ Questions closed on the dates given, moved here when `TODO.md` was cut back to o
 - **No client-side error tracking in `web/`, a conscious asymmetry.** *(2026-07-11)* Honeybadger covers the API (`api/Gemfile`, wired in production); the frontend reports nothing, and that is accepted for a single-user app: the one user *is* the error reporter.
 - **No offer-comparison view.** *(2026-07-15)* Once `v1.8.0` (normalized 年収) and `v1.9.0` (visa, hiring entity, timezone) land their fields, a side-by-side compare of applications in `offer` status was the obvious UI over them, considered in the 2026-07-15 scoping pass and skipped. Simultaneous offers are rare for a single user, and the moment two exist is a spreadsheet moment: high-stakes, one-off, and better served by the CSV export than by a view maintained year-round for a day that may not come. The fields themselves ship regardless; a sortable column or two on the list may cover the rest. **Reopen the day two live offers actually coexist**: that is the trigger, not a release number.
 - **No duplicate-posting detection beyond the ownership warning.** *(2026-07-15)* A fuzzy company+role match at create/prefill time ("looks like #12") was considered in the same pass and rejected: one user with tens of applications recognizes a duplicate himself, and the duplicate that actually costs money (two agencies submitting to the same company) is exactly what `v1.6.0`'s ownership-window warning already fires on. A second, fuzzier warning next to it would add false positives, not protection. **Reopen only if application volume grows past what a human scans**, which would mean the app has outgrown its one-user premise anyway.
+- **No email verification (Devise `:confirmable`), unless registration ever reopens.** *(2026-07-22)* `:confirmable` confirms that whoever typed an address into a sign-up form can read that mailbox, and there is no sign-up form: the operator types the address into `bin/rails users:create` himself, so there is nothing left to verify. Moved here from `TODO.md`'s conditional list, where it had drifted into a portfolio checkbox for a box that does not exist. **Reopen the day registration does**: `v1.4.1` closed it, and `SPEC.md` § Registration is closed already lists the five things reopening would owe users, of which this is one; that is the trigger, not a release number.
 
 ---
 

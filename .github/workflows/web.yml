@@ -87,6 +87,11 @@ jobs:
       - name: i18n catalog parity
         run: npm run lint:i18n
 
+      # Proves the "no hardcoded FSM sets" claim rather than asserting it in prose
+      # (a grep that had been wrong twice). Legit affordance sets carry a marker.
+      - name: FSM copies
+        run: npm run lint:fsm
+
       - name: TypeScript
         run: npx tsc --noEmit
 
