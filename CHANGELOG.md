@@ -20,7 +20,7 @@ The patch above the daily-driver batch: correctness fixes a review of the merged
 
 ## v1.11.0 (unreleased)
 
-The daily driver: the dashboard opens on the work in play and grows an Upcoming agenda, the list gains free-text search, every write finally speaks through one toast, transition notes reach the closing moves, and the long stage-chip row collapses; plus two hardening items (a CI check that proves the "no hardcoded FSM sets" claim, and Dependabot) and the HSP copy fix that started the batch. A minor by the mechanical test: every change is `web/` presentation, an additive read-only query param, or a fresh read on an existing endpoint. No migration and no schema touch, so the previous image boots and serves against this database unchanged. The two API additions (`?q=` on the list, `upcoming` on the dashboard) are backward-compatible reads; the previous frontend simply ignores them.
+The daily driver: the dashboard opens on the work in play and grows an Upcoming agenda, the list gains free-text search, every write finally speaks through one toast, transition notes reach the closing moves, and the long stage-chip row is trimmed to the active stages plus Accepted; plus two hardening items (a CI check that proves the "no hardcoded FSM sets" claim, and Dependabot) and the HSP copy fix that started the batch. A minor by the mechanical test: every change is `web/` presentation, an additive read-only query param, or a fresh read on an existing endpoint. No migration and no schema touch, so the previous image boots and serves against this database unchanged. The two API additions (`?q=` on the list, `upcoming` on the dashboard) are backward-compatible reads; the previous frontend simply ignores them.
 
 ### The dashboard defaults to active applications, and hides archived *(feat/dashboard-active-default)*
 
@@ -45,9 +45,9 @@ The daily driver: the dashboard opens on the work in play and grows an Upcoming 
 
 - **The optional transition-note textarea now appears on the closing moves too** (`rejected`, `accepted`, `declined`, `withdrawn`, `archived`), on the detail page's transition buttons where the interview-stage note already lives, so a rejection carries its feedback and an offer its terms on the exact transition they belong to rather than in the single `applications.notes` blob. **No migration:** `TransitionService` already accepted a `note` on any transition and `timeline_entries.note` already existed; this is the affordance reaching the moves that already stop for a confirm. As with the stage note, the prompt is the detail page's alone: the board's card menu and its drag stay promptless.
 
-### Stage chips collapse behind a disclosure
+### The chip row trims the closed stages
 
-- **The status chip row shows the active stages inline and folds the closed ones behind a "Closed stages" toggle**: thirteen chips is past the ~10 Baymard found scannable, and the active-default only hid them until "All" or a closed stage is picked. The split is the fetched `active_states`, so nothing new enumerates the FSM; a selected closed chip (a shared `?status=rejected` URL, or "All") forces the group open and cannot be collapsed away, so a lit chip is never hidden.
+- **The status chip row shows the active stages plus `accepted`, and drops the other closed-stage chips** (`declined`, `rejected`, `ghosted`, `withdrawn`): thirteen chips is past the ~10 Baymard found scannable, and those graveyard stages are rarely filtered on their own. They stay reachable — the "All" preset and a shared `?status=` URL still select them, a trimmed stage reappears as a chip whenever it is the current selection (so a lit chip is never hidden), and the Board's closed rail shows every closed stage with cards in full. The split is the fetched `active_states`, so nothing new enumerates the FSM.
 
 ### One toast for every write *(feat)*
 
