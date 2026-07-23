@@ -522,8 +522,6 @@
     "noStages": "なし",
     "allStagesHidden": "すべてのステージを非表示にしているため、表示できる応募がありません。",
     "showAllStages": "すべてのステージを表示",
-    "showClosedStages": "終了したステージ（{count}）",
-    "showFewerStages": "閉じる",
     "option": "{label} ({count})",
     "noMatches": "条件に一致する応募はありません。",
     "empty": "まだ応募がありません。",

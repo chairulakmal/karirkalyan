@@ -522,8 +522,6 @@
     "noStages": "None",
     "allStagesHidden": "Every stage is hidden, so there is nothing to list.",
     "showAllStages": "Show every stage",
-    "showClosedStages": "Closed stages ({count})",
-    "showFewerStages": "Show fewer",
     "option": "{label} ({count})",
     "noMatches": "No applications match these filters.",
     "empty": "No applications yet.",

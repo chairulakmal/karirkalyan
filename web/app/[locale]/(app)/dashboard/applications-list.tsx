@@ -140,9 +140,6 @@ export function ApplicationsList({
   // on Enter (submit), and clearing it to empty applies immediately so the "x"
   // works. Seeded from the URL so a shared ?q= view shows its term.
   const [qInput, setQInput] = useState(initialFilters.q ?? "");
-  // The closed-stage chips collapse behind a disclosure (v1.11.0); see the split
-  // derived below. Starts collapsed; a selected closed chip forces it open.
-  const [showClosed, setShowClosed] = useState(false);
 
   // Mirror the applied filters into the URL so a filtered view is linkable,
   // reload-survivable, and back-button-correct. `replace`, not `push`: filtering
@@ -306,23 +303,23 @@ export function ApplicationsList({
     0,
   );
 
-  // Chip disclosure (v1.11.0): the active stages sit inline, the closed ones
-  // collapse behind a "Closed stages" toggle: thirteen chips is past the ~10
-  // Baymard found scannable, and v1.11.0's active-default only hides them until
-  // "All" or a closed stage is picked, which is the row this trims. The split is
-  // the fetched `active_states`, so nothing here enumerates the FSM. When that
-  // set is unknown (/transitions failed, `activeRendered` empty) there is no
-  // split to make and every chip renders inline as before. A selected closed
-  // chip (a shared ?status=rejected URL, or "All") forces the group open and
-  // cannot be collapsed away, so a lit chip is never hidden behind the toggle.
-  const inlineChips = activeRendered.length > 0 ? activeRendered : rendered;
-  const closedChips = activeRendered.length > 0 ? rendered.filter((s) => !activeStates.includes(s)) : [];
-  const closedSelected = closedChips.some((s) => filters.statuses.includes(s));
-  const closedOpen = showClosed || closedSelected;
+  // Chip-row trim (v1.11.0): the active stages plus `accepted` render inline; the
+  // other closed stages (declined/rejected/ghosted/withdrawn) get no chip, since
+  // thirteen chips is past the ~10 Baymard found scannable and those graveyard
+  // stages are rarely filtered on their own — their home is the Board's closed
+  // rail. They are not lost: the "All" preset and a shared ?status= URL still
+  // select them, and a trimmed stage reappears here whenever it is currently
+  // selected, so a lit chip is never hidden. The split is the fetched
+  // `active_states`; when that set is unknown (/transitions failed,
+  // `activeRendered` empty) there is nothing to trim and every stage-with-rows
+  // renders inline as before.
+  const knowsActive = activeRendered.length > 0;
+  const alwaysShown = (s: Status) => !knowsActive || activeStates.includes(s) || s === "accepted";
+  const visibleChips = rendered.filter((s) => alwaysShown(s) || filters.statuses.includes(s));
 
-  // One chip, rendered inline or inside the disclosure: a real checkbox so the
-  // mark is structural, not a colour alone (WCAG 1.4.1); the status tint drops
-  // when unselected, a redundant scan aid on a wide row rather than the signal.
+  // One chip: a real checkbox so the mark is structural, not a colour alone
+  // (WCAG 1.4.1); the status tint drops when unselected, a redundant scan aid on
+  // a wide row rather than the signal.
   function StageChip(status: Status) {
     const on = filters.statuses.includes(status);
     return (
@@ -482,32 +479,7 @@ export function ApplicationsList({
               <Preset label={t("noStages")} onClick={() => applyFilters({ ...filters, statuses: [] })} />
             </div>
 
-            {inlineChips.map(StageChip)}
-            {closedChips.length > 0 &&
-              (closedOpen ? (
-                <>
-                  {closedChips.map(StageChip)}
-                  {/* Only a collapse control when nothing closed is selected;
-                      a lit closed chip keeps the group open on purpose. */}
-                  {!closedSelected && (
-                    <button
-                      type="button"
-                      onClick={() => setShowClosed(false)}
-                      className="inline-flex min-h-10 items-center px-3 py-1 text-xs text-ink-soft underline underline-offset-4 transition hover:text-midnight"
-                    >
-                      {t("showFewerStages")}
-                    </button>
-                  )}
-                </>
-              ) : (
-                <button
-                  type="button"
-                  onClick={() => setShowClosed(true)}
-                  className="inline-flex min-h-10 items-center gap-1 border border-dashed border-dune bg-linen px-3 py-1 text-xs font-medium text-ink-soft transition hover:bg-sand hover:text-midnight"
-                >
-                  {t("showClosedStages", { count: closedChips.length })}
-                </button>
-              ))}
+            {visibleChips.map(StageChip)}
           </div>
         </fieldset>
       )}
