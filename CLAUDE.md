@@ -34,7 +34,7 @@ Consequences:
 
 Do not restate release status, versions, or scope in this file: that is `TODO.md`'s job, and copies here go stale.
 
-**Do not start any `2.0.0` work until Akmal has actually started his next job.** The whole `2.0.0` cluster (the `positions` tenure entity and everything hanging off it, plus the post-job infrastructure items) is gated on that life event, not on finishing `v1.10.0`: treat it as out of scope until Akmal says the job has begun. This is a standing guardrail, not a scope restatement; `TODO.md`'s `2.0.0` cluster owns the what and the why.
+**`v1` is closed to new features, and no `2.0.0` work starts until Akmal has actually started his next job.** Two halves of one guardrail. Anything that adds a capability now belongs to the `2.0.0` cluster (the rewrite to Hono + Nuxt, the `positions` tenure entity and everything hanging off it), which is gated on that life event and not on any release number: treat it as out of scope until Akmal says the job has begun. Meanwhile a `v1` change ships only if it makes something the app already does work correctly or stops something it already does from being abused. Do not argue a feature into a patch because it looks small. This is a standing guardrail, not a scope restatement; `TODO.md` § The rule owns the reasoning and the `2.0.0` cluster owns the what and the why.
 
 ## Invariants most worth knowing
 

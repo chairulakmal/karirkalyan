@@ -1335,7 +1335,7 @@ Where the targeted layer applies is decided by one question: **does the element 
 
 Job-board brand names (`BOARD_LABELS`), schema.org enum values in the `jsonLd` blob, the `KarirKalyan` wordmark, and the HTTP methods and paths in the `/docs` endpoint table.
 
-See `TODO.md` for remaining scope.
+The i18n surface is complete: `v1.8.1` shipped the last of it (§ Japanese line breaking) and `TODO.md` carries no i18n scope, which this line used to point at.
 
 ---
 
@@ -1395,7 +1395,7 @@ So `icon-maskable-512.png` is the same artwork flattened onto the plate colour (
 
 #### The service worker: push-only, never a fetch handler
 
-`web/public/sw.js` exists for exactly two events: `push` (parse the payload, `showNotification`) and `notificationclick` (focus an existing window on the payload's URL, or open one). **It must never gain a `fetch` handler.** Every route renders dynamically so its scripts carry the per-request CSP nonce (§ Route guard); a service worker that cached HTML would serve pages whose nonces no longer match the response header, and every script on them would be silently blocked: the app would break in the exact way that is hardest to see coming. This is also why **offline support is out**, recorded in `TODO.md` as architectural rather than deferred: offline *is* a `fetch` handler.
+`web/public/sw.js` exists for exactly two events: `push` (parse the payload, `showNotification`) and `notificationclick` (focus an existing window on the payload's URL, or open one). **It must never gain a `fetch` handler.** Every route renders dynamically so its scripts carry the per-request CSP nonce (§ Route guard); a service worker that cached HTML would serve pages whose nonces no longer match the response header, and every script on them would be silently blocked: the app would break in the exact way that is hardest to see coming. This is also why **offline support is out**: it is architectural rather than deferred, so it appears in no plan and this paragraph is its record. Offline *is* a `fetch` handler.
 
 Three pieces of plumbing, each of which fails silently if forgotten:
 
@@ -1577,7 +1577,7 @@ Runs entirely server-side in a service object, never from the browser, so the An
 
 The obvious design is for Rails to return a stable machine-readable code (`stale_record`, `invalid_credentials`) and for `web/` to look that code up in a message catalog. The API's codes stay the single source of truth, `web/` supplies presentation, and nothing is duplicated.
 
-**That design was specified before anyone checked the response shape, and the shape does not support it.** Rails returns a free-text English sentence and an HTTP status: there is no code, anywhere. Adding one is an `api/` change, and v1.1.0 is `web/`-only by design (see `TODO.md`).
+**That design was specified before anyone checked the response shape, and the shape does not support it.** Rails returns a free-text English sentence and an HTTP status: there is no code, anywhere. Adding one is an `api/` change, and v1.1.0 was `web/`-only by design (`CHANGELOG.md` § v1.1.0).
 
 Rather than break the boundary for a frontend release, or invent a code by string-matching English sentences in `web/` (which is a parser for prose, and breaks the first time someone rewords a validation message), v1.1.0 localizes on the status. Coarse, but every string it produces is correct, and the two errors users actually see (`401` bad credentials, `409` stale `lock_version`) are exactly the ones a status distinguishes cleanly.
 
