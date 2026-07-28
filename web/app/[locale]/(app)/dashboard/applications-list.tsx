@@ -1,8 +1,9 @@
 "use client";
 
-import { useState } from "react";
+import { useRef, useState } from "react";
 import { useLocale, useTranslations } from "next-intl";
 import { Link, usePathname, useRouter } from "@/i18n/navigation";
+import { useToast } from "@/app/components/toast";
 import {
   formatDate,
   isOverdue,
@@ -105,6 +106,7 @@ export function ApplicationsList({
   const locale = useLocale();
   const router = useRouter();
   const pathname = usePathname();
+  const toast = useToast();
   const atRisk = new Set(atRiskIds);
   const rendered = statusBuckets.map(([status]) => status);
   // The dashboard's default view and the "Active" preset are the same set: the
@@ -168,6 +170,16 @@ export function ApplicationsList({
   // applications renders no chips either, and that is `empty`, not hidden.
   const noStages = rendered.length > 0 && filters.statuses.length === 0;
 
+  // Monotonic request id. Every fetch takes a ticket and only the holder of the
+  // newest one is allowed to write state, which is what makes it safe to drop
+  // the old `if (loading) return` gate. That gate had a visible cost: clearing
+  // the search box while a request was in flight discarded the clear, so the
+  // box read empty, the list stayed filtered, `?q=` stayed in the URL, and
+  // "Clear filters" sat lit with nothing apparently filtering. Easy to hit on a
+  // phone. Now the latest intent always wins and a superseded response is
+  // dropped instead of overwriting a newer one.
+  const seq = useRef(0);
+
   async function fetchPage(f: Filters, after?: string) {
     const qs = new URLSearchParams({ limit: "10" });
     if (after) qs.set("after", after);
@@ -187,7 +199,6 @@ export function ApplicationsList({
   }
 
   async function applyFilters(next: Filters) {
-    if (loading) return;
     // "Show nothing" is not a query the server can be asked: an empty status
     // list reads as unfiltered there (`where(status: [])` would match zero rows
     // silently, so ListQuery deliberately ignores it), and asking would hand
@@ -197,16 +208,34 @@ export function ApplicationsList({
       syncUrl(next);
       return;
     }
+    const mine = ++seq.current;
     setLoading(true);
     try {
       const body = await fetchPage(next);
-      if (!body) return;
+      // Superseded by a later request: drop this result rather than letting a
+      // slow early response overwrite a fast later one.
+      if (mine !== seq.current) return;
+      // A 5xx or a dropped connection used to land here and do nothing at all:
+      // the spinner cleared, the chip snapped back, and the user was left to
+      // conclude the filter was broken. It gets the same toast every other
+      // write surface in this release got.
+      if (!body) {
+        toast.error(t("filterFailed"));
+        return;
+      }
       setFilters(next);
       syncUrl(next);
       setItems(sortByImportance(body.data.filter(notArchived)));
       setMeta(body.meta);
+    } catch {
+      // fetch *rejects* (rather than resolving !ok) on DNS failure, connection
+      // reset, or offline. Every caller here is a synchronous handler that
+      // discards the promise, so without this the rejection floated to
+      // window.onunhandledrejection with no UI feedback at all. On an
+      // Android-first PWA a dropped connection mid-filter is the common case.
+      if (mine === seq.current) toast.error(t("filterFailed"));
     } finally {
-      setLoading(false);
+      if (mine === seq.current) setLoading(false);
     }
   }
 
@@ -221,15 +250,24 @@ export function ApplicationsList({
 
   async function loadMore() {
     if (!meta.next_cursor || loading) return;
+    const mine = ++seq.current;
     setLoading(true);
     try {
       const body = await fetchPage(filters, meta.next_cursor);
-      if (!body) return;
+      // A filter change while a page was loading wins over the page: appending
+      // rows fetched under the old filters would mix two result sets.
+      if (mine !== seq.current) return;
+      if (!body) {
+        toast.error(t("loadMoreFailed"));
+        return;
+      }
       // Append in server (cursor) order — do not re-sort the accumulated list.
       setItems((prev) => [...prev, ...body.data.filter(notArchived)]);
       setMeta(body.meta);
+    } catch {
+      if (mine === seq.current) toast.error(t("loadMoreFailed"));
     } finally {
-      setLoading(false);
+      if (mine === seq.current) setLoading(false);
     }
   }
 
@@ -375,9 +413,10 @@ export function ApplicationsList({
             {/* Not `disabled` while a page is in flight, for the reason the chip
                 <fieldset> below spells out: a disabled element cannot hold focus,
                 so the browser blurs it to <body> mid-search and a keyboard user
-                pays a full tab back for every consecutive query. Block the
-                handler, not the control — applyFilters early-returns on
-                `loading`, so a submit mid-fetch is a no-op with focus intact. */}
+                pays a full tab back for every consecutive query. A submit
+                mid-fetch is now honoured rather than dropped: applyFilters takes
+                a sequence ticket and the newest one wins, so the later intent
+                supersedes the in-flight request instead of being discarded. */}
             <input
               id="list-search"
               type="search"
@@ -455,9 +494,10 @@ export function ApplicationsList({
         // Deliberately not `disabled` while a page is in flight: that reaches
         // every control inside — including the checkbox the user just toggled,
         // and a disabled element cannot hold focus, so every toggle would drop
-        // the caret to <body> and cost a keyboard user a full tab back. Block
-        // the handler, not the control: applyFilters already early-returns on
-        // `loading`, so a second click is a no-op with focus intact.
+        // the caret to <body> and cost a keyboard user a full tab back. A
+        // toggle mid-fetch is applied, not swallowed: applyFilters supersedes
+        // the in-flight request by sequence number, so focus stays put *and*
+        // the click has the effect the user asked for.
         <fieldset
           aria-busy={loading}
           className={`border-0 p-0 transition ${loading ? "opacity-60" : ""}`}
@@ -653,8 +693,9 @@ function FilterSelect({
       {/* No `disabled` while a page is in flight, the rule the chip <fieldset>
           and the search box above both follow: a keyboard user changing this
           select would otherwise have it disable under them and drop focus to
-          <body>. applyFilters early-returns on `loading`, so a change mid-fetch
-          costs nothing but the selection snapping back on the next render. */}
+          <body>. A change mid-fetch no longer snaps back either: applyFilters
+          supersedes the in-flight request rather than discarding the new
+          selection, so what the user picked is what they get. */}
       <select
         value={value}
         onChange={(e) => onChange(e.target.value)}
