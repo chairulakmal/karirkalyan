@@ -10,6 +10,7 @@ import { ResidenceManager } from "./residence-manager";
 // allowed to fire the permission prompt.
 export default async function SettingsPage() {
   const t = await getTranslations("settings");
+  const tErrors = await getTranslations("errors");
   const [res, profileRes] = await Promise.all([
     apiFetch<Passkey[]>("/passkeys"),
     apiFetch<Profile>("/me"),
@@ -22,10 +23,17 @@ export default async function SettingsPage() {
       <section className="mt-8 border border-dune p-5">
         <h2 className="text-lg">{t("residenceTitle")}</h2>
         <p className="mt-2 text-sm leading-relaxed text-ink-soft">{t("residenceDescription")}</p>
-        {profileRes.ok ? (
+        {/* Three states, not two: a failure carries `error`, but a success with
+            no body (204, or a non-JSON 200 from a proxy mid-deploy) carries
+            neither an error nor a profile, and this form has nothing to edit
+            without one. Both dead ends render as an error, since from the user's
+            side they are the same thing. */}
+        {profileRes.ok && profileRes.data ? (
           <ResidenceManager profile={profileRes.data} />
         ) : (
-          <p className="mt-4 text-sm text-danger">{profileRes.error}</p>
+          <p className="mt-4 text-sm text-danger">
+            {profileRes.ok ? tErrors("emptyResponse") : profileRes.error}
+          </p>
         )}
       </section>
 
@@ -34,7 +42,9 @@ export default async function SettingsPage() {
         <p className="mt-2 text-sm leading-relaxed text-ink-soft">{t("passkeysDescription")}</p>
 
         {res.ok ? (
-          <PasskeysManager passkeys={res.data} />
+          // A body-less success reads as "no passkeys yet", which is the same
+          // thing an empty list means to this component.
+          <PasskeysManager passkeys={res.data ?? []} />
         ) : (
           <p className="mt-4 text-sm text-danger">{res.error}</p>
         )}

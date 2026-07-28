@@ -31,8 +31,29 @@ export type ApiFailure = {
   details?: ApiErrorDetail[];
 };
 
+/**
+ * `data` is `T | null`, not `T`, and the null is load-bearing.
+ *
+ * Two of the three success paths below genuinely return no body: a 204, and a
+ * non-JSON 200 (a Railway holding page mid-deploy, a proxy interstitial). Those
+ * used to be written `data: null as T`, an assertion that told the compiler the
+ * value was a `T` at exactly the boundary where types are erased and the value
+ * is least trustworthy. The cost was real: dashboard/page.tsx destructured
+ * `appsRes.data` unguarded and would throw "Cannot destructure property 'data'
+ * of null" inside a Server Component, taking the whole page to the error
+ * boundary, while its two sibling reads on the same page were carefully
+ * guarded. The compiler could not point at the difference, because the type
+ * said the value was never null.
+ *
+ * `ok: true` therefore means "the request succeeded", never "a body arrived".
+ * Callers narrow with `?.` and a fallback, or an explicit early return.
+ *
+ * The remaining dishonesty is `body as T` on the JSON path: the shape is still
+ * asserted, not checked. Parsing responses against a schema at this boundary is
+ * the next step, and is scoped in TODO.md rather than done here.
+ */
 export type ApiResult<T> =
-  | { ok: true; status: number; data: T; authHeader: string | null }
+  | { ok: true; status: number; data: T | null; authHeader: string | null }
   | ApiFailure;
 
 /**
@@ -73,14 +94,14 @@ export async function apiFetch<T = unknown>(
   const authHeader = response.headers.get("Authorization");
 
   if (response.status === 204) {
-    return { ok: true, status: 204, data: null as T, authHeader };
+    return { ok: true, status: 204, data: null, authHeader };
   }
 
   // Some endpoints return non-JSON (file downloads handled separately).
   const contentType = response.headers.get("Content-Type") ?? "";
   if (!contentType.includes("application/json")) {
     if (response.ok) {
-      return { ok: true, status: response.status, data: null as T, authHeader };
+      return { ok: true, status: response.status, data: null, authHeader };
     }
     return {
       ok: false,

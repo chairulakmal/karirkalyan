@@ -36,6 +36,11 @@ export default async function ApplicationDetailPage({
       </div>
     );
   }
+  // `ok` does not imply a body: apiFetch answers `data: null` for a 204 or a
+  // non-JSON 200, which is what a Railway holding page mid-deploy looks like.
+  // A detail page with no application to show is the same nothing a 404 is, so
+  // it takes the same exit rather than throwing on the first property read.
+  if (!res.data) notFound();
   const app = res.data;
   const numId = Number(id);
 

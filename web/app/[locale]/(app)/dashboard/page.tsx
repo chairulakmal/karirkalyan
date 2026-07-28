@@ -94,10 +94,16 @@ export default async function Dashboard({
 
   const appsRes = await apiFetch<Paginated<Application>>(`/applications?${appsQs}`);
 
-  if (!appsRes.ok) {
+  // The `!appsRes.data` half is not belt-and-braces: `ok` means the request
+  // succeeded, not that a body arrived (204, or a non-JSON 200 from a proxy
+  // mid-deploy). Destructuring it unguarded threw inside this Server Component
+  // and took the whole dashboard to the error boundary, while the two reads 40
+  // lines above were carefully guarded against the same thing. Now it degrades
+  // the same way an outright failure does.
+  if (!appsRes.ok || !appsRes.data) {
     return (
       <div className="border border-danger/40 bg-danger/10 p-5 text-sm text-danger">
-        {t("failedToLoad", { message: appsRes.error })}
+        {t("failedToLoad", { message: appsRes.ok ? t("emptyResponse") : appsRes.error })}
       </div>
     );
   }
