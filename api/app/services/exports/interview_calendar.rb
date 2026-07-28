@@ -72,13 +72,26 @@ module Exports
       time.utc.strftime("%Y%m%dT%H%M%SZ")
     end
 
-    # RFC 5545 TEXT escaping: backslash, semicolon, comma, and newline.
+    # RFC 5545 TEXT escaping: backslash, semicolon, comma, and line breaks.
+    #
+    # Line breaks are normalised first, and all three forms of them, because a
+    # bare CR used to survive into the content line. Nothing validates the format
+    # of company/role/url (they are presence-only), so a CR planted in a field
+    # reached the file raw, and a parser that still treats a lone CR as a line
+    # terminator would read what followed as real calendar properties:
+    #
+    #   company = "Acme\rBEGIN:VALARM\rTRIGGER:-PT15M\r..."
+    #
+    # CRLF was already safe by accident (the \n rule caught the LF, leaving a
+    # stray CR that broke the injected property name), which is exactly the kind
+    # of accident not to rely on. Order matters: \r\n must collapse before the
+    # bare-\n rule, or it becomes two escapes.
     def escape(value)
       value.to_s
         .gsub("\\", "\\\\\\\\")
         .gsub(";", "\\;")
         .gsub(",", "\\,")
-        .gsub("\n", "\\n")
+        .gsub(/\r\n|\r|\n/, "\\n")
     end
 
     # Content lines longer than 75 octets are folded: split on octet boundaries
