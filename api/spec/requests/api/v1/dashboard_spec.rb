@@ -201,6 +201,24 @@ RSpec.describe "Dashboard", type: :request do
         .to include("application_id" => nil, "company" => nil)
     end
 
+    # The `at` value had no coverage at all, which is how the residence row came
+    # to serialise the container's zone (UTC on Railway) while every other item
+    # serialised Tokyo. Asserting the offset is what makes that a red test rather
+    # than an invisible inconsistency: CI runs UTC, so `Date#to_time` fails here.
+    it "serialises every agenda date in Tokyo, the residence row included" do
+      expiry = 20.days.from_now.to_date
+      user.update!(residence_expires_on: expiry)
+      create(:application, :applied, company: "Soonest", user: user, follow_up_at: 2.days.from_now)
+
+      get "/api/v1/dashboard", headers: headers
+      upcoming = JSON.parse(response.body)["upcoming"]
+
+      expect(upcoming.map { |item| item["at"] }).to all(end_with("+09:00"))
+      residence = upcoming.find { |item| item["type"] == "residence" }
+      expect(residence["at"]).to eq(expiry.in_time_zone.iso8601)
+      expect(residence["at"]).to start_with(expiry.to_fs(:iso8601))
+    end
+
     it "excludes past interviews and follow-ups on closed applications" do
       user.update!(residence_expires_on: nil)
       create(:application, :applied, company: "Past", user: user, interview_at: 2.days.ago)

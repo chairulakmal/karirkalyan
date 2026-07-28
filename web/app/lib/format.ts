@@ -43,12 +43,20 @@ export function statusBadgeClass(s: Status): string {
  * True when a follow-up's calendar date is before today. Compares the date
  * part as a string (server serialises in app time, Tokyo) so no timezone
  * arithmetic can shift the day.
+ *
+ * "Today" is Tokyo's today, pinned exactly as `formatDate` below pins its own
+ * output, because the two have to agree about the same date: this runs on the
+ * server (Railway sets no `TZ`, so the `web` container is UTC) and again in the
+ * browser (JST), and a wall-clock "today" made those two answers differ every
+ * morning between 00:00 and 09:00 JST — a different colour and a different i18n
+ * key for the same row, which React 19 reports as a hydration mismatch.
+ * `en-CA` because it formats as `YYYY-MM-DD`, the shape this comparison needs.
  */
+const tokyoToday = new Intl.DateTimeFormat("en-CA", { timeZone: "Asia/Tokyo" });
+
 export function isOverdue(iso: string | null | undefined): boolean {
   if (!iso) return false;
-  const d = new Date();
-  const today = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
-  return iso.slice(0, 10) < today;
+  return iso.slice(0, 10) < tokyoToday.format(new Date());
 }
 
 /*
@@ -106,8 +114,9 @@ export function formatDate(iso: string | null | undefined, locale: string): stri
     day: "numeric",
     // The API serialises in app time (Tokyo), and a date-only field like
     // `follow_up_at` parses as UTC midnight. Without pinning the zone, a viewer
-    // west of UTC sees the previous day — and `isOverdue` above, which compares
-    // date strings, would then disagree with what is on screen.
+    // west of UTC sees the previous day — and `isOverdue` above, which pins this
+    // same zone for exactly this reason, would then disagree with what is on
+    // screen.
     timeZone: "Asia/Tokyo",
   });
 }
