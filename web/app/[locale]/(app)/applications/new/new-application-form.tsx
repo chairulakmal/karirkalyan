@@ -628,7 +628,7 @@ export function NewApplicationForm({
         <FileField name="resume" label={t("resume")} />
         <FileField name="cover_letter" label={t("coverLetter")} />
       </Row>
-      {error ? <p className="text-sm text-danger">{error}</p> : null}
+      {error ? <p role="alert" className="text-sm text-danger">{error}</p> : null}
       <button
         type="submit"
         disabled={pending}
@@ -684,7 +684,7 @@ function FileField({ name, label }: { name: string; label: string }) {
         className="mt-1.5 block w-full border border-dune bg-linen px-3 py-2 text-sm text-midnight file:mr-3 file:border-0 file:bg-transparent file:text-sm file:font-medium file:text-cobalt"
       />
       <p className="mt-1 text-xs text-ink-soft">{t("hint")}</p>
-      {error ? <p className="mt-1 text-xs text-danger">{error}</p> : null}
+      {error ? <p role="alert" className="mt-1 text-xs text-danger">{error}</p> : null}
     </label>
   );
 }

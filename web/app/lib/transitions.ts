@@ -63,3 +63,14 @@ export const STAGE_NOTE_STATES: ReadonlySet<Status> = new Set([
   "final_round",
   "offer",
 ]);
+
+/**
+ * The transition note's character ceiling, mirrored from Rails'
+ * `TimelineEntry::NOTE_MAX_LENGTH` so the two textareas that write one can show
+ * the limit as a stop rather than let the user meet it as a 422.
+ *
+ * The server is authoritative and validates independently; this copy only
+ * dresses the input. If they ever disagree, the model wins and the worst case
+ * is a stop at the wrong number, never an accepted note the API rejects.
+ */
+export const NOTE_MAX_LENGTH = 2_000;

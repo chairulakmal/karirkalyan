@@ -3,6 +3,7 @@
 import { useState, useTransition } from "react";
 import { useTranslations } from "next-intl";
 import { deleteApplication } from "@/app/lib/actions";
+import { useConfirmPanel } from "@/app/lib/use-confirm-panel";
 
 // Inline confirm (not window.confirm) to match the styled confirm flow the
 // transition buttons use — one destructive-action pattern across the app.
@@ -11,6 +12,7 @@ export function DeleteButton({ id }: { id: number }) {
   const [confirming, setConfirming] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [pending, startTransition] = useTransition();
+  const { panelRef, triggerRef } = useConfirmPanel(confirming);
 
   function onConfirm() {
     setError(null);
@@ -30,8 +32,13 @@ export function DeleteButton({ id }: { id: number }) {
       // basis-full below sm: the parent header row can't fit the back link
       // and this block side by side at 375px, and the prompt must never be
       // clipped — an unreadable confirmation defeats the confirm step.
-      <div className="basis-full text-right sm:basis-auto">
-        <p className="text-xs text-danger">{t("confirmPrompt")}</p>
+      <div ref={panelRef} className="basis-full text-right sm:basis-auto">
+        {/* role="alert" so the panel's appearance is spoken: a <p> swapping in
+            is not an event a screen reader reports on its own, and this is the
+            one sentence a user must read before destroying a record. */}
+        <p role="alert" className="text-xs text-danger">
+          {t("confirmPrompt")}
+        </p>
         <div className="mt-1.5 flex justify-end gap-2">
           <button
             type="button"
@@ -57,13 +64,14 @@ export function DeleteButton({ id }: { id: number }) {
   return (
     <div>
       <button
+        ref={triggerRef}
         type="button"
         onClick={() => setConfirming(true)}
         className="border border-danger/40 bg-linen px-3 py-1.5 text-sm text-danger hover:bg-danger/10"
       >
         {t("delete")}
       </button>
-      {error ? <p className="mt-1 text-xs text-danger">{error}</p> : null}
+      {error ? <p role="alert" className="mt-1 text-xs text-danger">{error}</p> : null}
     </div>
   );
 }

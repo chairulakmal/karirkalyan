@@ -476,7 +476,7 @@ export function DetailsEditor(props: Props) {
             className="mt-1.5 block w-full border border-dune bg-linen px-3 py-2 text-sm text-midnight placeholder:text-ink-soft"
           />
         </label>
-        {error ? <p className="text-sm text-danger">{error}</p> : null}
+        {error ? <p role="alert" className="text-sm text-danger">{error}</p> : null}
         <div className="flex items-center gap-2">
           <button
             type="submit"

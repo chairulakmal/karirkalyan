@@ -174,7 +174,7 @@ export function AuthForm({ share = null }: { share?: SharedCapture | null }) {
           required
           minLength={8}
         />
-        {error ? <p className="text-sm text-danger">{error}</p> : null}
+        {error ? <p role="alert" className="text-sm text-danger">{error}</p> : null}
         <button
           type="submit"
           disabled={busy}

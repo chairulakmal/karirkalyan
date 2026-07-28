@@ -89,7 +89,7 @@ export function ResidenceManager({ profile }: { profile: Profile }) {
           />
         ) : null}
         <div className="sm:col-span-2">
-          {error ? <p className="mb-2 text-sm text-danger">{error}</p> : null}
+          {error ? <p role="alert" className="mb-2 text-sm text-danger">{error}</p> : null}
           <button
             type="submit"
             disabled={pending}

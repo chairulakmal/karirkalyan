@@ -108,7 +108,7 @@ export function GhostRiskCard({ risk }: { risk: GhostRisk }) {
         ))}
       </ul>
 
-      {error ? <p className="mt-3 text-sm text-danger">{error}</p> : null}
+      {error ? <p role="alert" className="mt-3 text-sm text-danger">{error}</p> : null}
     </section>
   );
 }

@@ -38,7 +38,7 @@ export function TalkingPoints({ id }: { id: number }) {
       </div>
       <p className="mt-2 text-xs text-ink-soft">{t("hint")}</p>
 
-      {error ? <p className="mt-3 text-sm text-danger">{error}</p> : null}
+      {error ? <p role="alert" className="mt-3 text-sm text-danger">{error}</p> : null}
 
       {points ? (
         points.length > 0 ? (
