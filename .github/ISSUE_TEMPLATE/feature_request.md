@@ -10,7 +10,7 @@ labels: enhancement
 
 ## Proposed solution
 
-<!-- A sketch of the change. Not a final spec — just enough to discuss. -->
+<!-- A sketch of the change. Not a final spec, just enough to discuss. -->
 
 ## Alternatives considered
 

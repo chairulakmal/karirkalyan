@@ -12,7 +12,7 @@ https://github.com/user-attachments/assets/ecabba9e-b81d-40e6-9ab7-2a5911443c45
 
 <!-- SCREENSHOT: kanban board at /ja/board, Japanese locale, demo account data. Embed here once captured. -->
 
-**ライブデモ：** [kk.chairulakmal.com](https://kk.chairulakmal.com)。デモアカウントはワンクリックです（サインインページの「Try demo account」）。全状態を網羅する12件の応募データがあらかじめ入っています。API ドキュメントは Swagger UI として [`/api-docs`](https://api-production-4899.up.railway.app/api-docs) で公開しています。
+**ライブデモ：** [kk.chairulakmal.com](https://kk.chairulakmal.com)。デモアカウントはワンクリックです（サインインページの「Try demo account」）。ウィッシュリストから内定承諾まで、パイプライン全体に散らばる12件の応募データがあらかじめ入っています。API ドキュメントは Swagger UI として [`/api-docs`](https://api-production-4899.up.railway.app/api-docs) で公開しています。
 
 ## ハイライト
 
@@ -36,7 +36,7 @@ https://github.com/user-attachments/assets/ecabba9e-b81d-40e6-9ab7-2a5911443c45
 | API | Rails 8.1（API-only）、Ruby 3.4.9、Devise + devise-jwt |
 | フロントエンド | Next.js 16.2、React 19.2、TypeScript 5、Tailwind CSS、next-intl |
 | データベース | PostgreSQL 18。ローカルは Docker、本番は Railway マネージド |
-| テスト | RSpec（ユニット＋リクエストの2層）、Playwright 1.60（E2E） |
+| テスト | RSpec（ユニット＋リクエストの2層）、Vitest（`web/` のユニット）、Playwright 1.60（E2E） |
 
 ## ローカルで動かす
 
@@ -68,7 +68,7 @@ bundle exec rspec spec/lib spec/services   # ユニットスペックのみ（�
 bundle exec rspec spec/requests            # 実 PostgreSQL に対するリクエストスペック
 
 # フロントエンド（web/ で実行）
-npm run lint && npm run lint:i18n && npx tsc --noEmit
+npm run lint && npm run lint:i18n && npm run lint:fsm && npx tsc --noEmit && npm test
 npm run test:e2e                           # Playwright。Postgres の起動とシードが前提
 ```
 
@@ -78,7 +78,7 @@ API のテストは2層です。ユニットスペック（`spec/lib`、`spec/se
 
 フロントエンドには Playwright のスモークスイート（[`web/e2e/`](web/e2e)）があり、応募の作成、ステータス遷移、履歴書の添付というクリティカルパスを両アプリ越しに検証します。
 
-CI はパス検知型のワークフロー2本です。[`api.yml`](.github/workflows/api.yml) は RuboCop、Brakeman、bundler-audit、RSpec を実行します。[`web.yml`](.github/workflows/web.yml) は ESLint、i18n 整合性チェック、`tsc`、本番ビルド、そしてジョブ内でシードした実 Rails API に対する Playwright スイートを実行します。
+CI はパス検知型のワークフロー2本です。[`api.yml`](.github/workflows/api.yml) は RuboCop、Brakeman、bundler-audit、RSpec を実行します。[`web.yml`](.github/workflows/web.yml) は ESLint、i18n 整合性チェック、FSM コピー検査、`tsc`、Vitest のユニットスイート、本番ビルド、そしてジョブ内でシードした実 Rails API に対する Playwright スイートを実行します。
 
 ## アーキテクチャ
 
