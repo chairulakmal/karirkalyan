@@ -1,23 +1,18 @@
 import { type NextRequest } from "next/server";
 import { apiFetch } from "@/app/lib/api";
+import { pickListParams } from "@/app/lib/list-params";
 import type { Application, Paginated } from "@/app/lib/types";
 
+/**
+ * The client list's pagination and filtering seam. It exists so the browser
+ * never holds the JWT: the session cookie is httpOnly, so only server code can
+ * attach it (SPEC.md § Auth flow).
+ *
+ * The param allowlist is deliberately NOT written out here. app/lib/list-params.ts
+ * owns it, and its comment records what re-enumerating it by hand cost.
+ */
 export async function GET(request: NextRequest) {
-  const { searchParams } = request.nextUrl;
-  const after = searchParams.get("after");
-  const limit = searchParams.get("limit") ?? "10";
-
-  const status = searchParams.get("status");
-  const company = searchParams.get("company");
-  const source = searchParams.get("source");
-  const japaneseLevel = searchParams.get("japanese_level");
-
-  const qs = new URLSearchParams({ limit });
-  if (after) qs.set("after", after);
-  if (status) qs.set("status", status);
-  if (company) qs.set("company", company);
-  if (source) qs.set("source", source);
-  if (japaneseLevel) qs.set("japanese_level", japaneseLevel);
+  const qs = pickListParams(request.nextUrl.searchParams);
 
   const result = await apiFetch<Paginated<Application>>(`/applications?${qs}`);
 
