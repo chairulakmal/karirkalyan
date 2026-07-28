@@ -456,7 +456,7 @@ function CardMenu({
                 onChange={(e) => setReason(e.target.value)}
                 placeholder={tt("customReason")}
                 aria-label={tt("reopenPrompt")}
-                className="w-full border border-dune bg-linen px-2 py-1.5 font-mono text-xs text-midnight placeholder:text-ink-soft"
+                className="w-full border border-rule-strong bg-linen px-2 py-1.5 font-mono text-xs text-midnight placeholder:text-ink-soft"
               />
               <ConfirmCancel
                 confirmDisabled={reason.trim().length === 0}
@@ -471,12 +471,12 @@ function CardMenu({
                   label: ts(`label.${confirming}`),
                   description: ts(`description.${confirming}`),
                   b: (chunks) => <span className="font-medium text-midnight">{chunks}</span>,
-                  dim: (chunks) => <span className="text-ink-soft/80">{chunks}</span>,
+                  dim: (chunks) => <span className="text-ink-soft">{chunks}</span>,
                 })}{" "}
                 {terminalStates.length === 0 ? null : terminalStates.includes(confirming) ? (
-                  <span className="text-danger/80">{tt("permanentWarning")}</span>
+                  <span className="text-danger">{tt("permanentWarning")}</span>
                 ) : (
-                  <span className="text-ink-soft/70">{tt("reopenable")}</span>
+                  <span className="text-ink-soft">{tt("reopenable")}</span>
                 )}
               </p>
               <ConfirmCancel

@@ -9,7 +9,7 @@ export function Field(props: React.InputHTMLAttributes<HTMLInputElement> & { lab
       <input
         {...rest}
         name={name}
-        className="mt-1.5 block w-full border border-dune bg-linen px-3 py-2 text-sm text-midnight placeholder:text-ink-soft"
+        className="mt-1.5 block w-full border border-rule-strong bg-linen px-3 py-2 text-sm text-midnight placeholder:text-ink-soft"
       />
     </label>
   );

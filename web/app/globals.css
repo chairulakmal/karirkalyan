@@ -17,6 +17,18 @@
   --color-linen: #f7f3ea;
   --color-sand: #ece8df;
   --color-dune: #cfc8b8;
+  /* The boundary colour for *interactive* controls: inputs, selects, textareas,
+   * and the buttons that read as fields. Not a new brand colour so much as the
+   * accessible weight of dune, which fails as a control boundary:
+   *
+   *   dune        on linen 1.50   on sand 1.36    (WCAG 1.4.11 needs 3.0)
+   *   rule-strong on linen 3.70   on sand 3.35
+   *
+   * The 1.4.11 escape (boundary identifiable some other way) does not apply
+   * here: a control's fill is linen on a sand page, which is 1.10, so nothing
+   * else marks where it is. dune stays correct for decorative dividers and card
+   * edges, where 1.4.11 does not reach. See SPEC.md § Design system. */
+  --color-rule-strong: #847d6b;
 
   --font-serif: var(--font-fraunces), "Times New Roman", serif;
   --font-sans: var(--font-manrope), system-ui, -apple-system, sans-serif;
@@ -49,6 +61,17 @@ h1, h2, h3 {
   font-family: var(--font-serif);
   font-variation-settings: "opsz" 36, "wght" 500;
   letter-spacing: -0.02em;
+}
+
+/* WCAG 2.2 SC 2.4.11 (Focus Not Obscured). The tab bar is `sticky bottom-0` on
+ * phone widths, so tabbing to a control near the bottom of the viewport could
+ * scroll it exactly underneath the bar. Only below sm, because that is the only
+ * width the bar renders at. The inset is included for the same reason the toast
+ * stack accounts for it. */
+@media (max-width: 40rem) {
+  html {
+    scroll-padding-bottom: calc(4rem + env(safe-area-inset-bottom));
+  }
 }
 
 /* Negative tracking is a Latin display device; kanji and kana are drawn to
@@ -94,6 +117,29 @@ h1, h2, h3 {
   letter-spacing: 0.18em;
   text-transform: uppercase;
   color: var(--color-ink-soft);
+}
+
+/* Japanese gets a different cut of the same label, because three of the four
+ * declarations above are Latin-typography decisions that do not survive
+ * translation:
+ *
+ *   - 10px is too small for kanji. This file already reached that conclusion
+ *     once — see the .hsp-lg override below, and the comment beside it saying
+ *     the mono labels "read poorly at small sizes" — but only applied it to the
+ *     public HSP calculator, while every *form label in the signed-in app* uses
+ *     this class and the Japanese ones live there (在留資格, 業績連動賞与,
+ *     必要な重なり（時間）).
+ *   - 0.18em of tracking is designed for uppercase Latin; on CJK it forces the
+ *     glyphs apart without the shape cue that justifies it.
+ *   - text-transform: uppercase is a no-op on kana and kanji, so all it does is
+ *     distort the embedded Latin (JLPT N1).
+ *
+ * The mono face has no CJK coverage either, so ja falls through to a system
+ * fallback regardless; sizing it for that fallback is the honest treatment. */
+:lang(ja) .kk-label {
+  font-size: 12px;
+  letter-spacing: 0.08em;
+  text-transform: none;
 }
 
 /* Display heading — the hero, and nothing else.

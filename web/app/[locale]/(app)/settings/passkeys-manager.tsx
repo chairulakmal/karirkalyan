@@ -169,7 +169,7 @@ export function PasskeysManager({ passkeys }: { passkeys: Passkey[] }) {
               onChange={(e) => setNickname(e.target.value)}
               placeholder={t("nicknamePlaceholder")}
               maxLength={100}
-              className="mt-1 w-full border border-dune bg-linen px-3 py-2 text-sm"
+              className="mt-1 w-full border border-rule-strong bg-linen px-3 py-2 text-sm"
             />
           </label>
           <button

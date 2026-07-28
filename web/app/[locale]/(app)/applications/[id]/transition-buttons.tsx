@@ -166,7 +166,7 @@ export function TransitionButtons({
                   onChange={(e) => setReversalReason(e.target.value)}
                   placeholder={t("customReason")}
                   aria-label={t("reopenPrompt")}
-                  className="w-full border border-dune bg-linen px-3 py-1.5 font-mono text-xs text-midnight placeholder:text-ink-soft"
+                  className="w-full border border-rule-strong bg-linen px-3 py-1.5 font-mono text-xs text-midnight placeholder:text-ink-soft"
                 />
                 <div className="flex gap-2">
                   <button
@@ -205,7 +205,7 @@ export function TransitionButtons({
                   aria-label={t("stageNotePrompt", { label: ts(`label.${status}`) })}
                   maxLength={NOTE_MAX_LENGTH}
                   rows={3}
-                  className="w-full border border-dune bg-linen px-3 py-1.5 text-xs text-midnight placeholder:text-ink-soft"
+                  className="w-full border border-rule-strong bg-linen px-3 py-1.5 text-xs text-midnight placeholder:text-ink-soft"
                 />
                 <div className="flex gap-2">
                   <button
@@ -238,12 +238,12 @@ export function TransitionButtons({
                     label: ts(`label.${status}`),
                     description: ts(`description.${status}`),
                     b: (chunks) => <span className="font-medium text-midnight">{chunks}</span>,
-                    dim: (chunks) => <span className="text-ink-soft/80">{chunks}</span>,
+                    dim: (chunks) => <span className="text-ink-soft">{chunks}</span>,
                   })}{" "}
                   {permanence === true ? (
-                    <span className="text-danger/80">{t("permanentWarning")}</span>
+                    <span className="text-danger">{t("permanentWarning")}</span>
                   ) : permanence === false ? (
-                    <span className="text-ink-soft/70">{t("reopenable")}</span>
+                    <span className="text-ink-soft">{t("reopenable")}</span>
                   ) : null}
                 </p>
                 {/* Optional note on the way out: a closing move often carries a
@@ -257,7 +257,7 @@ export function TransitionButtons({
                   aria-label={t("closeNotePrompt")}
                   maxLength={NOTE_MAX_LENGTH}
                   rows={2}
-                  className="w-full border border-dune bg-linen px-3 py-1.5 text-xs text-midnight placeholder:text-ink-soft"
+                  className="w-full border border-rule-strong bg-linen px-3 py-1.5 text-xs text-midnight placeholder:text-ink-soft"
                 />
                 <div className="flex gap-2">
                   <button

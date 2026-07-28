@@ -437,7 +437,7 @@ export function ApplicationsList({
                 if (e.key === "Enter" && e.nativeEvent.isComposing) e.preventDefault();
               }}
               placeholder={t("searchPlaceholder")}
-              className="mt-1.5 block min-w-44 border border-dune bg-linen px-3 py-1.5 text-sm text-midnight placeholder:text-ink-soft/50"
+              className="mt-1.5 block min-w-44 border border-dune bg-linen px-3 py-1.5 text-sm text-midnight placeholder:text-ink-soft"
             />
           </form>
           <FilterSelect
@@ -699,7 +699,7 @@ function FilterSelect({
       <select
         value={value}
         onChange={(e) => onChange(e.target.value)}
-        className="mt-1.5 block min-w-44 border border-dune bg-linen px-3 py-1.5 text-sm text-midnight"
+        className="mt-1.5 block min-w-44 border border-rule-strong bg-linen px-3 py-1.5 text-sm text-midnight"
       >
         <option value="">{allLabel}</option>
         {options.map((o) => (

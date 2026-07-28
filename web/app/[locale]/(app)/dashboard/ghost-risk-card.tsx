@@ -5,6 +5,7 @@ import { useTranslations } from "next-intl";
 import { Link, useRouter } from "@/i18n/navigation";
 import { transitionStatus } from "@/app/lib/actions";
 import { InfoPopover } from "@/app/components/info-popover";
+import { useToast } from "@/app/components/toast";
 import type { GhostRisk, GhostRiskEntry } from "@/app/lib/types";
 
 /*
@@ -22,7 +23,9 @@ export function GhostRiskCard({ risk }: { risk: GhostRisk }) {
   const t = useTranslations("dashboard.ghostRisk");
   const ts = useTranslations("status");
   const tErrors = useTranslations("errors");
+  const tt = useTranslations("transitions");
   const router = useRouter();
+  const toast = useToast();
   const [error, setError] = useState<string | null>(null);
   const [pendingId, setPendingId] = useState<number | null>(null);
   const [isPending, startTransition] = useTransition();
@@ -30,12 +33,23 @@ export function GhostRiskCard({ risk }: { risk: GhostRisk }) {
   if (risk.at_risk.length === 0) return null;
 
   function markGhosted(entry: GhostRiskEntry) {
+    // The buttons are no longer `disabled` while a move is in flight (that
+    // reaches the one the user just pressed, and a disabled element cannot hold
+    // focus), so the handler is what stops a double submit. Same rule the list's
+    // filter bar documents at length.
+    if (isPending) return;
     setError(null);
     setPendingId(entry.id);
     startTransition(async () => {
       const result = await transitionStatus(entry.id, "ghosted", entry.lock_version);
       setPendingId(null);
-      if (result.ok) return;
+      if (result.ok) {
+        // SPEC.md § Toast feedback says one toast per write. This surface was
+        // silent: the row simply vanished on revalidate, which reads as the app
+        // losing the record rather than as the move succeeding.
+        toast.success(tt("moved", { label: ts("label.ghosted") }));
+        return;
+      }
       if (result.status === 409) {
         // Stale lock — the row moved under us. A refresh re-runs the query, and
         // if it moved on its own the application drops off this list anyway.
@@ -50,7 +64,7 @@ export function GhostRiskCard({ risk }: { risk: GhostRisk }) {
   return (
     <section className="border border-danger/40 bg-danger/5 p-5">
       <div className="flex flex-wrap items-baseline gap-x-2">
-        <p className="kk-label text-danger">{t("eyebrow")}</p>
+        <h2 className="kk-label text-danger">{t("eyebrow")}</h2>
         <span className="inline-block align-middle">
           <InfoPopover label={t("explainAria")}>
             <div className="space-y-2 font-sans text-sm leading-relaxed text-ink-soft">
@@ -99,8 +113,8 @@ export function GhostRiskCard({ risk }: { risk: GhostRisk }) {
             <button
               type="button"
               onClick={() => markGhosted(entry)}
-              disabled={isPending}
-              className="inline-flex min-h-10 shrink-0 items-center bg-danger/10 px-3 py-1 text-xs font-medium text-danger ring-1 ring-inset ring-danger/30 transition hover:bg-danger/20 disabled:opacity-50"
+              aria-busy={pendingId === entry.id}
+              className="inline-flex min-h-10 shrink-0 items-center bg-danger/10 px-3 py-1 text-xs font-medium text-danger ring-1 ring-inset ring-danger/30 transition hover:bg-danger/20"
             >
               {pendingId === entry.id ? t("marking") : t("markGhosted")}
             </button>

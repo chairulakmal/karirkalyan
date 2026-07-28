@@ -11,7 +11,8 @@
     "forReviewers": "For reviewers",
     "about": "How it is built",
     "apiDocs": "API docs",
-    "source": "Source"
+    "source": "Source",
+    "skipToContent": "Skip to content"
   },
   "status": {
     "label": {

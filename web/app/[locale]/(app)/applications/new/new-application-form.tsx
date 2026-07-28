@@ -267,7 +267,7 @@ export function NewApplicationForm({
             value={url}
             onChange={(e) => setUrl(e.target.value)}
             placeholder="https://…"
-            className="block w-full border border-dune bg-linen px-3 py-2 text-sm text-midnight placeholder:text-ink-soft"
+            className="block w-full border border-rule-strong bg-linen px-3 py-2 text-sm text-midnight placeholder:text-ink-soft"
           />
           <button
             type="button"
@@ -317,7 +317,7 @@ export function NewApplicationForm({
               rows={8}
               placeholder={t("pastePlaceholder")}
               aria-describedby="paste-hint paste-count"
-              className="mt-2 block w-full border border-dune bg-linen px-3 py-2 text-sm text-midnight placeholder:text-ink-soft"
+              className="mt-2 block w-full border border-rule-strong bg-linen px-3 py-2 text-sm text-midnight placeholder:text-ink-soft"
             />
             <div className="mt-2 flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
               {/* Not a live region, deliberately. It is already the textarea's
@@ -385,15 +385,24 @@ export function NewApplicationForm({
           picker sends no `status`, so the API applies its own default; offering
           a guessed set would risk a 422 on a state it no longer accepts. */}
       {entryStates.length === 0 ? null : (
-        <label className="block text-sm">
-          <span className="kk-label">{t("status")}</span>
+        // htmlFor + aria-describedby, not a wrapping <label>: wrapping folded
+        // the hint into the control's *name*, so this select announced as
+        // "Status You can advance the status later from the application page."
+        // The paste textarea above documents this exact trap and solves it the
+        // same way; this neighbour was missed. (WCAG 1.3.1 / 4.1.2.)
+        <div className="block text-sm">
+          <label htmlFor="new-status" className="kk-label">
+            {t("status")}
+          </label>
           <select
+            id="new-status"
             name="status"
             value={status}
+            aria-describedby="new-status-hint"
             // Every option's value is a member of `entryStates`, so the cast
             // re-states what the render below already guarantees.
             onChange={(e) => setStatus(e.target.value as Status)}
-            className="mt-1.5 block w-full border border-dune bg-linen px-3 py-2 text-sm text-midnight"
+            className="mt-1.5 block w-full border border-rule-strong bg-linen px-3 py-2 text-sm text-midnight"
           >
             {entryStates.map((s) => (
               <option key={s} value={s}>
@@ -401,8 +410,10 @@ export function NewApplicationForm({
               </option>
             ))}
           </select>
-          <span className="mt-1 block text-xs text-ink-soft">{t("statusHint")}</span>
-        </label>
+          <span id="new-status-hint" className="mt-1 block text-xs text-ink-soft">
+            {t("statusHint")}
+          </span>
+        </div>
       )}
       {status === "applied" ? (
         <Field
@@ -428,7 +439,7 @@ export function NewApplicationForm({
               name="channel"
               value={channel}
               onChange={(e) => setChannel(e.target.value as Channel | "")}
-              className="mt-1.5 block w-full border border-dune bg-linen px-3 py-2 text-sm text-midnight"
+              className="mt-1.5 block w-full border border-rule-strong bg-linen px-3 py-2 text-sm text-midnight"
             >
               <option value="">{t("market.unset")}</option>
               {CHANNELS.map((c) => (
@@ -444,7 +455,7 @@ export function NewApplicationForm({
               name="japanese_level"
               value={japaneseLevel}
               onChange={(e) => setJapaneseLevel(e.target.value as JapaneseLevel | "")}
-              className="mt-1.5 block w-full border border-dune bg-linen px-3 py-2 text-sm text-midnight"
+              className="mt-1.5 block w-full border border-rule-strong bg-linen px-3 py-2 text-sm text-midnight"
             >
               <option value="">{t("market.unset")}</option>
               {JAPANESE_LEVELS.map((l) => (
@@ -484,7 +495,7 @@ export function NewApplicationForm({
               name="sponsorship"
               value={sponsorship}
               onChange={(e) => setSponsorship(e.target.value as Sponsorship)}
-              className="mt-1.5 block w-full border border-dune bg-linen px-3 py-2 text-sm text-midnight"
+              className="mt-1.5 block w-full border border-rule-strong bg-linen px-3 py-2 text-sm text-midnight"
             >
               {SPONSORSHIPS.map((s) => (
                 <option key={s} value={s}>
@@ -500,7 +511,7 @@ export function NewApplicationForm({
                 name="status_of_residence"
                 value={statusOfResidence}
                 onChange={(e) => setStatusOfResidence(e.target.value as StatusOfResidence | "")}
-                className="mt-1.5 block w-full border border-dune bg-linen px-3 py-2 text-sm text-midnight"
+                className="mt-1.5 block w-full border border-rule-strong bg-linen px-3 py-2 text-sm text-midnight"
               >
                 <option value="">{t("market.unset")}</option>
                 {STATUSES_OF_RESIDENCE.map((s) => (
@@ -520,7 +531,7 @@ export function NewApplicationForm({
             name="hiring_entity"
             value={hiringEntity}
             onChange={(e) => setHiringEntity(e.target.value as HiringEntity | "")}
-            className="mt-1.5 block w-full border border-dune bg-linen px-3 py-2 text-sm text-midnight"
+            className="mt-1.5 block w-full border border-rule-strong bg-linen px-3 py-2 text-sm text-midnight"
           >
             <option value="">{t("market.unset")}</option>
             {HIRING_ENTITIES.map((h) => (
@@ -539,7 +550,7 @@ export function NewApplicationForm({
               name="company_timezone"
               value={companyTimezone}
               onChange={(e) => setCompanyTimezone(e.target.value as CompanyTimezone | "")}
-              className="mt-1.5 block w-full border border-dune bg-linen px-3 py-2 text-sm text-midnight"
+              className="mt-1.5 block w-full border border-rule-strong bg-linen px-3 py-2 text-sm text-midnight"
             >
               <option value="">{t("market.unset")}</option>
               {COMPANY_TIMEZONES.map((z) => (
@@ -621,7 +632,7 @@ export function NewApplicationForm({
           rows={4}
           value={notes}
           onChange={(e) => setNotes(e.target.value)}
-          className="mt-1.5 block w-full border border-dune bg-linen px-3 py-2 text-sm text-midnight placeholder:text-ink-soft"
+          className="mt-1.5 block w-full border border-rule-strong bg-linen px-3 py-2 text-sm text-midnight placeholder:text-ink-soft"
         />
       </label>
       <Row>
@@ -667,24 +678,37 @@ function FileField({ name, label }: { name: string; label: string }) {
   }
 
   return (
-    <label className="block text-sm">
+    // htmlFor + aria-describedby rather than a wrapping <label>, for the reason
+    // the Status select above now records: wrapping folded both the size hint
+    // AND the error text into the input's accessible *name*, so an oversize-file
+    // rejection became part of what the control is called instead of something
+    // announced. Described, not named.
+    <div className="block text-sm">
       {/* The label stays short: kk-label is tracked uppercase mono, so every
           character is wide and "Cover letter (optional · PDF, max 1 MB)"
           wrapped in a half column. The type/size constraint lives in the
           normal-case hint below instead, the same files.hint string the
           detail-page uploader shows. */}
-      <span className="kk-label">
+      <label htmlFor={name} className="kk-label">
         {label} <span className="font-normal text-ink-soft">{t("optional")}</span>
-      </span>
+      </label>
       <input
+        id={name}
         type="file"
         name={name}
         accept=".pdf,application/pdf"
         onChange={onChange}
-        className="mt-1.5 block w-full border border-dune bg-linen px-3 py-2 text-sm text-midnight file:mr-3 file:border-0 file:bg-transparent file:text-sm file:font-medium file:text-cobalt"
+        aria-describedby={error ? `${name}-hint ${name}-error` : `${name}-hint`}
+        className="mt-1.5 block w-full border border-rule-strong bg-linen px-3 py-2 text-sm text-midnight file:mr-3 file:border-0 file:bg-transparent file:text-sm file:font-medium file:text-cobalt"
       />
-      <p className="mt-1 text-xs text-ink-soft">{t("hint")}</p>
-      {error ? <p role="alert" className="mt-1 text-xs text-danger">{error}</p> : null}
-    </label>
+      <p id={`${name}-hint`} className="mt-1 text-xs text-ink-soft">
+        {t("hint")}
+      </p>
+      {error ? (
+        <p id={`${name}-error`} role="alert" className="mt-1 text-xs text-danger">
+          {error}
+        </p>
+      ) : null}
+    </div>
   );
 }

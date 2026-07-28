@@ -11,7 +11,8 @@
     "forReviewers": "レビュー担当者向け",
     "about": "設計について",
     "apiDocs": "APIドキュメント",
-    "source": "ソースコード"
+    "source": "ソースコード",
+    "skipToContent": "本文へスキップ"
   },
   "status": {
     "label": {

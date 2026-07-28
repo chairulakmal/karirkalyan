@@ -68,7 +68,7 @@ export function ResidenceManager({ profile }: { profile: Profile }) {
             name="residence_status"
             value={status}
             onChange={(e) => setStatus(e.target.value as ResidenceStatus | "")}
-            className="mt-1.5 block w-full border border-dune bg-linen px-3 py-2 text-sm text-midnight"
+            className="mt-1.5 block w-full border border-rule-strong bg-linen px-3 py-2 text-sm text-midnight"
           >
             <option value="">{t("unset")}</option>
             {RESIDENCE_STATUSES.map((s) => (
