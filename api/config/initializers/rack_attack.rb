@@ -217,7 +217,7 @@ class Rack::Attack
 
   # Transitions, matching the write numbers above: the same shape of authenticated
   # write, on the same records. As with uploads, this bounds the rate and not the
-  # total — TimelineEntry::NOTE_MAX_LENGTH bounds how much each one can carry.
+  # total: TimelineEntry::NOTE_MAX_LENGTH bounds how much each one can carry.
   throttle("applications/transition/minute", limit: 30, period: 1.minute) { |req| application_transition_user_id(req) }
   throttle("applications/transition/hour", limit: 300, period: 1.hour) { |req| application_transition_user_id(req) }
 

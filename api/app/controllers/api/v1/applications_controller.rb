@@ -145,7 +145,7 @@ module Api
           actor:       current_user,
           # Same guard, and the same reason, as `text` in #prefill above: a JSON
           # object arrives as ActionController::Parameters, whose #to_s is a hash
-          # inspection, which is `present?` — so `.presence` alone would store
+          # inspection, which is `present?`, so `.presence` alone would store
           # `{"a" => "b"}` in the note column.
           note:        (params[:note] if params[:note].is_a?(String)).presence
         ).call

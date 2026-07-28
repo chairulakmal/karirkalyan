@@ -317,7 +317,7 @@ RSpec.describe "Rack::Attack throttling", type: :request, skip_n_plus_one: true 
   # Transitions matched no throttle at all: they fail the /\d+\z anchor above, and nothing
   # else claimed them. Every one writes a timeline_entries row and the FSM permits an
   # unbounded applied -> rejected -> applied cycle, so it was a write loop with no ceiling.
-  describe "PATCH /api/v1/applications/:id/transition — per-account cap" do
+  describe "PATCH /api/v1/applications/:id/transition, per-account cap" do
     let(:user)   { create(:user) }
     let(:record) { create(:application, :draft, user: user) }
 
@@ -352,7 +352,7 @@ RSpec.describe "Rack::Attack throttling", type: :request, skip_n_plus_one: true 
 
   # The most expensive call in the app (a resume PDF base64'd inline into a paid Claude
   # request) and it had no throttle of any kind while prefill, which is cheaper, had four.
-  describe "POST /api/v1/applications/:id/talking_points — per-account cap" do
+  describe "POST /api/v1/applications/:id/talking_points, per-account cap" do
     let(:user)   { create(:user) }
     let(:record) { create(:application, :draft, user: user) }
 

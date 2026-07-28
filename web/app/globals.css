@@ -124,8 +124,8 @@ h1, h2, h3 {
  * translation:
  *
  *   - 10px is too small for kanji. This file already reached that conclusion
- *     once — see the .hsp-lg override below, and the comment beside it saying
- *     the mono labels "read poorly at small sizes" — but only applied it to the
+ *     once: see the .hsp-lg override below, and the comment beside it saying
+ *     the mono labels "read poorly at small sizes", but only applied it to the
  *     public HSP calculator, while every *form label in the signed-in app* uses
  *     this class and the Japanese ones live there (在留資格, 業績連動賞与,
  *     必要な重なり（時間）).

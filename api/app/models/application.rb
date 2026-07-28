@@ -68,7 +68,7 @@ class Application < ApplicationRecord
   # backup story is a nightly pg_dump. See SPEC.md § Security.
   MAX_PER_USER = 200
 
-  # The ceiling on the free-text `notes` column — see the validation below for why
+  # The ceiling on the free-text `notes` column. See the validation below for why
   # it needed one. Same job as MAX_PER_USER, one level down: a bound on the total,
   # which no throttle can provide.
   NOTES_MAX_LENGTH = 10_000

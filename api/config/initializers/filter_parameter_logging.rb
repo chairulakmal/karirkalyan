@@ -14,7 +14,7 @@
 #   - WebAuthn assertions. Both passkey ceremonies read the credential through
 #     to_unsafe_h, so id/rawId/clientDataJSON/authenticatorData/signature/userHandle
 #     were all logged. userHandle is users.webauthn_id, which User#as_json
-#     deliberately strips from every API response — so the logs held something the
+#     deliberately strips from every API response, so the logs held something the
 #     API contract treats as internal.
 #   - Push subscriptions. endpoint + p256dh + auth together ARE the addressing and
 #     keying material for a browser's push channel. `:_key` matches `public_key`,
