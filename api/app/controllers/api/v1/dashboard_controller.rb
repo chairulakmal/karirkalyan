@@ -50,7 +50,11 @@ module Api
 
         if (expiry = current_user.residence_expires_on) &&
            expiry <= AGENDA_RESIDENCE_WINDOW_DAYS.days.from_now.to_date
-          items << { type: "residence", at: expiry.to_time, application_id: nil,
+          # `in_time_zone`, never `to_time`: the latter resolves a bare Date in the
+          # container's system zone (UTC on Railway), so this row would serialise
+          # +00:00 while every other agenda item, coming from a datetime column,
+          # serialises +09:00. The expiry is a Tokyo calendar date like the rest.
+          items << { type: "residence", at: expiry.in_time_zone, application_id: nil,
                      company: nil, role: nil, status: nil }
         end
 

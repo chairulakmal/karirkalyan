@@ -372,11 +372,16 @@ export function ApplicationsList({
             <label className="kk-label" htmlFor="list-search">
               {t("search")}
             </label>
+            {/* Not `disabled` while a page is in flight, for the reason the chip
+                <fieldset> below spells out: a disabled element cannot hold focus,
+                so the browser blurs it to <body> mid-search and a keyboard user
+                pays a full tab back for every consecutive query. Block the
+                handler, not the control — applyFilters early-returns on
+                `loading`, so a submit mid-fetch is a no-op with focus intact. */}
             <input
               id="list-search"
               type="search"
               value={qInput}
-              disabled={loading}
               onChange={(e) => {
                 const v = e.target.value;
                 setQInput(v);
@@ -384,14 +389,21 @@ export function ApplicationsList({
                 // typing waits for Enter so each keystroke is not a refetch.
                 if (v === "" && filters.q) applyFilters({ ...filters, q: null });
               }}
+              onKeyDown={(e) => {
+                // The Enter that confirms a kanji candidate belongs to the IME,
+                // not to this form: ungated it leaks through as a submit and
+                // searches half-composed text, which on a Japanese-market app is
+                // the primary way this box gets typed in. `isComposing` lives on
+                // the native event; React does not surface it on the synthetic one.
+                if (e.key === "Enter" && e.nativeEvent.isComposing) e.preventDefault();
+              }}
               placeholder={t("searchPlaceholder")}
-              className="mt-1.5 block min-w-44 border border-dune bg-linen px-3 py-1.5 text-sm text-midnight placeholder:text-ink-soft/50 disabled:opacity-50"
+              className="mt-1.5 block min-w-44 border border-dune bg-linen px-3 py-1.5 text-sm text-midnight placeholder:text-ink-soft/50"
             />
           </form>
           <FilterSelect
             label={t("company")}
             value={filters.company ?? ""}
-            disabled={loading}
             allLabel={t("allCompanies")}
             options={companyOptions.map(([name, count]) => ({ value: name, label: name, count }))}
             onChange={(value) => changeCompany(value || null)}
@@ -399,7 +411,6 @@ export function ApplicationsList({
           <FilterSelect
             label={t("jobBoard")}
             value={filters.source ?? ""}
-            disabled={loading}
             allLabel={t("allBoards")}
             options={boardOptions.map(([host, count]) => ({
               value: host,
@@ -415,7 +426,6 @@ export function ApplicationsList({
           <FilterSelect
             label={t("japaneseLevel")}
             value={filters.japaneseLevel ?? ""}
-            disabled={loading}
             allLabel={t("allLevels")}
             options={JAPANESE_LEVELS.map((l) => ({
               value: l,
@@ -628,25 +638,27 @@ function FilterSelect({
   value,
   options,
   allLabel,
-  disabled,
   onChange,
 }: {
   label: string;
   value: string;
   options: Option[];
   allLabel: string;
-  disabled: boolean;
   onChange: (value: string) => void;
 }) {
   const t = useTranslations("list");
   return (
     <label className="block text-sm">
       <span className="kk-label">{label}</span>
+      {/* No `disabled` while a page is in flight, the rule the chip <fieldset>
+          and the search box above both follow: a keyboard user changing this
+          select would otherwise have it disable under them and drop focus to
+          <body>. applyFilters early-returns on `loading`, so a change mid-fetch
+          costs nothing but the selection snapping back on the next render. */}
       <select
         value={value}
-        disabled={disabled}
         onChange={(e) => onChange(e.target.value)}
-        className="mt-1.5 block min-w-44 border border-dune bg-linen px-3 py-1.5 text-sm text-midnight disabled:opacity-50"
+        className="mt-1.5 block min-w-44 border border-dune bg-linen px-3 py-1.5 text-sm text-midnight"
       >
         <option value="">{allLabel}</option>
         {options.map((o) => (
