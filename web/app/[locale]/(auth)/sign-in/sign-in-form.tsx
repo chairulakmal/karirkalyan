@@ -174,7 +174,7 @@ export function AuthForm({ share = null }: { share?: SharedCapture | null }) {
           required
           minLength={8}
         />
-        {error ? <p className="text-sm text-danger">{error}</p> : null}
+        {error ? <p role="alert" className="text-sm text-danger">{error}</p> : null}
         <button
           type="submit"
           disabled={busy}
@@ -192,7 +192,12 @@ export function AuthForm({ share = null }: { share?: SharedCapture | null }) {
           type="button"
           onClick={onPasskeySignIn}
           disabled={busy}
-          className="w-full border border-dune px-4 py-2.5 text-sm font-medium text-ink transition hover:border-cobalt hover:text-cobalt disabled:opacity-50"
+          // `text-ink` was a dead class: there is no --color-ink token (only
+          // --color-ink-soft), so Tailwind v4 emitted nothing and the button
+          // silently inherited the body colour. It survived because that looks
+          // almost identical. Named properly now, and the border joins the rest
+          // of the interactive controls at an accessible weight.
+          className="w-full border border-rule-strong px-4 py-2.5 text-sm font-medium text-midnight transition hover:border-cobalt hover:text-cobalt disabled:opacity-50"
         >
           {passkeyPending ? t("passkeySigningIn") : t("signInWithPasskey")}
         </button>

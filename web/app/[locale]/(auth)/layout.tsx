@@ -15,7 +15,10 @@ export default function AuthLayout({ children }: { children: React.ReactNode }) 
             <LocaleSwitcher />
           </div>
         </div>
-        <div className="bg-linen border border-dune p-8 shadow-sm">{children}</div>
+        {/* <main>, not a <div>: without it the sign-in form sat outside every
+            landmark, so a screen-reader user navigating by landmark could not
+            reach the app's front door at all. */}
+        <main className="bg-linen border border-dune p-8 shadow-sm">{children}</main>
       </div>
     </div>
   );

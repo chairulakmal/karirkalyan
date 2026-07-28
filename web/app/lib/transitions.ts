@@ -5,22 +5,21 @@ import type { Status, TransitionTable } from "./types";
  * that perform them — the detail page's transition buttons and the board's
  * card menu — so the confirm/revival behaviour cannot drift between them.
  *
- * Both sets classify *targets and sources* of a move: which are worth a prompt,
- * and which offer a way back. That is UI judgement layered on the FSM rather
- * than a reading of it — no FSM fact would tell you that `ghosted` deserves no
- * confirm while `rejected` does.
+ * What lives here classifies *targets and sources* of a move: which are worth a
+ * prompt, which offer an optional note, and which offer a way back. That is UI
+ * judgement layered on the FSM rather than a reading of it: no FSM fact would
+ * tell you that `ghosted` deserves no confirm while `rejected` does.
  *
- * Neither set is authoritative: every move they dress up is validated
- * server-side, so the worst either can do is misjudge an affordance. Which
+ * None of it is authoritative: every move it dresses up is validated
+ * server-side, so the worst it can do is misjudge an affordance. Which
  * states are *terminal* is an FSM fact, so it comes from the fetched table's
- * `terminal_states` rather than a third set here.
+ * `terminal_states` rather than a set here.
  *
- * `CONFIRM_REQUIRED` is pure judgement. `REVIVAL_STATES` is not quite: it
- * encodes the knowledge that these three states have an edge back to `applied`,
- * which the fetched `transitions[status]` also answers — an affordance built on
- * an FSM fact rather than merely beside one. Stale, it would offer a revival the
- * server refuses, or hide one it allows. Deriving it from the fetched table is
- * the open question tracked in TODO.md.
+ * The sets are pure judgement, and that is the line. The one affordance that
+ * rested on an FSM fact instead (which closed states have an edge back to
+ * `applied`) is no longer a set at all: `REVIVAL_STATES` was folded into
+ * `canRevive()` in v1.10.0, which reads the fetched table. A hardcoded copy
+ * could have offered a revival the server refuses, or hidden one it allows.
  */
 
 // Closed states whose entry is deliberate — the UI asks before moving here.
@@ -63,3 +62,14 @@ export const STAGE_NOTE_STATES: ReadonlySet<Status> = new Set([
   "final_round",
   "offer",
 ]);
+
+/**
+ * The transition note's character ceiling, mirrored from Rails'
+ * `TimelineEntry::NOTE_MAX_LENGTH` so the two textareas that write one can show
+ * the limit as a stop rather than let the user meet it as a 422.
+ *
+ * The server is authoritative and validates independently; this copy only
+ * dresses the input. If they ever disagree, the model wins and the worst case
+ * is a stop at the wrong number, never an accepted note the API rejects.
+ */
+export const NOTE_MAX_LENGTH = 2_000;

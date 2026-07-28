@@ -28,7 +28,7 @@ export default async function NewApplicationPage({
      fetched rather than copied (SPEC.md § The transition table). Degrades to
      `[]` when the table fails or predates the field; the form reads that as
      *unknown* and drops the picker, letting the API pick the initial state. */
-  const entryStates = tableRes.ok ? (tableRes.data.entry_states ?? []) : [];
+  const entryStates = tableRes.ok ? (tableRes.data?.entry_states ?? []) : [];
 
   return (
     <div className="mx-auto max-w-2xl">

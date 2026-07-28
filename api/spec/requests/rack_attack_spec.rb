@@ -25,6 +25,24 @@ RSpec.describe "Rack::Attack throttling", type: :request, skip_n_plus_one: true 
       expect(payload["error"]).to match(/Too many requests/)
       expect(payload["code"]).to eq("rate_limited")
     end
+
+    # Every per-IP throttle rests on req.ip, and req.ip is only as trustworthy as the
+    # header Rack reads it from. Rack 3.2 consults the RFC-7239 `Forwarded:` header
+    # ahead of `X-Forwarded-For`, and Railway normalises the latter but does not strip
+    # the former, so a client could hand us a fresh identity per request and rotate
+    # through the limit. rack_attack.rb pins forwarded_priority to [:x_forwarded] to
+    # close it; this is the proof.
+    it "ignores a spoofed Forwarded header when identifying the client" do
+      5.times do |i|
+        post "/api/v1/auth/sign_in", params: body, as: :json,
+          headers: { "HTTP_FORWARDED" => "for=203.0.113.#{i}" }
+      end
+
+      post "/api/v1/auth/sign_in", params: body, as: :json,
+        headers: { "HTTP_FORWARDED" => "for=203.0.113.99" }
+
+      expect(response).to have_http_status(:too_many_requests)
+    end
   end
 
   # The auth/sign_up throttle was deleted along with the endpoint it protected
@@ -273,7 +291,9 @@ RSpec.describe "Rack::Attack throttling", type: :request, skip_n_plus_one: true 
     end
 
     # The path regex is anchored on /\d+\z precisely so the neighbours keep their own treatment.
-    it "does not count a transition, which is a different path with a different cost" do
+    # "Their own treatment" means their own budget, not none: transition has its own throttle
+    # below. It used to have nothing, which is what this anchor bought before that existed.
+    it "does not count a transition against the upload budget" do
       token = jwt_for(user)
       30.times { |i| edit(token, "edit #{i}", "198.51.100.#{i}") }
 
@@ -291,6 +311,78 @@ RSpec.describe "Rack::Attack throttling", type: :request, skip_n_plus_one: true 
       delete "/api/v1/applications/#{record.id}", headers: { "Authorization" => token }
 
       expect(response).to have_http_status(:no_content)
+    end
+  end
+
+  # Transitions matched no throttle at all: they fail the /\d+\z anchor above, and nothing
+  # else claimed them. Every one writes a timeline_entries row and the FSM permits an
+  # unbounded applied -> rejected -> applied cycle, so it was a write loop with no ceiling.
+  describe "PATCH /api/v1/applications/:id/transition, per-account cap" do
+    let(:user)   { create(:user) }
+    let(:record) { create(:application, :draft, user: user) }
+
+    def move(token, to)
+      patch "/api/v1/applications/#{record.id}/transition",
+        params: { status: to }, as: :json, headers: { "Authorization" => token }
+    end
+
+    it "returns 429 after 30 transitions for one account within 1 minute" do
+      token = jwt_for(user)
+      # applied <-> rejected is a legal cycle, which is exactly why the endpoint needed a cap.
+      30.times { |i| move(token, i.even? ? "applied" : "rejected") }
+
+      move(token, "applied")
+
+      expect(response).to have_http_status(:too_many_requests)
+      expect(response.headers["Retry-After"]).to eq("60")
+    end
+
+    it "caps each account independently" do
+      token = jwt_for(user)
+      30.times { |i| move(token, i.even? ? "applied" : "rejected") }
+
+      other        = create(:user)
+      other_record = create(:application, :draft, user: other)
+      patch "/api/v1/applications/#{other_record.id}/transition",
+        params: { status: "applied" }, as: :json, headers: { "Authorization" => jwt_for(other) }
+
+      expect(response).not_to have_http_status(:too_many_requests)
+    end
+  end
+
+  # The most expensive call in the app (a resume PDF base64'd inline into a paid Claude
+  # request) and it had no throttle of any kind while prefill, which is cheaper, had four.
+  describe "POST /api/v1/applications/:id/talking_points, per-account cap" do
+    let(:user)   { create(:user) }
+    let(:record) { create(:application, :draft, user: user) }
+
+    def generate(token)
+      post "/api/v1/applications/#{record.id}/talking_points",
+        as: :json, headers: { "Authorization" => token }
+    end
+
+    it "returns 429 after 5 generations for one account within 1 minute" do
+      token = jwt_for(user)
+      # The upstream call is not stubbed: whatever these return (503 without a key, 422
+      # without a resume), the counter saw the request, which is the assertion.
+      5.times { generate(token) }
+
+      generate(token)
+
+      expect(response).to have_http_status(:too_many_requests)
+      expect(response.headers["Retry-After"]).to eq("60")
+    end
+
+    it "caps each account independently" do
+      token = jwt_for(user)
+      5.times { generate(token) }
+
+      other        = create(:user)
+      other_record = create(:application, :draft, user: other)
+      post "/api/v1/applications/#{other_record.id}/talking_points",
+        as: :json, headers: { "Authorization" => jwt_for(other) }
+
+      expect(response).not_to have_http_status(:too_many_requests)
     end
   end
 

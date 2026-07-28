@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useTransition } from "react";
+import { useEffect, useRef, useState, useTransition } from "react";
 import { useLocale, useTranslations } from "next-intl";
 import { useRouter } from "@/i18n/navigation";
 import { deletePasskey, getPasskeyRegistrationOptions, registerPasskey } from "@/app/lib/actions";
@@ -24,6 +24,30 @@ export function PasskeysManager({ passkeys }: { passkeys: Passkey[] }) {
   // False on the server render, the real detection after hydration — same
   // rule as the sign-in button.
   const ready = usePasskeysSupported();
+
+  // Focus management for the inline confirm, the same job app/lib/use-confirm-panel.ts
+  // does for the single-instance panels. It cannot be reused here because this
+  // one lives inside a .map(): the element focus must return to is the Remove
+  // button of the *specific* row that was confirming, so the restore target has
+  // to be looked up by id rather than held in one ref.
+  const panelRef = useRef<HTMLDivElement>(null);
+  const triggerRefs = useRef(new Map<number, HTMLButtonElement | null>());
+  const previousConfirmingId = useRef<number | null>(null);
+
+  useEffect(() => {
+    const previous = previousConfirmingId.current;
+    if (confirmingId === previous) return;
+    previousConfirmingId.current = confirmingId;
+
+    if (confirmingId !== null) {
+      panelRef.current
+        ?.querySelector<HTMLElement>("button:not([disabled])")
+        ?.focus();
+    } else if (previous !== null) {
+      // The row's Remove button has just remounted, so its ref is live again.
+      triggerRefs.current.get(previous)?.focus();
+    }
+  }, [confirmingId]);
 
   async function onAdd() {
     setError(null);
@@ -95,8 +119,10 @@ export function PasskeysManager({ passkeys }: { passkeys: Passkey[] }) {
               {confirmingId === passkey.id ? (
                 // Inline confirm, not window.confirm — the one destructive-action
                 // pattern across the app (see delete-button.tsx).
-                <div className="basis-full text-right sm:basis-auto">
-                  <p className="text-xs text-danger">{t("confirmRemove")}</p>
+                <div ref={panelRef} className="basis-full text-right sm:basis-auto">
+                  <p role="alert" className="text-xs text-danger">
+                    {t("confirmRemove")}
+                  </p>
                   <div className="mt-1.5 flex justify-end gap-2">
                     <button
                       type="button"
@@ -118,6 +144,9 @@ export function PasskeysManager({ passkeys }: { passkeys: Passkey[] }) {
                 </div>
               ) : (
                 <button
+                  ref={(node) => {
+                    triggerRefs.current.set(passkey.id, node);
+                  }}
                   type="button"
                   onClick={() => setConfirmingId(passkey.id)}
                   className="border border-danger/40 bg-linen px-3 py-1.5 text-sm text-danger hover:bg-danger/10"
@@ -140,7 +169,7 @@ export function PasskeysManager({ passkeys }: { passkeys: Passkey[] }) {
               onChange={(e) => setNickname(e.target.value)}
               placeholder={t("nicknamePlaceholder")}
               maxLength={100}
-              className="mt-1 w-full border border-dune bg-linen px-3 py-2 text-sm"
+              className="mt-1 w-full border border-rule-strong bg-linen px-3 py-2 text-sm"
             />
           </label>
           <button
@@ -156,7 +185,7 @@ export function PasskeysManager({ passkeys }: { passkeys: Passkey[] }) {
         <p className="text-sm text-ink-soft">{t("unsupported")}</p>
       )}
 
-      {error ? <p className="text-sm text-danger">{error}</p> : null}
+      {error ? <p role="alert" className="text-sm text-danger">{error}</p> : null}
     </div>
   );
 }

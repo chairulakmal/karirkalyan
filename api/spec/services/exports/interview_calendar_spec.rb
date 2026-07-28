@@ -39,6 +39,35 @@ RSpec.describe Exports::InterviewCalendar do
 
       expect(ics).to include('SUMMARY:Interview: Mercari\, Inc. (SRE\; Platform)')
     end
+
+    # A bare CR used to survive `escape` and reach the file raw, so a parser that
+    # treats a lone CR as a line terminator would read the rest of the field as
+    # real calendar properties. Nothing validates the format of company/role, so
+    # planting one only takes a write to the row.
+    it "escapes a bare CR rather than letting it terminate the content line" do
+      application = create(:application, user: user,
+        company: "Acme\rBEGIN:VALARM\rTRIGGER:-PT15M\rACTION:DISPLAY\rEND:VALARM",
+        role: "Backend",
+        interview_at: Time.zone.local(2026, 7, 25, 15, 0, 0))
+
+      ics = described_class.new(application).call
+
+      # Every CRLF in the output is a line ending the writer put there; none of
+      # them came from the company name, and no CR survives on its own.
+      expect(ics.split("\r\n").join("\n")).not_to include("\r")
+      expect(ics).not_to match(/^BEGIN:VALARM/)
+      expect(ics.gsub("\r\n ", "")).to include('SUMMARY:Interview: Acme\nBEGIN:VALARM')
+    end
+
+    it "collapses CRLF to a single escape, not two" do
+      application = create(:application, user: user,
+        company: "Acme\r\nTokyo", role: "Backend",
+        interview_at: Time.zone.local(2026, 7, 25, 15, 0, 0))
+
+      ics = described_class.new(application).call
+
+      expect(ics.gsub("\r\n ", "")).to include('SUMMARY:Interview: Acme\nTokyo')
+    end
   end
 
   describe "#filename" do

@@ -83,13 +83,13 @@ Production `Rails.cache` is `:solid_cache_store`: Postgres-backed, so throttle c
 
 ### AI job-URL pre-fill
 
-`POST /api/v1/applications/prefill` takes a job-posting URL and returns `{ company, role, notes }` for the user to review and edit before saving: the AI fills the form, it never writes to the database. Logic lives in `Applications::UrlPrefillService`: it fetches the page, strips the HTML to text, and asks **Claude Haiku 4.5** (official `anthropic` gem) to extract the fields via a tool/JSON schema, so the response is structured data rather than free text to parse. Claude reads Japanese postings natively: the same flow works on a Wantedly listing, a Greenhouse page, or a company careers site without a per-site parser, which is the point for a Tokyo job search.
+`POST /api/v1/applications/prefill` takes a job-posting **`url` or pasted `text`** (the paste path landed in `v1.6.0`, for postings a fetcher cannot read) and returns the structured fields for the user to review and edit before saving: `company`, `role`, `notes`, plus the Japan-market set added in `v1.8.0`–`v1.9.0` (`channel`, `agency`, `japanese_level`, `sponsorship`, `hiring_entity`, `company_timezone`, `overlap_hours_required`, and the four 年収 compensation fields), with `url` and `posting_text` merged on top: the AI fills the form, it never writes to the database. Logic lives in `Applications::UrlPrefillService`: it fetches the page, strips the HTML to text, and asks **Claude Haiku 4.5** (official `anthropic` gem) to extract the fields via a tool/JSON schema, so the response is structured data rather than free text to parse. Claude reads Japanese postings natively: the same flow works on a Wantedly listing, a Greenhouse page, or a company careers site without a per-site parser, which is the point for a Tokyo job search.
 
 Because the server fetches a user-supplied URL, two safeguards apply:
 - **SSRF guard**: the host is resolved and any private / loopback / link-local address (including the cloud metadata endpoint `169.254.169.254`) is refused, re-checked on every redirect hop. One internal address rejects the whole URL, and the connection is then pinned to an address that passed the check (`http.ipaddr`), so Net::HTTP cannot re-resolve to something else between the check and the connect.
 - **Cost & abuse control**: the endpoint is auth-gated and rate-limited via Rack::Attack (10/min per IP), with a body-size cap on the fetch and a character cap on the text sent to Claude to bound token usage.
 
-Errors are typed, because the five ways this fails ask the user for five different things: the URL itself being bad or private → `422` `invalid_url`; a site refusing an automated reader → `422` `prefill_blocked` (the URL is fine; retrying hits the same wall); the page not being fetchable at all → `502` `prefill_unreachable`, which is also where an upstream `429` lands, since that refusal is the one that lifts and a retry is worth asking for; the page being fetched but yielding nothing usable, whether empty of text or an AI failure → `502` `prefill_failed`; missing `ANTHROPIC_API_KEY` → `503` `prefill_unavailable`. The model only ever receives text the server already fetched: Anthropic's server-side web-search/fetch tools are deliberately **not** used, which keeps the SSRF guard, rate limiting, and cost under the app's control. Haiku 4.5 is chosen because extraction is a small, well-defined task: a typical posting costs a fraction of a cent.
+Errors are typed, because the six ways this fails ask the user for six different things: the URL itself being bad or private → `422` `invalid_url`; a site refusing an automated reader → `422` `prefill_blocked` (the URL is fine; retrying hits the same wall); the page not being fetchable at all → `502` `prefill_unreachable`, which is also where an upstream `429` lands, since that refusal is the one that lifts and a retry is worth asking for; the page being fetched but yielding nothing usable, whether empty of text or an AI failure → `502` `prefill_failed`; a pasted posting over `MAX_TEXT_CHARS` once stripped to text → `422` `prefill_paste_too_long`, which only the paste path can raise (a fetched page over the cap is truncated in silence, because the user never saw its length); missing `ANTHROPIC_API_KEY` → `503` `prefill_unavailable`. The model only ever receives text the server already fetched: Anthropic's server-side web-search/fetch tools are deliberately **not** used, which keeps the SSRF guard, rate limiting, and cost under the app's control. Haiku 4.5 is chosen because extraction is a small, well-defined task: a typical posting costs a fraction of a cent.
 
 **Fetch behaviour & limitations.** The fetch sends an honest, identifying `User-Agent` (`KarirKalyan-Prefill/1.0 (+https://kk.chairulakmal.com)`) rather than impersonating a browser: a site that wants to recognise the request can. Because it's a plain server-side `Net::HTTP` GET, it works on pages that serve their content as static HTML, but it will **not** reliably fetch every site, and that's by design rather than a bug:
 
@@ -172,11 +172,14 @@ POST   /api/v1/auth/passkey                # verify the assertion; answers with 
 
 GET    /api/v1/applications
 POST   /api/v1/applications
-POST   /api/v1/applications/prefill        # AI URL pre-fill (Claude)
+POST   /api/v1/applications/prefill        # AI pre-fill (Claude); url or pasted text
+GET    /api/v1/applications/ownership_check # agency duplicate-submission warning
 GET    /api/v1/applications/:id
 PATCH  /api/v1/applications/:id
 DELETE /api/v1/applications/:id
 PATCH  /api/v1/applications/:id/transition
+POST   /api/v1/applications/:id/talking_points  # cover-letter bullets (resume x posting)
+GET    /api/v1/applications/:id/interview  # .ics VEVENT for interview_at (text/calendar)
 GET    /api/v1/applications/:id/resume
 GET    /api/v1/applications/:id/cover_letter
 
@@ -197,6 +200,7 @@ GET    /api/v1/transitions               # the FSM transition table; the board r
                                          #   instead of mirroring it in TypeScript
 GET    /api/v1/dashboard
 GET    /api/v1/me
+PATCH  /api/v1/me                        # residence status / expiry
 
 GET    /up                               # deep health check: pings Postgres; no OpenAPI path
 GET    /api-docs

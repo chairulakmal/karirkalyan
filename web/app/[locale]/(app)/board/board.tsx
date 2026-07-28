@@ -1,6 +1,6 @@
 "use client";
 
-import { useOptimistic, useState, useTransition } from "react";
+import { useEffect, useOptimistic, useRef, useState, useTransition } from "react";
 import { useLocale, useTranslations } from "next-intl";
 import { Link, useRouter } from "@/i18n/navigation";
 import { transitionStatus } from "@/app/lib/actions";
@@ -8,6 +8,7 @@ import { jobBoardLabel, stageAge, statusBadgeClass } from "@/app/lib/format";
 import { excerpt } from "@/app/lib/excerpt";
 import { useToast } from "@/app/components/toast";
 import { CONFIRM_REQUIRED, canRevive } from "@/app/lib/transitions";
+import { useConfirmPanel } from "@/app/lib/use-confirm-panel";
 import type { Application, Status, TransitionTable } from "@/app/lib/types";
 
 // The two candidate-side columns where a stalled item is the user's own to move
@@ -325,6 +326,20 @@ function CardMenu({
   const [open, setOpen] = useState(false);
   const [confirming, setConfirming] = useState<Status | null>(null);
   const [reason, setReason] = useState("");
+  // Opening moves focus into the panel; closing (including via Escape, which
+  // used to leave focus nowhere at all) returns it to the ⋯ trigger.
+  const { panelRef, triggerRef } = useConfirmPanel<HTMLDivElement, HTMLButtonElement>(open);
+  // Picking a target that needs confirming swaps the item list for a confirm
+  // panel, so the button that had focus unmounts. Without this, focus fell to
+  // <body> and the wrapper's onBlur then closed the whole menu underneath the
+  // user. Focus moves to the confirm panel's first control instead.
+  const confirmRef = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    if (!confirming) return;
+    confirmRef.current
+      ?.querySelector<HTMLElement>('button:not([disabled]), input[type="text"]')
+      ?.focus();
+  }, [confirming]);
 
   const isRevival = revivable;
   // Catalog entries under `transitions.reasons` are JSON arrays → t.raw.
@@ -365,8 +380,17 @@ function CardMenu({
       }}
     >
       <button
+        ref={triggerRef}
         type="button"
-        aria-haspopup="menu"
+        // A disclosure, not an ARIA menu. `role="menu"` used to sit on the panel
+        // below with `role="menuitem"` on each child, and it lied: a screen
+        // reader switches to application mode on a menu and forwards arrow keys
+        // to it, but nothing here implements roving tabindex or arrow handling,
+        // so the user was told "menu" and then found it did not behave like one.
+        // The children are ordinary <button>s and work correctly as such. This
+        // is the same call SPEC.md § Auth flow already made for the account menu
+        // ("a plain disclosure, not an ARIA menu"); this one went the other way.
+        aria-haspopup="true"
         aria-expanded={open}
         aria-label={t("moveMenu", { company: app.company })}
         onClick={() => (open ? close() : setOpen(true))}
@@ -377,7 +401,7 @@ function CardMenu({
 
       {open && (
         <div
-          role="menu"
+          ref={panelRef}
           // z-20, not z-10: the ancestors here create no stacking context, so
           // this competes at the root against the sticky tab bar's z-10 — at
           // equal z the later-rendered bar would paint over (and swallow taps
@@ -393,7 +417,6 @@ function CardMenu({
                 <button
                   key={to}
                   type="button"
-                  role="menuitem"
                   onClick={() => pick(to)}
                   className="flex w-full items-center gap-2 px-3 py-2 text-left text-xs transition hover:bg-sand/60"
                 >
@@ -406,13 +429,16 @@ function CardMenu({
               ))}
             </>
           ) : confirming === "applied" && isRevival ? (
-            <div className="space-y-2 p-3">
-              <p className="text-xs font-medium text-ink-soft">{tt("reopenPrompt")}</p>
+            <div ref={confirmRef} className="space-y-2 p-3">
+              <p role="alert" className="text-xs font-medium text-ink-soft">
+                {tt("reopenPrompt")}
+              </p>
               <div className="flex flex-wrap gap-1.5">
                 {presets.map((preset) => (
                   <button
                     key={preset}
                     type="button"
+                    aria-pressed={reason === preset}
                     onClick={() => setReason(preset)}
                     className={`px-2 py-1 text-xs ring-1 ring-inset ring-midnight/20 transition ${
                       reason === preset
@@ -429,7 +455,8 @@ function CardMenu({
                 value={reason}
                 onChange={(e) => setReason(e.target.value)}
                 placeholder={tt("customReason")}
-                className="w-full border border-dune bg-linen px-2 py-1.5 font-mono text-xs text-midnight placeholder:text-ink-soft/50"
+                aria-label={tt("reopenPrompt")}
+                className="w-full border border-rule-strong bg-linen px-2 py-1.5 font-mono text-xs text-midnight placeholder:text-ink-soft"
               />
               <ConfirmCancel
                 confirmDisabled={reason.trim().length === 0}
@@ -438,18 +465,18 @@ function CardMenu({
               />
             </div>
           ) : (
-            <div className="space-y-2 p-3">
-              <p className="text-xs text-ink-soft">
+            <div ref={confirmRef} className="space-y-2 p-3">
+              <p role="alert" className="text-xs text-ink-soft">
                 {tt.rich("confirmMark", {
                   label: ts(`label.${confirming}`),
                   description: ts(`description.${confirming}`),
                   b: (chunks) => <span className="font-medium text-midnight">{chunks}</span>,
-                  dim: (chunks) => <span className="text-ink-soft/80">{chunks}</span>,
+                  dim: (chunks) => <span className="text-ink-soft">{chunks}</span>,
                 })}{" "}
                 {terminalStates.length === 0 ? null : terminalStates.includes(confirming) ? (
-                  <span className="text-danger/80">{tt("permanentWarning")}</span>
+                  <span className="text-danger">{tt("permanentWarning")}</span>
                 ) : (
-                  <span className="text-ink-soft/70">{tt("reopenable")}</span>
+                  <span className="text-ink-soft">{tt("reopenable")}</span>
                 )}
               </p>
               <ConfirmCancel

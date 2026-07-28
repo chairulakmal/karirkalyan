@@ -62,7 +62,7 @@ async function Item({
           </span>
         ) : null}
         {isTerminal ? (
-          <span className="font-mono text-[10px] uppercase tracking-widest text-danger/70">
+          <span className="font-mono text-[10px] uppercase tracking-widest text-danger">
             {t("permanent")}
           </span>
         ) : null}

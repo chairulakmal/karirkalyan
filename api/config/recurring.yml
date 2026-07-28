@@ -1,5 +1,14 @@
 # Solid Queue recurring tasks (replaces the old sidekiq-cron schedule).
-# Loaded by the dispatcher; timezone is explicit in the cron expression.
+# Loaded by the dispatcher.
+#
+# Timezone: the two daily tasks name Asia/Tokyo in the cron string, because a
+# wall-clock promise to a Tokyo user has to survive the container running UTC.
+# The two hourly ones are deliberately zone-less. Since solid_queue 1.5.0 a
+# zone-less schedule resolves in config.time_zone ("Tokyo") rather than the
+# system zone (UTC on Railway) -- for an hourly-at-minute-N schedule those are
+# the same set of instants, because JST is a whole-hour offset, so the 1.5.0
+# change is a no-op here. Anything added below that is daily, or that runs in a
+# half-hour zone, does NOT get that reprieve: give it an explicit zone.
 
 production:
   # Daily follow-up reminders at 08:15 JST (was "15 23 * * *" UTC under

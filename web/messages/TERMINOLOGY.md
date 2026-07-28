@@ -10,7 +10,7 @@ second-guessed later.
 | `wishlist` | 検討中 | "Under consideration." Boards use 気になる ("interested"), but that describes a *button*, not a stage. |
 | `draft` | 下書き | Standard. |
 | `applied` | 応募済み | Standard. |
-| `phone_screen` | カジュアル面談 | The literal 電話面接 is misleading — Japanese hiring calls the recruiter's first conversation a カジュアル面談, and it is rarely a phone call. |
+| `phone_screen` | カジュアル面談 | The literal 電話面接 is misleading: Japanese hiring calls the recruiter's first conversation a カジュアル面談, and it is rarely a phone call. |
 | `technical` | 技術面接 | Covers both interview and take-home; 技術選考 would imply a gate. |
 | `final_round` | 最終面接 | Standard. |
 | `offer` | 内定 | Exactly this concept: a formal, binding-by-custom offer of employment. Not オファー. |

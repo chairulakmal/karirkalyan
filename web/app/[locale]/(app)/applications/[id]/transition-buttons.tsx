@@ -1,12 +1,12 @@
 "use client";
 
-import { useState, useTransition } from "react";
+import { useEffect, useRef, useState, useTransition } from "react";
 import { useTranslations } from "next-intl";
 import { useRouter } from "@/i18n/navigation";
 import { transitionStatus } from "@/app/lib/actions";
 import { statusBadgeClass } from "@/app/lib/format";
 import { useToast } from "@/app/components/toast";
-import { CONFIRM_REQUIRED, STAGE_NOTE_STATES } from "@/app/lib/transitions";
+import { CONFIRM_REQUIRED, NOTE_MAX_LENGTH, STAGE_NOTE_STATES } from "@/app/lib/transitions";
 import type { Status } from "@/app/lib/types";
 
 /**
@@ -43,6 +43,32 @@ export function TransitionButtons({
   const [reversalReason, setReversalReason] = useState("");
   const [stageNote, setStageNote] = useState("");
   const [pending, startTransition] = useTransition();
+
+  // Focus management for the three confirm panels below. Same job as
+  // app/lib/use-confirm-panel.ts, done by hand for the same reason
+  // passkeys-manager does: the panel replaces one button inside a .map(), so
+  // focus has to return to the trigger for *that* status, looked up by key.
+  // Without this, opening a confirm dropped focus to <body> and Confirm was a
+  // full tab-from-top away; cancelling stranded the user a second time.
+  const panelRef = useRef<HTMLDivElement>(null);
+  const triggerRefs = useRef(new Map<Status, HTMLButtonElement | null>());
+  const previousConfirming = useRef<Status | null>(null);
+
+  useEffect(() => {
+    const previous = previousConfirming.current;
+    if (confirming === previous) return;
+    previousConfirming.current = confirming;
+
+    if (confirming !== null) {
+      // The first control is the preset chip row or the note field, which is
+      // where the user's next decision is, not the Confirm button.
+      panelRef.current
+        ?.querySelector<HTMLElement>('button:not([disabled]), textarea, input[type="text"]')
+        ?.focus();
+    } else if (previous !== null) {
+      triggerRefs.current.get(previous)?.focus();
+    }
+  }, [confirming]);
 
   function go(to: Status, note?: string) {
     setError(null);
@@ -105,13 +131,19 @@ export function TransitionButtons({
 
           if (confirming === status && isRevivalButton) {
             return (
-              <div key={status} className="w-full space-y-3">
-                <p className="text-xs font-medium text-ink-soft">{t("reopenPrompt")}</p>
+              <div key={status} ref={panelRef} className="w-full space-y-3">
+                <p role="alert" className="text-xs font-medium text-ink-soft">
+                  {t("reopenPrompt")}
+                </p>
                 <div className="flex flex-wrap gap-2">
                   {presets.map((reason) => (
                     <button
                       key={reason}
                       type="button"
+                      // aria-pressed: selection was signalled by fill colour
+                      // alone, which is nothing to a screen reader (WCAG 1.4.1
+                      // for the visual, 4.1.2 for the state).
+                      aria-pressed={reversalReason === reason}
                       onClick={() => setReversalReason(reason)}
                       className={`inline-flex min-h-10 items-center px-3 py-1 text-xs ring-1 ring-inset ring-midnight/20 transition ${
                         reversalReason === reason
@@ -123,12 +155,18 @@ export function TransitionButtons({
                     </button>
                   ))}
                 </div>
+                {/* The instruction above is an unassociated <p>, and a
+                    placeholder disappears the moment the user types, so without
+                    aria-label this field announced as an unnamed text box
+                    (WCAG 3.3.2). Its sibling at the closing panel below already
+                    did this correctly. */}
                 <input
                   type="text"
                   value={reversalReason}
                   onChange={(e) => setReversalReason(e.target.value)}
                   placeholder={t("customReason")}
-                  className="w-full border border-dune bg-linen px-3 py-1.5 font-mono text-xs text-midnight placeholder:text-ink-soft/50"
+                  aria-label={t("reopenPrompt")}
+                  className="w-full border border-rule-strong bg-linen px-3 py-1.5 font-mono text-xs text-midnight placeholder:text-ink-soft"
                 />
                 <div className="flex gap-2">
                   <button
@@ -154,8 +192,8 @@ export function TransitionButtons({
 
           if (confirming === status && STAGE_NOTE_STATES.has(status)) {
             return (
-              <div key={status} className="w-full space-y-3">
-                <p className="text-xs font-medium text-ink-soft">
+              <div key={status} ref={panelRef} className="w-full space-y-3">
+                <p role="alert" className="text-xs font-medium text-ink-soft">
                   {t("stageNotePrompt", { label: ts(`label.${status}`) })}
                 </p>
                 {/* Optional: Advance works with an empty note. "who you met,
@@ -164,8 +202,10 @@ export function TransitionButtons({
                   value={stageNote}
                   onChange={(e) => setStageNote(e.target.value)}
                   placeholder={t("stageNotePlaceholder")}
+                  aria-label={t("stageNotePrompt", { label: ts(`label.${status}`) })}
+                  maxLength={NOTE_MAX_LENGTH}
                   rows={3}
-                  className="w-full border border-dune bg-linen px-3 py-1.5 text-xs text-midnight placeholder:text-ink-soft/50"
+                  className="w-full border border-rule-strong bg-linen px-3 py-1.5 text-xs text-midnight placeholder:text-ink-soft"
                 />
                 <div className="flex gap-2">
                   <button
@@ -192,18 +232,18 @@ export function TransitionButtons({
           if (confirming === status) {
             const permanence = terminalStates.length === 0 ? null : terminalStates.includes(status);
             return (
-              <div key={status} className="w-full space-y-3">
-                <p className="text-xs text-ink-soft">
+              <div key={status} ref={panelRef} className="w-full space-y-3">
+                <p role="alert" className="text-xs text-ink-soft">
                   {t.rich("confirmMark", {
                     label: ts(`label.${status}`),
                     description: ts(`description.${status}`),
                     b: (chunks) => <span className="font-medium text-midnight">{chunks}</span>,
-                    dim: (chunks) => <span className="text-ink-soft/80">{chunks}</span>,
+                    dim: (chunks) => <span className="text-ink-soft">{chunks}</span>,
                   })}{" "}
                   {permanence === true ? (
-                    <span className="text-danger/80">{t("permanentWarning")}</span>
+                    <span className="text-danger">{t("permanentWarning")}</span>
                   ) : permanence === false ? (
-                    <span className="text-ink-soft/70">{t("reopenable")}</span>
+                    <span className="text-ink-soft">{t("reopenable")}</span>
                   ) : null}
                 </p>
                 {/* Optional note on the way out: a closing move often carries a
@@ -215,8 +255,9 @@ export function TransitionButtons({
                   onChange={(e) => setStageNote(e.target.value)}
                   placeholder={t("closeNotePlaceholder")}
                   aria-label={t("closeNotePrompt")}
+                  maxLength={NOTE_MAX_LENGTH}
                   rows={2}
-                  className="w-full border border-dune bg-linen px-3 py-1.5 text-xs text-midnight placeholder:text-ink-soft/50"
+                  className="w-full border border-rule-strong bg-linen px-3 py-1.5 text-xs text-midnight placeholder:text-ink-soft"
                 />
                 <div className="flex gap-2">
                   <button
@@ -243,6 +284,9 @@ export function TransitionButtons({
           return (
             <button
               key={status}
+              ref={(node) => {
+                triggerRefs.current.set(status, node);
+              }}
               type="button"
               onClick={() => handleClick(status)}
               disabled={pending}
@@ -254,7 +298,7 @@ export function TransitionButtons({
           );
         })}
       </div>
-      {error ? <p className="mt-3 text-sm text-danger">{error}</p> : null}
+      {error ? <p role="alert" className="mt-3 text-sm text-danger">{error}</p> : null}
     </div>
   );
 }

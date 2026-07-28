@@ -133,7 +133,7 @@ export function DetailsEditor(props: Props) {
     return (
       <div className="border border-dune bg-linen p-5">
         <div className="flex items-baseline justify-between">
-          <p className="kk-label">{t("title")}</p>
+          <h2 className="kk-label">{t("title")}</h2>
           <button
             type="button"
             onClick={() => {
@@ -280,7 +280,7 @@ export function DetailsEditor(props: Props) {
 
   return (
     <div className="border border-dune bg-linen p-5">
-      <p className="kk-label">{t("editTitle")}</p>
+      <h2 className="kk-label">{t("editTitle")}</h2>
       <form action={onSubmit} className="mt-3 space-y-4">
         <Field name="company" label={t("company")} defaultValue={props.company} required />
         <Field name="role" label={t("role")} defaultValue={props.role} required />
@@ -304,7 +304,7 @@ export function DetailsEditor(props: Props) {
               name="channel"
               value={channel}
               onChange={(e) => setChannel(e.target.value as Channel | "")}
-              className="mt-1.5 block w-full border border-dune bg-linen px-3 py-2 text-sm text-midnight"
+              className="mt-1.5 block w-full border border-rule-strong bg-linen px-3 py-2 text-sm text-midnight"
             >
               <option value="">{t("blank")}</option>
               {CHANNELS.map((c) => (
@@ -319,7 +319,7 @@ export function DetailsEditor(props: Props) {
             <select
               name="japanese_level"
               defaultValue={props.japaneseLevel ?? ""}
-              className="mt-1.5 block w-full border border-dune bg-linen px-3 py-2 text-sm text-midnight"
+              className="mt-1.5 block w-full border border-rule-strong bg-linen px-3 py-2 text-sm text-midnight"
             >
               <option value="">{t("blank")}</option>
               {JAPANESE_LEVELS.map((l) => (
@@ -347,7 +347,7 @@ export function DetailsEditor(props: Props) {
               name="sponsorship"
               value={sponsorship}
               onChange={(e) => setSponsorship(e.target.value as Sponsorship)}
-              className="mt-1.5 block w-full border border-dune bg-linen px-3 py-2 text-sm text-midnight"
+              className="mt-1.5 block w-full border border-rule-strong bg-linen px-3 py-2 text-sm text-midnight"
             >
               {SPONSORSHIPS.map((s) => (
                 <option key={s} value={s}>
@@ -369,7 +369,7 @@ export function DetailsEditor(props: Props) {
               <select
                 name="status_of_residence"
                 defaultValue={props.statusOfResidence ?? ""}
-                className="mt-1.5 block w-full border border-dune bg-linen px-3 py-2 text-sm text-midnight"
+                className="mt-1.5 block w-full border border-rule-strong bg-linen px-3 py-2 text-sm text-midnight"
               >
                 <option value="">{t("blank")}</option>
                 {STATUSES_OF_RESIDENCE.map((s) => (
@@ -386,7 +386,7 @@ export function DetailsEditor(props: Props) {
           <select
             name="hiring_entity"
             defaultValue={props.hiringEntity ?? ""}
-            className="mt-1.5 block w-full border border-dune bg-linen px-3 py-2 text-sm text-midnight"
+            className="mt-1.5 block w-full border border-rule-strong bg-linen px-3 py-2 text-sm text-midnight"
           >
             <option value="">{t("blank")}</option>
             {HIRING_ENTITIES.map((h) => (
@@ -402,7 +402,7 @@ export function DetailsEditor(props: Props) {
             <select
               name="company_timezone"
               defaultValue={props.companyTimezone ?? ""}
-              className="mt-1.5 block w-full border border-dune bg-linen px-3 py-2 text-sm text-midnight"
+              className="mt-1.5 block w-full border border-rule-strong bg-linen px-3 py-2 text-sm text-midnight"
             >
               <option value="">{t("blank")}</option>
               {COMPANY_TIMEZONES.map((z) => (
@@ -473,10 +473,10 @@ export function DetailsEditor(props: Props) {
             name="notes"
             rows={4}
             defaultValue={props.notes ?? ""}
-            className="mt-1.5 block w-full border border-dune bg-linen px-3 py-2 text-sm text-midnight placeholder:text-ink-soft"
+            className="mt-1.5 block w-full border border-rule-strong bg-linen px-3 py-2 text-sm text-midnight placeholder:text-ink-soft"
           />
         </label>
-        {error ? <p className="text-sm text-danger">{error}</p> : null}
+        {error ? <p role="alert" className="text-sm text-danger">{error}</p> : null}
         <div className="flex items-center gap-2">
           <button
             type="submit"

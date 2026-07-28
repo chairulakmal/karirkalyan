@@ -24,6 +24,10 @@ async function fetchAllApplications(): Promise<FetchAll> {
     if (after) qs.set("after", after);
     const res = await apiFetch<Paginated<Application>>(`/applications?${qs}`);
     if (!res.ok) return { ok: false, error: res.error };
+    // A body-less success (204, or a non-JSON 200 from a proxy mid-deploy) is
+    // the end of the walk, not a crash: return what we have rather than reading
+    // `.data` off null. Not marked truncated, because nothing says there is more.
+    if (!res.data) return { ok: true, applications, truncated: false };
 
     applications.push(...res.data.data);
     const { meta } = res.data;

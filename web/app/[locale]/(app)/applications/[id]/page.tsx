@@ -36,6 +36,11 @@ export default async function ApplicationDetailPage({
       </div>
     );
   }
+  // `ok` does not imply a body: apiFetch answers `data: null` for a 204 or a
+  // non-JSON 200, which is what a Railway holding page mid-deploy looks like.
+  // A detail page with no application to show is the same nothing a 404 is, so
+  // it takes the same exit rather than throwing on the first property read.
+  if (!res.data) notFound();
   const app = res.data;
   const numId = Number(id);
 
@@ -101,7 +106,7 @@ export default async function ApplicationDetailPage({
 
       <section className="border border-dune bg-linen p-5">
         <div className="flex items-center gap-2">
-          <p className="kk-label">{t("transition")}</p>
+          <h2 className="kk-label">{t("transition")}</h2>
           {/* A failed table costs the "permanent" badge here and the
               permanent/reopenable line in the confirm below — the help still
               explains every status, it just stops making a claim it cannot
@@ -165,7 +170,7 @@ export default async function ApplicationDetailPage({
         />
 
         <div className="border border-dune bg-linen p-5">
-          <p className="kk-label">{t("documents")}</p>
+          <h2 className="kk-label">{t("documents")}</h2>
           <FileUpload
             id={numId}
             field="resume"
@@ -202,7 +207,7 @@ export default async function ApplicationDetailPage({
       ) : null}
 
       <section className="border border-dune bg-linen p-5">
-        <p className="kk-label">{t("timeline")}</p>
+        <h2 className="kk-label">{t("timeline")}</h2>
         {app.timeline_entries.length === 0 ? (
           <p className="mt-3 text-sm text-ink-soft">{t("noTransitions")}</p>
         ) : (

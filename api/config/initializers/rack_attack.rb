@@ -5,8 +5,25 @@
 # Puma workers/processes; :memory_store in dev, :null_store in test (the
 # throttling spec swaps in its own MemoryStore).
 #
-# req.ip respects Rails' trusted-proxy handling, so behind Railway/Cloudflare the
-# real client IP is used (not the proxy's).
+# Client IP: this file used to claim "req.ip respects Rails' trusted-proxy
+# handling". It does not, and the difference was exploitable. Rack::Attack::Request
+# subclasses Rack::Request and overrides neither #ip nor reads
+# env["action_dispatch.remote_ip"], so req.ip is governed by Rack's own rules and
+# NOT by config.action_dispatch.trusted_proxies (which this app never set anyway).
+# Rack 3.2 reads the RFC-7239 `Forwarded:` header ahead of `X-Forwarded-For`, and
+# Railway normalises the latter but does not strip the former, so any client could
+# hand us the IP it wanted to be throttled as:
+#
+#   REMOTE_ADDR 10.0.1.5 + XFF 203.0.113.9 + "Forwarded: for=1.2.3.4"  =>  1.2.3.4
+#
+# Rotating that header per request gave a fresh throttle key every time, which
+# defeated auth/sign_in, auth/passkey (the ONLY limit on an unauthenticated
+# endpoint that does bcrypt work and writes a cache row per call), and ai/prefill's
+# per-IP leg. Pinning the priority to the header our proxy actually sets closes it.
+# This is a global Rack setting, so ActionDispatch's request.ip inherits the same
+# hardening, which is what we want.
+Rack::Request.forwarded_priority = [ :x_forwarded ]
+
 #
 # JSON-bodied requests don't expose `req.params` inside Rack middleware (Rails
 # parses the body downstream), so where we need a value from the body — the
@@ -86,13 +103,41 @@ class Rack::Attack
   # tightly so the neighbours keep their own treatment — POST /applications/prefill is not the
   # collection path and has its own caps above, and .../:id/transition fails the /\d+\z anchor.
   # DELETE is absent on purpose: it is the one write that gives storage back.
+  #
+  # "The neighbours keep their own treatment" was true of prefill and false of the other two:
+  # transition and talking_points fell through this anchor into *no* throttle at all, which is
+  # the fail-open the header comment warns about, landing on routes that comment predates. Both
+  # now have their own discriminators below.
   APPLICATION_MEMBER_PATH = %r{\A/api/v1/applications/\d+\z}
+  APPLICATION_TRANSITION_PATH = %r{\A/api/v1/applications/\d+/transition\z}
+  APPLICATION_TALKING_POINTS_PATH = %r{\A/api/v1/applications/\d+/talking_points\z}
 
   def self.application_write_user_id(req)
     path = normalized_path(req)
     write = (req.post? && path == "/api/v1/applications") ||
             ((req.patch? || req.put?) && path.match?(APPLICATION_MEMBER_PATH))
     return unless write
+
+    account_id(req)
+  end
+
+  # Status changes. Every one writes a timeline_entries row, and the FSM permits an
+  # unbounded cycle (applied -> rejected -> applied -> ...), so this is a write loop
+  # with no natural ceiling. Per-account, like the writes above, because the cost is
+  # a function of whose data grows.
+  def self.application_transition_user_id(req)
+    return unless req.patch? && normalized_path(req).match?(APPLICATION_TRANSITION_PATH)
+
+    account_id(req)
+  end
+
+  # The most expensive call in the app: it base64-encodes the stored resume PDF
+  # inline (up to 1 MB) into a paid Claude request, inside a Puma request thread.
+  # It had no throttle of any kind, per-IP or per-account, while prefill (which is
+  # cheaper) had four. The shared demo account's credentials are published by
+  # design, so "a user can overspend their own budget" was really "anyone can".
+  def self.talking_points_user_id(req)
+    return unless req.post? && normalized_path(req).match?(APPLICATION_TALKING_POINTS_PATH)
 
     account_id(req)
   end
@@ -169,6 +214,20 @@ class Rack::Attack
   # a request that is cheap either way. 30/min is far above a human editing their applications.
   throttle("applications/write/minute", limit: 30, period: 1.minute) { |req| application_write_user_id(req) }
   throttle("applications/write/hour", limit: 300, period: 1.hour) { |req| application_write_user_id(req) }
+
+  # Transitions, matching the write numbers above: the same shape of authenticated
+  # write, on the same records. As with uploads, this bounds the rate and not the
+  # total: TimelineEntry::NOTE_MAX_LENGTH bounds how much each one can carry.
+  throttle("applications/transition/minute", limit: 30, period: 1.minute) { |req| application_transition_user_id(req) }
+  throttle("applications/transition/hour", limit: 300, period: 1.hour) { |req| application_transition_user_id(req) }
+
+  # Talking points: the prefill posture and tighter numbers, because each call ships
+  # a PDF as well as a prompt. Per-account only, and deliberately not per-IP: the
+  # endpoint requires a decodable JWT, so there is no unauthenticated leg for a
+  # coarse IP cap to protect.
+  throttle("ai/talking_points/account/minute", limit: 5, period: 1.minute) { |req| talking_points_user_id(req) }
+  throttle("ai/talking_points/account/hour", limit: 30, period: 1.hour) { |req| talking_points_user_id(req) }
+  throttle("ai/talking_points/account/day", limit: 60, period: 1.day) { |req| talking_points_user_id(req) }
 
   # Passkey enrollment is an authenticated write like the two above, and the
   # shared demo login makes every authenticated write a public one. The rate

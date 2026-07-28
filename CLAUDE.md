@@ -34,7 +34,7 @@ Consequences:
 
 Do not restate release status, versions, or scope in this file: that is `TODO.md`'s job, and copies here go stale.
 
-**Do not start any `2.0.0` work until Akmal has actually started his next job.** The whole `2.0.0` cluster (the `positions` tenure entity and everything hanging off it, plus the post-job infrastructure items) is gated on that life event, not on finishing `v1.10.0`: treat it as out of scope until Akmal says the job has begun. This is a standing guardrail, not a scope restatement; `TODO.md`'s `2.0.0` cluster owns the what and the why.
+**`v1` is closed to new features, and no `2.0.0` work starts until Akmal has actually started his next job.** Two halves of one guardrail. Anything that adds a capability now belongs to the `2.0.0` cluster (the rewrite to Hono + Nuxt, the `positions` tenure entity and everything hanging off it), which is gated on that life event and not on any release number: treat it as out of scope until Akmal says the job has begun. Meanwhile a `v1` change ships only if it makes something the app already does work correctly or stops something it already does from being abused. Do not argue a feature into a patch because it looks small. This is a standing guardrail, not a scope restatement; `TODO.md` § The rule owns the reasoning and the `2.0.0` cluster owns the what and the why.
 
 ## Invariants most worth knowing
 
@@ -75,7 +75,7 @@ CI is path-aware so a docs commit doesn't pay for a full Rails suite and Next bu
 
 `SPEC.md` moves in the same PR as the behaviour change (rule above). The **rest** of the documentation surface is not allowed to wait for release day either: **after each feature lands, and before the release that ships it is tagged**, bring the other docs up to date: `README.md` *and* `README.ja.md` (always together, never one without the other), `CHANGELOG.md`, the swagger/rswag output, `llms.txt`. Tagging a release whose docs still describe the previous release is the `PLAN.md` failure mode with a version number on it.
 
-**Which digit moves** is decided by one mechanical test, not by how big the release feels: *could the previous release's image boot and serve against the database this release leaves behind?* If **no**, it is a **major**: an irreversible migration, `/api/v1` → `/api/v2`, an `ApplicationFSM` state removed or renamed, a required env var dropped. If yes and the release adds a user-visible capability, it is a **minor**; if it adds none (fixes, security, dependency bumps, performance), it is a **patch**. The reasoning, and why SemVer's own definition of major cannot fire on this project, is in `SPEC.md` § Versioning & releases. The `docs-auditor` subagent exists for exactly this post-feature sweep.
+**Which digit moves** is decided by one mechanical test, not by how big the release feels. `SPEC.md` § Versioning & releases states the test, lists what counts as a major, and explains why SemVer's own definition of major cannot fire on this project: read it there rather than from a copy here, which is what this file's opening sentence promises and what this paragraph used to break. The `docs-auditor` subagent exists for exactly this post-feature sweep.
 
 **The tag is not the last step: `gh release create` closes the release**, with notes drawn from the `CHANGELOG.md` entry. `SPEC.md` § Versioning & releases has always named it as part of the ritual, but `v1.7.0` still shipped tagged and release-less for a day because this list did not, so it now does.
 

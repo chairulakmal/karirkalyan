@@ -68,6 +68,11 @@ class Application < ApplicationRecord
   # backup story is a nightly pg_dump. See SPEC.md § Security.
   MAX_PER_USER = 200
 
+  # The ceiling on the free-text `notes` column. See the validation below for why
+  # it needed one. Same job as MAX_PER_USER, one level down: a bound on the total,
+  # which no throttle can provide.
+  NOTES_MAX_LENGTH = 10_000
+
   DOWNLOAD_KINDS = %i[resume cover_letter].freeze
 
   # Readable, not load-bearing: the id is what makes a download name unique, so a segment is
@@ -100,6 +105,12 @@ class Application < ApplicationRecord
   validates :posting_snapshot,
             length: { maximum: Applications::UrlPrefillService::MAX_TEXT_CHARS },
             allow_nil: true
+  # `notes` was the one free-text column with no ceiling: posting_snapshot, resume
+  # and cover_letter all had one, and it did not, so an update loop could grow a
+  # row without limit. Sized to hold what the prefill service can put there (its
+  # notes field is a short tech-stack line plus 2-4 sentences) with generous room
+  # for the user's own additions.
+  validates :notes, length: { maximum: NOTES_MAX_LENGTH }, allow_nil: true
   validates :resume,       length: { maximum: MAX_FILE_SIZE, message: "must be under 1 MB" }, allow_nil: true
   validates :cover_letter, length: { maximum: MAX_FILE_SIZE, message: "must be under 1 MB" }, allow_nil: true
   validate :resume_must_be_pdf,       if: -> { resume.present? && will_save_change_to_resume? }

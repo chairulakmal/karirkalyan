@@ -167,6 +167,10 @@ export async function createApplication(formData: FormData): Promise<ActionFailu
   });
 
   if (!res.ok) return apiFailure(res);
+  // A create that answers 201 with no body leaves us no id to navigate to, so
+  // there is nowhere to redirect. Report it rather than building
+  // `/applications/undefined`.
+  if (!res.data) return localFailure("emptyResponse");
 
   const locale = await getLocale();
   revalidatePath(getPathname({ href: "/dashboard", locale }));
@@ -217,6 +221,9 @@ export async function prefillFromUrl(url: string): Promise<PrefillResult> {
   });
 
   if (!res.ok) return apiFailure(res);
+  // Prefill's whole product is the fields; a success carrying none of them is a
+  // failure to the caller, whatever the status line said.
+  if (!res.data) return localFailure("emptyResponse");
   return { ok: true, ...res.data };
 }
 
@@ -232,6 +239,7 @@ export async function prefillFromText(text: string, url: string): Promise<Prefil
   });
 
   if (!res.ok) return apiFailure(res);
+  if (!res.data) return localFailure("emptyResponse");
   return { ok: true, ...res.data };
 }
 
@@ -249,6 +257,10 @@ export async function checkOwnership(company: string): Promise<OwnershipResult> 
     `/applications/ownership_check?company=${encodeURIComponent(trimmed)}`,
   );
   if (!res.ok) return apiFailure(res);
+  // This one is a warning surface, and the caller renders a failure as nothing.
+  // An empty body means "no open windows found", which is the same thing the
+  // empty-company early return above already answers.
+  if (!res.data) return { ok: true, window_months: 0, submissions: [] };
   return { ok: true, ...res.data };
 }
 
@@ -351,6 +363,7 @@ export async function generateTalkingPoints(id: number): Promise<TalkingPointsRe
     method: "POST",
   });
   if (!res.ok) return apiFailure(res);
+  if (!res.data) return localFailure("emptyResponse");
   return { ok: true, points: res.data.points };
 }
 
@@ -373,6 +386,9 @@ export async function getPasskeyRegistrationOptions(): Promise<PasskeyOptionsRes
     method: "POST",
   });
   if (!res.ok) return apiFailure(res);
+  // No options means no ceremony to start: the browser cannot register against
+  // an empty challenge, so fail here rather than hand it undefined.
+  if (!res.data) return localFailure("emptyResponse");
   return { ok: true, options: res.data };
 }
 
@@ -410,6 +426,9 @@ export type PushPublicKeyResult = { ok: true; publicKey: string } | ActionFailur
 export async function getPushPublicKey(): Promise<PushPublicKeyResult> {
   const res = await apiFetch<{ public_key: string }>("/push_subscriptions/public_key");
   if (!res.ok) return apiFailure(res);
+  // Push is unconfigurable without the VAPID key, and the caller already treats
+  // a failure as "push unavailable", which is the honest reading of no body.
+  if (!res.data) return localFailure("emptyResponse");
   return { ok: true, publicKey: res.data.public_key };
 }
 

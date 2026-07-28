@@ -1,6 +1,14 @@
 "use client";
 
-import { createContext, useCallback, useContext, useMemo, useRef, useState } from "react";
+import {
+  createContext,
+  useCallback,
+  useContext,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+} from "react";
 import { useTranslations } from "next-intl";
 
 type Tone = "success" | "error";
@@ -24,18 +32,65 @@ export function ToastProvider({ children }: { children: React.ReactNode }) {
   const [toasts, setToasts] = useState<Toast[]>([]);
   const nextId = useRef(0);
 
+  // Live dismissal timers, so hovering or focusing the stack can hold them open.
+  // WCAG 2.2.1 (Timing Adjustable) wants a timed message to be pausable, and
+  // there is a concrete bug behind the SC here too: if a keyboard user has
+  // tabbed to a toast's Dismiss button when the timer fires, the button unmounts
+  // under them and focus drops to <body>.
+  const timers = useRef(new Map<number, ReturnType<typeof setTimeout>>());
+
   const dismiss = useCallback((id: number) => {
+    const timer = timers.current.get(id);
+    if (timer) clearTimeout(timer);
+    timers.current.delete(id);
     setToasts((current) => current.filter((toast) => toast.id !== id));
   }, []);
+
+  const schedule = useCallback(
+    (id: number) => {
+      timers.current.set(
+        id,
+        setTimeout(() => dismiss(id), AUTO_DISMISS_MS),
+      );
+    },
+    [dismiss],
+  );
 
   const push = useCallback(
     (message: string, tone: Tone) => {
       const id = nextId.current++;
       setToasts((current) => [...current, { id, message, tone }]);
-      setTimeout(() => dismiss(id), AUTO_DISMISS_MS);
+      schedule(id);
     },
-    [dismiss],
+    [schedule],
   );
+
+  // Pointer or keyboard focus anywhere in the stack holds every toast; leaving
+  // restarts them. Whole-stack rather than per-toast because reaching one toast
+  // means moving across its neighbours, and losing them on the way is the same
+  // problem one step removed.
+  const holdAll = useCallback(() => {
+    for (const timer of timers.current.values()) clearTimeout(timer);
+    timers.current.clear();
+  }, []);
+
+  const resumeAll = useCallback(() => {
+    setToasts((current) => {
+      for (const toast of current) {
+        if (!timers.current.has(toast.id)) schedule(toast.id);
+      }
+      return current;
+    });
+  }, [schedule]);
+
+  // Never leave a timer behind on unmount.
+  useEffect(() => {
+    const pending = timers.current;
+    return () => {
+      for (const timer of pending.values()) clearTimeout(timer);
+      pending.clear();
+    };
+  }, []);
 
   // Stable identity: callers read `.success`/`.error` in event handlers, and a
   // fresh object each render would re-render every consumer when a toast appears.
@@ -55,7 +110,15 @@ export function ToastProvider({ children }: { children: React.ReactNode }) {
           toasts themselves re-enable it for the dismiss button. */}
       <div
         aria-live="polite"
-        className="pointer-events-none fixed inset-x-0 bottom-16 z-50 flex flex-col items-center gap-2 px-4 sm:bottom-4"
+        onMouseEnter={holdAll}
+        onMouseLeave={resumeAll}
+        onFocusCapture={holdAll}
+        onBlurCapture={resumeAll}
+        // bottom offset clears the phone tab bar *and* its safe-area inset: on a
+        // device reporting a bottom inset the old flat bottom-16 overlapped the
+        // bar, and since the toasts re-enable pointer events it swallowed taps
+        // meant for a tab.
+        className="pointer-events-none fixed inset-x-0 bottom-[calc(4rem+env(safe-area-inset-bottom))] z-50 flex flex-col items-center gap-2 px-4 sm:bottom-4"
       >
         {toasts.map((toast) => (
           // No per-toast role here: the parent already declares one polite live

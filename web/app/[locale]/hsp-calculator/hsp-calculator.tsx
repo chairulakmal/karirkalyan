@@ -215,7 +215,7 @@ function Select({
       <select
         value={value}
         onChange={(e) => onChange(e.target.value)}
-        className="mt-2 block w-full border border-dune bg-linen px-3 py-2.5 text-lg text-midnight transition hover:border-ink-soft"
+        className="mt-2 block w-full border border-rule-strong bg-linen px-3 py-2.5 text-lg text-midnight transition hover:border-ink-soft"
       >
         {options.map((o) => (
           <option key={o.value} value={o.value}>
@@ -288,7 +288,7 @@ function NumberField({
         step={step}
         onChange={(e) => handleChange(e.target.value)}
         onBlur={handleBlur}
-        className="mt-2 block w-full border border-dune bg-linen px-3 py-2.5 text-lg text-midnight transition hover:border-ink-soft placeholder:text-dune"
+        className="mt-2 block w-full border border-rule-strong bg-linen px-3 py-2.5 text-lg text-midnight transition hover:border-ink-soft placeholder:text-dune"
       />
     </label>
   );

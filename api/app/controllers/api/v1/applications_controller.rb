@@ -143,7 +143,11 @@ module Api
           application: @application,
           to:          params.require(:status),
           actor:       current_user,
-          note:        params[:note].presence
+          # Same guard, and the same reason, as `text` in #prefill above: a JSON
+          # object arrives as ActionController::Parameters, whose #to_s is a hash
+          # inspection, which is `present?`, so `.presence` alone would store
+          # `{"a" => "b"}` in the note column.
+          note:        (params[:note] if params[:note].is_a?(String)).presence
         ).call
         render json: @application.reload.as_json.merge(
           valid_next_states: ApplicationFSM.valid_next_states(@application.status)

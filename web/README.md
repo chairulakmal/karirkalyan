@@ -1,6 +1,6 @@
 # KarirKalyan: Next.js Frontend
 
-The operational README for `web/`, KarirKalyan's Next.js 16 App Router frontend: how it authenticates, routes, and runs locally. The most important rule in it: the JWT never reaches client JavaScript: sign-in exchanges the token through a route handler that sets an `httpOnly` cookie, which is one reason Next.js was chosen over a pure SPA. Contents: the stack, the auth design, i18n and its CI-enforced catalog parity, the screens, local setup, and the Playwright end-to-end suite. How the system works and why lives in [`SPEC.md`](../SPEC.md); this file is what you type.
+The operational README for `web/`, KarirKalyan's Next.js 16 App Router frontend: how it authenticates, routes, and runs locally. The most important rule in it: the JWT never reaches client JavaScript: sign-in exchanges the token through a route handler that sets an `httpOnly` cookie, which is one reason Next.js was chosen over a pure SPA. Contents: the stack, the auth design, i18n and its CI-enforced catalog parity, the screens, local setup, the Vitest unit suite, and the Playwright end-to-end suite. How the system works and why lives in [`SPEC.md`](../SPEC.md); this file is what you type.
 
 ## Stack
 
@@ -34,6 +34,7 @@ Every page lives under a `[locale]` segment: `en` and `ja` (`i18n/routing.ts`, m
 | `/applications/new` | Create a new application; includes the AI job-URL pre-fill |
 | `/applications/[id]` | Detail view: FSM transition buttons (from `valid_next_states`), timeline entries, resume/cover letter upload |
 | `/settings` | Passkey enrollment (create and revoke; feature-detected, desktop-first) and the push-notification toggle for the follow-up digest. The only place the notification-permission prompt can fire |
+| `/hsp-calculator` | Public, no-auth 高度専門職 (Highly Skilled Professional) points calculator, engineer track. No session required; its point table is verified against the MOJ source |
 | `/about`, `/docs` | Project write-up and documentation |
 | `/privacy`, `/terms` | Legal pages, both locales; readable signed in or out |
 
@@ -49,6 +50,17 @@ npm run dev   # :3000
 ```
 
 Expects the Rails API on `:3001`. Copy `.env.example` to `.env.local` if you need to override `API_URL` (server-side only, never exposed to the browser).
+
+## Unit tests (Vitest)
+
+`npm test` runs the no-DOM, no-browser tier: pure TypeScript logic, co-located as `app/**/*.test.ts`, plus the BFF route handlers under `app/api/`, which are plain `Request -> Response` functions and need only a stubbed `apiFetch`. It runs in CI ahead of the build.
+
+```bash
+npm test                    # single run
+npm run test:watch          # watch mode
+```
+
+Vitest owns this layer and Playwright owns the browser; nothing in `app/**/*.test.ts` starts a server. The route-handler tests exist because that seam had none when the list's `?q=` search silently stopped reaching the API: `tsc` was clean and every other check passed.
 
 ## End-to-end tests (Playwright)
 

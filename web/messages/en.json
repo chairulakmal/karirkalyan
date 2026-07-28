@@ -11,7 +11,8 @@
     "forReviewers": "For reviewers",
     "about": "How it is built",
     "apiDocs": "API docs",
-    "source": "Source"
+    "source": "Source",
+    "skipToContent": "Skip to content"
   },
   "status": {
     "label": {
@@ -257,7 +258,8 @@
       "base_too_many_applications": "Your account is full. Delete an application to add another one.",
       "base_too_many_passkeys": "Your account has reached its passkey limit. Remove one to add another.",
       "base_too_many_push_subscriptions": "Your account has reached its device limit for notifications. Disable them on another device to add this one."
-    }
+    },
+    "emptyResponse": "The server returned no data. Try again."
   },
   "home": {
     "signIn": "Sign in",
@@ -459,6 +461,7 @@
     "avgDaysAria": "What counts toward this average",
     "avgDaysTooltip": "Counts applications that reached offer, accepted, or declined. Measured from your applied date to when the offer status was recorded in the audit log.",
     "failedToLoad": "Failed to load: {message}",
+    "emptyResponse": "the server returned no data",
     "exports": {
       "blurb": "Take your history with you. The spreadsheet is a convenience view of your applications; the archive is everything — applications, timeline, and the resumes and cover letters you uploaded.",
       "csv": "Applications (.csv)",
@@ -532,7 +535,9 @@
     "followUp": "Follow up {date}",
     "loading": "Loading…",
     "loadMore": "Load more",
-    "resultCount": "{count, plural, =0 {No applications shown} one {# application shown} other {# applications shown}}"
+    "resultCount": "{count, plural, =0 {No applications shown} one {# application shown} other {# applications shown}}",
+    "filterFailed": "Could not update the list. Check your connection and try again.",
+    "loadMoreFailed": "Could not load more applications. Try again."
   },
   "detail": {
     "eyebrow": "Application",
