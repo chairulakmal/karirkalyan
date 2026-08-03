@@ -87,6 +87,21 @@ RSpec.describe JapanCalendar do
       expect(described_class.business_days_between(entered, Time.zone.parse("2026-06-24 10:00"))).to eq(2)
     end
 
+    # business_days_between does not call business_day? per date: it pulls the
+    # national holidays for the span in one gem call, because doing it per date
+    # cost 13.7s for the dashboard's worst case. That makes the two definitions
+    # of "business day" separate code paths, so this pins them together over a
+    # span carrying every kind of dead zone: two New Years, Golden Week, Obon,
+    # the equinoxes, and a 振替休日.
+    it "agrees with counting business_day? one date at a time" do
+      from = Date.new(2025, 11, 30)
+      to   = Date.new(2027, 3, 31)
+      naive = ((from + 1)..to).count { |date| described_class.business_day?(date) }
+
+      expect(described_class.business_days_between(from, to)).to eq(naive)
+      expect(naive).to be > 300 # a span worth checking, not an empty range
+    end
+
     it "is zero rather than negative when the end precedes the start" do
       expect(described_class.business_days_between(Date.new(2026, 6, 24), Date.new(2026, 6, 3))).to eq(0)
     end

@@ -57,7 +57,10 @@ module Applications
     # The elapsed-time arithmetic itself is deliberately *not* in SQL any more:
     # the holiday rules live in a Ruby gem and the seasonal dead zones live in
     # JapanCalendar, so Postgres cannot answer this question. It costs one row
-    # per in-flight application, which at personal-tracker scale is tens.
+    # per in-flight application, which at personal-tracker scale is tens, plus
+    # one gem call per row inside business_days_between. The worst case the cap
+    # allows (200 applications, all silent for years) is the reason that method
+    # does not simply loop business_day?; see the note there.
     def in_flight
       sql = <<~SQL.squish
         SELECT
