@@ -45,7 +45,7 @@ The trade-off: the losing writer must reload and redo the edit. That beats the a
 
 Count calendar days instead and every threshold shrinks exactly when companies are slowest to reply. That is how you end up telling someone a live application is dead.
 
-The thresholds are fixed: 15 working days after applying, 10 after a phone screen. An earlier version derived them from the user's own reply times. `v1.11.2` dropped it, because there is one user and he could neither predict the number nor overrule it.
+The thresholds are fixed: 15 working days after applying, 10 after a phone screen. An earlier version derived them from the user's own reply times. We dropped it, because there is one user and he could neither predict the number nor overrule it.
 
 The trade-off: the query runs on each request instead of reading a precomputed flag. At the 200-applications-per-account cap that is cheap, and a derived answer can never disagree with the timeline it came from.
 
