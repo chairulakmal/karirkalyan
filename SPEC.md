@@ -21,7 +21,7 @@ Two consequences worth stating plainly:
 - **If code and SPEC.md disagree, that is a bug in one of them**, not a documentation chore to sweep up later. Decide which is wrong and fix that one. Silence is the failure mode: this file spent an entire release describing Sidekiq and Redis after both had been removed, which is exactly why it now carries this rule.
 - **SPEC.md describes the system as it is**, in the present tense. It is not a plan and not a history. Open work lives in [`TODO.md`](TODO.md); shipped work lives in [`CHANGELOG.md`](CHANGELOG.md), including the pre-1.0.0 build phases that used to sit at the top of this file.
 
-Last synced against the code: **2026-07-28**. Newest first, and nothing sits unreleased above it: **`v1.11.1`** (tagged 2026-07-28), the bug-fix patch. Its headline is that **the list's `?q=` search never reached the API**: the BFF route handler re-enumerated the query params by hand and was never taught about `q`, so a typed search silently returned unfiltered rows while every surface reported success (the allowlist now lives once, in `app/lib/list-params.ts`; spec and code disagreed and the **code** was the bug, so § Query layer is unchanged).
+Last synced against the code: **2026-08-03**. Newest first. Two fixes sit unreleased above the newest tag, headed for **`v1.11.2`**: the prefill extractor read a residents-of-Japan-only posting as `sponsorship: "unavailable"`, asserting a refusal to sponsor that no posting had stated (§ `UrlPrefillService`); and ghost risk counted calendar days, so every threshold silently shrank across Golden Week, Obon and the New Year, which is when it should have been most patient. Fixing the second took the derived p90 with it: the thresholds are now fixed counts of business days, and the payload lost `basis` and `sample_sizes` (§ `Applications::GhostRiskQuery`). Then **`v1.11.1`** (tagged 2026-07-28), the bug-fix patch. Its headline is that **the list's `?q=` search never reached the API**: the BFF route handler re-enumerated the query params by hand and was never taught about `q`, so a typed search silently returned unfiltered rows while every surface reported success (the allowlist now lives once, in `app/lib/list-params.ts`; spec and code disagreed and the **code** was the bug, so § Query layer is unchanged).
 
 Beside it, a security pass: § Security records that **`Rack::Request.forwarded_priority` is pinned**, because the RFC-7239 `Forwarded:` header let a client choose its own throttle key and defeat every per-IP limit; **`applications/transition` and `ai/talking_points` gain throttles**, having matched none at all; **`TimelineEntry::NOTE_MAX_LENGTH` and `Application::NOTES_MAX_LENGTH`** bound the two free-text columns that had no ceiling; the **param-filter list** grows the WebAuthn and push material lograge was writing out in full; and § Exports records that the `.ics` `escape` now collapses a **bare CR**, which used to reach the file raw.
 
@@ -317,12 +317,12 @@ timeline_entries
   idempotency_key   string, unique      ← prevents duplicate reminder entries on job retry
   created_at, updated_at
 
-  index (application_id, created_at)   ← composite; serves the ghost-risk window function
+  index (application_id, created_at)   ← composite; serves every per-application read in time order
   index (actor_id)
   index (idempotency_key) unique
 ```
 
-The `(application_id, created_at)` composite **replaces** a bare `application_id` index, which it covers as a prefix, so it is a widening, not an extra index. It exists because every read of this table is per-application in time order: the detail page's timeline, and the `LAG(created_at) OVER (PARTITION BY application_id ORDER BY created_at)` in the ghost-risk query, which is now the heaviest thing the dashboard does.
+The `(application_id, created_at)` composite **replaces** a bare `application_id` index, which it covers as a prefix, so it is a widening, not an extra index. It exists because every read of this table is per-application in time order: the detail page's timeline, and the `MAX(created_at)` per-application lookups behind the ghost-risk query and the board's `days_in_stage`. It was introduced for a `LAG(created_at) OVER (PARTITION BY application_id ORDER BY created_at)` window function that `v1.11.2` removed with the derived threshold; the index earns its keep on the correlated `MAX` subqueries that replaced it, which want the same ordering.
 
 There is still deliberately **no index on `to_status`**, though the dashboard's offer-lookup subquery filters on it. Add `(to_status, application_id, created_at)` if the table grows; see `TODO.md`.
 
@@ -419,7 +419,7 @@ Paste a job-posting URL on the new-application form; it returns the extracted fi
 
 The service fetches the page, strips HTML to text, and asks Claude (via the official `anthropic` gem) for structured fields through a tool/JSON schema, so the result is typed rather than free text to be parsed.
 
-**One extraction pass owns every captured field.** Since `v1.8.0` the tool schema asks for the Japan-market fields beside `company`/`role`/`notes`: `channel` (does the posting read as an agency listing, a direct one, or neither), `agency` (the agency's name when there is one), `japanese_level` (on `Application::JAPANESE_LEVELS`' taxonomy), and the four compensation-structure numbers (§ Data model). `v1.9.0` adds `sponsorship` (does the posting state that the employer sponsors a work visa: `available`/`unavailable`, or empty when unstated, which the extractor normalises to `nil`; the `unknown` default that fills the form is supplied by the column default and the form's initial state, not by this pass), because the boards this project targets tag visa support on every listing, and `hiring_entity` (`own_entity`/`eor`/`contractor`/`unsupported`, empty-then-`nil` when unstated), because remote postings usually state their hiring model, and `company_timezone` (one of `Application::COMPANY_TIMEZONES`, derived from the posting's stated location or HQ) plus `overlap_hours_required` (the daily overlap the role demands, a number), because remote postings state both far more reliably than they state sponsorship. `status_of_residence` is **not** in the schema: postings rarely name the exact 在留資格, so it is a manual one-tap field, not an extracted one. Only `company`/`role`/`notes` are `required` in the schema; the market fields are optional, and the service normalises what comes back rather than trusting it (an enum value outside the model's set becomes `nil`, a non-positive number becomes `nil`), because a schema constrains shape, not judgement, and a hallucinated `channel` written to the form is worse than an empty one. The all-fields-empty `ExtractionError` check stays keyed to `company`/`role`/`notes` alone: a page with a company and role is a posting even when it names no salary, and the reverse is not true.
+**One extraction pass owns every captured field.** Since `v1.8.0` the tool schema asks for the Japan-market fields beside `company`/`role`/`notes`: `channel` (does the posting read as an agency listing, a direct one, or neither), `agency` (the agency's name when there is one), `japanese_level` (on `Application::JAPANESE_LEVELS`' taxonomy), and the four compensation-structure numbers (§ Data model). `v1.9.0` adds `sponsorship` (does the posting state that the employer sponsors a work visa: `available`/`unavailable`, or empty when unstated, which the extractor normalises to `nil`; the `unknown` default that fills the form is supplied by the column default and the form's initial state, not by this pass), because the boards this project targets tag visa support on every listing. **A residency requirement is not a sponsorship answer, and the description says so explicitly.** A posting open only to residents of Japan says the company will not hire from overseas, a different fact from whether it sponsors: a resident on a dependent or spouse visa still needs a change of 在留資格 that the employer files. So `unavailable` is reserved for a posting that says it does not sponsor, and a residents-only posting silent on sponsorship comes back empty and normalises to `nil`, leaving the `unknown` default in place. The wording is this pedantic because it has already gone wrong once: an earlier description read `unavailable` as "requires existing work authorization / no sponsorship", and residents-only listings tripped the first clause alone, overwriting decision-relevant signal with a guess. Recording the residency requirement as a fact in its own right is a `2.0.0` column, not this field's job (`TODO.md`). The pass also takes `hiring_entity` (`own_entity`/`eor`/`contractor`/`unsupported`, empty-then-`nil` when unstated), because remote postings usually state their hiring model, and `company_timezone` (one of `Application::COMPANY_TIMEZONES`, derived from the posting's stated location or HQ) plus `overlap_hours_required` (the daily overlap the role demands, a number), because remote postings state both far more reliably than they state sponsorship. `status_of_residence` is **not** in the schema: postings rarely name the exact 在留資格, so it is a manual one-tap field, not an extracted one. Only `company`/`role`/`notes` are `required` in the schema; the market fields are optional, and the service normalises what comes back rather than trusting it (an enum value outside the model's set becomes `nil`, a non-positive number becomes `nil`), because a schema constrains shape, not judgement, and a hallucinated `channel` written to the form is worse than an empty one. The all-fields-empty `ExtractionError` check stays keyed to `company`/`role`/`notes` alone: a page with a company and role is a posting even when it names no salary, and the reverse is not true.
 
 **The response also carries `posting_text` (the stripped, capped text that was sent to Claude), and that is how `posting_snapshot` gets captured without prefill persisting anything.** There is no row to write at prefill time, so "persist at prefill" literally cannot mean a database write; instead the form holds `posting_text` and submits it as `application[posting_snapshot]` when the user creates the application. Zero manual entry, the user's review still stands between extraction and persistence, and both entry points fill it the same way: a pasted posting snapshots exactly as a fetched one does, which matters because a posting that could never be fetched is the strongest case for keeping a copy.
 
@@ -519,7 +519,7 @@ This is documented because it already happened once and took production down (CH
 
 Services exist for *writes*: an explicit user action changes state (§ Service layer). Query objects are the read-side counterpart: a non-trivial read model that mutates nothing. `app/queries/` holds them.
 
-A read model earns a query object when it is **more than a scope**: `GhostRiskQuery` composes a window function with a percentile aggregate, and `ListQuery` composes four filters with cursor decoding and a lookahead. A one-line `where` does not qualify and belongs on the model.
+A read model earns a query object when it is **more than a scope**: `GhostRiskQuery` composes a correlated subquery with business-day arithmetic that SQL cannot express, and `ListQuery` composes four filters with cursor decoding and a lookahead. A one-line `where` does not qualify and belongs on the model.
 
 #### `Applications::ListQuery`
 
@@ -541,47 +541,41 @@ The `source` filter is a host substring match (`ILIKE`), not a column: § `JobBo
 
 Signature: `new(user:).call`. Answers one question: **which applications has the user probably been ghosted on?**
 
-> **At a glance** · It reads each `timeline_entries` row as an *exit* from a stage, derives how long every stage took, and flags an application still sitting in a monitored stage (`applied`, `phone_screen`) past the user's own p90 response time. No new column, no new table: the audit log already holds everything it needs.
+> **At a glance** · It dates each in-flight application from the last `timeline_entries` row that moved it (falling back to `applied_at`, then `created_at`), counts how many **business days** of silence have passed since, and flags anything in a monitored stage (`applied`, `phone_screen`) past that stage's fixed threshold. No new column, no new table: the audit log already holds everything it needs.
+
+**Silence is counted in business days, and that is the load-bearing decision here.** The question is whether a *company* has gone quiet, and a company that is closed has not. `JapanCalendar` already owns that judgement for `FollowUpReminderJob`, which refuses to send a nudge into a weekend, a national holiday, Golden Week, Obon or the New Year shutdown; this query measures against the same calendar, so the two features cannot disagree about what a dead zone is. `JapanCalendar.business_days_between` is the shared primitive, exclusive of the entry day and inclusive of today.
+
+Counting calendar days instead is not a smaller version of this, it is wrong in a specific and expensive direction: every threshold silently *shrinks* exactly when companies are least responsive. A three-week threshold spanning Golden Week is about eleven working days of real silence, so the application gets flagged while the company is merely on holiday, and the cost of that is named below: a false flag invites the user to close a live application.
+
+The arithmetic is therefore in Ruby rather than in SQL. The holiday rules live in the `holidays` gem and the seasonal spans live in `JapanCalendar`, so Postgres cannot answer the question; the query fetches one row per in-flight application and counts in Ruby, which at personal-tracker scale is tens of rows. **`business_days_between` batches its holiday lookup for that reason**, taking every national holiday in the span in one `Holidays.between` call rather than asking `business_day?` per day. The distinction is not academic: `MAX_PER_USER` allows 200 applications, an application forgotten in `applied` is exactly what this feature exists to surface, and 200 of those silent for three years measured **13.7s** the naive way against **0.7s** batched. It leaves two definitions of "is this a working day" in one module, so `japan_calendar_spec` pins the batched count against a day-by-day `business_day?` loop over a span carrying two New Years, Golden Week, Obon, both equinoxes and a 振替休日.
 
 <details>
-<summary><strong>How time-in-stage is derived from the audit log (and why the obvious reading is wrong)</strong></summary>
+<summary><strong>How the stage entry moment is derived from the audit log (and why the obvious reading is wrong)</strong></summary>
 
-The `ghosted` state has always existed in the FSM, but nothing ever *suggested* it: the user had to notice the silence themselves, which is precisely the thing a person in the middle of a job search is bad at. This query turns the audit trail the app already keeps into the suggestion. It needs no new column and no new table: `timeline_entries` already records `from_status`, `to_status`, and `created_at` for every move, which is enough to reconstruct how long every application sat in every stage.
+The `ghosted` state has always existed in the FSM, but nothing ever *suggested* it: the user had to notice the silence themselves, which is precisely the thing a person in the middle of a job search is bad at. This query turns the audit trail the app already keeps into the suggestion. It needs no new column and no new table: `timeline_entries` already records `from_status`, `to_status`, and `created_at` for every move.
 
-**Deriving time-in-stage.** The obvious reading ("an application entered stage `S` at the `created_at` of its `to_status = S` row") is wrong here, and wrong in a way that silently discards most of the data. Creation writes no timeline entry (§ `timeline_entries`), so an application added directly as `applied` (the common case, since people add jobs they have already applied to) has no `to_status = 'applied'` row to anchor on.
-
-So read each row as an **exit**, not an entry. Every timeline entry is an exit from its `from_status`; the moment that stage was *entered* is the previous entry's `created_at`, or, when there is no previous entry, the application's own start:
+**Dating the current stage.** The obvious reading ("an application entered stage `S` at the `created_at` of its `to_status = S` row") is wrong here, and wrong in a way that silently discards most of the data. Creation writes no timeline entry (§ `timeline_entries`), so an application added directly as `applied` (the common case, since people add jobs they have already applied to) has no `to_status = 'applied'` row to anchor on. The stage was entered at the application's **most recent** transition, or, when it has never moved, at its own start:
 
 ```sql
 COALESCE(
-  LAG(created_at) OVER (PARTITION BY application_id ORDER BY created_at),
+  (SELECT MAX(created_at) FROM timeline_entries WHERE application_id = applications.id),
   applications.applied_at,
   applications.created_at
 )
 ```
 
-That single expression covers every case. A backdated `applied_at` (the create form accepts one) correctly dates the first stage from the real application date rather than the day the row was typed in. A revival (`ghosted → applied`) has a preceding entry, so `LAG` wins and the reset `applied_at` (the known sharp edge in § `Applications::TransitionService`) never gets a chance to corrupt the interval. And a `wishlist` application whose `applied_at` is null falls through to `created_at`.
-
-**What counts as a response.** The sample must measure *how long the company took to reply when it replied at all*, so exits to `ghosted`, `withdrawn`, and `archived` are excluded. Including `ghosted` in particular would be self-defeating: every application the user marks ghosted after a long silence would push their own threshold up, and the predictor would grow steadily more reluctant to predict. Everything else is a response: an advance up the pipeline, or a rejection.
+That single expression covers every case. A backdated `applied_at` (the create form accepts one) correctly dates the stage from the real application date rather than the day the row was typed in. A revival (`ghosted → applied`) has a transition of its own, so the `MAX` wins and the silence is measured from the revival, not from the original application. And a `wishlist` application whose `applied_at` is null falls through to `created_at`.
 
 </details>
 
-**The threshold.** Per stage in `RISK_STAGES = %w[applied phone_screen]` (the two stages where the next move is the company's and silence therefore means something), take `percentile_cont(0.9)` over the user's own completed response times. An application currently sitting in that stage past its threshold is *likely ghosted*. p90, not the median: the claim is "you are outside the range where replies normally arrive", and being wrong here is expensive in both directions: a false flag invites the user to close a live application.
+**The thresholds.** Per stage in `RISK_STAGES = %w[applied phone_screen]` (the two stages where the next move is the company's and silence therefore means something), `THRESHOLDS` is a fixed count of business days: **`applied: 15`, `phone_screen: 10`**. An application sitting *strictly past* its threshold is *likely ghosted*; sitting exactly on it is still a normal wait. In a stretch with no holidays those are three weeks and two weeks; across Golden Week or the New Year they stretch, which is the entire point of counting this way.
 
-Cold start is the real design problem, and it is handled in three parts:
-
-| Guard | Value | Why |
-|---|---|---|
-| `MIN_SAMPLE` | `5` responses in that stage | Below this a p90 is one lucky outlier. Falls back to the default. |
-| `DEFAULT_P90` | `applied: 21`, `phone_screen: 14` days | Ordinary hiring-timeline heuristics, used until the user has their own history. |
-| clamp | `7 … 90` days | A user whose few replies all landed same-day would otherwise get a 2-day threshold and see every application flagged. The floor is a guard against confident nonsense; the ceiling stops one 200-day outlier from disabling the feature. |
-
-The payload names which of the two applied (`basis: "personal" | "default"`) and the sample size behind it, and the UI says so. A number this consequential should not arrive unexplained.
+**The user's own response percentile no longer moves them, deliberately.** Until `v1.11.2` the threshold was `percentile_cont(0.9)` over the user's completed response times per stage, with three cold-start guards (a `MIN_SAMPLE` of 5, a `DEFAULT_P90` pair, and a 7-to-90-day clamp), and the payload carried a `basis`/`sample_sizes` pair so the UI could say which had applied. It was removed on the north star's own terms: the app has exactly one user, and he judged that a threshold derived from his history was a number he could not predict or overrule, on a call he wanted to make himself. What replaced it is not a worse estimate, it is a stated policy. Two consequences worth keeping in view: the historical-percentile CTE is gone entirely (so the query no longer reads exits at all, only the latest transition), and with no sample to explain the payload narrowed to `thresholds` and `at_risk`.
 
 <details>
-<summary><strong>Why two stages, and why the defaults are what they are</strong></summary>
+<summary><strong>Why two stages, and why the thresholds are what they are</strong></summary>
 
-Ghosting is the mainstream case, not an edge case: [53% of job seekers were ghosted by an employer in the past year](https://www.ihire.com/resourcecenter/employer/pages/53-percent-of-job-seekers-have-been-ghosted-by-a-potential-employer) (up from 38% in 2024), and [61% report being ghosted *after* an interview](https://blog.theinterviewguys.com/the-2025-ghosting-index/), which is why the flag covers `phone_screen` and not just `applied`. The same research breaks it down by stage (28% after application, 16% after a phone screen, 12% after multiple interviews), a distribution the `DEFAULT_P90` pair is sanity-checked against: silence after an application is both commoner and tolerated longer than silence after someone has spoken to you.
+Ghosting is the mainstream case, not an edge case: [53% of job seekers were ghosted by an employer in the past year](https://www.ihire.com/resourcecenter/employer/pages/53-percent-of-job-seekers-have-been-ghosted-by-a-potential-employer) (up from 38% in 2024), and [61% report being ghosted *after* an interview](https://blog.theinterviewguys.com/the-2025-ghosting-index/), which is why the flag covers `phone_screen` and not just `applied`. The same research breaks it down by stage (28% after application, 16% after a phone screen, 12% after multiple interviews), a distribution the pair is sanity-checked against: silence after an application is both commoner and tolerated longer than silence after someone has spoken to you. 15 and 10 business days were chosen to land on the previous `DEFAULT_P90` values (21 and 14 calendar days) in an ordinary month, so the change is a change of *calendar*, not a retuning of how patient the app is.
 
 </details>
 
@@ -761,12 +755,10 @@ It lives on `ApplicationsController` as a collection route rather than in a quer
   "total":             11,
   "avg_days_to_offer": 24.5,
   "ghost_risk": {
-    "thresholds":   { "applied": 21.0, "phone_screen": 14.0 },
-    "basis":        { "applied": "personal", "phone_screen": "default" },
-    "sample_sizes": { "applied": 9, "phone_screen": 2 },
+    "thresholds": { "applied": 15, "phone_screen": 10 },
     "at_risk": [
       { "id": 7, "company": "Mercari", "role": "Backend Engineer", "status": "applied",
-        "lock_version": 1, "days_in_stage": 34.2, "threshold": 21.0 }
+        "lock_version": 1, "business_days_in_stage": 22, "threshold": 15 }
     ]
   },
   "user": { "id": 1, "email": "a@b.com", "created_at": "…", "updated_at": "…" },
@@ -777,7 +769,7 @@ It lives on `ApplicationsController` as a collection route rather than in a quer
 }
 ```
 
-`at_risk` is sorted longest-silence first and carries `lock_version`, so the UI can offer the `ghosted` transition inline without a second fetch: the whole point of the feature is that seeing the problem and resolving it are one click apart.
+`at_risk` is sorted longest-silence first and carries `lock_version`, so the UI can offer the `ghosted` transition inline without a second fetch: the whole point of the feature is that seeing the problem and resolving it are one click apart. **Every day count in this block is a business day** (§ `Applications::GhostRiskQuery`), which is why the field is `business_days_in_stage` rather than the list payload's `days_in_stage`: that one is calendar days, and the two must never be read as the same number. They never describe the same application in practice (the board's is for `wishlist`/`draft`, this is for `applied`/`phone_screen`), so the distinct name is the guard against a future reader assuming otherwise.
 
 **`user` is the former `GET /api/v1/me` payload, folded in.** The dashboard is the only page that wanted it, and it was fetching both endpoints in parallel anyway: one wasted request per load. `/me` still exists (it is a documented endpoint and costs nothing), but `web/` no longer calls it.
 

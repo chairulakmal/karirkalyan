@@ -53,6 +53,65 @@ RSpec.describe JapanCalendar do
     end
   end
 
+  describe ".business_days_between" do
+    # June is the only month with no national holiday and no seasonal dead zone,
+    # so inside it business days are just weekdays and the count is checkable
+    # by hand: Jun 3 and Jun 24 are both Wednesdays, three clean weeks apart.
+    it "counts weekdays across a clean span" do
+      expect(described_class.business_days_between(Date.new(2026, 6, 3), Date.new(2026, 6, 24))).to eq(15)
+    end
+
+    it "is exclusive of the start and inclusive of the end" do
+      friday = Date.new(2026, 6, 19)
+
+      expect(described_class.business_days_between(friday, friday)).to eq(0)
+      expect(described_class.business_days_between(friday, Date.new(2026, 6, 20))).to eq(0) # Saturday
+      expect(described_class.business_days_between(friday, Date.new(2026, 6, 22))).to eq(1) # Monday
+    end
+
+    it "skips national holidays, Golden Week, Obon and the New Year" do
+      # 24 calendar days across Golden Week, but only 10 a company could answer on.
+      expect(described_class.business_days_between(Date.new(2026, 4, 17), Date.new(2026, 5, 11))).to eq(10)
+      # Obon plus Mountain Day.
+      expect(described_class.business_days_between(Date.new(2026, 8, 7), Date.new(2026, 8, 21))).to eq(7)
+      # The New Year shutdown, which wraps the year boundary: of fourteen days
+      # only Dec 28 and Jan 4-8 survive, Jan 1 being a holiday in its own right.
+      expect(described_class.business_days_between(Date.new(2026, 12, 25), Date.new(2027, 1, 8))).to eq(6)
+    end
+
+    it "reads timestamps in the app's zone, not UTC" do
+      # 15:00 UTC on the 21st is already the 22nd in Tokyo, so the span to the
+      # 24th is two business days, not three.
+      entered = Time.utc(2026, 6, 21, 15, 0)
+
+      expect(described_class.business_days_between(entered, Time.zone.parse("2026-06-24 10:00"))).to eq(2)
+    end
+
+    # business_days_between does not call business_day? per date: it pulls the
+    # national holidays for the span in one gem call, because doing it per date
+    # cost 13.7s for the dashboard's worst case. That makes the two definitions
+    # of "business day" separate code paths, so this pins them together over a
+    # span carrying every kind of dead zone: two New Years, Golden Week, Obon,
+    # the equinoxes, and a 振替休日.
+    it "agrees with counting business_day? one date at a time" do
+      from = Date.new(2025, 11, 30)
+      to   = Date.new(2027, 3, 31)
+      naive = ((from + 1)..to).count { |date| described_class.business_day?(date) }
+
+      expect(described_class.business_days_between(from, to)).to eq(naive)
+      expect(naive).to be > 300 # a span worth checking, not an empty range
+    end
+
+    it "is zero rather than negative when the end precedes the start" do
+      expect(described_class.business_days_between(Date.new(2026, 6, 24), Date.new(2026, 6, 3))).to eq(0)
+    end
+
+    it "is zero when either end is missing" do
+      expect(described_class.business_days_between(nil, Date.new(2026, 6, 24))).to eq(0)
+      expect(described_class.business_days_between(Date.new(2026, 6, 3), nil)).to eq(0)
+    end
+  end
+
   describe ".dead_zone_reason" do
     it "is nil on a business day" do
       expect(described_class.dead_zone_reason(Date.new(2026, 7, 10))).to be_nil

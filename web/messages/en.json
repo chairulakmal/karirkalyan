@@ -469,18 +469,15 @@
     },
     "ghostRisk": {
       "eyebrow": "Probably ghosted",
-      "summary": "{count, plural, one {# application has} other {# applications have}} been quiet longer than a company usually takes to get back to you.",
-      "silence": "{days, plural, one {# day} other {# days}} of silence in {stage} — past your {threshold}-day mark",
+      "summary": "{count, plural, one {# application has} other {# applications have}} been quiet past the limit for the stage they are in.",
+      "silence": "{days, plural, one {# working day} other {# working days}} of silence in {stage}, past the {threshold}-day mark",
       "markGhosted": "Mark as ghosted",
       "marking": "Marking…",
       "marker": "Quiet",
-      "markerTitle": "Silent longer than a reply usually takes at this stage",
+      "markerTitle": "Silent longer than this stage allows",
       "explainAria": "How this is worked out",
-      "explain": "Compares each waiting application against how long companies have actually taken to reply to you at that stage — the 90th percentile of your own response times. Until you have five replies at a stage, a general default is used instead.",
-      "basis": {
-        "personal": "{stage}: {days} days — your 90th percentile, from {count} replies",
-        "default": "{stage}: {days} days — default, only {count} of the 5 replies needed"
-      }
+      "explain": "Counts working days only. Weekends, Japanese national holidays, Golden Week, Obon and the New Year shutdown are not silence, because nobody was there to reply. An application is flagged once it passes the limit for its stage.",
+      "threshold": "{stage}: {days} working days"
     },
     "upcoming": {
       "title": "Upcoming",

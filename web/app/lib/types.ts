@@ -258,25 +258,26 @@ export type TransitionTable = {
 // keyed on one of these.
 export type RiskStage = "applied" | "phone_screen";
 
-// One application that has gone quiet for longer than the user's own p90
-// response time for the stage it is sitting in. `lock_version` rides along so
-// the card can offer the `ghosted` transition without re-fetching the record.
+// One application that has gone quiet for longer than its stage allows.
+// `lock_version` rides along so the card can offer the `ghosted` transition
+// without re-fetching the record.
+//
+// Both day counts are BUSINESS days, and deliberately not the list payload's
+// `days_in_stage`, which is calendar days: the two never describe the same
+// application (the board's is for wishlist/draft, this is for applied/
+// phone_screen), and a near-miss name would invite exactly that confusion.
 export type GhostRiskEntry = {
   id: number;
   company: string;
   role: string;
   status: RiskStage;
   lock_version: number;
-  days_in_stage: number;
+  business_days_in_stage: number;
   threshold: number;
 };
 
 export type GhostRisk = {
   thresholds: Record<RiskStage, number>;
-  // Whether each threshold is the user's own p90 or the global fallback. The UI
-  // says which, rather than passing off a default as a personal statistic.
-  basis: Record<RiskStage, "personal" | "default">;
-  sample_sizes: Record<RiskStage, number>;
   // Longest silence first.
   at_risk: GhostRiskEntry[];
 };

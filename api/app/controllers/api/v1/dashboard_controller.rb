@@ -5,7 +5,7 @@ module Api
       # won't invalidate on a deploy/reload if the underlying rows are unchanged,
       # so a shape change (e.g. adding `facets`) would otherwise serve a stale
       # cached payload from Solid Cache (prod) or the in-process memory store (dev).
-      STATS_CACHE_VERSION = 4
+      STATS_CACHE_VERSION = 5
 
       # The Upcoming agenda (v1.11.0): how many dated items to surface, and how far
       # out a residence-expiry clock has to be before it counts as "upcoming".

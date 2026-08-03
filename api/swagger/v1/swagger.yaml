@@ -91,7 +91,7 @@ paths:
           reads as 1; absent or empty reads as the default 10.
       responses:
         '200':
-          description: does not return another user's applications
+          description: q filters over company, role, and notes
         '401':
           description: not authenticated
     post:
@@ -736,32 +736,19 @@ paths:
                     type: object
                     required:
                     - thresholds
-                    - basis
-                    - sample_sizes
                     - at_risk
-                    description: Applications silent past the user's p90 response
-                      time for their stage
+                    description: 'Applications silent past the fixed threshold for
+                      their stage. Every day count here is a BUSINESS day: weekends,
+                      Japanese national holidays, Golden Week, Obon and the New Year
+                      shutdown are excluded, so these numbers are not comparable with
+                      the list payload''s calendar-day days_in_stage'
                     properties:
                       thresholds:
                         type: object
                         additionalProperties:
-                          type: number
-                        description: Days of silence tolerated per stage, keyed on
-                          applied/phone_screen
-                      basis:
-                        type: object
-                        additionalProperties:
-                          type: string
-                          enum:
-                          - personal
-                          - default
-                        description: Whether each threshold came from the user's own
-                          history or the global default
-                      sample_sizes:
-                        type: object
-                        additionalProperties:
                           type: integer
-                        description: Completed responses behind each threshold
+                        description: Business days of silence tolerated per stage,
+                          keyed on applied/phone_screen
                       at_risk:
                         type: array
                         description: Longest silence first
@@ -773,7 +760,7 @@ paths:
                           - role
                           - status
                           - lock_version
-                          - days_in_stage
+                          - business_days_in_stage
                           - threshold
                           properties:
                             id:
@@ -790,10 +777,10 @@ paths:
                             lock_version:
                               type: integer
                               description: So the UI can transition inline
-                            days_in_stage:
-                              type: number
+                            business_days_in_stage:
+                              type: integer
                             threshold:
-                              type: number
+                              type: integer
                   user:
                     type: object
                     description: The GET /me payload, folded in; the dashboard was

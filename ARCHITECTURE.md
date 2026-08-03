@@ -39,9 +39,13 @@ The trade-off: the losing writer must reload and redo the edit. That beats the a
 
 ## Ghost prediction is derived, not stored
 
-[`api/app/queries/applications/ghost_risk_query.rb`](api/app/queries/applications/ghost_risk_query.rb) flags applications that have been quiet for longer than the user's own p90 reply time. It reconstructs how long each application sat in each stage from `timeline_entries` alone: `LAG(created_at) OVER (PARTITION BY application_id ORDER BY created_at)` finds each stage's entry moment, and `percentile_cont(0.9)` computes the per-stage p90. No new column, no new table; the audit rows the transition service already writes are the entire dataset.
+[`api/app/queries/applications/ghost_risk_query.rb`](api/app/queries/applications/ghost_risk_query.rb) flags applications that have been quiet for longer than their stage allows. It works out when the current stage started from `timeline_entries` alone: the most recent transition, or `applied_at`, or `created_at`, because creation writes no timeline row. No new column, no new table; the audit rows the transition service already writes are the entire dataset.
 
-Three guards exist because a p90 over four data points is a rumour, not a statistic. A stage needs at least 5 recorded replies before the personal threshold applies, the personal value is clamped to 7 to 90 days, and below the sample minimum a per-stage default takes over (21 days for `applied`, 14 for `phone_screen`), with the response naming which basis it used. Exits to `ghosted`, `withdrawn`, and `archived` are excluded from the sample; counting `ghosted` would let every ghosting the user records raise their own threshold until the predictor stopped predicting.
+**Silence is counted in working days.** A company that is closed has not gone quiet. `JapanCalendar` already knows which days those are, because the follow-up reminder job will not send on a weekend, a national holiday, Golden Week, Obon, or over New Year. Ghost risk asks the same module, so the two can never disagree.
+
+Count calendar days instead and every threshold shrinks exactly when companies are slowest to reply. That is how you end up telling someone a live application is dead.
+
+The thresholds are fixed: 15 working days after applying, 10 after a phone screen. An earlier version derived them from the user's own reply times. `v1.11.2` dropped it, because there is one user and he could neither predict the number nor overrule it.
 
 The trade-off: the query runs on each request instead of reading a precomputed flag. At the 200-applications-per-account cap that is cheap, and a derived answer can never disagree with the timeline it came from.
 
