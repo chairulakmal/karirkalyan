@@ -6,7 +6,7 @@ The history: shipped work, newest first, **`v1.11.1`** (tagged 2026-07-28) back 
 
 ## v1.11.2 (unreleased)
 
-The first patch under the feature freeze: two fixes, both cases of the app stating something it had no evidence for. **A patch by the mechanical test**: no migration, no new capability. The dashboard payload does narrow (`ghost_risk` loses `basis` and `sample_sizes`), which is a contract change in the strict sense; it is treated as a patch because `web/` is the only consumer and both halves deploy together, and `STATS_CACHE_VERSION` is bumped so no cached payload outlives the shape.
+The first patch under the feature freeze: two fixes, both cases of the app stating something it had no evidence for, plus a dependency and Dependabot chore. **A patch by the mechanical test**: no migration, no new capability. The dashboard payload does narrow (`ghost_risk` loses `basis` and `sample_sizes`), which is a contract change in the strict sense; it is treated as a patch because `web/` is the only consumer and both halves deploy together, and `STATS_CACHE_VERSION` is bumped so no cached payload outlives the shape.
 
 ### Fixed: ghost risk counted calendar days, so holidays read as silence
 
@@ -23,6 +23,14 @@ The first patch under the feature freeze: two fixes, both cases of the app stati
 - **The schema text is what the specs pin.** The bug lived entirely in a prompt, and `url_prefill_service_spec.rb` drives a doubled Claude client, so no spec there can judge how a posting is read; three new examples assert the description itself keeps the carve-out and never restores work authorization as grounds for `unavailable`.
 - **Recording the residency requirement is deliberately not part of this.** It is a genuinely useful filter (a Tokyo-resident candidate competes in a much smaller pool), but it needs a column and a filter of its own, which is a capability: [`TODO.md`](TODO.md) holds it in the `2.0.0` cluster, with the reasoning for why it must not become a fourth `sponsorship` value.
 
+
+### Chore: non-major dependency updates, and Dependabot actually turned off
+
+- **Gems and packages brought current, no majors.** Gems via `bundle update --minor` so nothing could cross a major: rails and its eleven `activesupport`/`actionpack` siblings `8.1.3` → `8.1.3.1`, `holidays` `11.1.0` → `11.3.0`, `solid_queue` `1.5.0` → `1.6.0`, plus `et-orbi`, `json`, `rbs` and `zeitwerk` patches; `bindata` 3.0.0 and `diff-lcs` 2.0.0 held back. Packages via `npm update` so the manifest ranges did the gating, plus `next` and `eslint-config-next` `16.2.11` → `16.2.12` (both exact pins, so a manifest edit). `@types/node` `20` → `26` was lockfile drift rather than a decision: `package.json` already declared `^26`. `eslint` 10 and `typescript` 7 stay held back, still blocked upstream for the reasons § v1.11.0 records.
+- **The rails patch was not optional by the time it landed.** `bundler-audit` began failing on `activestorage 8.1.3` once the advisory database picked up **CVE-2026-66066** (arbitrary file read and RCE in Active Storage variant processing, fixed in `8.1.3.1`) on 2026-08-02. Actual exposure here was nil, since `active_storage/engine` is commented out in `config/application.rb` and this app stores blobs in `bytea` columns, but the scan reads the lockfile rather than the loaded engines, so it failed the required check and was right to.
+- **`holidays` `11.3.0` was checked against the ghost-risk change above** before it was taken, because that fix pins exact business-day counts to this gem's Japanese data. All eight pinned counts and the 315-day equivalence span are unchanged.
+- **`.github/dependabot.yml` is deleted, because commenting it out never disabled it.** See § Decisions for the evidence and for what a future config would have to solve. Dependency updates are done by hand instead, which is what every release since `v1.11.0` has actually done.
+- **`npm audit` reports five advisories that cannot be fixed from here, and `npm audit fix --force` would install `next@9.3.3`.** `postcss` and `sharp` are bundled inside `next@16.2.12`, the latest, so both are upstream; `uuid` is pinned at 9 by `budoux` → `google-artifactregistry-auth` → `google-auth-library` → `gaxios`, a runtime dependency chain of budoux rather than a dev one, whose advisory needs `uuid` called with a `buf` argument that nothing on our path passes. Recorded here so the next person to run `npm audit` does not reach for `--force`.
 ---
 
 ## v1.11.1 (2026-07-28)
