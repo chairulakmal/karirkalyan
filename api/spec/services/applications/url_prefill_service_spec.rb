@@ -126,6 +126,34 @@ RSpec.describe Applications::UrlPrefillService do
       end
     end
 
+    # The residents-only bug lived entirely in the tool description: an earlier
+    # wording reserved `unavailable` for a posting that "requires existing work
+    # authorization / no sponsorship", and a residents-only listing tripped the
+    # first clause on its own. The client is a double here, so no spec can judge
+    # how Claude reads a posting -- the schema text is the artefact that was
+    # wrong, so the schema text is what gets pinned. SPEC.md § UrlPrefillService.
+    context "the sponsorship description" do
+      let(:description) do
+        described_class::TOOL.dig(:input_schema, :properties, :sponsorship, :description)
+      end
+
+      it "reserves 'unavailable' for a posting that says it does not sponsor" do
+        expect(description).to match(/'unavailable' ONLY when the posting says it does not sponsor/)
+      end
+
+      it "tells the extractor a residency requirement is not an answer to it" do
+        expect(description).to match(/residency requirement is NOT an answer/i)
+        expect(description).to include("residents of Japan only")
+        expect(description).to include("must have existing work authorization")
+      end
+
+      it "does not let a work-authorization requirement stand as a reason for 'unavailable'" do
+        clause = description[/'unavailable'[^;.]*/]
+
+        expect(clause).not_to match(/work authorization/i)
+      end
+    end
+
     # The fallback for a posting the fetcher cannot read. The load-bearing claim is
     # that it is the *same* pipeline entered one step later, so these pin both
     # halves: that the fetch never happens, and that to_text still does.

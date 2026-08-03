@@ -1,6 +1,19 @@
 # Changelog
 
-The history: shipped work, newest first, **`v1.11.1`** (tagged 2026-07-28) back through `v1.0.0`, with nothing unreleased above it. The most important section is the one that is not a release: **§ Decisions records the settled decisions-not-to-build**, so that [`TODO.md`](TODO.md) (where open work lives) can stay plan-only without the reasoning getting lost. Contents: strict reverse-chronological order, with the two sections that carry no tag (§ Decisions, § Backups) slotted at their own dates rather than collected at the end, and the pre-1.0.0 build phases closing the file. Each section owns its own bookkeeping: which PRs landed it, whether it carries a tag of its own, and, since `v1.3.1`, which digit moved and why under the versioning policy's mechanical test. A release heading that names another release's tag is not an error: `v1.9.0` shipped inside `v1.10.0`'s, and says so.
+The history: shipped work, newest first, **`v1.11.1`** (tagged 2026-07-28) back through `v1.0.0`, with **`v1.11.2`** sitting unreleased above it pending its tag. The most important section is the one that is not a release: **§ Decisions records the settled decisions-not-to-build**, so that [`TODO.md`](TODO.md) (where open work lives) can stay plan-only without the reasoning getting lost. Contents: strict reverse-chronological order, with the two sections that carry no tag (§ Decisions, § Backups) slotted at their own dates rather than collected at the end, and the pre-1.0.0 build phases closing the file. Each section owns its own bookkeeping: which PRs landed it, whether it carries a tag of its own, and, since `v1.3.1`, which digit moved and why under the versioning policy's mechanical test. A release heading that names another release's tag is not an error: `v1.9.0` shipped inside `v1.10.0`'s, and says so.
+
+---
+
+## v1.11.2 (unreleased)
+
+The first patch under the feature freeze, and so far one fix. **A patch by the mechanical test**: no migration, no `v1` contract broken, no new capability.
+
+### Fixed: a residents-only posting was recorded as "No sponsorship"
+
+- **`UrlPrefillService` asserted a refusal to sponsor that no posting had stated.** The `extract_job_posting` tool schema told the extractor to answer `sponsorship: "unavailable"` when a posting "explicitly requires existing work authorization / no sponsorship", and a residents-of-Japan-only listing on TokyoDev or Japan Dev trips the first clause on its own. The two are independent facts: residents-only says the company will not hire from overseas, not that it will not sponsor, and a resident on a dependent or spouse visa still needs a change of 在留資格 that the employer files. So the detail page rendered "No sponsorship" on a role that may well be takeable, and it did so by overwriting `unknown`, the one column default whose entire justification is that unknown is decision-relevant signal rather than missing data.
+- **Fixed in the description, not the enum.** `unavailable` is now reserved for a posting that says it does not sponsor; residency phrasings (`residents of Japan only`, `must already live in Japan`, `no relocation`, `must have existing work authorization`) are named as non-answers, so a residents-only posting silent on sponsorship comes back empty and normalises to `nil`, leaving the `unknown` default in place. `SPEC.md` § `UrlPrefillService` carries the rule and why the wording is pedantic.
+- **The schema text is what the specs pin.** The bug lived entirely in a prompt, and `url_prefill_service_spec.rb` drives a doubled Claude client, so no spec there can judge how a posting is read; three new examples assert the description itself keeps the carve-out and never restores work authorization as grounds for `unavailable`.
+- **Recording the residency requirement is deliberately not part of this.** It is a genuinely useful filter (a Tokyo-resident candidate competes in a much smaller pool), but it needs a column and a filter of its own, which is a capability: [`TODO.md`](TODO.md) holds it in the `2.0.0` cluster, with the reasoning for why it must not become a fourth `sponsorship` value.
 
 ---
 
