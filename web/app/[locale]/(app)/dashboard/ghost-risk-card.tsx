@@ -9,15 +9,17 @@ import { useToast } from "@/app/components/toast";
 import type { GhostRisk, GhostRiskEntry } from "@/app/lib/types";
 
 /*
- * The applications that have gone quiet for longer than the user's own p90
- * response time for the stage they're in — and, next to each, the one move that
- * clears it. Marking `ghosted` from here is deliberate: the point of the card is
- * to empty itself. `ghosted` is not in CONFIRM_REQUIRED (it's revivable, and the
- * detail page fires it on a single click too), so there's no dialog to mirror.
+ * The applications that have gone quiet for longer than their stage allows, and
+ * next to each, the one move that clears it. Marking `ghosted` from here is
+ * deliberate: the point of the card is to empty itself. `ghosted` is not in
+ * CONFIRM_REQUIRED (it's revivable, and the detail page fires it on a single
+ * click too), so there's no dialog to mirror.
  *
  * The server ranks the rows; this component never re-sorts or re-judges them.
- * Every number on screen — the threshold, whether it is personal or a default —
- * comes from Applications::GhostRiskQuery.
+ * Every number on screen comes from Applications::GhostRiskQuery, and every one
+ * of them is a count of BUSINESS days: weekends, Japanese national holidays,
+ * Golden Week, Obon and the New Year shutdown are not silence, because nobody
+ * was there to answer. The copy says "working days" for that reason.
  */
 export function GhostRiskCard({ risk }: { risk: GhostRisk }) {
   const t = useTranslations("dashboard.ghostRisk");
@@ -72,10 +74,9 @@ export function GhostRiskCard({ risk }: { risk: GhostRisk }) {
               <ul className="space-y-1">
                 {(["applied", "phone_screen"] as const).map((stage) => (
                   <li key={stage} className="font-mono text-xs">
-                    {t(`basis.${risk.basis[stage]}`, {
+                    {t("threshold", {
                       stage: ts(`label.${stage}`),
                       days: risk.thresholds[stage],
-                      count: risk.sample_sizes[stage],
                     })}
                   </li>
                 ))}
@@ -104,7 +105,7 @@ export function GhostRiskCard({ risk }: { risk: GhostRisk }) {
               <span className="ml-2 text-sm text-ink-soft">{entry.role}</span>
               <p className="mt-0.5 font-mono text-xs text-ink-soft">
                 {t("silence", {
-                  days: Math.round(entry.days_in_stage),
+                  days: entry.business_days_in_stage,
                   stage: ts(`label.${entry.status}`),
                   threshold: entry.threshold,
                 })}

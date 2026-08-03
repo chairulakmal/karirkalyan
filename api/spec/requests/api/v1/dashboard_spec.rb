@@ -46,35 +46,26 @@ RSpec.describe "Dashboard", type: :request do
             },
             ghost_risk: {
               type: :object,
-              required: %w[thresholds basis sample_sizes at_risk],
-              description: "Applications silent past the user's p90 response time for their stage",
+              required: %w[thresholds at_risk],
+              description: "Applications silent past the fixed threshold for their stage. Every day count here is a BUSINESS day: weekends, Japanese national holidays, Golden Week, Obon and the New Year shutdown are excluded, so these numbers are not comparable with the list payload's calendar-day days_in_stage",
               properties: {
                 thresholds: {
-                  type: :object, additionalProperties: { type: :number },
-                  description: "Days of silence tolerated per stage, keyed on applied/phone_screen"
-                },
-                basis: {
-                  type: :object,
-                  additionalProperties: { type: :string, enum: %w[personal default] },
-                  description: "Whether each threshold came from the user's own history or the global default"
-                },
-                sample_sizes: {
                   type: :object, additionalProperties: { type: :integer },
-                  description: "Completed responses behind each threshold"
+                  description: "Business days of silence tolerated per stage, keyed on applied/phone_screen"
                 },
                 at_risk: {
                   type: :array, description: "Longest silence first",
                   items: {
                     type: :object,
-                    required: %w[id company role status lock_version days_in_stage threshold],
+                    required: %w[id company role status lock_version business_days_in_stage threshold],
                     properties: {
-                      id:            { type: :integer },
-                      company:       { type: :string },
-                      role:          { type: :string },
-                      status:        { type: :string, enum: %w[applied phone_screen] },
-                      lock_version:  { type: :integer, description: "So the UI can transition inline" },
-                      days_in_stage: { type: :number },
-                      threshold:     { type: :number }
+                      id:                     { type: :integer },
+                      company:                { type: :string },
+                      role:                   { type: :string },
+                      status:                 { type: :string, enum: %w[applied phone_screen] },
+                      lock_version:           { type: :integer, description: "So the UI can transition inline" },
+                      business_days_in_stage: { type: :integer },
+                      threshold:              { type: :integer }
                     }
                   }
                 }
@@ -124,7 +115,7 @@ RSpec.describe "Dashboard", type: :request do
           expect(data["by_status"]["phone_screen"]).to eq(1)
           expect(data["by_status"]["rejected"]).to eq(1)
           expect(data["total"]).to eq(4)
-          expect(data["ghost_risk"]).to include("thresholds", "basis", "sample_sizes", "at_risk")
+          expect(data["ghost_risk"].keys).to contain_exactly("thresholds", "at_risk")
           expect(data["user"]["email"]).to eq(user.email)
         end
       end
@@ -267,25 +258,28 @@ RSpec.describe "Dashboard", type: :request do
   describe "ghost_risk" do
     let(:headers) { { "Authorization" => jwt_for(user) } }
 
+    # The clock is pinned because the counts are in business days, and June is
+    # the one month with neither a national holiday nor a seasonal dead zone.
+    # 2026-05-27 to 2026-06-24 is 20 business days, past the applied threshold.
     it "flags a silent application and ships what the UI needs to close it" do
-      stale = create(:application, user: user, company: "Mercari",
-                     status: "applied", applied_at: 40.days.ago)
+      travel_to(Time.zone.parse("2026-06-24 10:00")) do
+        stale = create(:application, user: user, company: "Mercari",
+                       status: "applied", applied_at: Time.zone.parse("2026-05-27 10:00"))
 
-      get "/api/v1/dashboard", headers: headers
-      risk = JSON.parse(response.body)["ghost_risk"]
+        get "/api/v1/dashboard", headers: headers
+        risk = JSON.parse(response.body)["ghost_risk"]
 
-      expect(risk["at_risk"].length).to eq(1)
-      expect(risk["at_risk"].first).to include(
-        "id"           => stale.id,
-        "company"      => "Mercari",
-        "status"       => "applied",
-        "threshold"    => 21.0,
-        "lock_version" => stale.lock_version
-      )
-      # No history yet, so the default threshold is what judged it — and the
-      # payload says so rather than presenting the number as the user's own.
-      expect(risk["basis"]["applied"]).to eq("default")
-      expect(risk["sample_sizes"]["applied"]).to eq(0)
+        expect(risk["thresholds"]).to eq("applied" => 15, "phone_screen" => 10)
+        expect(risk["at_risk"].length).to eq(1)
+        expect(risk["at_risk"].first).to include(
+          "id"                     => stale.id,
+          "company"                => "Mercari",
+          "status"                 => "applied",
+          "threshold"              => 15,
+          "business_days_in_stage" => 20,
+          "lock_version"           => stale.lock_version
+        )
+      end
     end
 
     it "is empty when nothing has been silent for long" do
@@ -325,11 +319,14 @@ RSpec.describe "Dashboard", type: :request do
     # application crosses its threshold — so the date has to be in the key or the
     # flag would not appear until something else invalidated the cache.
     it "recomputes the next day, so a silence that crosses the threshold is seen" do
-      evening = Time.zone.local(2026, 7, 11, 18, 0, 0)
+      # A Wednesday evening in June, so "the next day" is a business day and the
+      # count actually moves; the applied date is 15 business days back.
+      evening = Time.zone.local(2026, 6, 24, 18, 0, 0)
 
       travel_to(evening) do
-        # Exactly at the 21-day default threshold — not yet past it.
-        create(:application, user: user, status: "applied", applied_at: 21.days.ago)
+        # Exactly at the 15-business-day threshold, so not yet past it.
+        create(:application, user: user, status: "applied",
+               applied_at: Time.zone.parse("2026-06-03 10:00"))
 
         get "/api/v1/dashboard", headers: { "Authorization" => jwt_for(user) }
         expect(JSON.parse(response.body)["ghost_risk"]["at_risk"]).to be_empty

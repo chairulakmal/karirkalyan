@@ -6,7 +6,14 @@ The history: shipped work, newest first, **`v1.11.1`** (tagged 2026-07-28) back 
 
 ## v1.11.2 (unreleased)
 
-The first patch under the feature freeze, and so far one fix. **A patch by the mechanical test**: no migration, no `v1` contract broken, no new capability.
+The first patch under the feature freeze: two fixes, both cases of the app stating something it had no evidence for. **A patch by the mechanical test**: no migration, no new capability. The dashboard payload does narrow (`ghost_risk` loses `basis` and `sample_sizes`), which is a contract change in the strict sense; it is treated as a patch because `web/` is the only consumer and both halves deploy together, and `STATS_CACHE_VERSION` is bumped so no cached payload outlives the shape.
+
+### Fixed: ghost risk counted calendar days, so holidays read as silence
+
+- **Every threshold silently shrank exactly when companies were least responsive.** The two stages were judged against elapsed *calendar* days, so a 21-day threshold spanning Golden Week fired after about eleven working days of real silence. `JapanCalendar` has existed since `v1.4.0` and `FollowUpReminderJob` already refuses to nudge into weekends, national holidays, Golden Week, Obon and the New Year shutdown, on the reasoning that the question is whether a company will answer. Ghost risk asked the same question against a different calendar, and the cost of the mismatch is the one `SPEC.md` names: a false flag invites the user to close a live application.
+- **Silence is now counted in business days**, via a new `JapanCalendar.business_days_between` shared with the reminder job, so the two features cannot disagree about what a dead zone is. The arithmetic moved out of SQL and into Ruby because the holiday rules live in a gem and the seasonal spans live in `JapanCalendar`, so Postgres cannot answer the question; it costs one row per in-flight application.
+- **The derived threshold went with it.** The p90 over the user's own response times, its `MIN_SAMPLE` of 5, the `DEFAULT_P90` pair and the 7-to-90-day clamp are gone, replaced by fixed `THRESHOLDS` of **15 business days on `applied` and 10 on `phone_screen`**. Those were chosen to land on the old 21/14 calendar defaults in a month without holidays, so this is a change of calendar rather than a retuning of how patient the app is. It is a deliberate reduction, taken on the north star's terms: the app has one user, and a threshold he could not predict or overrule was not serving him. `SPEC.md` § `Applications::GhostRiskQuery` records the reasoning and what was removed.
+- **The payload and the copy narrowed with it.** `basis` and `sample_sizes` are gone (there is no sample to describe), `days_in_stage` became `business_days_in_stage` so it can never be confused with the list payload's calendar-day field of the same name, and the card's explainer now says what it actually does in both locales. The historical-percentile CTE is gone, so the query no longer reads timeline exits at all, only each application's latest transition.
 
 ### Fixed: a residents-only posting was recorded as "No sponsorship"
 

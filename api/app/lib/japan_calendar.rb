@@ -29,6 +29,31 @@ module JapanCalendar
     !weekend?(date) && !national_holiday?(date) && !seasonal_dead_zone?(date)
   end
 
+  # How many business days of silence separate `from` and `to`: the number of
+  # days on which a company could actually have replied. GhostRiskQuery measures
+  # against this rather than against calendar days, so that the same dead zones
+  # FollowUpReminderJob refuses to send into do not also count as being ignored.
+  #
+  # Exclusive of `from` and inclusive of `to`, so an application that entered a
+  # stage today has nothing to answer for yet, and one that entered on Friday is
+  # owed one business day by Monday. Counted day by day rather than derived,
+  # because the seasonal spans above are this module's own invention and no
+  # arithmetic on weekday numbers knows about them; the spans are days, not
+  # months, so there is nothing here worth optimising.
+  #
+  # Both ends are read in the app's zone before being reduced to dates: they
+  # arrive as UTC timestamps from Postgres, and a UTC date is the wrong day for
+  # nine hours out of every twenty-four.
+  def self.business_days_between(from, to)
+    return 0 if from.blank? || to.blank?
+
+    from = from.in_time_zone.to_date
+    to   = to.in_time_zone.to_date
+    return 0 if to <= from
+
+    ((from + 1)..to).count { |date| business_day?(date) }
+  end
+
   # Why the job held its fire, for the log line. nil when `date` is a business day.
   def self.dead_zone_reason(date)
     return :weekend if weekend?(date)
