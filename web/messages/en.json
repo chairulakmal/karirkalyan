@@ -534,7 +534,16 @@
     "loadMore": "Load more",
     "resultCount": "{count, plural, =0 {No applications shown} one {# application shown} other {# applications shown}}",
     "filterFailed": "Could not update the list. Check your connection and try again.",
-    "loadMoreFailed": "Could not load more applications. Try again."
+    "loadMoreFailed": "Could not load more applications. Try again.",
+    "pin": {
+      "add": "Pin {company} to the top",
+      "remove": "Unpin {company}",
+      "addShort": "Pin to top",
+      "removeShort": "Unpin",
+      "full": "You can pin {max} applications at a time. Unpin one first.",
+      "unavailable": "Pins are stored in this browser, and it is not allowing that right now.",
+      "hidden": "{count, plural, one {# pinned application is not in this view} other {# pinned applications are not in this view}}. Clear the filters, or load more."
+    }
   },
   "detail": {
     "eyebrow": "Application",

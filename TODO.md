@@ -20,6 +20,8 @@ The plan: open work only. The most important thing here is a rule, not a list: *
 
 **The admission test, applied to anything proposed for `v1`:** does it make something the app already does work correctly, or stop something it already does from being abused? If yes it ships, and it is a patch by the mechanical test (no migration, no `v1` contract broken, no new capability). If it adds a capability, however small and however tempting, it is `2.0.0` work and waits for the trigger. Security fixes, dependency bumps, and CI chores pass on the same reading: none is a capability.
 
+**One exception has been taken, knowingly: dashboard pins (2026-08-04).** Up to three applications hoisted to the top of the dashboard list, held in `localStorage` (`SPEC.md` § Pinned applications). It is a capability and it **fails the admission test above**; it was built because the author asked for it with the trade in front of him, not because an argument was found that let it through. It is recorded here so the freeze stays honest: a rule with an unrecorded exception is a rule nobody believes the second time. What it cost is bounded and worth naming, because that boundedness is the whole of its defence: no migration, no endpoint, no Rails file, and `web/`-only, which is also the code the rewrite deletes wholesale, so it is the *most* throwaway shape a feature can have. **This is not a precedent, and the test is unchanged.** The next feature is measured against the test, not against this paragraph.
+
 **The freeze does not gate the `2.0.0` cluster; it is what fills it.** What is frozen is shipping features into the current stack, not wanting them. An idea that arrives tomorrow gets written down there, not argued into a patch.
 
 ### Open on `v1`

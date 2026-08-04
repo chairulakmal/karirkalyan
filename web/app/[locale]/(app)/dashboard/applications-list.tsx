@@ -4,6 +4,7 @@ import { useRef, useState } from "react";
 import { useLocale, useTranslations } from "next-intl";
 import { Link, usePathname, useRouter } from "@/i18n/navigation";
 import { useToast } from "@/app/components/toast";
+import { PinButton } from "@/app/components/pin-button";
 import {
   formatDate,
   isOverdue,
@@ -11,6 +12,8 @@ import {
   statusBadgeClass,
   timeAgo,
 } from "@/app/lib/format";
+import { MAX_PINS, hiddenPinCount, sortPinnedFirst } from "@/app/lib/pins";
+import { usePins } from "@/app/lib/use-pins";
 import type { Application, JapaneseLevel, PageMeta, Status } from "@/app/lib/types";
 import { JAPANESE_LEVELS } from "@/app/lib/types";
 
@@ -107,6 +110,8 @@ export function ApplicationsList({
   const router = useRouter();
   const pathname = usePathname();
   const toast = useToast();
+  // Device-local, and empty until after hydration (SPEC.md § Pinned applications).
+  const { pins, toggle: togglePin } = usePins();
   const atRisk = new Set(atRiskIds);
   const rendered = statusBuckets.map(([status]) => status);
   // The dashboard's default view and the "Active" preset are the same set: the
@@ -392,6 +397,22 @@ export function ApplicationsList({
     applyFilters({ ...filters, company, source });
   }
 
+  // Pins are applied at render time, on top of whatever order the fetches left
+  // behind, and they reorder *only* what is already on screen: a pin never
+  // fetches a row and never overrides a filter. A pin the current view excludes
+  // is therefore reported rather than silently honoured, because an off-page pin
+  // and a lost pin look identical from here (SPEC.md § Pinned applications).
+  const ordered = sortPinnedFirst(items, pins);
+  const hiddenPins = hiddenPinCount(items, pins);
+
+  function onPinToggle(id: number) {
+    // Pinning and unpinning need no confirmation: the row moves. The two
+    // failures do, because in both the button appears to do nothing at all.
+    const outcome = togglePin(id);
+    if (outcome === "full") toast.error(t("pin.full", { max: MAX_PINS }));
+    if (outcome === "unavailable") toast.error(t("pin.unavailable"));
+  }
+
   return (
     <div className="space-y-4">
       {facets.length > 0 && (
@@ -577,59 +598,89 @@ export function ApplicationsList({
           )}
         </div>
       ) : (
-        <ul className={`divide-y divide-dune border border-dune bg-linen transition-opacity ${loading ? "opacity-50" : ""}`}>
-          {items.map((app) => (
-            <li key={app.id}>
-              <Link
-                href={`/applications/${app.id}`}
-                className="flex items-center justify-between gap-6 px-5 py-4 transition hover:bg-sand/60"
-              >
-                <div className="min-w-0 flex-1">
-                  <div className="flex items-baseline gap-3">
-                    <p className="truncate font-serif text-lg font-medium text-midnight">
-                      {app.company}
-                    </p>
-                    <span
-                      title={ts(`description.${app.status}`)}
-                      className={`inline-flex items-center px-2 py-0.5 text-xs font-medium ring-1 ring-inset ${statusBadgeClass(app.status)}`}
-                    >
-                      {ts(`label.${app.status}`)}
-                    </span>
-                    {atRisk.has(app.id) && (
-                      <span
-                        title={tg("markerTitle")}
-                        className="inline-flex items-center px-2 py-0.5 text-xs font-medium text-danger ring-1 ring-inset ring-danger/30"
-                      >
-                        {tg("marker")}
-                      </span>
-                    )}
-                  </div>
-                  <p className="mt-1 truncate text-sm text-ink-soft">{app.role}</p>
-                </div>
-                <div className="hidden text-right font-mono text-xs text-ink-soft sm:block">
-                  {app.applied_at ? (
-                    <p>{t("appliedAgo", { ago: timeAgo(app.applied_at, locale) })}</p>
-                  ) : (
-                    <p>{t("createdAgo", { ago: timeAgo(app.created_at, locale) })}</p>
-                  )}
-                  {app.follow_up_at ? (
-                    // Overdue only shouts on applications still in play — a
-                    // stale date on a rejected/closed one isn't actionable.
-                    activeStates.includes(app.status) && isOverdue(app.follow_up_at) ? (
-                      <p className="mt-0.5 font-medium text-danger">
-                        {t("followUpOverdue", { date: formatDate(app.follow_up_at, locale) })}
-                      </p>
-                    ) : (
-                      <p className="mt-0.5 font-medium text-saffron-ink">
-                        {t("followUp", { date: formatDate(app.follow_up_at, locale) })}
-                      </p>
-                    )
-                  ) : null}
-                </div>
-              </Link>
-            </li>
-          ))}
-        </ul>
+        <>
+          {/* A pin the current view cannot show is not a bug, but it is
+              indistinguishable from one unless it is said out loud. Polite by
+              default (it is a plain <p>, not a live region): it renders as part
+              of a list the user just filtered or paged, so it is already in the
+              flow they are reading. */}
+          {hiddenPins > 0 && (
+            <p className="border border-dashed border-dune bg-sand/40 px-4 py-2 text-xs text-ink-soft">
+              {t("pin.hidden", { count: hiddenPins })}
+            </p>
+          )}
+          <ul className={`divide-y divide-dune border border-dune bg-linen transition-opacity ${loading ? "opacity-50" : ""}`}>
+            {ordered.map((app) => {
+              const pinned = pins.includes(app.id);
+              return (
+                // The pin toggle is a sibling of the link, not a child of it: a
+                // button inside an anchor is invalid HTML. The hover tint moves
+                // up to the <li> so the whole row still lights as one thing, and
+                // the transparent border on unpinned rows keeps the saffron rule
+                // from shifting text by 2px when a row is pinned.
+                <li
+                  key={app.id}
+                  className={`flex items-center gap-2 border-l-2 pr-3 transition hover:bg-sand/60 ${
+                    pinned ? "border-saffron" : "border-transparent"
+                  }`}
+                >
+                  <Link
+                    href={`/applications/${app.id}`}
+                    className="flex min-w-0 flex-1 items-center justify-between gap-6 py-4 pl-5"
+                  >
+                    <div className="min-w-0 flex-1">
+                      <div className="flex items-baseline gap-3">
+                        <p className="truncate font-serif text-lg font-medium text-midnight">
+                          {app.company}
+                        </p>
+                        <span
+                          title={ts(`description.${app.status}`)}
+                          className={`inline-flex items-center px-2 py-0.5 text-xs font-medium ring-1 ring-inset ${statusBadgeClass(app.status)}`}
+                        >
+                          {ts(`label.${app.status}`)}
+                        </span>
+                        {atRisk.has(app.id) && (
+                          <span
+                            title={tg("markerTitle")}
+                            className="inline-flex items-center px-2 py-0.5 text-xs font-medium text-danger ring-1 ring-inset ring-danger/30"
+                          >
+                            {tg("marker")}
+                          </span>
+                        )}
+                      </div>
+                      <p className="mt-1 truncate text-sm text-ink-soft">{app.role}</p>
+                    </div>
+                    <div className="hidden text-right font-mono text-xs text-ink-soft sm:block">
+                      {app.applied_at ? (
+                        <p>{t("appliedAgo", { ago: timeAgo(app.applied_at, locale) })}</p>
+                      ) : (
+                        <p>{t("createdAgo", { ago: timeAgo(app.created_at, locale) })}</p>
+                      )}
+                      {app.follow_up_at ? (
+                        // Overdue only shouts on applications still in play: a
+                        // stale date on a rejected/closed one isn't actionable.
+                        activeStates.includes(app.status) && isOverdue(app.follow_up_at) ? (
+                          <p className="mt-0.5 font-medium text-danger">
+                            {t("followUpOverdue", { date: formatDate(app.follow_up_at, locale) })}
+                          </p>
+                        ) : (
+                          <p className="mt-0.5 font-medium text-saffron-ink">
+                            {t("followUp", { date: formatDate(app.follow_up_at, locale) })}
+                          </p>
+                        )
+                      ) : null}
+                    </div>
+                  </Link>
+                  <PinButton
+                    pinned={pinned}
+                    company={app.company}
+                    onToggle={() => onPinToggle(app.id)}
+                  />
+                </li>
+              );
+            })}
+          </ul>
+        </>
       )}
 
       {/* `meta` is whatever the last fetch left behind, and hiding every stage
