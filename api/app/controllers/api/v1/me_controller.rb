@@ -15,7 +15,17 @@ module Api
         if current_user.update(me_params)
           render json: profile_json
         else
-          render json: { errors: current_user.errors }, status: :unprocessable_entity
+          # The one endpoint that answered off-contract. It rendered
+          # `{ errors: … }`: no `error` sentence, no `code`, no per-field
+          # `details`, against SPEC.md § API contract's "every error response is
+          # { error, code }", so web/'s apiFailure had nothing to key on and fell
+          # through to status-keyed copy. The visible message on /settings does
+          # not change today (the catalog has no field.residence_status_inclusion
+          # entry, so it resolves to code.validation_failed, which reads the same
+          # as the 422 fallback); what changes is that the response is now
+          # something a client can branch on, so the next validation this endpoint
+          # grows arrives localizable rather than needing this found again.
+          render_validation_failed(current_user)
         end
       end
 
