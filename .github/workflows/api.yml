@@ -11,8 +11,9 @@ defaults:
 
 jobs:
   # Decides whether this commit touches anything the API build cares about.
-  # Docs-only commits skip `verify` but still get a green `gate`, because a
-  # required status check that never runs stays "expected" and blocks the push.
+  # Docs-only and web-only commits skip `verify` but still get a green `gate`,
+  # because a required status check that never runs stays "expected" and blocks
+  # the push.
   changes:
     name: Detect changes
     runs-on: ubuntu-latest
@@ -47,12 +48,17 @@ jobs:
           echo "Changed files:"
           printf '%s\n' "$files" | sed 's/^/  /'
 
-          # Anything not on this list is treated as code, so an unrecognised path
-          # errs toward running CI rather than skipping it.
-          non_docs=$(printf '%s\n' "$files" \
-            | grep -vE '(\.md$|^LICENSE$|^notes/|^web/public/llms\.txt$)' || true)
+          # Two things cannot affect the Rails build: documentation, and the whole
+          # of web/. Everything else counts, so an unrecognised root path errs
+          # toward running CI rather than skipping it. The exclusion is stated as
+          # what is irrelevant rather than as `^api/`, to keep that fail-safe.
+          #
+          # Ignoring web/ outright is safe in this direction only. web.yml cannot
+          # return the favour, because its E2E job boots this API; it says so.
+          relevant=$(printf '%s\n' "$files" \
+            | grep -vE '(\.md$|^LICENSE$|^notes/|^web/)' || true)
 
-          if [ -n "$non_docs" ]; then
+          if [ -n "$relevant" ]; then
             echo "code=true" >> "$GITHUB_OUTPUT"
           else
             echo "code=false" >> "$GITHUB_OUTPUT"
@@ -146,6 +152,6 @@ jobs:
 
           case "$verify" in
             success) echo "API checks passed." ;;
-            skipped) echo "Docs-only change; API checks not required." ;;
+            skipped) echo "Nothing under api/ changed; API checks not required." ;;
             *)       echo "::error::API checks did not pass (result: $verify)."; exit 1 ;;
           esac

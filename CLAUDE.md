@@ -69,7 +69,7 @@ How much ceremony a change gets depends on what kind of change it is:
 
 It requires a pull request (0 approvals), requires the `Lint, security & test` and `Lint, typecheck & build` checks, and blocks deletion and force-pushes. The **Admin** repository role has `bypass_mode: always`, so Akmal can push straight to `main`; that is what makes the docs row above possible. The bypass applies to *every* rule, so the table is still discipline rather than a wall: don't reach for it outside the docs row.
 
-CI is path-aware so a docs commit doesn't pay for a full Rails suite and Next build. Both workflows split into `changes` → `verify` → `gate`. **`gate` owns the required context name and must always run**: a required check that is skipped stays *expected* forever and blocks the merge, so path filtering lives in `changes`, never on the workflow trigger. If you rename a job, keep `gate`'s `name:` byte-identical to the ruleset's context string.
+CI is path-aware **per tree**: a docs commit pays for neither suite, a `web/` commit doesn't pay for the Rails suite, and an `api/` commit doesn't pay for the Next build. One asymmetry, deliberate: `web-ci`'s Playwright job boots the real Rails API, so an `api/`-only push still runs it, since it is the only job that tests the two halves against each other. Both workflows split into `changes` → `verify` → `gate`. **`gate` owns the required context name and must always run**: a required check that is skipped stays *expected* forever and blocks the merge, so path filtering lives in `changes`, never on the workflow trigger. If you rename a job, keep `gate`'s `name:` byte-identical to the ruleset's context string.
 
 ## Releases: docs follow the feature, not the tag
 
