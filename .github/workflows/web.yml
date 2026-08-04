@@ -17,6 +17,7 @@ jobs:
     runs-on: ubuntu-latest
     outputs:
       code: ${{ steps.filter.outputs.code }}
+      api: ${{ steps.filter.outputs.api }}
     steps:
       - name: Checkout code
         uses: actions/checkout@v7
@@ -38,6 +39,7 @@ jobs:
             if [ -z "$before" ] || [ "$before" = "0000000000000000000000000000000000000000" ] \
                || ! git cat-file -e "$before^{commit}" 2>/dev/null; then
               echo "code=true" >> "$GITHUB_OUTPUT"
+              echo "api=true" >> "$GITHUB_OUTPUT"
               exit 0
             fi
             files=$(git diff --name-only "$before" "${{ github.sha }}")
@@ -46,15 +48,33 @@ jobs:
           echo "Changed files:"
           printf '%s\n' "$files" | sed 's/^/  /'
 
-          # Anything not on this list is treated as code, so an unrecognised path
-          # errs toward running CI rather than skipping it.
-          non_docs=$(printf '%s\n' "$files" \
-            | grep -vE '(\.md$|^LICENSE$|^notes/|^web/public/llms\.txt$)' || true)
+          # Two questions, because the two jobs below have different appetites.
+          #
+          # `code` drives lint/typecheck/build, which cannot see the backend, so
+          # it ignores api/ the way api.yml ignores web/. Stated as an exclusion
+          # list rather than as `^web/`, so an unrecognised root path still runs.
+          # llms.txt stays on that list despite living under web/: CLAUDE.md
+          # counts it as documentation and it ships as a static asset, so a
+          # rebuild would buy nothing.
+          #
+          # `api` drives the E2E job, and there the favour is not returned: that
+          # job boots the real Rails API and is the only thing in this repo that
+          # tests the two halves against each other, so a backend-only change is
+          # precisely what it exists to catch.
+          relevant=$(printf '%s\n' "$files" \
+            | grep -vE '(\.md$|^LICENSE$|^notes/|^api/|^web/public/llms\.txt$)' || true)
+          api_changed=$(printf '%s\n' "$files" | grep -E '^api/' || true)
 
-          if [ -n "$non_docs" ]; then
+          if [ -n "$relevant" ]; then
             echo "code=true" >> "$GITHUB_OUTPUT"
           else
             echo "code=false" >> "$GITHUB_OUTPUT"
+          fi
+
+          if [ -n "$api_changed" ]; then
+            echo "api=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "api=false" >> "$GITHUB_OUTPUT"
           fi
 
   verify:
@@ -106,7 +126,17 @@ jobs:
   e2e:
     name: Playwright E2E
     needs: [changes, verify]
-    if: github.event_name == 'push' && needs.changes.outputs.code == 'true'
+    # `always()`, because a backend-only change skips `verify` and would take this
+    # job down with it through `needs`: the one job that would have caught the
+    # contract break, skipped for touching only the backend. The result guards put
+    # the ordering back, so a red or cancelled `verify` still short-circuits it.
+    if: >-
+      always()
+      && github.event_name == 'push'
+      && needs.changes.result == 'success'
+      && needs.verify.result != 'failure'
+      && needs.verify.result != 'cancelled'
+      && (needs.changes.outputs.code == 'true' || needs.changes.outputs.api == 'true')
     runs-on: ubuntu-latest
 
     services:
@@ -196,6 +226,6 @@ jobs:
 
           case "$verify" in
             success) echo "Web checks passed." ;;
-            skipped) echo "Docs-only change; web checks not required." ;;
+            skipped) echo "Nothing under web/ changed; web checks not required." ;;
             *)       echo "::error::Web checks did not pass (result: $verify)."; exit 1 ;;
           esac
