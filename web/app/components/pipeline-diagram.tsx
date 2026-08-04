@@ -6,8 +6,12 @@ import type { Status } from "@/app/lib/types";
  * The homepage argues the app is built on a state machine. This draws one.
  *
  * **It is an illustration, not a mirror of the transition table.** It draws the
- * happy path and the three revival edges; the real table has 33 edges, and
- * `api/app/lib/application_fsm.rb` is its only source of truth. Copying the full
+ * happy path and the three revival edges; the real table lives only in
+ * `api/app/lib/application_fsm.rb` and is not restated here, not even as an edge
+ * count. This docstring carried one until it went stale, and the fresh count that
+ * briefly replaced it would have gone the same way: a hand-copied number is a
+ * hand-copied table one digit wide. SPEC.md § Public pages states that as a rule,
+ * having already been wrong about it once. Copying the full
  * table into TypeScript is exactly what the Kanban board was deferred to v1.2.0
  * to avoid — nothing here is read by the app, and no behaviour depends on it, so
  * a stale arrow is a wrong drawing rather than a wrong transition. The caption

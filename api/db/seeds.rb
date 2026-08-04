@@ -193,18 +193,22 @@ seed_data = [
     ]
   },
 
-  # ── Cybozo (Cybozu) ── Withdrew before applying (salary too low) ──────────
+  # ── Cybozo (Cybozu) ── Dropped before applying (salary too low) ───────────
+  # Archived, not withdrawn: withdrawal starts at `applied` (SPEC.md § State
+  # machine), and a draft dropped before it was ever sent is a lead stopped, which
+  # is what archiving means. This row is also the demo's one example of the board's
+  # closed rail, since archived applications are excluded from the dashboard.
   {
     slug: "cybozo",
     app: {
       company: "Cybozo Inc.",
       role:    "Backend Engineer",
-      status:  "withdrawn",
+      status:  "archived",
       url:     "https://cybozo.co.jp/careers/backend",
       notes:   "Groupware / kintone team. Interesting Ruby culture, but salary range ¥5.5M–6.5M is below ¥7.5M+ target."
     },
     transitions: [
-      { from: "draft",        to: "withdrawn",    note: "Salary range disclosed: ¥5.5M–6.5M. Below target. Withdrew before submitting.", at: 3.months.ago + 15.days }
+      { from: "draft",        to: "archived",     note: "Salary range disclosed: ¥5.5M–6.5M. Below target. Dropped before submitting.", at: 3.months.ago + 15.days }
     ]
   },
 

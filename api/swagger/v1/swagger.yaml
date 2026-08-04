@@ -893,7 +893,8 @@ paths:
           description: a permanent resident has no clock, so days-remaining is null
             even with a date
         '422':
-          description: an unknown residence status is rejected
+          description: an unknown residence status is rejected, in the shared error
+            envelope
         '401':
           description: not authenticated
       requestBody:

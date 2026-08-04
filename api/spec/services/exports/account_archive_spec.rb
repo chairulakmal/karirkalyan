@@ -60,6 +60,19 @@ RSpec.describe Exports::AccountArchive do
     expect(entries.map { |entry| entry["note"] }).to include("Recruiter call")
   end
 
+  # "Every column" was not every column. Application#as_json drops posting_snapshot
+  # alongside the two blobs, for a reason that belongs to the index and the board rather
+  # than to this file, and the archive inherited the omission: the captured posting was
+  # the one piece of user data that left no copy anywhere, in the artefact whose whole
+  # promise is that nothing is lost. The CSV excludes it deliberately, so there was no
+  # second door either.
+  it "carries the posting snapshot, which as_json drops" do
+    create(:application, user: user, posting_snapshot: "Senior Backend Engineer at Mercari. Ruby, Go, Kubernetes.")
+
+    expect(manifest["applications"].first["posting_snapshot"])
+      .to eq("Senior Backend Engineer at Mercari. Ruby, Go, Kubernetes.")
+  end
+
   it "does not leak the blob columns into account.json" do
     create(:application, :with_resume, user: user)
     expect(manifest["applications"].first.keys).not_to include("resume", "cover_letter")

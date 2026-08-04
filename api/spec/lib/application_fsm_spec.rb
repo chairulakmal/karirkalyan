@@ -50,8 +50,8 @@ RSpec.describe ApplicationFSM do
         end
       end
 
-      it "allows withdrawal from wishlist, draft, applied, phone_screen, technical, final_round" do
-        %w[wishlist draft applied phone_screen technical final_round].each do |state|
+      it "allows withdrawal from applied, phone_screen, technical, final_round" do
+        %w[applied phone_screen technical final_round].each do |state|
           expect { described_class.assert_transition!(state, "withdrawn") }.not_to raise_error
         end
       end
@@ -117,18 +117,34 @@ RSpec.describe ApplicationFSM do
         expect { described_class.assert_transition!("archived", "draft") }
           .to raise_error(ApplicationFSM::InvalidTransitionError)
       end
+
+      # The pre-application stages have one exit each besides their forward move,
+      # and it is `archived`. Withdrawal needs an application to withdraw; a lead
+      # dropped before it was sent is housekeeping, not a candidate-side outcome.
+      # Asserted per state rather than in a loop so a failure names which one
+      # regressed, and kept here (not in the "exits" context) because the point is
+      # that these are refusals now.
+      it "raises on wishlist → withdrawn (nothing has been applied to yet)" do
+        expect { described_class.assert_transition!("wishlist", "withdrawn") }
+          .to raise_error(ApplicationFSM::InvalidTransitionError)
+      end
+
+      it "raises on draft → withdrawn (nothing has been applied to yet)" do
+        expect { described_class.assert_transition!("draft", "withdrawn") }
+          .to raise_error(ApplicationFSM::InvalidTransitionError)
+      end
     end
   end
 
   describe ".valid_next_states" do
-    it "returns [draft, withdrawn, archived] for wishlist" do
+    it "returns [draft, archived] for wishlist" do
       expect(described_class.valid_next_states("wishlist"))
-        .to contain_exactly("draft", "withdrawn", "archived")
+        .to contain_exactly("draft", "archived")
     end
 
-    it "returns [applied, withdrawn, archived] for draft" do
+    it "returns [applied, archived] for draft" do
       expect(described_class.valid_next_states("draft"))
-        .to contain_exactly("applied", "withdrawn", "archived")
+        .to contain_exactly("applied", "archived")
     end
 
     it "returns all exits for applied" do

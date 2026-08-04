@@ -78,11 +78,23 @@ RSpec.describe "Me", type: :request do
         end
       end
 
-      response "422", "an unknown residence status is rejected" do
+      # The rejection itself always worked; the *shape* of it did not. This
+      # endpoint used to render `{ errors: … }`, the only place in the API that
+      # answered off SPEC.md § API contract's `{ error, code }` envelope, so a
+      # client had no `code` to branch on and no per-field `details` to localize
+      # from. Asserted here rather than trusted, because a 422 status alone is
+      # exactly what let the wrong body go unnoticed.
+      response "422", "an unknown residence status is rejected, in the shared error envelope" do
         let(:user)          { create(:user) }
         let(:Authorization) { jwt_for(user) }
         let(:body)          { { user: { residence_status: "tourist" } } }
-        run_test!
+        run_test! do |response|
+          payload = JSON.parse(response.body)
+          expect(payload["code"]).to eq("validation_failed")
+          expect(payload["error"]).to be_a(String).and be_present
+          expect(payload["details"])
+            .to include("field" => "residence_status", "code" => "inclusion")
+        end
       end
 
       response "401", "not authenticated" do

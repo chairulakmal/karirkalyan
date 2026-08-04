@@ -66,8 +66,17 @@ module Exports
     # as_json already drops the two blob columns (Application#as_json), which is what we
     # want here: the PDFs travel as files, and each row names its own so the mapping
     # survives even when the slug is unhelpful.
+    #
+    # posting_snapshot is dropped by that same override for a different reason (index and
+    # board fetch every row, and 12k of text per row is blob weight in a text costume), so
+    # it has to be merged back, exactly as ApplicationsController#show does. Riding
+    # as_json alone quietly made this file's whole promise false: the archive is the leg
+    # the user can pull without a provider or a shell, "nothing is lost" is its entire
+    # job, and the snapshot is the one column no other export carries: the CSV excludes it
+    # by design, and its purpose is surviving a posting that gets taken down.
     def application_json(application)
       application.as_json.merge(
+        posting_snapshot:  application.posting_snapshot,
         resume_file:       blob_path_if_present(application, :resume),
         cover_letter_file: blob_path_if_present(application, :cover_letter),
         timeline_entries:  application.timeline_entries.sort_by(&:created_at).as_json
