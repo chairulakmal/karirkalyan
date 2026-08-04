@@ -24,8 +24,13 @@ module ApplicationFSM
     { from: "final_round",  to: "ghosted"      },
     { from: "ghosted",      to: "applied"      },
 
-    { from: "wishlist",     to: "withdrawn"    },
-    { from: "draft",        to: "withdrawn"    },
+    # Withdrawal starts at `applied`: there has to be an application to withdraw.
+    # A wishlist or draft you decide against is not a candidate-side outcome, it
+    # is a lead you stopped pursuing, and `archived` (reachable from both, below)
+    # already means exactly that. SPEC.md § State machine has the full reasoning,
+    # including why the two removed rows were a correctness problem and not just
+    # a redundant pair: they let a never-applied row leave the pre-application
+    # stages, which the dashboard's outcome rates read as having been applied to.
     { from: "applied",      to: "withdrawn"    },
     { from: "phone_screen", to: "withdrawn"    },
     { from: "technical",    to: "withdrawn"    },

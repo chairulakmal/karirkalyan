@@ -1,11 +1,14 @@
 module Api
   module V1
     class DashboardController < ApplicationController
-      # Bump when the stats payload SHAPE changes — the data-derived key alone
-      # won't invalidate on a deploy/reload if the underlying rows are unchanged,
-      # so a shape change (e.g. adding `facets`) would otherwise serve a stale
-      # cached payload from Solid Cache (prod) or the in-process memory store (dev).
-      STATS_CACHE_VERSION = 5
+      # Bump when the stats payload shape OR the way any figure in it is computed
+      # changes. The data-derived key alone won't invalidate on a deploy/reload if
+      # the underlying rows are unchanged, so either kind of change would otherwise
+      # serve a stale cached payload from Solid Cache (prod) or the in-process
+      # memory store (dev). v6 is a computation change with no shape change (the
+      # outcome-rate denominator moved from status to applied_at), which is exactly
+      # the case the old "SHAPE" wording would have talked you out of bumping for.
+      STATS_CACHE_VERSION = 6
 
       # The Upcoming agenda (v1.11.0): how many dated items to surface, and how far
       # out a residence-expiry clock has to be before it counts as "upcoming".
@@ -129,16 +132,25 @@ module Api
       end
 
       # Two stat cards over the FSM + timeline, zero schema. The denominator for
-      # both is applications that actually left the pre-application stages
-      # (wishlist/draft); wishlist items nobody has applied to would only dilute a
-      # rate about how companies respond. A "response" is the company replying at
-      # all (advancing you or rejecting you), so ghosting is precisely its
-      # absence; both are read from the timeline, so a later revival does not
-      # erase that a reply (or a ghosting) once happened. Nil when there is
-      # nothing applied to, which the card renders as "not enough data" rather
-      # than a misleading 0%.
+      # both is applications that were actually applied to; a wishlist item
+      # nobody sent anything to would only dilute a rate about how companies
+      # respond. A "response" is the company replying at all (advancing you or
+      # rejecting you), so ghosting is precisely its absence; both are read from
+      # the timeline, so a later revival does not erase that a reply (or a
+      # ghosting) once happened. Nil when there is nothing applied to, which the
+      # card renders as "not enough data" rather than a misleading 0%.
+      #
+      # The denominator asks `applied_at`, not the current status. It used to be
+      # `where.not(status: %w[wishlist draft])`, which reads a fact about the past
+      # off a pointer that keeps moving: archive a wishlist row (housekeeping the
+      # app encourages) and it is suddenly in neither excluded stage, so it joined
+      # the denominator while the numerator, a timeline read, could never match it.
+      # Both rates fell a little every time the user tidied up. applied_at is
+      # written exactly when an application becomes one (creation into `applied`,
+      # or any transition into it) and never cleared, so it survives every later
+      # move; avg_days_to_offer above already gates on it.
       def outcome_rates
-        applied = current_user.applications.where.not(status: %w[wishlist draft]).count
+        applied = current_user.applications.where.not(applied_at: nil).count
         return { response_rate: nil, ghost_rate: nil } if applied.zero?
 
         responded = current_user.timeline_entries

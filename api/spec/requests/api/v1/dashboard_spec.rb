@@ -173,6 +173,46 @@ RSpec.describe "Dashboard", type: :request do
       expect(body["response_rate"]).to eq(50)
       expect(body["ghost_rate"]).to eq(50)
     end
+
+    # The regression: the denominator used to be `status NOT IN (wishlist, draft)`,
+    # which is a fact about the past read off a pointer that keeps moving. Archiving
+    # is housekeeping the app encourages, and it moved a never-applied row out of
+    # both excluded stages and into the denominator, where it could never earn a
+    # numerator. Two archived leads against one real application drove a 100% rate
+    # to 33% under the old query; both specs below fail against it.
+    it "keeps archived wishlist and draft leads out of the denominator" do
+      applied = create(:application, :applied, company: "Real", user: user)
+      Applications::TransitionService.new(application: applied, to: "phone_screen", actor: user).call
+
+      lead = create(:application, company: "Lead", status: "wishlist", user: user)
+      Applications::TransitionService.new(application: lead, to: "archived", actor: user).call
+      drafted = create(:application, :draft, company: "Drafted", user: user)
+      Applications::TransitionService.new(application: drafted, to: "archived", actor: user).call
+
+      get "/api/v1/dashboard", headers: headers
+      body = JSON.parse(response.body)
+
+      expect(body["response_rate"]).to eq(100)
+      expect(body["ghost_rate"]).to eq(0)
+    end
+
+    # applied_at survives every later move, which is the whole reason it is the
+    # anchor: a withdrawn or archived application that really was applied to still
+    # belongs in the denominator, and its timeline still holds whatever the company
+    # did before it closed. Only the never-applied rows drop out.
+    it "keeps a closed application that was really applied to in the denominator" do
+      withdrawn = create(:application, :applied, company: "Withdrew", user: user)
+      Applications::TransitionService.new(application: withdrawn, to: "withdrawn", actor: user).call
+      archived = create(:application, :applied, company: "Archived", user: user)
+      Applications::TransitionService.new(application: archived, to: "rejected", actor: user).call
+      Applications::TransitionService.new(application: archived.reload, to: "archived", actor: user).call
+
+      get "/api/v1/dashboard", headers: headers
+      body = JSON.parse(response.body)
+
+      # Two in the denominator; the archived one was rejected, which is a response.
+      expect(body["response_rate"]).to eq(50)
+    end
   end
 
   describe "the upcoming agenda" do
