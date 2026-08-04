@@ -534,7 +534,16 @@
     "loadMore": "もっと見る",
     "resultCount": "{count, plural, =0 {表示中の応募はありません} other {応募 #件を表示中}}",
     "filterFailed": "リストを更新できませんでした。接続を確認してもう一度お試しください。",
-    "loadMoreFailed": "追加の応募を読み込めませんでした。もう一度お試しください。"
+    "loadMoreFailed": "追加の応募を読み込めませんでした。もう一度お試しください。",
+    "pin": {
+      "add": "{company}を上部に固定",
+      "remove": "{company}の固定を解除",
+      "addShort": "上部に固定",
+      "removeShort": "固定を解除",
+      "full": "固定できるのは同時に{max}件までです。先にどれかの固定を解除してください。",
+      "unavailable": "固定はこのブラウザに保存されますが、現在保存が許可されていません。",
+      "hidden": "{count, plural, other {固定した応募のうち#件がこの表示に含まれていません}}。絞り込みを解除するか、「もっと見る」を押してください。"
+    }
   },
   "detail": {
     "eyebrow": "応募",

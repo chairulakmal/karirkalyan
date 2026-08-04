@@ -75,6 +75,11 @@ pipeline. Built as a portfolio project by Chairul Akmal (https://chairulakmal.co
   URL (a filtered view is linkable and reload-survivable); triage cards on the two candidate-side
   board columns (notes excerpt, source, days-in-stage, stalest-first); and cover-letter talking
   points extracted as bullets from the resume against the posting (bullets, not a draft).
+- Pins up to three applications to the top of the dashboard list. Pins are device-local
+  (localStorage, no column and no endpoint) because a pin is a transient attention marker rather
+  than a fact about the application. A pin reorders only what is already rendered, so it can never
+  contradict the filters above it or claim a row from a page that was not fetched; when the current
+  view excludes a pinned application, the list says how many rather than dropping it silently.
 - Offers a Kanban board at /board: one column per active status, and dragging a card between
   columns performs a real FSM transition. The board fetches the legal moves and its column set
   from GET /api/v1/transitions rather than keeping its own copy of the table, and the server
