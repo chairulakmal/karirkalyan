@@ -41,10 +41,12 @@ pipeline. Built as a portfolio project by Chairul Akmal (https://chairulakmal.co
 - Records an optional note on any status change (interview details, a rejection's feedback, an
   offer's terms) against the timeline entry it belongs to; every write is confirmed with one toast
 - Predicts which applications have been ghosted: the dashboard flags any application sitting in
-  applied or phone_screen that has been silent longer than the 90th percentile of that user's own
-  historical reply times for the stage, derived from the timeline audit trail with a window
-  function. Below five recorded replies at a stage it falls back to a global default (21 days for
-  applied, 14 for phone_screen) and labels the threshold as a default rather than a personal one.
+  applied or phone_screen (the two stages where the next move belongs to the company) that has been
+  silent longer than a fixed per-stage threshold, reconstructed from the timeline audit trail with
+  no extra column or table. Silence is counted in Japanese business days, not calendar days: 15
+  working days after applying, 10 after a phone screen, so weekends, national holidays, Golden
+  Week, Obon and the New Year stretch the threshold instead of running it down. A company that is
+  closed has not gone quiet.
 - Models the Tokyo job market specifically: each application records the recruiter channel
   (direct / agency / referral) and which agency submitted it, and the app warns before a
   duplicate submission while an agency's candidate-ownership window (assumed 18 months) is

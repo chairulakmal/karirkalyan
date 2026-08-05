@@ -268,6 +268,7 @@
     "about": "About",
     "eyebrow": "A portfolio project by <link>Chairul Akmal</link>",
     "headline": "A job tracker built on a <accent>finite state machine</accent>.",
+    "promise": "Track your career, not just job applications.",
     "lede": "Thirteen states, an explicit transition table, and an immutable audit trail behind every change. Track an application from <em>wishlist</em> to <em>offer</em> without the pipeline ever lying to you about where it is.",
     "stack": "Rails 8 · Next.js 16 · PostgreSQL 18",
     "sourceCode": "Source code",
@@ -542,7 +543,8 @@
       "removeShort": "Unpin",
       "full": "You can pin {max} applications at a time. Unpin one first.",
       "unavailable": "Pins are stored in this browser, and it is not allowing that right now.",
-      "hidden": "{count, plural, one {# pinned application is not in this view} other {# pinned applications are not in this view}}. Clear the filters, or load more."
+      "hidden": "{count, plural, one {# pinned application is not in this view} other {# pinned applications are not in this view}}: filtered out, not loaded yet, or deleted.",
+      "clearAll": "Unpin all"
     }
   },
   "detail": {

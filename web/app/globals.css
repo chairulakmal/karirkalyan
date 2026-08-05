@@ -2,8 +2,8 @@
 
 /* ─── Cobalt brand tokens ────────────────────────────────────────────────
  * Source of truth: the Claude Design project (see BRAND.md at the repo root).
- * Colours track brand book v1.2. Type deliberately does not: the brand book
- * has moved to Plus Jakarta Sans and this app has not. See BRAND.md.
+ * Colours and type both track brand book v1.2, whose type direction is T1:
+ * one variable family for everything, no serif, no second webfont.
  * Exposed to Tailwind via @theme so `bg-cobalt`, `text-saffron`, etc. work.
  */
 
@@ -32,16 +32,20 @@
    * edges, where 1.4.11 does not reach. See SPEC.md § Design system. */
   --color-rule-strong: #847d6b;
 
-  --font-serif: var(--font-fraunces), "Times New Roman", serif;
-  --font-sans: var(--font-manrope), system-ui, -apple-system, sans-serif;
-  --font-mono: var(--font-plex-mono), ui-monospace, monospace;
+  /* One family covers display through caption, so there is no --font-serif:
+   * a `font-serif` utility would resolve to Tailwind's stock Georgia stack,
+   * which is not in the brand. The mono role is a system stack rather than a
+   * webfont, so .kk-label and .kk-num cost no font file and render in whatever
+   * the OS calls monospace. */
+  --font-sans: var(--font-jakarta), system-ui, -apple-system, sans-serif;
+  --font-mono: ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, monospace;
 
   --radius-card: 0;
   --radius-button: 0;
 
   /* Motion, from tokens.css (--kk-ease / --kk-base). Overriding Tailwind's
    * defaults means every bare `transition` utility already in the codebase
-   * picks up the brand curve — nobody has to remember `ease-brand`. */
+   * picks up the brand curve, so nobody has to remember `ease-brand`. */
   --ease-brand: cubic-bezier(0.2, 0.6, 0.2, 1);
   --default-transition-duration: 200ms;
   --default-transition-timing-function: cubic-bezier(0.2, 0.6, 0.2, 1);
@@ -59,10 +63,31 @@ body {
   line-height: 1.5;
 }
 
-h1, h2, h3 {
-  font-family: var(--font-serif);
-  font-variation-settings: "opsz" 36, "wght" 500;
-  letter-spacing: -0.02em;
+/* Two heading steps, not three: h3 shares h2's cut. At 28px and below the
+ * tracking difference stops being legible, and a step nothing specifies is a
+ * step that drifts. Weight and tracking travel together per role, so both come
+ * from the same row of the brand book's scale.
+ *
+ * Family is named rather than inherited, even though T1 has only one. Inherited
+ * would be subtly different: a heading inside a `font-mono` wrapper would take
+ * the wrapper's face, where the rule it replaced (which named --font-serif)
+ * always pulled it back to the brand's heading face. Naming --font-sans keeps
+ * that behaviour and still tracks .hsp-system, which redefines the token rather
+ * than the property.
+ *
+ * These rules are unlayered, which outranks Tailwind's layered `font-*`
+ * utilities: a `font-semibold` on an <h1> is dead. That was equally true of the
+ * font-variation-settings rule this replaced, which is why no heading in the
+ * codebase carries one. */
+h1 {
+  font-family: var(--font-sans);
+  font-weight: 700;
+  letter-spacing: -0.03em;
+}
+h2, h3 {
+  font-family: var(--font-sans);
+  font-weight: 600;
+  letter-spacing: -0.018em;
 }
 
 /* WCAG 2.2 SC 2.4.11 (Focus Not Obscured). The tab bar is `sticky bottom-0` on
@@ -77,9 +102,16 @@ h1, h2, h3 {
 }
 
 /* Negative tracking is a Latin display device; kanji and kana are drawn to
- * full-width boxes, so no heading is tightened under Japanese. The mono eyebrow
- * (.kk-label) and the hero display cut (.kk-display) set their own tracking and
- * are excluded, so only the plain serif headings above are reset. */
+ * full-width boxes, so no heading is tightened under Japanese. T1 tightened the
+ * heading roles further (-0.03em / -0.018em against the old flat -0.02em),
+ * which makes this rule matter more, not less.
+ *
+ * The two exclusions are excluded because they carry their OWN :lang(ja) rule,
+ * not because they are exempt: .kk-label below, .kk-display beside its base
+ * rule. That distinction was the bug: .kk-display was excluded on the strength
+ * of "sets its own tracking", which was only ever true of its Latin value, so
+ * the hero was the one heading in the app that kept a Latin display device
+ * under Japanese. Anything added to this :not() list owes a ja rule too. */
 :lang(ja) :is(h1, h2, h3):not(.kk-label, .kk-display) {
   letter-spacing: 0;
 }
@@ -97,18 +129,23 @@ h1, h2, h3 {
   word-break: auto-phrase;
 }
 
-/* Editorial wordmark — "karir" upright + "kalyan" italic-cobalt. */
+/* Wordmark: "karir" at 800 + "kalyan" at 300 cobalt, both upright.
+ *
+ * Weight and colour carry the two-word structure on their own. The italic that
+ * used to do it is gone with the serif, and that is the visible cost of T1: the
+ * mark reads product-first rather than magazine-ish. It was not a free trade,
+ * it was the one accepted to stop 20px italic Fraunces appearing in card
+ * titles. BRAND.md § The directive has the argument. */
 .kk-wordmark {
-  font-family: var(--font-serif);
-  font-variation-settings: "opsz" 144, "wght" 400;
+  font-family: var(--font-sans);
+  font-weight: 800;
   letter-spacing: -0.045em;
   line-height: 0.92;
   color: var(--color-midnight);
   white-space: nowrap;
 }
 .kk-wordmark .kalyan {
-  font-style: italic;
-  font-variation-settings: "opsz" 144, "wght" 300;
+  font-weight: 300;
   color: var(--color-cobalt);
 }
 
@@ -136,26 +173,48 @@ h1, h2, h3 {
  *   - text-transform: uppercase is a no-op on kana and kanji, so all it does is
  *     distort the embedded Latin (JLPT N1).
  *
- * The mono face has no CJK coverage either, so ja falls through to a system
- * fallback regardless; sizing it for that fallback is the honest treatment. */
+ * The mono role has no CJK coverage either. It is a system stack under T1
+ * rather than IBM Plex Mono, which changes nothing here: ui-monospace resolves
+ * to a Latin monospace on every platform, so ja falls through to a further
+ * fallback regardless, and sizing it for that fallback is the honest
+ * treatment. */
 :lang(ja) .kk-label {
   font-size: 12px;
   letter-spacing: 0.08em;
   text-transform: none;
 }
 
-/* Display heading — the hero, and nothing else.
+/* Display: the hero, and nothing else.
  *
- * Fraunces is an optical-size variable font: `opsz` is not a size, it is how the
- * letterforms are drawn *for* a size. The h1/h2/h3 rule above sets opsz 36,
- * which is cut for headings — thin joins and open counters that look weak once
- * the type is 60px+. At display sizes the 144 cut is the correct one, the same
- * cut the wordmark uses, and the tracking has to come in to compensate. */
+ * Display is a CLASS, not an element. An <h1> takes the h1 role above; the one
+ * display-scale line on the page takes this. Collapsing the two is what would
+ * push every other heading down a step, and it is why both roles exist rather
+ * than one.
+ *
+ * 600 is LIGHTER than h1's 700, which is deliberate and not a transposition.
+ * Weight reads against size: this rule only ever runs at 2.75rem and up (7xl on
+ * md), where 800 set the headline solid, while h1 runs small enough that 700 is
+ * what separates it from h2. The ladder is not monotonic and should not be
+ * "fixed" into one. The wordmark stays at 800 for the same reason inverted: a
+ * mark is drawn once at a fixed size. */
 .kk-display {
-  font-family: var(--font-serif);
-  font-variation-settings: "opsz" 144, "wght" 400;
-  letter-spacing: -0.035em;
-  line-height: 0.98;
+  font-family: var(--font-sans);
+  font-weight: 600;
+  letter-spacing: -0.04em;
+  line-height: 1.02;
+}
+
+/* The Japanese cut of the same role. Both values above are Latin display
+ * devices and both have to go, for the same reason the heading rule near the
+ * top of this file exists: -0.04em pulls full-width kana and kanji into each
+ * other rather than closing a gap that was there, and 1.02 is set for Latin
+ * lowercase, where the em box is mostly empty above the x-height. CJK glyphs
+ * fill it, and the ja hero wraps to three or four lines on a phone, where 1.02
+ * puts the verticals of one line against the next. 1.25 is the loosest of the
+ * three ja headings for the largest type, which is the right direction. */
+:lang(ja) .kk-display {
+  letter-spacing: 0;
+  line-height: 1.25;
 }
 
 /* Mono ordinal for numbered sections — the transition table's own vocabulary,
@@ -178,14 +237,15 @@ h1, h2, h3 {
 
 /* HSP calculator: render in the visitor's system fonts, scoped to that page.
  * It is a standalone public tool where dependency-free, instantly-painted text
- * beats brand typography, and the mono labels read poorly at small sizes. Within
- * this scope --font-serif and --font-mono collapse onto the system sans, so the
- * headings and the old mono labels (kk-label, font-mono) match the plain form
- * text. The rest of the app is untouched; the header wordmark and footer, which
- * sit outside the scoped element, keep the brand faces. */
+ * beats brand typography, and the mono labels read poorly at small sizes.
+ * Within this scope --font-sans drops Jakarta and --font-mono collapses onto
+ * it, so the headings and the mono labels (kk-label, font-mono) match the plain
+ * form text. Redefining --font-sans is enough to reach the headings and
+ * .kk-display, since both read the token rather than naming a family; there is
+ * no --font-serif to collapse any more. The rest of the app is untouched, and
+ * the header wordmark and footer sit outside the scope, so they stay branded. */
 .hsp-system {
   --font-sans: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
-  --font-serif: var(--font-sans);
   --font-mono: var(--font-sans);
   font-family: var(--font-sans);
 }

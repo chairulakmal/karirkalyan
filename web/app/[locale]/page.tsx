@@ -80,13 +80,18 @@ export default async function Home() {
             })}
           </p>
 
-          {/* The headline is the only display-scale type on the site. It gets the
-              144 optical cut; every other heading keeps the 36 cut from globals. */}
+          {/* The headline is the only display-scale type on the site, so it is
+              the only place .kk-display is used; every other heading takes the
+              h1 role from globals.
+              The accent is cobalt alone. It used to be italic too, which is
+              gone with the serif: the ja headline puts the accent on
+              有限ステートマシン, where an italic was only ever a synthesized
+              oblique on kana anyway. */}
           <h1 className="kk-display mt-5 max-w-4xl text-[2.75rem] md:text-7xl">
             <Phrase>
               {t.rich("headline", {
                 accent: (chunks) => (
-                  <span className="italic text-cobalt">
+                  <span className="text-cobalt">
                     <Phrase>{chunks}</Phrase>
                   </span>
                 ),
@@ -94,7 +99,16 @@ export default async function Home() {
             </Phrase>
           </h1>
 
-          <p className="mt-8 max-w-2xl text-lg leading-relaxed text-ink-soft">
+          {/* The positioning line, between the headline and the lede on purpose.
+              The headline says what the thing is built on, which is the answer a
+              reviewer wants; this says what it is for, which is the answer a user
+              wants. Midnight rather than ink-soft so it reads as a second claim
+              and not as the start of the paragraph below it. */}
+          <p className="mt-6 max-w-2xl text-xl font-medium text-midnight">
+            <Phrase>{t("promise")}</Phrase>
+          </p>
+
+          <p className="mt-4 max-w-2xl text-lg leading-relaxed text-ink-soft">
             {t.rich("lede", { em: (chunks) => <em>{chunks}</em> })}
           </p>
           <p className="mt-5 font-mono text-xs tracking-wide text-ink-soft">{t("stack")}</p>

@@ -1,6 +1,6 @@
 import type { Metadata } from "next";
 import { connection } from "next/server";
-import { Fraunces, Manrope } from "next/font/google";
+import { Plus_Jakarta_Sans } from "next/font/google";
 import "./globals.css";
 
 /**
@@ -12,24 +12,17 @@ import "./globals.css";
  * to Next's built-in bare document: no `lang`, no stylesheet, no fonts.
  *
  * Unlike `[locale]/not-found.tsx`, this bypasses normal rendering, so it must
- * return a full HTML document and import its own styles and fonts. Only the two
- * families this page actually uses are loaded — body text and the heading — and
- * in the same variable form as the root layout, so the emitted files are
- * content-hash-shared with it rather than adding static duplicates to the build.
+ * return a full HTML document and import its own styles and fonts. The brand is
+ * one family, declared here in exactly the same form as the root layout, so the
+ * emitted file is content-hash-shared with it rather than a second copy in the
+ * build. Keep the two call sites identical for that reason.
  *
  * Copy stays English: an unmatched path carries no locale to translate into.
  */
 
-const manrope = Manrope({
-  variable: "--font-manrope",
+const jakarta = Plus_Jakarta_Sans({
+  variable: "--font-jakarta",
   subsets: ["latin"],
-  display: "swap",
-});
-
-const fraunces = Fraunces({
-  variable: "--font-fraunces",
-  subsets: ["latin"],
-  axes: ["opsz"],
   display: "swap",
 });
 
@@ -45,7 +38,7 @@ export default async function GlobalNotFound() {
   await connection();
 
   return (
-    <html lang="en" className={`${manrope.variable} ${fraunces.variable} h-full antialiased`}>
+    <html lang="en" className={`${jakarta.variable} h-full antialiased`}>
       <body className="min-h-full bg-sand text-midnight flex flex-col">
         <main className="mx-auto w-full max-w-5xl flex-1 px-6 py-16">
           <p className="kk-label">404</p>

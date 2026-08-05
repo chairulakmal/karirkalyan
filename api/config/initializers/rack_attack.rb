@@ -59,19 +59,56 @@ class Rack::Attack
     end
   end
 
-  # Normalised target email from a sign-in request's JSON body, or nil. Reads
-  # rack.input directly (form parsing doesn't cover JSON) and rewinds it so
-  # Rails can re-read the body downstream.
+  # Normalised target email from a sign-in request, or nil.
+  #
+  # This has to recognise every encoding Devise will actually authenticate from,
+  # not just the one the frontend happens to send. It previously read the body
+  # through JSON.parse alone, so a form-encoded, multipart or query-string
+  # sign-in (all of which authenticate exactly the same) raised, hit the rescue,
+  # and returned nil. A nil discriminator makes Rack::Attack count nothing and
+  # throttle nothing, so the two throttles below fell open on any request that
+  # simply declined to send JSON.
+  #
+  # That mattered more here than it would elsewhere: Devise :lockable is not
+  # enabled (app/models/user.rb), so these two are the ONLY account-level
+  # brute-force defence in the system. The per-IP throttle still fired, which
+  # left an attacker with N addresses 5N guesses a minute against one named
+  # account and no account-level ceiling at all: precisely the distributed case
+  # the email key exists to cover, against targets (demo@karirkalyan.com) the
+  # README publishes.
+  #
+  # The rule this is an instance of: a guard must key off what the request
+  # MEANS, never off an encoding the client chooses. Anything reading a body
+  # here owes both branches.
+  #
+  # JSON first, from rack.input directly because Rack's form parsing does not
+  # cover it, rewound so Rails can re-read the body downstream. Then Rack's own
+  # parsing, which covers form-encoded and multipart bodies and the query
+  # string, since #params merges GET over POST.
   def self.sign_in_email(req)
     return unless normalized_path(req) == "/api/v1/auth/sign_in" && req.post?
 
+    email = json_sign_in_email(req) || rack_sign_in_email(req)
+    email.is_a?(String) ? email.strip.downcase.presence : nil
+  end
+
+  def self.json_sign_in_email(req)
     body = req.body.read
     req.body.rewind
-    email = JSON.parse(body).dig("user", "email")
-    email.is_a?(String) ? email.strip.downcase.presence : nil
+    JSON.parse(body).dig("user", "email")
   rescue StandardError
     nil
   end
+  private_class_method :json_sign_in_email
+
+  # `params["user"]` is whatever the client sent, so it is not necessarily a
+  # Hash: `?user=x` makes it a String, and #dig raises TypeError on those.
+  def self.rack_sign_in_email(req)
+    req.params.dig("user", "email")
+  rescue StandardError
+    nil
+  end
+  private_class_method :rack_sign_in_email
 
   # Authenticated caller's id (JWT `sub`), decoded straight from the Authorization
   # header so the endpoints below can cap per-account, not just per-IP. Memoised on
