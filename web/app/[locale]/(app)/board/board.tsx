@@ -276,7 +276,7 @@ function Card({
       } ${draggable ? "cursor-grab" : ""}`}
     >
       <Link href={`/applications/${app.id}`} className="block px-3 py-2.5 pr-10 transition hover:bg-sand/60">
-        <p className="truncate font-serif text-sm font-medium text-midnight">{app.company}</p>
+        <p className="truncate text-sm font-medium text-midnight">{app.company}</p>
         <p className="mt-0.5 truncate text-xs text-ink-soft">{app.role}</p>
         {/* Triage facts on the two candidate-side columns only: a notes excerpt,
             the source it came from, and how long it has sat here: enough to

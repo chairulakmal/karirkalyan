@@ -1,13 +1,13 @@
 # Brand
 
-This is KarirKalyan's brand directive: where the brand book lives, which type direction has been chosen, and what still has to happen before that direction can ship. The one thing to take away: **the brand book is no longer in this repo, and the type direction recorded here is a decision, not the shipped state.** Below, in order: the source of truth and how to reach it, the T1 directive, what T1 leaves alone, the gap between the directive and `web/`, the upstream book's status, and the sync rule.
+This is KarirKalyan's brand directive: where the brand book lives, which type direction was chosen and why, and what is still owed. The one thing to take away: **the brand book is no longer in this repo, and its type direction (T1, Plus Jakarta Sans solo) now ships in `web/`.** Below, in order: the source of truth and how to reach it, the T1 directive, what T1 leaves alone, what shipping it cost and what it left open, the upstream book's status, and the sync rule.
 
 ## Contents
 
 - [Source of truth](#source-of-truth)
 - [The directive: T1, Jakarta solo](#the-directive-t1-jakarta-solo)
 - [What T1 does not change](#what-t1-does-not-change)
-- [The gap between this file and the code](#the-gap-between-this-file-and-the-code)
+- [Shipping T1](#shipping-t1)
 - [Upstream status and open gaps](#upstream-status-and-open-gaps)
 - [Sync rule](#sync-rule)
 
@@ -25,9 +25,9 @@ Note that the project is `PROJECT_TYPE_PROJECT`, not `PROJECT_TYPE_DESIGN_SYSTEM
 
 `Karirkalyan Type Directions.html` argues that the shipped type fails at text sizes: Fraunces at `opsz 144` and weight 300 italic forces display proportions into 20px card titles, where the joins go hairline and the italic `a` and `e` collapse. That critique is correct and it is the reason to move.
 
-It offered three ways out and recommended T2 (Jakarta paired with Newsreader). **T1 is the chosen direction**: one variable family for everything, no serif. It is also what `brand-assets/tokens.css` already implements, so the design project and this file now agree.
+It offered three ways out and recommended T2 (Jakarta paired with Newsreader). **T1 is the chosen direction**: one variable family for everything, no serif. It is what `brand-assets/tokens.css` implements and, since this file's second revision, what `web/app/globals.css` implements too.
 
-| Role | T1 | Shipped today |
+| Role | T1 | Was |
 | --- | --- | --- |
 | Wordmark | Plus Jakarta Sans, `karir` at 800 + `kalyan` at 300 cobalt, upright | Fraunces `opsz 144`, `kalyan` italic cobalt |
 | Display | Plus Jakarta Sans 800, `-0.04em` | Fraunces `opsz 144` (`.kk-display`) |
@@ -36,9 +36,9 @@ It offered three ways out and recommended T2 (Jakarta paired with Newsreader). *
 | Body | Plus Jakarta Sans 400 | Manrope |
 | Labels, mono | `ui-monospace` system stack | IBM Plex Mono |
 
-Two consequences worth stating plainly. Headings stop using `font-variation-settings` and go back to plain `font-weight` plus letter-spacing, which retires the whole `opsz` argument in `SPEC.md` § Design system. And the mono role drops a webfont for the system stack, so `.kk-label` and `.kk-num` will render differently on every OS.
+Two consequences worth stating plainly. Headings stop using `font-variation-settings` and go back to plain `font-weight` plus letter-spacing, which retires the whole `opsz` argument that used to sit in `SPEC.md` § Design system. And the mono role drops a webfont for the system stack, so `.kk-label` and `.kk-num` render differently on every OS.
 
-The wordmark loses its italic. That italic was carrying most of the "editorial" character, and T1 is honest that the brand ends up reading product-first rather than magazine-ish. That is the trade being accepted.
+The wordmark loses its italic. That italic was carrying most of the "editorial" character, and T1 is honest that the brand ends up reading product-first rather than magazine-ish. That is the trade that was accepted.
 
 ## What T1 does not change
 
@@ -47,18 +47,22 @@ The wordmark loses its italic. That italic was carrying most of the "editorial" 
 - **Motion.** `cubic-bezier(.2,.6,.2,1)`, 120ms and 200ms.
 - **The icons.** `Karirkalyan Type Directions.html` makes the right call here: a logo can keep its own typeface, because the mark is drawn once and never reflows, so the readability problem that motivates T1 does not apply to it. The Fraunces `kk` glyph and the saffron growth-tick stay. **No icon needs regenerating for T1.**
 
-## The gap between this file and the code
+## Shipping T1
 
-Nothing in `web/` has moved. The app still ships Fraunces, Manrope and IBM Plex Mono, and `SPEC.md` § Design system still describes that, correctly, because `SPEC.md` documents the system as it is. This file is the only place the Jakarta direction is recorded.
+**T1 ships in `web/`, and it broke the freeze to get there.** `TODO.md` § The rule closes `v1` to anything that does not make the app work correctly or stop it being abused, and this is the second named exception, after dashboard pins. It is recorded there rather than argued into passing the admission test. The honest reading: the 20px card titles *are* a legibility defect, so part of this is correctness, but replacing three typefaces across the whole system is more than that fix needed. It was done because the author asked for it with the trade in front of him.
 
-**Implementing T1 is `2.0.0` work.** A whole-system typeface swap adds no capability but is plainly not a bug fix either, and `CLAUDE.md`'s standing guardrail closes `v1` to anything that is not correctness or abuse prevention. There is a narrow counter-argument, that 20px Fraunces italic is a legibility defect and legibility is correctness, and it is worth taking seriously for the card titles specifically. It does not stretch to replacing three typefaces. If the card titles alone are hurting, fix those against the existing tokens and leave the system alone.
+What moved:
 
-When T1 does ship, these are the places that move:
+- `web/app/globals.css`. `--font-serif` is gone entirely, so a `font-serif` utility no longer resolves to anything branded; the three call sites that used it (the dashboard list, the upcoming card, the board card) dropped it, and those are exactly the 20px titles that motivated the move. `h1` and `h2, h3` split into two roles with their own weights and tracking, replacing one flat `font-variation-settings` rule. `.kk-wordmark` and `.kk-display` swap variation settings for `font-weight`. `.kk-label` and `.kk-num` are untouched: only `--font-mono` beneath them changed.
+- The homepage hero's accent span lost its `italic`, leaving cobalt to mark it. The Japanese headline puts that accent on 有限ステートマシン, where the italic was only ever a synthesized oblique.
+- `next/font/google` in `web/app/[locale]/layout.tsx` and `web/app/global-not-found.tsx`: three families collapse to one variable build, which also ends the variable-versus-static reasoning that `SPEC.md` used to carry.
+- `.hsp-system` drops its `--font-serif` line. It still overrides `--font-sans` and folds mono onto it, which is all that scope ever needed.
+- `SPEC.md` § Design system and § Public pages, in the same PR as the code, per the spec-first rule.
 
-- `web/app/globals.css`: `--font-serif`, `.kk-wordmark`, `.kk-display`, `.kk-label`, `.kk-num`, the `h1, h2, h3` variation settings, and the `.hsp-system` scope that currently collapses serif and mono onto a system sans.
-- The `:lang(ja)` letter-spacing reset. It exists because negative tracking is a Latin display device, and T1's `-0.04em` keeps that problem, so the rule stays and its exclusion list changes.
-- `next/font/google` in `web/app/[locale]/layout.tsx` and `web/app/global-not-found.tsx`: three families collapse to one, which also ends the variable-versus-static reasoning currently in `SPEC.md`.
-- `SPEC.md` § Design system and § i18n, in the same PR as the code, per the spec-first rule.
+Two predictions this file made about the work turned out wrong, and are corrected rather than quietly dropped:
+
+- **The `:lang(ja)` exclusion list did not change.** `.kk-label` and `.kk-display` still set their own tracking and are still the right exclusions; only the comment naming the old serif had to move. The rule matters slightly more now, since T1 tightens the heading roles past the flat `-0.02em` it replaced.
+- **"One `woff2` instead of five" is true only per `@font-face` declaration.** A clean build emits four files for the one family, because `subsets: ["latin"]` governs preloading rather than emission and Next writes every `unicode-range` slice Google declares. One slice is preloaded and fetched; the rest are dead weight on disk. `SPEC.md` § Design system states this so nobody re-derives it from a file count.
 
 ## Upstream status and open gaps
 

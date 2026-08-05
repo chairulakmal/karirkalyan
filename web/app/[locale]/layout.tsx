@@ -1,34 +1,22 @@
 import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 import { connection } from "next/server";
-import { Fraunces, IBM_Plex_Mono, Manrope } from "next/font/google";
+import { Plus_Jakarta_Sans } from "next/font/google";
 import { hasLocale, NextIntlClientProvider } from "next-intl";
 import { getTranslations } from "next-intl/server";
 import { routing } from "@/i18n/routing";
 import "../globals.css";
 
-// Fraunces and Manrope load as variable builds — one file per style instead of
-// one per weight, and the only form in which the `font-variation-settings`
-// rules in globals.css (`opsz`/`wght` cuts for headings, wordmark, display)
-// actually bind. IBM Plex Mono has no variable build, so it stays static.
-const manrope = Manrope({
-  variable: "--font-manrope",
+// The brand is one family (T1: see BRAND.md), so this is the whole webfont
+// budget: one variable build on the `wght` axis, 200..800. That single file is
+// what carries all five cuts globals.css asks for (display 800, h1 700, h2 600,
+// body 400, "kalyan" 300). Omitting `weight` is what selects the variable
+// build; enumerating weights would fetch a static instance each and lose that.
+// No italic, because T1 has no italic role. Labels use the system mono stack,
+// so there is no second family to load.
+const jakarta = Plus_Jakarta_Sans({
+  variable: "--font-jakarta",
   subsets: ["latin"],
-  display: "swap",
-});
-
-const fraunces = Fraunces({
-  variable: "--font-fraunces",
-  subsets: ["latin"],
-  style: ["normal", "italic"],
-  axes: ["opsz"],
-  display: "swap",
-});
-
-const plexMono = IBM_Plex_Mono({
-  variable: "--font-plex-mono",
-  subsets: ["latin"],
-  weight: ["400", "500"],
   display: "swap",
 });
 
@@ -109,7 +97,7 @@ export default async function RootLayout({
   return (
     <html
       lang={locale}
-      className={`${manrope.variable} ${fraunces.variable} ${plexMono.variable} h-full antialiased`}
+      className={`${jakarta.variable} h-full antialiased`}
     >
       <body className="min-h-full bg-sand text-midnight flex flex-col">
         <NextIntlClientProvider>{children}</NextIntlClientProvider>

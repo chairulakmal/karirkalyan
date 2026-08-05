@@ -80,13 +80,18 @@ export default async function Home() {
             })}
           </p>
 
-          {/* The headline is the only display-scale type on the site. It gets the
-              144 optical cut; every other heading keeps the 36 cut from globals. */}
+          {/* The headline is the only display-scale type on the site, so it is
+              the only place .kk-display is used; every other heading takes the
+              h1 role from globals.
+              The accent is cobalt alone. It used to be italic too, which is
+              gone with the serif: the ja headline puts the accent on
+              有限ステートマシン, where an italic was only ever a synthesized
+              oblique on kana anyway. */}
           <h1 className="kk-display mt-5 max-w-4xl text-[2.75rem] md:text-7xl">
             <Phrase>
               {t.rich("headline", {
                 accent: (chunks) => (
-                  <span className="italic text-cobalt">
+                  <span className="text-cobalt">
                     <Phrase>{chunks}</Phrase>
                   </span>
                 ),

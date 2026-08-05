@@ -192,7 +192,7 @@ export default async function Dashboard({
                         <span className="inline-flex items-center px-2 py-0.5 text-xs font-medium text-ink-soft ring-1 ring-inset ring-midnight/20">
                           {t(`upcoming.type.${item.type}`)}
                         </span>
-                        <p className="truncate font-serif text-sm font-medium text-midnight">
+                        <p className="truncate text-sm font-medium text-midnight">
                           {item.type === "residence" ? t("upcoming.residenceLabel") : item.company}
                         </p>
                       </div>

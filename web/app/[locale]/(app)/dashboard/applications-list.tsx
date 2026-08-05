@@ -630,7 +630,7 @@ export function ApplicationsList({
                   >
                     <div className="min-w-0 flex-1">
                       <div className="flex items-baseline gap-3">
-                        <p className="truncate font-serif text-lg font-medium text-midnight">
+                        <p className="truncate text-lg font-medium text-midnight">
                           {app.company}
                         </p>
                         <span
