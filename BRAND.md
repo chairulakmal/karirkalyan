@@ -30,11 +30,13 @@ It offered three ways out and recommended T2 (Jakarta paired with Newsreader). *
 | Role | T1 | Was |
 | --- | --- | --- |
 | Wordmark | Plus Jakarta Sans, `karir` at 800 + `kalyan` at 300 cobalt, upright | Fraunces `opsz 144`, `kalyan` italic cobalt |
-| Display | Plus Jakarta Sans 800, `-0.04em` | Fraunces `opsz 144` (`.kk-display`) |
+| Display | Plus Jakarta Sans 600, `-0.04em` | Fraunces `opsz 144` (`.kk-display`) |
 | H1 | Plus Jakarta Sans 700, `-0.03em` | Fraunces `opsz 36`, weight 500 |
 | H2 | Plus Jakarta Sans 600, `-0.018em` | Fraunces `opsz 36`, weight 500 |
 | Body | Plus Jakarta Sans 400 | Manrope |
 | Labels, mono | `ui-monospace` system stack | IBM Plex Mono |
+
+**Display is lighter than H1, and the wordmark is heavier than both.** Weight reads against size, so the ladder is not monotonic: display only ever runs at 72px and up, where 800 set the line solid, while H1 runs at 42px, where 700 is what separates it from H2. Display went 800 to 600 on 2026-08-05, after the swap shipped and the rendered headline read too heavy. The wordmark stayed at 800 and took its own `--kk-fw-wordmark` token upstream, since the two roles had only ever *happened* to share a number: a mark is drawn once at a fixed size, so the size argument does not reach it.
 
 Two consequences worth stating plainly. Headings stop using `font-variation-settings` and go back to plain `font-weight` plus letter-spacing, which retires the whole `opsz` argument that used to sit in `SPEC.md` § Design system. And the mono role drops a webfont for the system stack, so `.kk-label` and `.kk-num` render differently on every OS.
 

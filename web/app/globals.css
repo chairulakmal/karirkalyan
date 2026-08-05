@@ -184,11 +184,17 @@ h2, h3 {
  * Display is a CLASS, not an element. An <h1> takes the h1 role above; the one
  * display-scale line on the page takes this. Collapsing the two is what would
  * push every other heading down a step, and it is why both roles exist rather
- * than one. Weight 800 and -0.04em are the brand book's display row; the
- * tracking has to come in because 800 at 72px+ sets loose otherwise. */
+ * than one.
+ *
+ * 600 is LIGHTER than h1's 700, which is deliberate and not a transposition.
+ * Weight reads against size: this rule only ever runs at 2.75rem and up (7xl on
+ * md), where 800 set the headline solid, while h1 runs small enough that 700 is
+ * what separates it from h2. The ladder is not monotonic and should not be
+ * "fixed" into one. The wordmark stays at 800 for the same reason inverted: a
+ * mark is drawn once at a fixed size. */
 .kk-display {
   font-family: var(--font-sans);
-  font-weight: 800;
+  font-weight: 600;
   letter-spacing: -0.04em;
   line-height: 1.02;
 }

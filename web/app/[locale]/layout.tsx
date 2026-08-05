@@ -9,8 +9,8 @@ import "../globals.css";
 
 // The brand is one family (T1: see BRAND.md), so this is the whole webfont
 // budget: one variable build on the `wght` axis, 200..800. That single file is
-// what carries all five cuts globals.css asks for (display 800, h1 700, h2 600,
-// body 400, "kalyan" 300). Omitting `weight` is what selects the variable
+// what carries all five cuts globals.css asks for ("karir" 800, h1 700, display
+// and h2 600, body 400, "kalyan" 300). Omitting `weight` is what selects the variable
 // build; enumerating weights would fetch a static instance each and lose that.
 // No italic, because T1 has no italic role. Labels use the system mono stack,
 // so there is no second family to load.

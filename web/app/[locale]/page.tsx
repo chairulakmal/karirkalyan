@@ -99,7 +99,16 @@ export default async function Home() {
             </Phrase>
           </h1>
 
-          <p className="mt-8 max-w-2xl text-lg leading-relaxed text-ink-soft">
+          {/* The positioning line, between the headline and the lede on purpose.
+              The headline says what the thing is built on, which is the answer a
+              reviewer wants; this says what it is for, which is the answer a user
+              wants. Midnight rather than ink-soft so it reads as a second claim
+              and not as the start of the paragraph below it. */}
+          <p className="mt-6 max-w-2xl text-xl font-medium text-midnight">
+            <Phrase>{t("promise")}</Phrase>
+          </p>
+
+          <p className="mt-4 max-w-2xl text-lg leading-relaxed text-ink-soft">
             {t.rich("lede", { em: (chunks) => <em>{chunks}</em> })}
           </p>
           <p className="mt-5 font-mono text-xs tracking-wide text-ink-soft">{t("stack")}</p>
