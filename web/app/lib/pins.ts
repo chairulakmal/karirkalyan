@@ -94,10 +94,19 @@ export function sortPinnedFirst<T extends { id: number }>(items: T[], pins: numb
 
 /**
  * How many pins point at something the list is not currently showing: filtered
- * out, or on a page "Load more" has not reached.
+ * out, on a page "Load more" has not reached, or gone from the account
+ * entirely.
  *
- * Both cases are silent by construction, and a pin that is merely off-page is
+ * All three are silent by construction, and a pin that is merely off-page is
  * indistinguishable from a pin that was lost unless the list says so.
+ *
+ * The third case is why the caller must offer a way to unpin from here. A
+ * deleted application leaves an id that no fetch can ever return, so a note
+ * that only says "clear the filters, or load more" names two remedies that
+ * cannot work and the count never falls. Nothing prunes this set on its own:
+ * pruning would need proof the whole unfiltered list is loaded, which the
+ * cursor pagination cannot cheaply give, and guessing wrong silently discards
+ * a pin the user made.
  */
 export function hiddenPinCount(items: { id: number }[], pins: number[]): number {
   if (pins.length === 0) return 0;

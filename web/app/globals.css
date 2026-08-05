@@ -102,11 +102,16 @@ h2, h3 {
 }
 
 /* Negative tracking is a Latin display device; kanji and kana are drawn to
- * full-width boxes, so no heading is tightened under Japanese. The mono eyebrow
- * (.kk-label) and the hero display cut (.kk-display) set their own tracking and
- * are excluded, so only the plain headings above are reset. T1 tightened the
+ * full-width boxes, so no heading is tightened under Japanese. T1 tightened the
  * heading roles further (-0.03em / -0.018em against the old flat -0.02em),
- * which makes this rule matter more, not less. */
+ * which makes this rule matter more, not less.
+ *
+ * The two exclusions are excluded because they carry their OWN :lang(ja) rule,
+ * not because they are exempt: .kk-label below, .kk-display beside its base
+ * rule. That distinction was the bug: .kk-display was excluded on the strength
+ * of "sets its own tracking", which was only ever true of its Latin value, so
+ * the hero was the one heading in the app that kept a Latin display device
+ * under Japanese. Anything added to this :not() list owes a ja rule too. */
 :lang(ja) :is(h1, h2, h3):not(.kk-label, .kk-display) {
   letter-spacing: 0;
 }
@@ -197,6 +202,19 @@ h2, h3 {
   font-weight: 600;
   letter-spacing: -0.04em;
   line-height: 1.02;
+}
+
+/* The Japanese cut of the same role. Both values above are Latin display
+ * devices and both have to go, for the same reason the heading rule near the
+ * top of this file exists: -0.04em pulls full-width kana and kanji into each
+ * other rather than closing a gap that was there, and 1.02 is set for Latin
+ * lowercase, where the em box is mostly empty above the x-height. CJK glyphs
+ * fill it, and the ja hero wraps to three or four lines on a phone, where 1.02
+ * puts the verticals of one line against the next. 1.25 is the loosest of the
+ * three ja headings for the largest type, which is the right direction. */
+:lang(ja) .kk-display {
+  letter-spacing: 0;
+  line-height: 1.25;
 }
 
 /* Mono ordinal for numbered sections — the transition table's own vocabulary,

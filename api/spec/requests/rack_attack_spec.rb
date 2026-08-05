@@ -150,6 +150,60 @@ RSpec.describe "Rack::Attack throttling", type: :request, skip_n_plus_one: true 
 
       expect(response).to have_http_status(:unauthorized)
     end
+
+    # The backstop used to read the email through JSON.parse alone, so it saw
+    # only the encoding the frontend happens to send. Devise authenticates a
+    # form-encoded body and a query string just as readily, and on those the
+    # parse raised, the discriminator came back nil, and Rack::Attack counted
+    # nothing: the one account-level defence in the system fell open to any
+    # attacker who simply stopped sending JSON. Both of these fail against the
+    # old discriminator and pass against the current one.
+    it "counts a form-encoded attempt against the same email" do
+      10.times do |i|
+        post "/api/v1/auth/sign_in", params: body,
+          headers: { "REMOTE_ADDR" => "203.0.113.#{i}" }
+        expect(response).to have_http_status(:unauthorized)
+      end
+
+      post "/api/v1/auth/sign_in", params: body,
+        headers: { "REMOTE_ADDR" => "203.0.113.200" }
+
+      expect(response).to have_http_status(:too_many_requests)
+    end
+
+    it "counts a query-string attempt against the same email" do
+      query = "user[email]=victim@example.com&user[password]=wrongpass"
+
+      10.times do |i|
+        post "/api/v1/auth/sign_in?#{query}",
+          headers: { "REMOTE_ADDR" => "203.0.113.#{i}" }
+        expect(response).to have_http_status(:unauthorized)
+      end
+
+      post "/api/v1/auth/sign_in?#{query}",
+        headers: { "REMOTE_ADDR" => "203.0.113.200" }
+
+      expect(response).to have_http_status(:too_many_requests)
+    end
+
+    # One counter, not one per encoding: an attacker who alternates encodings
+    # must not get a fresh budget for each. Five JSON plus five form-encoded is
+    # ten attempts on one account, and the eleventh is refused.
+    it "shares one counter across encodings" do
+      5.times do |i|
+        post "/api/v1/auth/sign_in", params: body, as: :json,
+          headers: { "REMOTE_ADDR" => "203.0.113.#{i}" }
+      end
+      5.times do |i|
+        post "/api/v1/auth/sign_in", params: body,
+          headers: { "REMOTE_ADDR" => "203.0.113.1#{i}" }
+      end
+
+      post "/api/v1/auth/sign_in", params: body, as: :json,
+        headers: { "REMOTE_ADDR" => "203.0.113.200" }
+
+      expect(response).to have_http_status(:too_many_requests)
+    end
   end
 
   describe "POST /api/v1/applications/prefill — per-account cap" do

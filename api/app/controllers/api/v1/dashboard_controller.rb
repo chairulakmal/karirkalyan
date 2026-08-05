@@ -106,16 +106,33 @@ module Api
 
         # Use the TimelineEntry timestamp for when the offer was recorded, not
         # updated_at, which drifts on any subsequent edit to the application.
+        #
+        # The user predicate has to live INSIDE the derived table, not just on
+        # the outer relation. Postgres cannot push an outer filter through
+        # DISTINCT ON, so the version without it computed the first offer for
+        # every application in the database and then threw away all but one
+        # user's: work that grew with total rows on an endpoint that is per-user
+        # and, because the stats cache key carries MAX(updated_at) and
+        # Date.current, misses at least daily for everyone.
         avg_days_to_offer = current_user.applications
           .where(status: %w[offer accepted declined])
           .where.not(applied_at: nil)
           .joins(
-            "INNER JOIN (
-               SELECT DISTINCT ON (application_id) application_id, created_at AS offer_at
-               FROM timeline_entries
-               WHERE to_status = 'offer'
-               ORDER BY application_id, created_at
-             ) first_offer ON first_offer.application_id = applications.id"
+            # ::Application, not Application: this file is inside `module Api`,
+            # and the Rails application class in config/application.rb is
+            # Api::Application, so the bare constant resolves to that instead of
+            # to the model.
+            ::Application.sanitize_sql_array([
+              "INNER JOIN (
+                 SELECT DISTINCT ON (te.application_id) te.application_id, te.created_at AS offer_at
+                 FROM timeline_entries te
+                 INNER JOIN applications a
+                   ON a.id = te.application_id AND a.user_id = :user_id
+                 WHERE te.to_status = 'offer'
+                 ORDER BY te.application_id, te.created_at
+               ) first_offer ON first_offer.application_id = applications.id",
+              { user_id: current_user.id }
+            ])
           )
           .average("EXTRACT(epoch FROM (first_offer.offer_at - applied_at)) / 86400.0")
           &.to_f&.round(1)

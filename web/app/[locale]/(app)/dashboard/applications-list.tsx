@@ -111,7 +111,7 @@ export function ApplicationsList({
   const pathname = usePathname();
   const toast = useToast();
   // Device-local, and empty until after hydration (SPEC.md § Pinned applications).
-  const { pins, toggle: togglePin } = usePins();
+  const { pins, toggle: togglePin, clear: clearPins } = usePins();
   const atRisk = new Set(atRiskIds);
   const rendered = statusBuckets.map(([status]) => status);
   // The dashboard's default view and the "Active" preset are the same set: the
@@ -458,7 +458,7 @@ export function ApplicationsList({
                 if (e.key === "Enter" && e.nativeEvent.isComposing) e.preventDefault();
               }}
               placeholder={t("searchPlaceholder")}
-              className="mt-1.5 block min-w-44 border border-dune bg-linen px-3 py-1.5 text-sm text-midnight placeholder:text-ink-soft"
+              className="mt-1.5 block min-w-44 border border-rule-strong bg-linen px-3 py-1.5 text-sm text-midnight placeholder:text-ink-soft"
             />
           </form>
           <FilterSelect
@@ -605,9 +605,23 @@ export function ApplicationsList({
               of a list the user just filtered or paged, so it is already in the
               flow they are reading. */}
           {hiddenPins > 0 && (
-            <p className="border border-dashed border-dune bg-sand/40 px-4 py-2 text-xs text-ink-soft">
-              {t("pin.hidden", { count: hiddenPins })}
-            </p>
+            <div className="flex flex-wrap items-center justify-between gap-2 border border-dashed border-dune bg-sand/40 px-4 py-2 text-xs text-ink-soft">
+              <p>{t("pin.hidden", { count: hiddenPins })}</p>
+              {/* The escape hatch. A pin whose application was deleted can
+                  never come back into view, so the two remedies the note used
+                  to name were both dead ends and the count stuck forever. This
+                  is the only place an invisible pin can be released, because
+                  the per-row button needs a row. */}
+              <button
+                type="button"
+                onClick={() => {
+                  if (clearPins() === "unavailable") toast.error(t("pin.unavailable"));
+                }}
+                className="shrink-0 underline underline-offset-2 hover:text-midnight"
+              >
+                {t("pin.clearAll")}
+              </button>
+            </div>
           )}
           <ul className={`divide-y divide-dune border border-dune bg-linen transition-opacity ${loading ? "opacity-50" : ""}`}>
             {ordered.map((app) => {

@@ -44,7 +44,13 @@ export function DeleteButton({ id }: { id: number }) {
             type="button"
             onClick={onConfirm}
             disabled={pending}
-            className="border border-danger/40 bg-danger/10 px-3 py-1.5 text-sm font-medium text-danger hover:bg-danger/20 disabled:opacity-50"
+            // Full-strength danger on the border, not /40. This is the most
+            // destructive control in the app and it had the weakest boundary in
+            // it: danger/40 composites to 2.04:1 on linen, over a danger/10 fill
+            // that is 1.20:1 against the page, so the button a user must find to
+            // destroy a record was the hardest one to see. Undimmed danger is
+            // 7.21:1, well past the 3.0 that WCAG 1.4.11 asks of a control.
+            className="border border-danger bg-danger/10 px-3 py-1.5 text-sm font-medium text-danger hover:bg-danger/20 disabled:opacity-50"
           >
             {pending ? t("deleting") : t("confirmDelete")}
           </button>

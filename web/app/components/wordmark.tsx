@@ -14,7 +14,13 @@ export function Mark({ size = 32 }: { size?: number }) {
   return (
     <Image
       src="/brand/icons/karirkalyan-primary.svg"
-      alt="KarirKalyan"
+      // Decorative, deliberately. Every call site pairs this with <Wordmark>,
+      // which renders "karirkalyan" as real text at every width, so a real alt
+      // here is the same name twice: screen readers announced "KarirKalyan
+      // KarirKalyan" on all seven pages. <MonogramMark> below already got this
+      // right. If this mark ever appears without the wordmark beside it, it
+      // needs the name back.
+      alt=""
       width={size}
       height={size}
       priority

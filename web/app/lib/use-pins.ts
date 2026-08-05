@@ -91,6 +91,7 @@ export type PinOutcome = ToggleResult["outcome"] | "unavailable";
 export function usePins(): {
   pins: number[];
   toggle: (id: number) => PinOutcome;
+  clear: () => "cleared" | "unavailable";
 } {
   const pins = useSyncExternalStore(subscribe, getSnapshot, getServerSnapshot);
 
@@ -109,5 +110,26 @@ export function usePins(): {
     return result.outcome;
   }, []);
 
-  return { pins, toggle };
+  // The way out of a pin that can no longer be unpinned from its own row.
+  // `toggle` needs the row on screen to reach the button; a pin whose
+  // application was deleted has no row and never will, so without this the
+  // hidden-pins note counts it forever and neither remedy the note names can
+  // move it (SPEC.md § Pinned applications).
+  //
+  // It clears the whole set rather than one id because the note is the only
+  // place it can be offered and the note does not know WHICH pins are missing
+  // in a way the user could act on: the cap is three, so re-pinning is cheap.
+  // `removeItem` rather than writing "[]", so a cleared set leaves no key
+  // behind and `parsePins` reads the same nothing it reads on a fresh browser.
+  const clear = useCallback((): "cleared" | "unavailable" => {
+    try {
+      window.localStorage.removeItem(PINS_STORAGE_KEY);
+    } catch {
+      return "unavailable";
+    }
+    for (const listener of listeners) listener();
+    return "cleared";
+  }, []);
+
+  return { pins, toggle, clear };
 }
