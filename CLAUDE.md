@@ -30,6 +30,7 @@ Consequences:
 | Current release, what's next, open work | `TODO.md` (release status at the top) |
 | What shipped, and when | `CHANGELOG.md` (includes the pre-1.0.0 build phases) |
 | Local dev setup | `SPEC.md` § Local development |
+| Where the brand book lives, and the pending type change | `BRAND.md` |
 | What earns a major / minor / patch | `SPEC.md` § Versioning & releases |
 
 Do not restate release status, versions, or scope in this file: that is `TODO.md`'s job, and copies here go stale.

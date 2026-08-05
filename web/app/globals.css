@@ -1,7 +1,9 @@
 @import "tailwindcss";
 
-/* ─── Cobalt brand tokens (v1.0) ─────────────────────────────────────────
- * Source of truth: design/assets/tokens.css
+/* ─── Cobalt brand tokens ────────────────────────────────────────────────
+ * Source of truth: the Claude Design project (see BRAND.md at the repo root).
+ * Colours track brand book v1.2. Type deliberately does not: the brand book
+ * has moved to Plus Jakarta Sans and this app has not. See BRAND.md.
  * Exposed to Tailwind via @theme so `bg-cobalt`, `text-saffron`, etc. work.
  */
 

@@ -95,7 +95,6 @@ karirkalyan/
   api/    ← Rails 8 API-only. Owns data, auth, the FSM, background jobs.
     docker-compose.yml   ← postgres 18 for local dev (no Redis)
   web/    ← Next.js 16 App Router. Owns the UI and the browser session.
-  design/ ← design tokens and icon assets
   notes/  ← working notes; not authoritative
 ```
 
@@ -1081,9 +1080,11 @@ Vite would be right if this were a public app where a stateless token in `localS
 
 ### Design system
 
-> **At a glance** · `web/app/globals.css` is the single entry point where `design/assets/tokens.css` reaches the app, via Tailwind v4's `@theme inline`. Eleven colours, three typefaces (Fraunces / Manrope / IBM Plex Mono), **radius 0**: sharp corners are the editorial voice. No UI kit, no form library, no state library.
+> **At a glance** · `web/app/globals.css` is the single entry point where the brand tokens reach the app, via Tailwind v4's `@theme inline`. Twelve colours, three typefaces (Fraunces / Manrope / IBM Plex Mono), **radius 0**: sharp corners are the editorial voice. No UI kit, no form library, no state library. The brand book itself is no longer in this repo; `BRAND.md` says where it lives and records the pending type change.
 
-`design/assets/tokens.css` is the brand book; `globals.css` is the only place those tokens enter the app, through Tailwind v4's `@theme inline`. Eleven colours (the nine brand hues; `--color-danger`, a warm madder (`#96291D`) for destructive actions, error text, and terminal-negative statuses, always applied through opacity modifiers (`text-danger`, `bg-danger/10`, `ring-danger/30`) and never stock Tailwind `red-*`; and `--color-saffron-ink` (`#7A4D10`), the AA-contrast text cut of saffron, since bare `text-saffron` (`#E8A04A`) is only ~2:1 on linen: saffron carries meaning as a **fill or ring**, and any saffron *text* (the offer badge, the follow-up and agenda dates) uses `saffron-ink` for ~6.5:1), three typefaces (Fraunces display, Manrope body, IBM Plex Mono labels), and **radius `0`**: the sharp corners are the editorial voice, not an oversight.
+The brand book lives in the Claude Design project named in `BRAND.md`, not in this repo; `globals.css` is the only place those tokens enter the app, through Tailwind v4's `@theme inline`. Nothing imports the brand book at build time, so `globals.css` is a hand-kept mirror and the values here are the ones that actually ship. Twelve colours (the nine brand hues, plus three that exist because the obvious choice failed a contrast requirement: `--color-danger`, a warm madder (`#96291D`) for destructive actions, error text, and terminal-negative statuses, always applied through opacity modifiers (`text-danger`, `bg-danger/10`, `ring-danger/30`) and never stock Tailwind `red-*`; `--color-saffron-ink` (`#7A4D10`), the AA-contrast text cut of saffron, since bare `text-saffron` (`#E8A04A`) is only ~2:1 on linen: saffron carries meaning as a **fill or ring**, and any saffron *text* (the offer badge, the follow-up and agenda dates) uses `saffron-ink` for ~6.5:1; and `--color-rule-strong` (`#847D6B`), which carries the borders of interactive controls, `dune` being 1.50:1 on linen and 1.36:1 on sand where WCAG 1.4.11 requires 3.0, leaving `dune` for decorative dividers), three typefaces (Fraunces display, Manrope body, IBM Plex Mono labels), and **radius `0`**: the sharp corners are the editorial voice, not an oversight.
+
+As of brand book v1.2 the two sides agree on all twelve colours. They do **not** agree on type: the brand book has moved to Plus Jakarta Sans, and the app has not. `BRAND.md` owns that gap.
 
 The typefaces load through `next/font/google` in `web/app/[locale]/layout.tsx` (and `global-not-found.tsx`, whose two families use the same variable form so its files are content-hash-shared with the layout's). Fraunces and Manrope are **variable builds** (Fraunces with `axes: ["opsz"]` in normal + italic, Manrope with the default `wght` axis), while IBM Plex Mono has no variable build and stays static at 400/500. That is five base `woff2` files instead of the fifteen static instances loaded before, and it is also what makes the `font-variation-settings` rules below actually bind: `opsz`/`wght` variation settings are no-ops on a static instance, so the heading and wordmark cuts *require* the variable builds; don't "optimize" back to enumerated weights.
 
