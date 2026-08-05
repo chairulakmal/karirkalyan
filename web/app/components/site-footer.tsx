@@ -7,8 +7,8 @@ import { REPO_URL } from "@/app/lib/links";
  * Shared footer for the public pages (home, about, docs). `wide` matches the
  * homepage's 5xl measure; the prose pages keep the 2xl measure of their text.
  * `minimal` drops the app-specific links (API docs, privacy, terms) and keeps
- * only author, license, and GitHub: for the HSP calculator, a browser-only tool
- * whose data story and legal surface are not the resume-holding app's.
+ * only author and GitHub: for the HSP calculator, a browser-only tool whose
+ * data story and legal surface are not the resume-holding app's.
  */
 export async function SiteFooter({ wide = false, minimal = false }: { wide?: boolean; minimal?: boolean }) {
   const t = await getTranslations("footer");
@@ -50,14 +50,11 @@ export async function SiteFooter({ wide = false, minimal = false }: { wide?: boo
               </Link>
             </>
           )}
-          <Link
-            href={`${REPO_URL}/blob/main/LICENSE`}
-            target="_blank"
-            rel="noreferrer noopener"
-            className="underline underline-offset-4 hover:text-midnight"
-          >
-            {t("license")}
-          </Link>
+          {/* No separate licence link: the repo below states MIT in its own
+              sidebar and ships the LICENSE file, so a fifth item here bought a
+              second click to the same place. MIT asks that the licence travel
+              with copies of the software, which the repo does; it never asked
+              for a line in the UI. */}
           <Link
             href={REPO_URL}
             target="_blank"
