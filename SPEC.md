@@ -1722,6 +1722,10 @@ These add CRUD without adding new patterns. The goal is to show FSM, transaction
 
 Wraps each spec in a transaction and rolls back. Fastest option; truncation is only needed for multi-connection scenarios this project does not have.
 
+### Homepage `Try Demo` stays a link to `/sign-in`, not a one-click sign-in
+
+Considered: giving the homepage's `Try Demo` button its own client-side POST to `/api/auth/session` with the demo credentials, mirroring `onDemoSignIn` in `sign-in-form.tsx`, so a visitor lands on `/dashboard` without the intermediate page. Rejected. The saved click is worth little; `/sign-in` is where `registrationClosed` and the demo-account-is-shared-and-world-writable warning live, and skipping it drops that framing right before a stranger lands in someone else's live data, which matters more here than on a typical demo since the credentials are genuinely public. It would also cost `page.tsx` its server-component simplicity, since the button would need its own pending and error state to match what `AuthForm` already does. § Public pages already ranks the demo CTA second to "How it's built"; this keeps the funnel un-optimized on purpose.
+
 ---
 
 ## What this project is demonstrating
