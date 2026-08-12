@@ -8,6 +8,8 @@ import { InfoPopover } from "@/app/components/info-popover";
 import { useToast } from "@/app/components/toast";
 import type { GhostRisk, GhostRiskEntry } from "@/app/lib/types";
 
+const VISIBLE_COUNT = 3;
+
 /*
  * The applications that have gone quiet for longer than their stage allows, and
  * next to each, the one move that clears it. Marking `ghosted` from here is
@@ -15,7 +17,12 @@ import type { GhostRisk, GhostRiskEntry } from "@/app/lib/types";
  * CONFIRM_REQUIRED (it's revivable, and the detail page fires it on a single
  * click too), so there's no dialog to mirror.
  *
- * The server ranks the rows; this component never re-sorts or re-judges them.
+ * The server ranks the rows longest-silence-first; this component re-ranks
+ * them for display only (fewest business days in stage first, i.e. the most
+ * recently touched of the at-risk set) and caps the visible list at three,
+ * folding the rest behind "Show more" rather than growing the card by the
+ * length of the risk set.
+ *
  * Every number on screen comes from Applications::GhostRiskQuery, and every one
  * of them is a count of BUSINESS days: weekends, Japanese national holidays,
  * Golden Week, Obon and the New Year shutdown are not silence, because nobody
@@ -31,8 +38,15 @@ export function GhostRiskCard({ risk }: { risk: GhostRisk }) {
   const [error, setError] = useState<string | null>(null);
   const [pendingId, setPendingId] = useState<number | null>(null);
   const [isPending, startTransition] = useTransition();
+  const [expanded, setExpanded] = useState(false);
 
   if (risk.at_risk.length === 0) return null;
+
+  const sorted = [...risk.at_risk].sort(
+    (a, b) => a.business_days_in_stage - b.business_days_in_stage,
+  );
+  const visible = expanded ? sorted : sorted.slice(0, VISIBLE_COUNT);
+  const hiddenCount = sorted.length - VISIBLE_COUNT;
 
   function markGhosted(entry: GhostRiskEntry) {
     // The buttons are no longer `disabled` while a move is in flight (that
@@ -90,7 +104,7 @@ export function GhostRiskCard({ risk }: { risk: GhostRisk }) {
       </p>
 
       <ul className="mt-4 divide-y divide-danger/20 border-t border-danger/20">
-        {risk.at_risk.map((entry) => (
+        {visible.map((entry) => (
           <li
             key={entry.id}
             className="flex flex-wrap items-center justify-between gap-x-6 gap-y-2 py-3"
@@ -122,6 +136,16 @@ export function GhostRiskCard({ risk }: { risk: GhostRisk }) {
           </li>
         ))}
       </ul>
+
+      {hiddenCount > 0 && (
+        <button
+          type="button"
+          onClick={() => setExpanded((e) => !e)}
+          className="mt-3 text-xs font-medium text-danger underline decoration-danger/40 underline-offset-4 transition hover:decoration-danger"
+        >
+          {expanded ? t("showLess") : t("showMore", { count: hiddenCount })}
+        </button>
+      )}
 
       {error ? <p role="alert" className="mt-3 text-sm text-danger">{error}</p> : null}
     </section>

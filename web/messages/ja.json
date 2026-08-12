@@ -477,7 +477,9 @@
       "markerTitle": "この段階の目安を超えて音沙汰がありません",
       "explainAria": "判定の仕組みについて",
       "explain": "営業日のみを数えます。土日・祝日・ゴールデンウィーク・お盆・年末年始は、返信できる人がいないため音信不通とはみなしません。その段階の目安を超えた応募が表示されます。",
-      "threshold": "{stage}: 営業日{days}日"
+      "threshold": "{stage}: 営業日{days}日",
+      "showMore": "他{count}件を表示",
+      "showLess": "表示を減らす"
     },
     "upcoming": {
       "title": "予定",
@@ -487,7 +489,9 @@
         "residence": "在留期限"
       },
       "residenceLabel": "在留資格の期限",
-      "overdue": "期限超過"
+      "overdue": "期限超過",
+      "showMore": "他{count}件を表示",
+      "showLess": "表示を減らす"
     }
   },
   "board": {
