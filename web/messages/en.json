@@ -477,7 +477,9 @@
       "markerTitle": "Silent longer than this stage allows",
       "explainAria": "How this is worked out",
       "explain": "Counts working days only. Weekends, Japanese national holidays, Golden Week, Obon and the New Year shutdown are not silence, because nobody was there to reply. An application is flagged once it passes the limit for its stage.",
-      "threshold": "{stage}: {days} working days"
+      "threshold": "{stage}: {days} working days",
+      "showMore": "Show {count} more",
+      "showLess": "Show less"
     },
     "upcoming": {
       "title": "Upcoming",
@@ -487,7 +489,9 @@
         "residence": "Residence"
       },
       "residenceLabel": "Status of residence expires",
-      "overdue": "Overdue"
+      "overdue": "Overdue",
+      "showMore": "Show {count} more",
+      "showLess": "Show less"
     }
   },
   "board": {

@@ -10,6 +10,13 @@ The history: shipped work, newest first. **`v1.11.1`** (2026-07-28) is the last 
 
 By the mechanical test all of it **except dashboard pins** would have been a **patch**: no migration, no new capability. Pins are a new capability and would have forced a **minor**, which is exactly why they needed the freeze broken rather than argued around; they add no migration and no API surface, so a minor is as far as they reach. The dashboard payload does narrow (`ghost_risk` loses `basis` and `sample_sizes`), which is a contract change in the strict sense; it is treated as a patch because `web/` is the only consumer and both halves deploy together, and `STATS_CACHE_VERSION` is bumped so no cached payload outlives the shape. The FSM also loses two legal moves, which narrows what `PATCH /applications/:id/transition` accepts; the same reading applies, and it removes no capability the app needs, since the state those moves reached is still reachable by the move that actually describes the act.
 
+### Fixed: the ghost-risk card and Upcoming agenda grew with the account, unbounded
+
+**By the mechanical test this is a patch:** `web/` only, no migration, no endpoint, no new capability. Both sections listed every row the payload sent, so an account with a dozen at-risk applications or a busy week of follow-ups got a dashboard that grew past the fold with it.
+
+- **Both sections now cap their visible rows at three**, the rest behind a "Show more" toggle, so neither can push the rest of the dashboard down an arbitrary distance.
+- **Each re-ranks its own three for the read the section is for**, rather than keeping the server's ordering as the display order. `GhostRiskCard` shows the three most recently touched of the at-risk set (fewest `business_days_in_stage`); `UpcomingAgenda` shows the three closest to today by absolute distance, so a week-overdue follow-up outranks an interview three months out. Both re-ranks are display-only: `at_risk` still arrives longest-silence-first and `upcoming` still arrives chronological, unchanged on the wire (`SPEC.md` § Dashboard data).
+
 ### Fixed: a throttle that fell open, a pin that could not be unpinned, and the hero's Japanese
 
 **By the mechanical test this is a patch.** It carries a migration, but an index-only one: the previous image boots and serves against the database this leaves behind, and nothing here is a new capability. "Unpin all" is the one control added, and it exists only to leave a state the feature could already reach and could not exit, which is a bug fix rather than a capability.
