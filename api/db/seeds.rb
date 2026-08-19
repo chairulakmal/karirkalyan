@@ -13,6 +13,15 @@ demo = User.find_or_create_by!(email: DEMO_EMAIL) do |u|
   u.password_confirmation = DEMO_PASSWORD
 end
 
+# The demo's own residence clock, rewritten on every run rather than only at
+# creation, for the same reason every date below is relative: a fixed date
+# lapses, and the walkthrough would then show a visa item that expired months
+# ago. 80 days out puts it inside the agenda's 90-day residence window
+# (DashboardController::AGENDA_RESIDENCE_WINDOW_DAYS) while still leaving room
+# for the Certificate of Eligibility lead time (Visa::COE_LEAD_TIME_DAYS, 63),
+# which is the state where the countdown is worth acting on.
+demo.update!(residence_status: "engineer_specialist", residence_expires_on: 80.days.from_now.to_date)
+
 # The Playwright suite's account, and deliberately *not* the demo one. The E2E specs
 # assert on the row they just created, which they cannot do inside a fixture holding
 # twelve pre-loaded applications — and the demo account has to keep holding them,
@@ -36,6 +45,19 @@ unless Rails.env.production?
     u.password_confirmation = E2E_PASSWORD
   end
 end
+
+# Every date in this file is relative to *now*, and the two dashboard sections
+# that answer "what do I do today?" both read dates: the Upcoming agenda shows
+# the week ahead (SPEC.md § Dashboard layout) and the ghost-risk card counts
+# business days of silence. A demo seeded with fixed dates goes quiet in a week,
+# which for the one account a visitor ever sees is the whole walkthrough gone.
+#
+# So the agenda dates are anchored here, at a pinned hour in app time (Tokyo) so
+# an interview reads 15:00 rather than whatever minute the seed happened to run,
+# and chosen to put at least one item on either side of the 7-day window: an
+# overdue follow-up below it (the window has no lower bound), two commitments
+# inside it, and one reminder past it that folds behind "Show more".
+agenda_at = ->(days, hour) { Time.zone.now.change(hour: hour, min: 0) + days.days }
 
 seed_data = [
   # ── Marcari Inc. (Mercari) ── Full journey: accepted ──────────────────────
@@ -68,9 +90,9 @@ seed_data = [
       role:         "Backend Engineer",
       status:       "offer",
       url:          "https://careers.vine-corp.co.jp/jobs/backend-5512",
-      notes:        "Messaging infrastructure team. Kotlin + gRPC. Offer out, response deadline next week.",
+      notes:        "Messaging infrastructure team. Kotlin + gRPC. Offer out, response deadline this week.",
       applied_at:   2.months.ago,
-      follow_up_at: 1.week.from_now
+      follow_up_at: agenda_at.call(3, 17)
     },
     transitions: [
       { from: "wishlist",     to: "draft",        note: "Referred by ex-colleague Sato-san. Team has a strong infra reputation.",         at: 3.months.ago  },
@@ -86,17 +108,18 @@ seed_data = [
   {
     slug: "rokuton",
     app: {
-      company:    "Rokuton Group",
-      role:       "Senior Software Engineer",
-      status:     "final_round",
-      url:        "https://corp.rokuton.co.jp/careers/tech/sr-swe-4421",
-      notes:      "Payment platform team. Java + Spring Boot. Global team, English required. Final round scheduled.",
-      applied_at: 3.months.ago
+      company:      "Rokuton Group",
+      role:         "Senior Software Engineer",
+      status:       "final_round",
+      url:          "https://corp.rokuton.co.jp/careers/tech/sr-swe-4421",
+      notes:        "Payment platform team. Java + Spring Boot. Global team, English required. Final round scheduled.",
+      applied_at:   3.months.ago,
+      interview_at: agenda_at.call(2, 15)
     },
     transitions: [
       { from: "applied",      to: "phone_screen", note: "Global recruiting team emailed. First interview conducted in English.",          at: 10.weeks.ago  },
       { from: "phone_screen", to: "technical",    note: "Algorithm challenge (HackerRank) + Java deep-dive. 2 hours total.",             at: 8.weeks.ago   },
-      { from: "technical",    to: "final_round",  note: "Passed technical. Final round with hiring committee — scheduled next week.",     at: 3.weeks.ago   }
+      { from: "technical",    to: "final_round",  note: "Passed technical. Final round with the hiring committee, date confirmed.",       at: 3.weeks.ago   }
     ]
   },
 
@@ -104,12 +127,13 @@ seed_data = [
   {
     slug: "bena-games",
     app: {
-      company:    "BeNA Games",
-      role:       "Mobile Backend Engineer",
-      status:     "technical",
-      url:        "https://engineering.bena.co.jp/jobs/mobile-backend",
-      notes:      "Game server infra team. Ruby + Go. High-traffic scale, interesting domain. Take-home due Friday.",
-      applied_at: 10.weeks.ago
+      company:      "BeNA Games",
+      role:         "Mobile Backend Engineer",
+      status:       "technical",
+      url:          "https://engineering.bena.co.jp/jobs/mobile-backend",
+      notes:        "Game server infra team. Ruby + Go. High-traffic scale, interesting domain. Take-home submitted, no word since.",
+      applied_at:   10.weeks.ago,
+      follow_up_at: agenda_at.call(-2, 10)
     },
     transitions: [
       { from: "applied",      to: "phone_screen", note: "HR intro: team culture, game knowledge a definite plus.",                       at: 9.weeks.ago   },
@@ -231,11 +255,12 @@ seed_data = [
   {
     slug: "cogpal",
     app: {
-      company: "Cogpal Inc.",
-      role:    "Backend Engineer",
-      status:  "wishlist",
-      url:     "https://info.cogpal.jp/careers",
-      notes:   "Recipe platform. Ruby-first engineering culture, strong open-source presence. Research team before drafting."
+      company:      "Cogpal Inc.",
+      role:         "Backend Engineer",
+      status:       "wishlist",
+      url:          "https://info.cogpal.jp/careers",
+      notes:        "Recipe platform. Ruby-first engineering culture, strong open-source presence. Research the team, then recheck their careers page.",
+      follow_up_at: agenda_at.call(12, 9)
     },
     transitions: []
   }
@@ -251,12 +276,20 @@ seed_data.each do |entry|
     company: app_attrs[:company],
     role:    app_attrs[:role]
   ) do |a|
-    a.status       = app_attrs[:status]
-    a.url          = app_attrs[:url]
-    a.notes        = app_attrs[:notes]
-    a.applied_at   = app_attrs[:applied_at]
-    a.follow_up_at = app_attrs[:follow_up_at]
+    a.status     = app_attrs[:status]
+    a.url        = app_attrs[:url]
+    a.notes      = app_attrs[:notes]
+    a.applied_at = app_attrs[:applied_at]
   end
+
+  # The two forward-looking dates are rewritten on every run, not just on the
+  # run that creates the row. Both feed the Upcoming agenda, whose window is
+  # seven days wide, so a local database seeded a fortnight ago would show an
+  # agenda that had quietly emptied itself. In production this is moot: the
+  # hourly Demo::ResetService destroys the account before re-seeding, which is
+  # also why re-running the seed is allowed to overwrite whatever a visitor did
+  # to these two fields.
+  app.update!(follow_up_at: app_attrs[:follow_up_at], interview_at: app_attrs[:interview_at])
 
   transitions.each_with_index do |t, i|
     key = "seed-#{slug}-#{i}"
