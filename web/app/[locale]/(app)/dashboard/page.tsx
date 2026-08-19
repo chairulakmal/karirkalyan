@@ -183,14 +183,28 @@ export default async function Dashboard({
         initialFilters={urlFilters}
       />
 
-      {/* Stat cards (v1.10.0): response rate, time-in-stage, ghost rate, beside
-          the avg-days line rather than on a dedicated /insights page: a new
-          route and nav weight for one user is not worth it (SPEC.md). Each hides
-          until it has data, so a fresh account shows none rather than "0%". */}
-      {stats && (stats.response_rate != null || stats.avg_days_in_stage != null || stats.ghost_rate != null) && (
-        <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
+      {/* Stat cards (v1.10.0): response rate, screening success rate,
+          time-in-stage, ghost rate, beside the avg-days line rather than on a
+          dedicated /insights page: a new route and nav weight for one user is not
+          worth it (SPEC.md). Each hides until it has data, so a fresh account shows
+          none rather than "0%".
+
+          The screening success rate sits directly under the response rate: it is
+          that number without the rejections, and neither is worth much alone.
+          The gap between them is what separates a targeting problem from a
+          resume problem (SPEC.md § The dashboard payload). It is the freeze's
+          third recorded exception, TODO.md § The rule. */}
+      {stats &&
+        (stats.response_rate != null ||
+          stats.screening_success_rate != null ||
+          stats.avg_days_in_stage != null ||
+          stats.ghost_rate != null) && (
+        <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
           {stats.response_rate != null && (
             <StatCard label={t("responseRate")} value={`${stats.response_rate}%`} />
+          )}
+          {stats.screening_success_rate != null && (
+            <StatCard label={t("screeningSuccessRate")} value={`${stats.screening_success_rate}%`} />
           )}
           {stats.avg_days_in_stage != null && (
             <StatCard label={t("timeInStage")} value={t("daysValue", { days: stats.avg_days_in_stage })} />

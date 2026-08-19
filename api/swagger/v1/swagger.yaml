@@ -690,6 +690,7 @@ paths:
                 - total
                 - avg_days_to_offer
                 - response_rate
+                - screening_success_rate
                 - ghost_rate
                 - avg_days_in_stage
                 - ghost_risk
@@ -722,6 +723,12 @@ paths:
                     nullable: true
                     description: Percent of applied applications the company replied
                       to (advanced or rejected); null when none applied
+                  screening_success_rate:
+                    type: integer
+                    nullable: true
+                    description: Percent of applied applications taken past the resume
+                      screen (reached phone_screen, technical, final_round or offer);
+                      the response rate without the rejections. Null when none applied
                   ghost_rate:
                     type: integer
                     nullable: true

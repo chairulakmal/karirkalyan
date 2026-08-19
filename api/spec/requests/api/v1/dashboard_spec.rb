@@ -16,7 +16,7 @@ RSpec.describe "Dashboard", type: :request do
         # the one that earns a response schema. `ghost_risk` in particular is a
         # derived read model with no table behind it — see SPEC.md § Query layer.
         schema type: :object,
-          required: %w[by_status facets total avg_days_to_offer response_rate ghost_rate avg_days_in_stage ghost_risk user upcoming],
+          required: %w[by_status facets total avg_days_to_offer response_rate screening_success_rate ghost_rate avg_days_in_stage ghost_risk user upcoming],
           properties: {
             by_status: {
               type: :object, additionalProperties: { type: :integer },
@@ -35,6 +35,10 @@ RSpec.describe "Dashboard", type: :request do
             response_rate: {
               type: :integer, nullable: true,
               description: "Percent of applied applications the company replied to (advanced or rejected); null when none applied"
+            },
+            screening_success_rate: {
+              type: :integer, nullable: true,
+              description: "Percent of applied applications taken past the resume screen (reached phone_screen, technical, final_round or offer); the response rate without the rejections. Null when none applied"
             },
             ghost_rate: {
               type: :integer, nullable: true,
@@ -174,6 +178,49 @@ RSpec.describe "Dashboard", type: :request do
       expect(body["ghost_rate"]).to eq(50)
     end
 
+    # The gap between the two rates is the reason both exist, so the fixture is
+    # built to open one: three applications, all three answered, only one taken
+    # past the resume screen. A rate that counted rejections would report 100%
+    # here and tell the user nothing they did not already know.
+    it "counts only applications taken past the resume screen as screening success" do
+      passed = create(:application, :applied, company: "Passed", user: user)
+      Applications::TransitionService.new(application: passed, to: "phone_screen", actor: user).call
+      first_no = create(:application, :applied, company: "No", user: user)
+      Applications::TransitionService.new(application: first_no, to: "rejected", actor: user).call
+      second_no = create(:application, :applied, company: "Also no", user: user)
+      Applications::TransitionService.new(application: second_no, to: "rejected", actor: user).call
+
+      get "/api/v1/dashboard", headers: headers
+      body = JSON.parse(response.body)
+
+      expect(body["response_rate"]).to eq(100)
+      expect(body["screening_success_rate"]).to eq(33)
+    end
+
+    # Success here is a fact about the past, read from the timeline like every other
+    # rate here: the company that interviews you and then says no has still read
+    # your resume and said yes to it, and no later move retracts that.
+    it "keeps a screening success that a later rejection followed" do
+      application = create(:application, :applied, user: user)
+      Applications::TransitionService.new(application: application, to: "phone_screen", actor: user).call
+      Applications::TransitionService.new(application: application, to: "rejected", actor: user).call
+
+      get "/api/v1/dashboard", headers: headers
+
+      expect(JSON.parse(response.body)["screening_success_rate"]).to eq(100)
+    end
+
+    it "reports no rates at all when nothing has been applied to" do
+      create(:application, company: "Lead", status: "wishlist", user: user)
+
+      get "/api/v1/dashboard", headers: headers
+      body = JSON.parse(response.body)
+
+      expect(body["response_rate"]).to be_nil
+      expect(body["screening_success_rate"]).to be_nil
+      expect(body["ghost_rate"]).to be_nil
+    end
+
     # The regression: the denominator used to be `status NOT IN (wishlist, draft)`,
     # which is a fact about the past read off a pointer that keeps moving. Archiving
     # is housekeeping the app encourages, and it moved a never-applied row out of
@@ -193,6 +240,7 @@ RSpec.describe "Dashboard", type: :request do
       body = JSON.parse(response.body)
 
       expect(body["response_rate"]).to eq(100)
+      expect(body["screening_success_rate"]).to eq(100)
       expect(body["ghost_rate"]).to eq(0)
     end
 

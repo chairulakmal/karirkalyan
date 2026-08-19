@@ -8,7 +8,19 @@ module Api
       # memory store (dev). v6 is a computation change with no shape change (the
       # outcome-rate denominator moved from status to applied_at), which is exactly
       # the case the old "SHAPE" wording would have talked you out of bumping for.
-      STATS_CACHE_VERSION = 6
+      STATS_CACHE_VERSION = 7
+
+      # The two timeline reads the outcome rates are built from, and the reason
+      # they are one expression rather than two lists. Reaching any ADVANCED
+      # state is the company saying yes to the resume: the whole set, not
+      # `phone_screen` alone, because a company that skips the phone screen has
+      # still passed you, and a casual 面談 is recorded as `phone_screen`, so it
+      # counts as the pass it is. A *response* is the company replying at all,
+      # which is that same set plus a rejection. Deriving the second from the
+      # first is what stops the two rates drifting apart the next time a state
+      # is added.
+      ADVANCED_STATES = %w[phone_screen technical final_round offer].freeze
+      RESPONSE_STATES = (ADVANCED_STATES + %w[rejected]).freeze
 
       # The Upcoming agenda (v1.11.0): how many dated items to surface, and how far
       # out a residence-expiry clock has to be before it counts as "upcoming".
@@ -148,14 +160,21 @@ module Api
         }
       end
 
-      # Two stat cards over the FSM + timeline, zero schema. The denominator for
-      # both is applications that were actually applied to; a wishlist item
+      # Three stat cards over the FSM + timeline, zero schema. The denominator for
+      # all three is applications that were actually applied to; a wishlist item
       # nobody sent anything to would only dilute a rate about how companies
       # respond. A "response" is the company replying at all (advancing you or
-      # rejecting you), so ghosting is precisely its absence; both are read from
-      # the timeline, so a later revival does not erase that a reply (or a
+      # rejecting you), so ghosting is precisely its absence; all three are read
+      # from the timeline, so a later revival does not erase that a reply (or a
       # ghosting) once happened. Nil when there is nothing applied to, which the
       # card renders as "not enough data" rather than a misleading 0%.
+      #
+      # The screening success rate is the response rate with the rejections taken
+      # out, and the gap between the two is the point of carrying both: a low
+      # response rate is a targeting problem (nobody is reading it), while a high
+      # response rate over a low success rate is a resume problem (they read it and
+      # said no). Success is a fact about the past, so a rejection at the final
+      # round does not retract it, the same reading the response rate takes.
       #
       # The denominator asks `applied_at`, not the current status. It used to be
       # `where.not(status: %w[wishlist draft])`, which reads a fact about the past
@@ -168,17 +187,19 @@ module Api
       # move; avg_days_to_offer above already gates on it.
       def outcome_rates
         applied = current_user.applications.where.not(applied_at: nil).count
-        return { response_rate: nil, ghost_rate: nil } if applied.zero?
+        return { response_rate: nil, screening_success_rate: nil, ghost_rate: nil } if applied.zero?
 
         responded = current_user.timeline_entries
-          .where(to_status: %w[phone_screen technical final_round offer rejected])
-          .distinct.count(:application_id)
+          .where(to_status: RESPONSE_STATES).distinct.count(:application_id)
+        advanced = current_user.timeline_entries
+          .where(to_status: ADVANCED_STATES).distinct.count(:application_id)
         ghosted = current_user.timeline_entries
           .where(to_status: "ghosted").distinct.count(:application_id)
 
         {
-          response_rate: (responded.to_f / applied * 100).round,
-          ghost_rate:    (ghosted.to_f / applied * 100).round
+          response_rate:        (responded.to_f / applied * 100).round,
+          screening_success_rate:  (advanced.to_f / applied * 100).round,
+          ghost_rate:           (ghosted.to_f / applied * 100).round
         }
       end
 

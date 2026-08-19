@@ -455,6 +455,7 @@
     "memberSince": "登録日",
     "avgDays": "応募から内定までの平均日数:",
     "responseRate": "返信率",
+    "screeningSuccessRate": "書類通過率",
     "ghostRate": "音信不通率",
     "timeInStage": "平均滞在日数",
     "daysValue": "{days}日",
