@@ -59,12 +59,6 @@ export function isOverdue(iso: string | null | undefined): boolean {
   return iso.slice(0, 10) < tokyoToday.format(new Date());
 }
 
-// Absolute distance from now, in ms. Ranks agenda items by proximity to today
-// regardless of whether they're overdue (past) or upcoming (future).
-export function distanceFromNow(iso: string): number {
-  return Math.abs(new Date(iso).getTime() - Date.now());
-}
-
 /*
  * `locale` is typed as a plain string rather than the `Locale` union: every
  * caller gets it from next-intl's `useLocale()`/`getLocale()`, which are typed

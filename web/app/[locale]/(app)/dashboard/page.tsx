@@ -159,20 +159,29 @@ export default async function Dashboard({
         </Link>
       </header>
 
-      {/* Above the fold, above the profile: it is the only block on this page
-          that asks the user to do something, and it renders nothing when there
-          is nothing to act on. */}
-      {stats && <GhostRiskCard risk={stats.ghost_risk} />}
+      {/* The order of everything below is specified in SPEC.md § Dashboard
+          layout, and it is one rule: this week's work, then the working list,
+          then everything that is a read rather than a task.
 
-      {/* The Upcoming agenda (v1.11.0): the dated commitments already captured
-          but scattered (follow-ups, interviews, the residence clock), given one
-          chronological read. A dashboard section, not an /upcoming route, for the
-          same reason the stats are cards: a nav slot for one user is not worth it.
-          Renders nothing when there is nothing ahead; UpcomingAgenda owns the
-          closest-3-first cap and the "Show more" toggle. */}
+          The Upcoming agenda (v1.11.0) leads because it is the shortest block
+          on the page (a 7-day window, capped at 3 rows) and the only one that
+          is about today: the dated commitments already captured but scattered
+          (follow-ups, interviews, the residence clock), given one chronological
+          read. A dashboard section, not an /upcoming route, for the same reason
+          the stats are cards: a nav slot for one user is not worth it. Renders
+          nothing when there is nothing due this week; UpcomingAgenda owns the
+          window, the closest-3-first cap and the "Show more" toggle. */}
       {stats && <UpcomingAgenda upcoming={stats.upcoming} />}
 
-      <ProfileCard user={me} />
+      <ApplicationsList
+        initialItems={applications}
+        initialMeta={meta}
+        statusBuckets={statusBuckets}
+        activeStates={activeStates}
+        facets={facets}
+        atRiskIds={stats?.ghost_risk.at_risk.map((a) => a.id) ?? []}
+        initialFilters={urlFilters}
+      />
 
       {/* Stat cards (v1.10.0): response rate, time-in-stage, ghost rate, beside
           the avg-days line rather than on a dedicated /insights page: a new
@@ -211,15 +220,19 @@ export default async function Dashboard({
         </div>
       )}
 
-      <ApplicationsList
-        initialItems={applications}
-        initialMeta={meta}
-        statusBuckets={statusBuckets}
-        activeStates={activeStates}
-        facets={facets}
-        atRiskIds={stats?.ghost_risk.at_risk.map((a) => a.id) ?? []}
-        initialFilters={urlFilters}
-      />
+      {/* Below the list, not above it (2026-08-19). The card is still the only
+          block that asks the user to do something, but the rows it names are
+          already flagged inside the list itself (`atRiskIds` above), so the
+          nudge is not lost by moving it: what the card adds is the one-click
+          `ghosted` transition, which is a decision to take after reading the
+          pipeline rather than before. It renders nothing when nothing is at
+          risk, so on a healthy account this position costs nothing at all. */}
+      {stats && <GhostRiskCard risk={stats.ghost_risk} />}
+
+      {/* Account admin, so it sits last: an email address, a join date and two
+          export links are a page you visit deliberately, never something you
+          scroll past on the way to the list. */}
+      <ProfileCard user={me} />
     </div>
   );
 }
