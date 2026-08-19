@@ -455,6 +455,7 @@
     "memberSince": "Member since",
     "avgDays": "Average days from apply → offer:",
     "responseRate": "Response rate",
+    "screeningSuccessRate": "Screening success rate",
     "ghostRate": "Ghost rate",
     "timeInStage": "Avg time in stage",
     "daysValue": "{days}d",

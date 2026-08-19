@@ -72,8 +72,10 @@ pipeline. Built as a portfolio project by Chairul Akmal (https://chairulakmal.co
 - Publishes a public, no-auth Highly Skilled Professional (高度専門職) points calculator at
   /hsp-calculator: estimates the visa score on the engineering track from the MOJ points table
   (70-point threshold, J-Skip gate), unit-tested pure logic, with links out to the primary sources.
-- Turns the dashboard and board into a career read over the same audit trail: response rate, ghost
-  rate, and average time-in-stage stat cards; disjunctively-faceted filters whose state lives in the
+- Turns the dashboard and board into a career read over the same audit trail: response rate,
+  screening success rate (the response rate without the rejections, so the gap between the two
+  separates a targeting problem from a resume problem), ghost rate, and average time-in-stage stat
+  cards; disjunctively-faceted filters whose state lives in the
   URL (a filtered view is linkable and reload-survivable); triage cards on the two candidate-side
   board columns (notes excerpt, source, days-in-stage, stalest-first); and cover-letter talking
   points extracted as bullets from the resume against the posting (bullets, not a draft).

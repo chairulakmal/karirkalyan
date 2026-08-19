@@ -307,6 +307,10 @@ export type DashboardStats = {
   // Stat cards (v1.10.0), all null until there is enough data. Percentages are
   // whole numbers; avg_days_in_stage is a fractional day count.
   response_rate: number | null;
+  // The response rate without the rejections: applications the company took
+  // past the resume screen. The gap between the two is what makes either
+  // readable (SPEC.md § The dashboard payload).
+  screening_success_rate: number | null;
   ghost_rate: number | null;
   avg_days_in_stage: number | null;
   ghost_risk: GhostRisk;

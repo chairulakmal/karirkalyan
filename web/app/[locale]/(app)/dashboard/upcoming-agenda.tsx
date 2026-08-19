@@ -3,7 +3,8 @@
 import { useState } from "react";
 import { useLocale, useTranslations } from "next-intl";
 import { Link } from "@/i18n/navigation";
-import { distanceFromNow, formatDate, isOverdue } from "@/app/lib/format";
+import { planAgenda } from "@/app/lib/agenda";
+import { formatDate, isOverdue } from "@/app/lib/format";
 import { formatJstDateTime } from "@/app/lib/timezone";
 import type { AgendaItem } from "@/app/lib/types";
 
@@ -12,24 +13,33 @@ const VISIBLE_COUNT = 3;
 /*
  * The dated commitments already captured but scattered (follow-ups,
  * interviews, the residence clock), given one chronological read. The API
- * sends every item it has; this component is the one that decides how many
- * of them earn a place above the fold. It shows the three closest to today
- * (by absolute distance, so a week-overdue follow-up outranks an interview
- * three months out) and folds the rest behind "Show more" rather than
- * growing the dashboard by the length of the agenda.
+ * sends every item it has; this component is the one that decides which of
+ * them earn a place above the fold, in two steps that do different jobs.
+ * `planAgenda` decides what is *eligible*: the week ahead plus anything
+ * overdue, with the residence clock exempt (the reasoning is all in
+ * `agenda.ts`). The `VISIBLE_COUNT` cap then decides how many of those fit,
+ * closest-to-today first, rather than growing the dashboard by the length of
+ * the agenda. Everything outside either bound is folded behind "Show more",
+ * so nothing the API sent is unreachable.
+ *
+ * The section renders nothing when the window is empty, even if later items
+ * exist. That is the same promise it has always made (a dashboard that is
+ * quiet when there is nothing to do), narrowed from "nothing ahead" to
+ * "nothing ahead this week": an interview eleven weeks out is not a thing to
+ * do today, and it is still on its application, on the board, and here again
+ * as it comes within the week.
  */
 export function UpcomingAgenda({ upcoming }: { upcoming: AgendaItem[] }) {
   const t = useTranslations("dashboard.upcoming");
   const locale = useLocale();
   const [expanded, setExpanded] = useState(false);
 
-  if (upcoming.length === 0) return null;
+  const { withinWindow, later } = planAgenda(upcoming);
+  if (withinWindow.length === 0) return null;
 
-  const sorted = [...upcoming].sort(
-    (a, b) => distanceFromNow(a.at) - distanceFromNow(b.at),
-  );
-  const visible = expanded ? sorted : sorted.slice(0, VISIBLE_COUNT);
-  const hiddenCount = sorted.length - VISIBLE_COUNT;
+  const collapsed = withinWindow.slice(0, VISIBLE_COUNT);
+  const visible = expanded ? [...withinWindow, ...later] : collapsed;
+  const hiddenCount = withinWindow.length + later.length - collapsed.length;
 
   return (
     <section className="space-y-3">
