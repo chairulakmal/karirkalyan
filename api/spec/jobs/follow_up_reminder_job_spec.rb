@@ -40,6 +40,20 @@ RSpec.describe FollowUpReminderJob, type: :job do
       create(:application, user: user, status: "declined", follow_up_at: Time.current)
       expect { described_class.new.perform }.to change(TimelineEntry, :count).by(1)
     end
+
+    # The demo seed carries a permanently overdue follow-up on purpose, and the
+    # hourly reset destroys the claim that would settle it, so without this the
+    # one shared account earns a digest every morning forever.
+    it "skips the shared demo account" do
+      demo = create(:user, email: Demo::ResetService::DEMO_EMAIL)
+      create(:application, :applied, user: demo, follow_up_at: 2.days.ago)
+
+      expect { described_class.new.perform }
+        .to change(TimelineEntry, :count).by(1)
+        .and have_enqueued_mail(FollowUpMailer, :digest).once
+
+      expect(TimelineEntry.where(actor: demo)).to be_empty
+    end
   end
 
   describe "dead zones" do

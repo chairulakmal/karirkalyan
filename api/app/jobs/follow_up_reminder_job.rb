@@ -49,11 +49,20 @@ class FollowUpReminderJob < ApplicationJob
   # a reminder falling inside Golden Week is held on its own day and then picked up
   # by the next business day's run, because that run still sees it. LOOKBACK bounds
   # how far back that reaching goes.
+  #
+  # The shared demo account is excluded, and the reason is the claim below rather
+  # than politeness. Its seed carries a deliberately overdue follow-up so the
+  # dashboard's Upcoming section is never empty for a visitor, and Demo::ResetService
+  # destroys the account hourly, taking the TimelineEntry that claim() writes with
+  # it. The exactly-once anchor is therefore erased every hour, so that one seeded
+  # row would earn a fresh digest every single day, addressed to a mailbox that
+  # exists to be logged into rather than read.
   def due_on_or_before(today)
     Application
       .includes(:user)
       .where(follow_up_at: (today - LOOKBACK).beginning_of_day..today.end_of_day)
       .where.not(status: ApplicationFSM::TERMINAL_STATES)
+      .where.not(user: User.where(email: Demo::ResetService::DEMO_EMAIL))
       .order(:follow_up_at)
   end
 
