@@ -308,4 +308,4 @@ seed_data.each do |entry|
   end
 end
 
-puts "Demo seed complete — #{Application.where(user: demo).count} applications seeded for #{DEMO_EMAIL}"
+puts "Demo seed complete: #{Application.where(user: demo).count} applications seeded for #{DEMO_EMAIL}"

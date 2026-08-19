@@ -8,7 +8,10 @@ module Api
       # memory store (dev). v6 is a computation change with no shape change (the
       # outcome-rate denominator moved from status to applied_at), which is exactly
       # the case the old "SHAPE" wording would have talked you out of bumping for.
-      STATS_CACHE_VERSION = 7
+      # v8 is a rename inside the payload (screening_pass_rate became
+      # screening_success_rate) rather than a new figure: a key that changes is a
+      # shape change, and v7 entries still hold the old name.
+      STATS_CACHE_VERSION = 8
 
       # The two timeline reads the outcome rates are built from, and the reason
       # they are one expression rather than two lists. Reaching any ADVANCED
@@ -160,9 +163,9 @@ module Api
         }
       end
 
-      # Three stat cards over the FSM + timeline, zero schema. The denominator for
-      # all three is applications that were actually applied to; a wishlist item
-      # nobody sent anything to would only dilute a rate about how companies
+      # Four stat cards over the FSM + timeline, zero schema. The denominator for
+      # the three rates is applications that were actually applied to; a wishlist
+      # item nobody sent anything to would only dilute a rate about how companies
       # respond. A "response" is the company replying at all (advancing you or
       # rejecting you), so ghosting is precisely its absence; all three are read
       # from the timeline, so a later revival does not erase that a reply (or a
