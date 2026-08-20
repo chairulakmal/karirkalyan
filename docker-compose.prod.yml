@@ -62,7 +62,10 @@ services:
   web:
     build: ./web
     restart: unless-stopped
-    env_file: .env
+    # Its own file, not the root .env api reads: web is the internet-facing
+    # process and has no business holding Postgres/Devise/mailer/API-key
+    # secrets it never touches (.env.web.example).
+    env_file: .env.web
     environment:
       # Server-side only (never shipped to the browser): API_URL points at the
       # api container's internal name, not a public hostname, mirroring how

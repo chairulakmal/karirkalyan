@@ -15,7 +15,7 @@ RSpec.configure do |config|
       # Next.js app, which has no /api/v1 routes, so "Try it out" against it 404s.
       servers: [
         { url: "http://localhost:3001", description: "Local development" },
-        { url: "https://api.kk.chairulakmal.com", description: "Production" }
+        { url: "https://kk-api.chairulakmal.com", description: "Production" }
       ],
       components: {
         securitySchemes: {

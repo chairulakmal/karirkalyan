@@ -5,6 +5,7 @@
 
 # Secrets
 .env
+.env.web
 .env.local
 .env*.local
 !.env.prod.example

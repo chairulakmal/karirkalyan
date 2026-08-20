@@ -6,7 +6,9 @@
 #   cloudflared tunnel create karirkalyan        # prints the tunnel ID below,
 #                                                 # writes ~/.cloudflared/<id>.json
 #   cloudflared tunnel route dns karirkalyan kk.chairulakmal.com
-#   cloudflared tunnel route dns karirkalyan api.kk.chairulakmal.com
+#   cloudflared tunnel route dns karirkalyan kk-api.chairulakmal.com
+#   # Single-level on purpose: Cloudflare's default edge cert covers the apex
+#   # plus one wildcard level only, so api.kk.<domain> fails the handshake.
 #
 # `route dns` creates the CNAME records automatically (pointing at
 # <tunnel-id>.cfargotunnel.com); no manual DNS edit is needed for either
@@ -20,7 +22,7 @@ ingress:
   # match, so specific hostnames must come before any catch-all.
   - hostname: kk.chairulakmal.com
     service: http://web:3000
-  - hostname: api.kk.chairulakmal.com
+  - hostname: kk-api.chairulakmal.com
     service: http://api:8080
   # Required: cloudflared refuses to start without a final rule that matches
   # everything, even if nothing should ever hit it.

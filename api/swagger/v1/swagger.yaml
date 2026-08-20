@@ -7,7 +7,7 @@ info:
 servers:
 - url: http://localhost:3001
   description: Local development
-- url: https://api.kk.chairulakmal.com
+- url: https://kk-api.chairulakmal.com
   description: Production
 components:
   securitySchemes:

@@ -14,7 +14,7 @@ https://github.com/user-attachments/assets/862ca199-95e5-4e27-b9ef-ada7eb10a350
 
 <!-- SCREENSHOT: kanban board at /board, English locale, demo account data. Embed here once captured. -->
 
-**Live demo:** [kk.chairulakmal.com](https://kk.chairulakmal.com). The demo account is one click ("Try demo account" on the sign-in page) and comes prefilled with 12 applications spread across the pipeline, from `wishlist` through to `accepted`. API docs are served as Swagger UI at [`/api-docs`](https://api.kk.chairulakmal.com/api-docs).
+**Live demo:** [kk.chairulakmal.com](https://kk.chairulakmal.com). The demo account is one click ("Try demo account" on the sign-in page) and comes prefilled with 12 applications spread across the pipeline, from `wishlist` through to `accepted`. API docs are served as Swagger UI at [`/api-docs`](https://kk-api.chairulakmal.com/api-docs).
 
 ## Highlights
 

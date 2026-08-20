@@ -23,7 +23,7 @@ RSpec.describe AllowedHosts do
     end
 
     it "allows the Cloudflare Tunnel's public API subdomain" do
-      expect(permissions.allows?("api.kk.chairulakmal.com")).to be true
+      expect(permissions.allows?("kk-api.chairulakmal.com")).to be true
     end
 
     it "allows the primary domain, with and without a port" do
@@ -36,13 +36,21 @@ RSpec.describe AllowedHosts do
     # The v1.0.1 security finding claimed an unanchored /.*\.railway\.app/
     # accepted these. It never did — Rails anchors the pattern itself.
     it "blocks a trusted host used as a prefix of an attacker domain" do
-      expect(permissions.allows?("api.kk.chairulakmal.com.attacker.com")).to be false
+      expect(permissions.allows?("kk-api.chairulakmal.com.attacker.com")).to be false
       expect(permissions.allows?("api.attacker.com")).to be false
       expect(permissions.allows?("kk.chairulakmal.com.evil.com")).to be false
     end
 
     it "blocks an unrelated host" do
       expect(permissions.allows?("attacker.com")).to be false
+    end
+
+    # Regression: the two-level form was in AllowedHosts and nine other places
+    # up through PR #111, but it fails Cloudflare's TLS handshake and was never
+    # the real production host (SPEC.md § Deployment). Guards against it
+    # silently coming back the same way it silently went in.
+    it "blocks the abandoned two-level API hostname" do
+      expect(permissions.allows?("api.kk.chairulakmal.com")).to be false
     end
   end
 

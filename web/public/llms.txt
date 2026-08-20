@@ -126,7 +126,7 @@ claim one.
 - App: https://kk.chairulakmal.com
 - Architecture, and the reasoning behind it: https://kk.chairulakmal.com/about
 - API overview: https://kk.chairulakmal.com/docs
-- API reference (Swagger UI): https://api.kk.chairulakmal.com/api-docs
+- API reference (Swagger UI): https://kk-api.chairulakmal.com/api-docs
 - Japanese: the same pages under /ja (e.g. https://kk.chairulakmal.com/ja/about)
 - Demo account: demo@karirkalyan.com / oretachinomachida (12 pre-loaded Tokyo tech applications)
 - Privacy policy: https://kk.chairulakmal.com/privacy

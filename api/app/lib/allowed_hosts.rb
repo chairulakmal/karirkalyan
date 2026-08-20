@@ -13,9 +13,12 @@ module AllowedHosts
 
   # The Cloudflare Tunnel's public API subdomain, plus the bare Docker Compose
   # service name "api" used for internal web -> api calls over the internal
-  # network (docker-compose.prod.yml; SPEC.md § Deployment).
+  # network (docker-compose.prod.yml; SPEC.md § Deployment). Single-level
+  # subdomain on purpose: Cloudflare's default edge certificate covers the
+  # apex plus one wildcard level only, so a two-level form like
+  # api.kk.chairulakmal.com fails the TLS handshake (SPEC.md § Deployment).
   PATTERNS = [
-    /api\.kk\.chairulakmal\.com/i,
+    /kk-api\.chairulakmal\.com/i,
     /api/i
   ].freeze
 

@@ -5,7 +5,7 @@ export const REPO_URL = "https://github.com/chairulakmal/karirkalyan";
 // `web/` should fetch through it. Server-side requests go through
 // INTERNAL_API_URL (app/lib/api.ts), which in production is the internal
 // Docker Compose service address and carries the JWT.
-const PUBLIC_API_ORIGIN = "https://api.kk.chairulakmal.com";
+const PUBLIC_API_ORIGIN = "https://kk-api.chairulakmal.com";
 export const API_DOCS_URL = `${PUBLIC_API_ORIGIN}/api-docs`;
 
 // Where a data or erasure request lands. The legal pages name it, so it has to be
