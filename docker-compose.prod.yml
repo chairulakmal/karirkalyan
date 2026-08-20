@@ -7,7 +7,9 @@
 # No service publishes a host port. cloudflared is the only ingress: it reaches
 # `api` and `web` by service name over the `internal` network, which is also the
 # only network any container is on, so nothing here is reachable except through
-# the tunnel, however the host firewall is configured.
+# the tunnel, however the host firewall is configured. The backups self-hosted
+# runner (SPEC.md § Backups) does not need one either: it reaches `postgres` via
+# `docker exec` into this container, not a TCP connection from the host.
 #
 #   docker compose -f docker-compose.prod.yml up -d --build
 #
