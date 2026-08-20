@@ -40,9 +40,9 @@ Every page lives under a `[locale]` segment: `en` and `ja` (`i18n/routing.ts`, m
 
 ## Local setup
 
-**Prerequisites:** Node 24 (matches Railway production)
+**Prerequisites:** Node 24 (matches production)
 
-Node is pinned in **one** place (`.nvmrc`), and everything else reads it: `actions/setup-node` via `node-version-file`, and Railpack when it builds the production image. `package.json` restates it as `engines.node` because Railpack consults that first. Keep the two in step; a CI runtime that differs from production's is how the `npm ci` lockfile divergence bit twice.
+Node 24 lives in three places, not one, since the move off Railway (`SPEC.md` § Local development): `.nvmrc`, which `actions/setup-node` reads via `node-version-file`; `package.json`'s `engines.node`, a holdover from when Railpack consulted that field first; and `web/Dockerfile`'s `ARG NODE_VERSION` default, since that Dockerfile is what builds the production image now. Nothing wires the three together, so a version bump needs all of them edited by hand; a CI runtime that differs from production's is how the `npm ci` lockfile divergence bit twice.
 
 ```bash
 npm install

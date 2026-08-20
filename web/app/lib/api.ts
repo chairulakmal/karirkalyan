@@ -36,7 +36,8 @@ export type ApiFailure = {
  * `data` is `T | null`, not `T`, and the null is load-bearing.
  *
  * Two of the three success paths below genuinely return no body: a 204, and a
- * non-JSON 200 (a Railway holding page mid-deploy, a proxy interstitial). Those
+ * non-JSON 200 (a proxy interstitial, or a stale payload from the api container
+ * mid-restart during `bin/deploy`). Those
  * used to be written `data: null as T`, an assertion that told the compiler the
  * value was a `T` at exactly the boundary where types are erased and the value
  * is least trustworthy. The cost was real: dashboard/page.tsx destructured

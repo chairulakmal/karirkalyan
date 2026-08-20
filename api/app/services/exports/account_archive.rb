@@ -2,9 +2,10 @@ require "zip"
 
 module Exports
   # The data-safety artefact, and the reason exports exist at all: the real job-search
-  # history lives in one Railway Postgres, and the Hobby plan has no managed backups.
-  # Scheduled pg_dumps cover that from the outside; this covers it from the inside, and
-  # is the leg the user can pull without a provider, a cron runner, or a shell.
+  # history lives in one self-hosted Postgres, with no managed backup service behind it.
+  # Scheduled pg_dumps (SPEC.md § Backups) cover that from the outside; this covers it
+  # from the inside, and is the leg the user can pull without a provider, a cron runner,
+  # or a shell.
   #
   # Contents:
   #   account.json           user, every application with every column, every timeline entry

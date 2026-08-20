@@ -1,9 +1,9 @@
 # Generates a fresh VAPID keypair for Web Push (SPEC.md § Push notifications).
 #
 # Run once per environment and paste the output into that environment's env
-# (Railway variables in production, .env in development) — the pairs are
-# deliberately per-environment, so a dev key can never sign a push to the
-# production user. Never commit a keypair.
+# (the root .env in production, see .env.prod.example; .env in development).
+# The pairs are deliberately per-environment, so a dev key can never sign a
+# push to the production user. Never commit a keypair.
 namespace :push do
   desc "Generate a VAPID keypair for Web Push (per environment, never committed)"
   task vapid: :environment do

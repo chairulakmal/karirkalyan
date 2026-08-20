@@ -69,4 +69,16 @@ test:
 #
 production:
   <<: *default
-  url: <%= ENV["DATABASE_URL"] %>
+  # Discrete keys rather than the DATABASE_URL above, and deliberately the same
+  # shape as development/test. docker-compose.prod.yml used to build that URL by
+  # interpolating the credentials into a string, so a password containing ":",
+  # "@" or "/" either failed to parse or silently repointed the connection at
+  # another host. Passed as values, no character needs escaping.
+  #
+  # fetch without a default on the credentials: a missing one should stop the
+  # boot outright, not connect as some fallback identity.
+  database: <%= ENV.fetch("DB_NAME", "api_production") %>
+  username: <%= ENV.fetch("DB_USERNAME") %>
+  password: <%= ENV.fetch("DB_PASSWORD") %>
+  host:     <%= ENV.fetch("DB_HOST", "postgres") %>
+  port:     <%= ENV.fetch("DB_PORT", "5432") %>

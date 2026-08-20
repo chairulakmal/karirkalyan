@@ -56,7 +56,16 @@ EXPOSE 8080
 
 # /up (config/routes.rb) pings Postgres, not just process boot, so a lost DB
 # connection fails the healthcheck instead of leaving Puma up and serving 500s.
-HEALTHCHECK --interval=15s --timeout=5s --start-period=30s --retries=5 \
+#
+# The start period is deliberately long. bin/docker-entrypoint runs `db:prepare`
+# to completion before Puma binds, so every probe fails until migrations finish,
+# and both web and cloudflared gate on `api: condition: service_healthy`. Under
+# the old 30s window a first boot against an empty volume, or one slow migration
+# on modest hardware, did not just start late: compose called the dependency
+# failed and brought up neither, taking the whole site down over a delay. The
+# window costs nothing on a normal boot, where the first passing probe flips the
+# container healthy at once, which is why --start-interval is short.
+HEALTHCHECK --interval=15s --timeout=5s --start-period=300s --start-interval=5s --retries=5 \
   CMD curl -f http://localhost:8080/up || exit 1
 
 CMD ["bundle", "exec", "rails", "server", "-b", "0.0.0.0", "-p", "8080"]

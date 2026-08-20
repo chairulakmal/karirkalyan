@@ -48,8 +48,9 @@ export default async function BoardPage() {
   ]);
 
   // A 200 is not a promise about shape. `apiFetch` casts rather than parses, and
-  // web/api are separate Railway services — so mid-deploy this can be the payload
-  // from before `active_states` existed, with `ok: true` over the top of it. The
+  // web/api are separate containers restarted independently by `bin/deploy`, so
+  // mid-deploy this can be the payload from before `active_states` existed, with
+  // `ok: true` over the top of it. The
   // dashboard can shrug that off; the board cannot, because `active_states` *is*
   // its columns. An unusable table is a failed table.
   const table =

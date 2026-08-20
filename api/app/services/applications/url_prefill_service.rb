@@ -78,8 +78,9 @@ module Applications
     # SSRF defence: extra ranges beyond IPAddr's loopback?/private?/link_local?.
     # `::ffff:0:0/96` covers IPv4-mapped addresses, so `::ffff:127.0.0.1` is caught
     # here rather than needing its own unwrapping pass. NAT64 and 6to4 both need a
-    # translating gateway to mean anything, so they are theoretical on Railway —
-    # but `64:ff9b::7f00:1` is loopback wearing an IPv6 hat, and they cost a line.
+    # translating gateway to mean anything, so they are theoretical in this
+    # deployment, but `64:ff9b::7f00:1` is loopback wearing an IPv6 hat, and they
+    # cost a line.
     BLOCKED_RANGES = %w[
       0.0.0.0/8 100.64.0.0/10 192.0.0.0/24 198.18.0.0/15
       240.0.0.0/4 ::/128 ::ffff:0:0/96 64:ff9b::/96 2002::/16
@@ -350,7 +351,7 @@ module Applications
       # One message for "doesn't resolve" and "resolves somewhere internal", because
       # the difference between them is the answer to a question the user should not
       # be able to ask. Distinct copy turns a blind SSRF into an internal-hostname
-      # oracle: probe redis.railway.internal and admin.corp, and the wording tells
+      # oracle: probe postgres.internal and admin.corp, and the wording tells
       # you which names exist. The demo account's credentials are published, so
       # "authenticated" is not a meaningful barrier to whoever is asking. The real
       # reason goes to the log, where the operator can see it and the prober can't.

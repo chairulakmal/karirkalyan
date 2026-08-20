@@ -11,8 +11,10 @@
 # env["action_dispatch.remote_ip"], so req.ip is governed by Rack's own rules and
 # NOT by config.action_dispatch.trusted_proxies (which this app never set anyway).
 # Rack 3.2 reads the RFC-7239 `Forwarded:` header ahead of `X-Forwarded-For`, and
-# Railway normalises the latter but does not strip the former, so any client could
-# hand us the IP it wanted to be throttled as:
+# Railway normalised the latter but did not strip the former, so any client could
+# hand us the IP it wanted to be throttled as. The Cloudflare Tunnel this app now
+# sits behind closes the hole structurally (SPEC.md § Production lessons), since
+# a client has no path to the origin except through it, but the pin stays anyway:
 #
 #   REMOTE_ADDR 10.0.1.5 + XFF 203.0.113.9 + "Forwarded: for=1.2.3.4"  =>  1.2.3.4
 #

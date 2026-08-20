@@ -49,7 +49,8 @@ export default async function Dashboard({
   ]);
   // `ok` does not imply a populated `data` (apiFetch returns `null as T` for a
   // 204 or a non-JSON 200), and a 200 does not imply *this* payload: web and api
-  // are separate Railway services, so during a deploy window /transitions can
+  // are separate containers restarted independently by `bin/deploy`, so during a
+  // restart window /transitions can
   // answer from the release before active_states existed. Missing reads as
   // absent, which is already the failure path (it drops the default to
   // unfiltered below).

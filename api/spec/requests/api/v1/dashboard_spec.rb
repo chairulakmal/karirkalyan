@@ -281,7 +281,7 @@ RSpec.describe "Dashboard", type: :request do
     end
 
     # The `at` value had no coverage at all, which is how the residence row came
-    # to serialise the container's zone (UTC on Railway) while every other item
+    # to serialise the container's zone (UTC) while every other item
     # serialised Tokyo. Asserting the offset is what makes that a red test rather
     # than an invisible inconsistency: CI runs UTC, so `Date#to_time` fails here.
     it "serialises every agenda date in Tokyo, the residence row included" do

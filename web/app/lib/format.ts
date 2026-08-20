@@ -46,7 +46,7 @@ export function statusBadgeClass(s: Status): string {
  *
  * "Today" is Tokyo's today, pinned exactly as `formatDate` below pins its own
  * output, because the two have to agree about the same date: this runs on the
- * server (Railway sets no `TZ`, so the `web` container is UTC) and again in the
+ * server (the `web` container's image sets no `TZ`, so it is UTC) and again in the
  * browser (JST), and a wall-clock "today" made those two answers differ every
  * morning between 00:00 and 09:00 JST — a different colour and a different i18n
  * key for the same row, which React 19 reports as a hydration mismatch.
