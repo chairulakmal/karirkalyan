@@ -7,7 +7,7 @@ info:
 servers:
 - url: http://localhost:3001
   description: Local development
-- url: https://api-production-4899.up.railway.app
+- url: https://api.kk.chairulakmal.com
   description: Production
 components:
   securitySchemes:

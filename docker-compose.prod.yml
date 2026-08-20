@@ -1,0 +1,95 @@
+# Self-hosted production stack (Docker + Cloudflare Tunnel). Contrast with
+# api/docker-compose.yml, which is dev-only: Postgres alone, ports open to the
+# host, no built images. This file replaces Railway's two app services plus its
+# managed Postgres; SPEC.md § Deployment is the source of truth for the
+# reasoning, this file is just its executable form.
+#
+# No service publishes a host port. cloudflared is the only ingress: it reaches
+# `api` and `web` by service name over the `internal` network, which is also the
+# only network any container is on, so nothing here is reachable except through
+# the tunnel, however the host firewall is configured.
+#
+#   docker compose -f docker-compose.prod.yml up -d --build
+#
+# `name:` deliberately differs from api/docker-compose.yml's ("karirkalyan"):
+# Compose derives volume and network names from the project name, and this file
+# ran against api/docker-compose.yml's dev Postgres volume once already under a
+# shared name, failing on a stale password from a data directory it didn't
+# initialize. Same name would mean this stack and dev share one database.
+
+name: karirkalyan-prod
+
+services:
+  postgres:
+    # Matches production's major version, same as api/docker-compose.yml.
+    image: postgres:18
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${DB_USERNAME}
+      POSTGRES_PASSWORD: ${DB_PASSWORD}
+      POSTGRES_DB: ${DB_NAME:-api_production}
+    volumes:
+      # postgres:18 declares its volume at /var/lib/postgresql, not .../data:
+      # see api/docker-compose.yml's comment for why the old path silently
+      # loses data across `down`.
+      - postgres_data:/var/lib/postgresql
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${DB_USERNAME}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks: [internal]
+
+  api:
+    build: ./api
+    restart: unless-stopped
+    env_file: .env
+    environment:
+      # DB_USERNAME/DB_PASSWORD must not contain characters that need
+      # percent-encoding in a URL (":", "@", "/"): pick a generated password
+      # that avoids them, rather than encoding it here.
+      DATABASE_URL: postgres://${DB_USERNAME}:${DB_PASSWORD}@postgres:5432/${DB_NAME:-api_production}
+    depends_on:
+      # Puma boots against Postgres immediately; without this, api starts
+      # racing an unready database on every fresh `up` and fails on migrate.
+      postgres:
+        condition: service_healthy
+    networks: [internal]
+    mem_limit: 512m
+
+  web:
+    build: ./web
+    restart: unless-stopped
+    env_file: .env
+    environment:
+      # Server-side only (never shipped to the browser): API_URL points at the
+      # api container's internal name, not a public hostname, mirroring how
+      # Railway's private network resolved it before.
+      API_URL: http://api:8080
+    depends_on:
+      # Waits on api's own HEALTHCHECK (its /up dependency check), not just
+      # process start, so web never comes up fronting a Rails process that
+      # can't reach its own database.
+      api:
+        condition: service_healthy
+    networks: [internal]
+    mem_limit: 512m
+
+  cloudflared:
+    image: cloudflare/cloudflared:latest
+    restart: unless-stopped
+    command: tunnel --config /etc/cloudflared/config.yml run
+    volumes:
+      - ./cloudflared:/etc/cloudflared:ro
+    depends_on:
+      web:
+        condition: service_healthy
+      api:
+        condition: service_healthy
+    networks: [internal]
+
+networks:
+  internal:
+
+volumes:
+  postgres_data:

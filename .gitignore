@@ -1,11 +1,17 @@
 # local research notes — not for the repo
-/notes
+/notes/*
 /.claude
+!/notes/HISTORY.md
 
 # Secrets
 .env
 .env.local
 .env*.local
+!.env.prod.example
+
+# Cloudflare Tunnel: names a real tunnel ID and points at its credentials file
+cloudflared/config.yml
+cloudflared/*.json
 
 # macOS
 .DS_Store

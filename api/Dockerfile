@@ -1,10 +1,10 @@
 # syntax=docker/dockerfile:1
 # check=error=true
 
-# Production image for Railway. One image, one service: `api` runs the default
-# CMD (Puma), and Solid Queue's supervisor, dispatcher and workers run inside that
-# same Puma process via `plugin :solid_queue` — there is no worker service.
-# NOTE: with a Dockerfile present, Railway runs this CMD and IGNORES the Procfile.
+# Production image, built by docker-compose.prod.yml (SPEC.md § Deployment).
+# One image, one service: `api` runs the default CMD (Puma), and Solid Queue's
+# supervisor, dispatcher and workers run inside that same Puma process via
+# `plugin :solid_queue`, so there is no worker service, and no Procfile is read.
 # For local dev, use api/docker-compose.yml (Postgres only).
 
 ARG RUBY_VERSION=3.4.9
@@ -53,4 +53,10 @@ ENTRYPOINT ["/rails/bin/docker-entrypoint"]
 
 # Puma also hosts Solid Queue, so this is the only command any service runs.
 EXPOSE 8080
+
+# /up (config/routes.rb) pings Postgres, not just process boot, so a lost DB
+# connection fails the healthcheck instead of leaving Puma up and serving 500s.
+HEALTHCHECK --interval=15s --timeout=5s --start-period=30s --retries=5 \
+  CMD curl -f http://localhost:8080/up || exit 1
+
 CMD ["bundle", "exec", "rails", "server", "-b", "0.0.0.0", "-p", "8080"]

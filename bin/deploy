@@ -1,0 +1,17 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+# Manual deploy for the self-hosted stack (SPEC.md § Deployment). Railway's
+# watch-path deploys had no equivalent step: a merge under a watch path was the
+# deploy. Here the operator runs this after merging to main, from the repo root.
+#
+# Migrations need no separate step: api/bin/docker-entrypoint runs `db:prepare`
+# on every boot of a "rails server" command, so `up -d` alone brings the schema
+# current.
+
+cd "$(dirname "$0")/.."
+
+git pull --ff-only
+docker compose -f docker-compose.prod.yml build
+docker compose -f docker-compose.prod.yml up -d
+docker compose -f docker-compose.prod.yml ps

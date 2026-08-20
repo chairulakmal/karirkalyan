@@ -15,15 +15,15 @@ RSpec.describe AllowedHosts do
     # Rails' appended (:\d+)? unmatchable. Every internal web -> api call carries
     # a port, so the whole API 403'd and the frontend reported it as a 401.
     it "allows the internal service host with an explicit port" do
-      expect(permissions.allows?("karirkalyan-api.railway.internal:3001")).to be true
+      expect(permissions.allows?("api:8080")).to be true
     end
 
     it "allows the internal service host without a port" do
-      expect(permissions.allows?("karirkalyan-api.railway.internal")).to be true
+      expect(permissions.allows?("api")).to be true
     end
 
-    it "allows a Railway-issued public subdomain" do
-      expect(permissions.allows?("karirkalyan-api-production.up.railway.app")).to be true
+    it "allows the Cloudflare Tunnel's public API subdomain" do
+      expect(permissions.allows?("api.kk.chairulakmal.com")).to be true
     end
 
     it "allows the primary domain, with and without a port" do
@@ -36,8 +36,8 @@ RSpec.describe AllowedHosts do
     # The v1.0.1 security finding claimed an unanchored /.*\.railway\.app/
     # accepted these. It never did — Rails anchors the pattern itself.
     it "blocks a trusted host used as a prefix of an attacker domain" do
-      expect(permissions.allows?("foo.railway.app.attacker.com")).to be false
-      expect(permissions.allows?("foo.railway.internal.attacker.com")).to be false
+      expect(permissions.allows?("api.kk.chairulakmal.com.attacker.com")).to be false
+      expect(permissions.allows?("api.attacker.com")).to be false
       expect(permissions.allows?("kk.chairulakmal.com.evil.com")).to be false
     end
 

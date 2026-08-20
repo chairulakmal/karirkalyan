@@ -116,7 +116,7 @@ claim one.
   Workers run inside Puma, so there is no separate worker service.
 - Frontend: Next.js 16 App Router, TypeScript, Tailwind CSS
 - Auth: JWT issued by Rails, stored in httpOnly cookie by Next.js; never reaches client JS
-- Deploy: Railway (API service + web service + managed PostgreSQL)
+- Deploy: self-hosted Docker Compose behind a Cloudflare Tunnel (API service + web service + PostgreSQL)
 - Tests: RSpec (unit + request specs against real DB), Vitest (pure client logic, no DOM),
   Playwright E2E, and a CI script that fails the build when the en and ja message catalogs
   disagree about which keys exist
@@ -126,7 +126,7 @@ claim one.
 - App: https://kk.chairulakmal.com
 - Architecture, and the reasoning behind it: https://kk.chairulakmal.com/about
 - API overview: https://kk.chairulakmal.com/docs
-- API reference (Swagger UI): https://api-production-4899.up.railway.app/api-docs
+- API reference (Swagger UI): https://api.kk.chairulakmal.com/api-docs
 - Japanese: the same pages under /ja (e.g. https://kk.chairulakmal.com/ja/about)
 - Demo account: demo@karirkalyan.com / oretachinomachida (12 pre-loaded Tokyo tech applications)
 - Privacy policy: https://kk.chairulakmal.com/privacy

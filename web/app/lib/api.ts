@@ -3,8 +3,9 @@ import { redirect } from "next/navigation";
 
 /**
  * Where `web/`'s server-side code reaches Rails. Server-to-server only: in
- * production this resolves to the private `api.railway.internal` address, which
- * a browser cannot reach at all.
+ * production this resolves to `http://api:8080`, the `api` container's address
+ * on the internal Docker Compose network (SPEC.md § Deployment), which a
+ * browser cannot reach at all.
  *
  * Not to be confused with `PUBLIC_API_ORIGIN` (app/lib/links.ts) — that is the
  * API's public URL, and exists only to build outbound doc links for a browser

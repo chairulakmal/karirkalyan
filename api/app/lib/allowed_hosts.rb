@@ -6,15 +6,17 @@
 # every regexp as /\A#{pattern}(:\d+)?\z/ — see actionpack's
 # host_authorization.rb#sanitize_regexp — so anchoring is already applied and an
 # optional :port is appended. Writing your own trailing \z asserts end-of-string
-# before the port can match, which blocks "api.railway.internal:3001", the Host
-# on every internal service-to-service call.
+# before the port can match, which blocks "api:8080", the Host on every internal
+# service-to-service call.
 module AllowedHosts
   PRIMARY_DOMAIN = "kk.chairulakmal.com"
 
-  # Railway-issued public subdomains + private-network hostnames.
+  # The Cloudflare Tunnel's public API subdomain, plus the bare Docker Compose
+  # service name "api" used for internal web -> api calls over the internal
+  # network (docker-compose.prod.yml; SPEC.md § Deployment).
   PATTERNS = [
-    /([a-z0-9-]+\.)+railway\.app/i,
-    /([a-z0-9-]+\.)+railway\.internal/i
+    /api\.kk\.chairulakmal\.com/i,
+    /api/i
   ].freeze
 
   # Everything the production app trusts, including the runtime APP_HOST override.

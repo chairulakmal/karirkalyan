@@ -1,11 +1,11 @@
 export const REPO_URL = "https://github.com/chairulakmal/karirkalyan";
 
-// The API's *public* origin — where a browser reaches Rails directly. Its only
+// The API's *public* origin, where a browser reaches Rails directly. Its only
 // job is building outbound doc links, so it stays module-private: nothing in
 // `web/` should fetch through it. Server-side requests go through
-// INTERNAL_API_URL (app/lib/api.ts), which in production is the private
-// api.railway.internal address and carries the JWT.
-const PUBLIC_API_ORIGIN = "https://api-production-4899.up.railway.app";
+// INTERNAL_API_URL (app/lib/api.ts), which in production is the internal
+// Docker Compose service address and carries the JWT.
+const PUBLIC_API_ORIGIN = "https://api.kk.chairulakmal.com";
 export const API_DOCS_URL = `${PUBLIC_API_ORIGIN}/api-docs`;
 
 // Where a data or erasure request lands. The legal pages name it, so it has to be

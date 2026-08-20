@@ -1,0 +1,27 @@
+# Template for cloudflared/config.yml (gitignored: it names a real tunnel ID and
+# the path to that tunnel's credentials file, which is also gitignored). Copy
+# this to cloudflared/config.yml and fill in the values from:
+#
+#   cloudflared tunnel login
+#   cloudflared tunnel create karirkalyan        # prints the tunnel ID below,
+#                                                 # writes ~/.cloudflared/<id>.json
+#   cloudflared tunnel route dns karirkalyan kk.chairulakmal.com
+#   cloudflared tunnel route dns karirkalyan api.kk.chairulakmal.com
+#
+# `route dns` creates the CNAME records automatically (pointing at
+# <tunnel-id>.cfargotunnel.com); no manual DNS edit is needed for either
+# hostname once this runs.
+
+tunnel: <TUNNEL-ID>
+credentials-file: /etc/cloudflared/<TUNNEL-ID>.json
+
+ingress:
+  # Order matters: cloudflared checks rules top to bottom and uses the first
+  # match, so specific hostnames must come before any catch-all.
+  - hostname: kk.chairulakmal.com
+    service: http://web:3000
+  - hostname: api.kk.chairulakmal.com
+    service: http://api:8080
+  # Required: cloudflared refuses to start without a final rule that matches
+  # everything, even if nothing should ever hit it.
+  - service: http_status:404

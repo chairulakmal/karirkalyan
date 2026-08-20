@@ -16,7 +16,7 @@ The plan: open work only. The most important thing here is a rule, not a list: *
 
 - **A `v1` feature is work with a scheduled deletion date.** `2.0.0`'s centerpiece is a ground-up rewrite onto Cloudflare (below): Rails becomes Hono, Next becomes Nuxt. Anything built in `api/` or `web/` from here has to be built a second time in a stack that does not exist yet, so it is paid for twice and demoed once.
 - **The app is finished for the search that is actually running.** The north star is one user, and he has the tool: capture, pipeline, follow-ups, takeability constraints, the daily driver. Every remaining idea here pays off *after* the search closes, which is what the `2.0.0` trigger encodes.
-- **Cadence.** Every merge under a watch path is a Railway deploy, and each PR burns two CI runs (`CLAUDE.md` § Branching & PRs). A frozen feature surface is what makes the one-PR-per-day rule cheap instead of something to work around.
+- **Cadence.** Every merge under a watch path triggers a deploy, and each PR burns two CI runs (`CLAUDE.md` § Branching & PRs). A frozen feature surface is what makes the one-PR-per-day rule cheap instead of something to work around.
 
 **The admission test, applied to anything proposed for `v1`:** does it make something the app already does work correctly, or stop something it already does from being abused? If yes it ships, and it is a patch by the mechanical test (no migration, no `v1` contract broken, no new capability). If it adds a capability, however small and however tempting, it is `2.0.0` work and waits for the trigger. Security fixes, dependency bumps, and CI chores pass on the same reading: none is a capability.
 
