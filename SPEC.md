@@ -1620,7 +1620,7 @@ A restore drill passed 2026-07-11: `db-dump-7` restored into a scratch Postgres 
 
 **Prerequisites:** Docker, Ruby 3.4.9 (via mise), Node 24
 
-Node is pinned to 24 in **one** place (`web/.nvmrc`), and everything else reads it: `actions/setup-node` via `node-version-file`, and Railpack when it builds the production image. `web/package.json` restates it as `engines.node` because Railpack consults that first. Keep them in step; a CI runtime that differs from production's is how the `npm ci` lockfile divergence bit twice: in v1.1.0, and again in the dependency refresh after v1.3.0.
+**Node 24 now lives in three places, not one, since the move off Railway.** `web/.nvmrc` is what `actions/setup-node` reads via `node-version-file`; `web/package.json`'s `engines.node` restates it, a holdover from when Railpack consulted that field first to build the production image; and `web/Dockerfile`'s `ARG NODE_VERSION` default restates it again, since that Dockerfile is what builds the production image now (§ Deployment). Railpack read `.nvmrc` and `engines.node` on its own; nothing wires the Dockerfile's `ARG` to either, so a version bump needs all three edited by hand. Keep them in step regardless; a CI runtime that differs from production's is how the `npm ci` lockfile divergence bit twice already, in v1.1.0 and again in the dependency refresh after v1.3.0.
 
 Local Postgres tracks production's major version: both are **18**. A dev database a major version behind production is a bug waiting to be found in production, and the two drifted apart for exactly that reason once already: Railway was moved to `postgres-ssl:18` while `docker-compose.yml`, CI, and this file all still said 16.
 
