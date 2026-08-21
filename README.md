@@ -6,7 +6,7 @@
 
 [🇯🇵 日本語](README.ja.md)
 
-A job application tracker with a Rails 8 API and a Next.js 16 kanban board. Every status change goes through a server-enforced finite state machine, and the client asks the API which moves are legal instead of keeping its own copy of the rules. Below: a live demo, the highlights, the stack, how to run it locally, and how it is tested; [ARCHITECTURE.md](ARCHITECTURE.md) walks the design decisions.
+A job application tracker with a Rails 8 API and a Next.js 16 kanban board. Every status change goes through a server-enforced finite state machine, and the client asks the API which moves are legal instead of keeping its own copy of the rules. Below: a live demo, the highlights, the architecture and stack, how it is tested, and how to run it locally; [ARCHITECTURE.md](ARCHITECTURE.md) walks the design decisions.
 
 https://github.com/user-attachments/assets/862ca199-95e5-4e27-b9ef-ada7eb10a350
 
@@ -27,7 +27,9 @@ https://github.com/user-attachments/assets/862ca199-95e5-4e27-b9ef-ada7eb10a350
 - On Android, the app is a share target. Share a job posting from any app (LinkedIn, a browser tab, a recruiter's email) and it opens the new-application form with AI pre-fill already reading it; a share with no link fills the paste box instead. Install through **Chrome**: the share menu needs the WebAPK, which Brave doesn't build, so a Brave install is just a shortcut without this feature. Sharing *from* Brave still works.
 - Once installed, it behaves like a real app, not a website in a browser frame. On phones it shows a bottom tab bar. Long-press the launcher icon for New application and Board shortcuts. A `monochrome` icon lets Android tint the logo instead of dimming it.
 
-## Stack
+## Architecture
+
+[ARCHITECTURE.md](ARCHITECTURE.md) walks through the decisions with file paths: the state machine and its single transition table, the transactional write path and the `409` contract, ghost prediction derived from the audit trail, holiday-aware digest scheduling, the bilingual catalog setup, and the single-Postgres design. Each section states the choice, the reasoning, and the trade-off accepted. [SPEC.md](SPEC.md) is the full technical spec and the project's source of truth, kept in sync with the code by policy.
 
 | Layer | What the code pins |
 |---|---|
@@ -36,6 +38,14 @@ https://github.com/user-attachments/assets/862ca199-95e5-4e27-b9ef-ada7eb10a350
 | Database | PostgreSQL 18 in Docker, both locally and in production |
 | Deployment | Docker Compose + Cloudflare Tunnel, self-hosted (`SPEC.md` § Deployment) |
 | Tests | RSpec (unit and request tiers), Vitest (`web/` units), Playwright 1.60 end to end |
+
+## Testing and CI
+
+The API test suite has two tiers. Unit specs (`spec/lib`, `spec/services`) run with no database. Request specs (`spec/requests`) hit a real PostgreSQL and double as the source for the OpenAPI spec via rswag, so the API docs and the tests cannot drift apart. SimpleCov enforces an 80% line minimum with branch coverage on, and prosopite fails any request spec that triggers an N+1 query.
+
+The frontend has a Playwright smoke suite ([`web/e2e/`](web/e2e)) that drives both apps through the critical paths: create an application, transition its status, attach a resume.
+
+CI is two path-aware workflows. [`api.yml`](.github/workflows/api.yml) runs RuboCop, Brakeman, bundler-audit, and RSpec. [`web.yml`](.github/workflows/web.yml) runs ESLint, the i18n parity check, the FSM-copy check, `tsc`, the Vitest unit suite, the production build, and the Playwright suite against a real Rails API seeded inside the job. The badges at the top of this README track both workflows' current status.
 
 ## Running locally
 
@@ -70,15 +80,3 @@ bundle exec rspec spec/requests            # request specs against a real Postgr
 npm run lint && npm run lint:i18n && npm run lint:fsm && npx tsc --noEmit && npm test
 npm run test:e2e                           # Playwright; needs Postgres up and the seed loaded
 ```
-
-## Testing and CI
-
-The API test suite has two tiers. Unit specs (`spec/lib`, `spec/services`) run with no database. Request specs (`spec/requests`) hit a real PostgreSQL and double as the source for the OpenAPI spec via rswag, so the API docs and the tests cannot drift apart. SimpleCov enforces an 80% line minimum with branch coverage on, and prosopite fails any request spec that triggers an N+1 query.
-
-The frontend has a Playwright smoke suite ([`web/e2e/`](web/e2e)) that drives both apps through the critical paths: create an application, transition its status, attach a resume.
-
-CI is two path-aware workflows. [`api.yml`](.github/workflows/api.yml) runs RuboCop, Brakeman, bundler-audit, and RSpec. [`web.yml`](.github/workflows/web.yml) runs ESLint, the i18n parity check, the FSM-copy check, `tsc`, the Vitest unit suite, the production build, and the Playwright suite against a real Rails API seeded inside the job.
-
-## Architecture
-
-[ARCHITECTURE.md](ARCHITECTURE.md) walks through the decisions with file paths: the state machine and its single transition table, the transactional write path and the `409` contract, ghost prediction derived from the audit trail, holiday-aware digest scheduling, the bilingual catalog setup, and the single-Postgres design. Each section states the choice, the reasoning, and the trade-off accepted. [SPEC.md](SPEC.md) is the full technical spec and the project's source of truth, kept in sync with the code by policy.

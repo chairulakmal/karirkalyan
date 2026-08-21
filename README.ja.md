@@ -6,7 +6,7 @@
 
 [🇬🇧 English](README.md)
 
-求人応募トラッカーです。Rails 8 の API と、Next.js 16 のカンバンボードで動きます。ステータス変更は必ずサーバー側の状態機械を通ります。クライアントは遷移ルールを持たず、どの移動が合法かを API に聞きます。以下、ライブデモ、ハイライト、技術スタック、ローカルでの動かし方、テストと CI の順に説明します。設計判断は [ARCHITECTURE.md](ARCHITECTURE.md)（英語）にあります。
+求人応募トラッカーです。Rails 8 の API と、Next.js 16 のカンバンボードで動きます。ステータス変更は必ずサーバー側の状態機械を通ります。クライアントは遷移ルールを持たず、どの移動が合法かを API に聞きます。以下、ライブデモ、ハイライト、アーキテクチャと技術スタック、テストと CI、ローカルでの動かし方の順に説明します。設計判断は [ARCHITECTURE.md](ARCHITECTURE.md)（英語）にあります。
 
 https://github.com/user-attachments/assets/ecabba9e-b81d-40e6-9ab7-2a5911443c45
 
@@ -27,7 +27,9 @@ https://github.com/user-attachments/assets/ecabba9e-b81d-40e6-9ab7-2a5911443c45
 - Android にインストールすると、アプリは共有ターゲットになります。任意のアプリ（LinkedIn、ブラウザのタブ、リクルーターのメール）から求人票を共有すると、AI プレフィルが読み込み中の新規応募フォームが開きます。リンクがない共有は貼り付けボックスに入ります。インストールは **Chrome** から行ってください。共有メニューには WebAPK が必要で、Brave はこれを作らないため、Brave でのインストールはこの機能のないショートカットになります。Brave *から*の共有は問題なく動きます。
 - インストール後は、ブラウザのフレームに入ったサイトではなく、本物のアプリのように動きます。スマートフォンではボトムタブバーが表示されます。ランチャーアイコンを長押しすると「新規応募」と「カンバン」のショートカットが出ます。`monochrome` アイコンにより、Android はロゴを暗くする代わりに色を付けられます。
 
-## 技術スタック
+## アーキテクチャ
+
+[ARCHITECTURE.md](ARCHITECTURE.md)（英語）は、各判断をファイルパス付きで解説します。状態機械と単一の遷移表、トランザクション境界と `409` の契約、監査ログから導くゴースト予測、祝日を考えたダイジェストのスケジューリング、バイリンガルカタログの構成、単一 Postgres 設計。各セクションは、選んだ理由と受け入れたトレードオフを述べます。[SPEC.md](SPEC.md) は完全な技術仕様で、コードとの同期を保つこのプロジェクトの唯一の情報源です。
 
 | レイヤー | コードが固定しているもの |
 |---|---|
@@ -36,6 +38,14 @@ https://github.com/user-attachments/assets/ecabba9e-b81d-40e6-9ab7-2a5911443c45
 | データベース | PostgreSQL 18。ローカルも本番も Docker |
 | デプロイ | Docker Compose + Cloudflare Tunnel、セルフホスト（`SPEC.md` § Deployment） |
 | テスト | RSpec（ユニット＋リクエストの2層）、Vitest（`web/` のユニット）、Playwright 1.60（E2E） |
+
+## テストと CI
+
+API のテストは2層です。ユニットスペック（`spec/lib`、`spec/services`）はデータベースなしで走ります。リクエストスペック（`spec/requests`）は実際の PostgreSQL に対して走ります。rswag がこれを使って OpenAPI 仕様も生成するため、ドキュメントとテストがずれることはありません。SimpleCov は行カバレッジ80%を下限とし、ブランチカバレッジも見ます。prosopite は N+1 クエリを検出したリクエストスペックを失敗させます。
+
+フロントエンドには Playwright のスモークスイート（[`web/e2e/`](web/e2e)）があります。応募の作成、ステータス遷移、履歴書の添付という主要な流れを、API とフロントエンドの両方を通して確認します。
+
+CI はパス検知型のワークフロー2本です。[`api.yml`](.github/workflows/api.yml) は RuboCop、Brakeman、bundler-audit、RSpec を実行します。[`web.yml`](.github/workflows/web.yml) は ESLint、i18n 整合性チェック、FSM コピー検査、`tsc`、Vitest のユニットテスト、本番ビルド、そして Playwright スイートを実行します。Playwright は、ジョブの中でシードした実際の Rails API に対して動きます。この README 冒頭のバッジが、両ワークフローの現在の状態を示します。
 
 ## ローカルで動かす
 
@@ -70,15 +80,3 @@ bundle exec rspec spec/requests            # 実 PostgreSQL に対するリク�
 npm run lint && npm run lint:i18n && npm run lint:fsm && npx tsc --noEmit && npm test
 npm run test:e2e                           # Playwright。Postgres の起動とシードが前提
 ```
-
-## テストと CI
-
-API のテストは2層です。ユニットスペック（`spec/lib`、`spec/services`）はデータベースなしで走ります。リクエストスペック（`spec/requests`）は実際の PostgreSQL に対して走ります。rswag がこれを使って OpenAPI 仕様も生成するため、ドキュメントとテストがずれることはありません。SimpleCov は行カバレッジ80%を下限とし、ブランチカバレッジも見ます。prosopite は N+1 クエリを検出したリクエストスペックを失敗させます。
-
-フロントエンドには Playwright のスモークスイート（[`web/e2e/`](web/e2e)）があります。応募の作成、ステータス遷移、履歴書の添付という主要な流れを、API とフロントエンドの両方を通して確認します。
-
-CI はパス検知型のワークフロー2本です。[`api.yml`](.github/workflows/api.yml) は RuboCop、Brakeman、bundler-audit、RSpec を実行します。[`web.yml`](.github/workflows/web.yml) は ESLint、i18n 整合性チェック、FSM コピー検査、`tsc`、Vitest のユニットテスト、本番ビルド、そして Playwright スイートを実行します。Playwright は、ジョブの中でシードした実際の Rails API に対して動きます。
-
-## アーキテクチャ
-
-[ARCHITECTURE.md](ARCHITECTURE.md)（英語）は、各判断をファイルパス付きで解説します。状態機械と単一の遷移表、トランザクション境界と `409` の契約、監査ログから導くゴースト予測、祝日を考えたダイジェストのスケジューリング、バイリンガルカタログの構成、単一 Postgres 設計。各セクションは、選んだ理由と受け入れたトレードオフを述べます。[SPEC.md](SPEC.md) は完全な技術仕様で、コードとの同期を保つこのプロジェクトの唯一の情報源です。
