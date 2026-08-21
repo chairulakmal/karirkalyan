@@ -64,6 +64,13 @@ services:
       # listening at all; without this the first boot burns the retries.
       start_period: 60s
     networks: [internal]
+    # Previously left uncapped on purpose: a hard cap on Postgres caps the page
+    # cache it depends on, making it slow rather than making it fail. Capped
+    # anyway (2026-08-21) to bring all four services under one uniform,
+    # host-enforced ceiling. If Postgres shows cache-pressure symptoms (slow
+    # queries with memory.current's `file`/`inactive_file` near zero), this
+    # tradeoff is the first thing to revisit; see SPEC.md § Deployment.
+    mem_limit: 1g
 
   api:
     build: ./api
@@ -95,9 +102,10 @@ services:
     # had evicted every page of cache to stay under the limit and re-entered
     # reclaim 92 times, so Rails was re-reading from disk on every miss. No
     # `oom_kill` and no restart, which is exactly why it stayed invisible.
-    # 768m restores headroom on a host with ~48 GiB free; the limit stays a
-    # limit so a leak still gets contained rather than eating the machine.
-    mem_limit: 768m
+    # Bumped again to 1g on the same 2026-08-21 pass, applied uniformly across
+    # all four services rather than tuned per-service; the limit stays a limit
+    # so a leak still gets contained rather than eating the machine.
+    mem_limit: 1g
 
   web:
     build: ./web
@@ -118,7 +126,7 @@ services:
       api:
         condition: service_healthy
     networks: [internal]
-    mem_limit: 512m
+    mem_limit: 1g
 
   cloudflared:
     # Pinned to the version already running on this host (`cloudflared --version`
@@ -138,6 +146,7 @@ services:
       api:
         condition: service_healthy
     networks: [internal]
+    mem_limit: 1g
 
 networks:
   internal:

@@ -1023,17 +1023,17 @@ The manifest declares a `share_target`: sharing a posting from any Android app s
 - **The health windows are sized for the slowest legitimate boot, not the typical one.** `api`'s `HEALTHCHECK` allows a **300 s start period**, probed every 5 s. `bin/docker-entrypoint` runs `db:prepare` to completion *before* Puma binds, so every probe fails until migrations finish, and both other services gate on `api`. Under the original 30 s window a first boot against an empty volume would have been marked unhealthy and started neither of the other two: a delay turned into an outage.
 - **`postgres`'s healthcheck authenticates rather than pings.** `POSTGRES_PASSWORD` is read only while initializing an *empty* data directory, so editing `DB_PASSWORD` against an existing volume leaves the old password authoritative while `api` rebuilds its credentials every boot, and `pg_isready` reports healthy either way. The check runs a real `psql SELECT 1` with the configured credentials over **`-h postgres`, not `127.0.0.1`**: initdb's generated `pg_hba` **trusts loopback**, so a loopback check passes with any password at all. Rotating is two ordered steps, `ALTER USER … PASSWORD` first, then the `.env` edit.
 
-**Memory limits.** Only the two app containers carry a `mem_limit`.
+**Memory limits.** All four containers carry a `mem_limit` of **1g**, set uniformly rather than tuned per-service.
 
 | Container | `mem_limit` | Observed |
 |---|---|---|
-| `api` | **768m** | Was 512m and pinned against it: `memory.current` 510 MiB, `anon` 493 MiB of unreclaimable Ruby heap, `file` and `inactive_file` both **zero**, `memory.events` `max` at 92. The kernel had evicted every cached page and re-entered reclaim 92 times, so Rails went back to disk on every miss. `oom_kill` 0, 0 restarts, which is why it went unnoticed from the cutover onward |
-| `web` | 512m | ~102 MiB |
-| `postgres` | none, deliberately | A hard cap on Postgres caps the page cache it depends on: that makes a database slow without making it fail |
-| `cloudflared` | none | ~28 MiB |
+| `api` | 1g | Was 512m and pinned against it (`memory.current` 510 MiB, `anon` 493 MiB of unreclaimable Ruby heap, `file`/`inactive_file` both **zero**, `memory.events` `max` at 92: the kernel had evicted every cached page and re-entered reclaim 92 times, so Rails went back to disk on every miss), then 768m, then raised to the current uniform 1g |
+| `web` | 1g | ~102 MiB observed under 512m; headroom raised with the rest |
+| `postgres` | 1g | Previously left uncapped deliberately, since a hard cap on Postgres caps the page cache it depends on, making the database slow rather than making it fail. Capped anyway to keep all four containers under one uniform, host-enforced ceiling; if Postgres shows cache-pressure symptoms (slow queries with `file`/`inactive_file` near zero in `memory.current`), that tradeoff is the first thing to revisit |
+| `cloudflared` | 1g | ~28 MiB observed; far under the limit, capped only for uniformity |
 
-- **A memory limit can be changed without recreating the container**: `docker update --memory 768m --memory-swap 1536m <container>`. The swap figure is not decoration, since Compose sets `MemorySwap` to twice `mem_limit` and passing only `--memory` leaves the live container disagreeing with what the next `bin/deploy` builds. `docker-compose.prod.yml` stays the source of truth.
-- **`memory.events` is cumulative and never resets**, so its `max` answers "has this ever happened", not "is this happening". The diagnostic is whether it climbs from a noted baseline, which was **98** at the time of the change.
+- **A memory limit can be changed without recreating the container**: `docker update --memory 1g --memory-swap 2g <container>`. The swap figure is not decoration, since Compose sets `MemorySwap` to twice `mem_limit` and passing only `--memory` leaves the live container disagreeing with what the next `bin/deploy` builds. `docker-compose.prod.yml` stays the source of truth.
+- **`memory.events` is cumulative and never resets**, so its `max` answers "has this ever happened", not "is this happening". The diagnostic is whether it climbs from a noted baseline, which was **98** at the api container's prior 768m sizing.
 
 **Environment variables**, split by which container needs them:
 
