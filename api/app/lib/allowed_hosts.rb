@@ -17,6 +17,15 @@ module AllowedHosts
   # subdomain on purpose: Cloudflare's default edge certificate covers the
   # apex plus one wildcard level only, so a two-level form like
   # api.kk.chairulakmal.com fails the TLS handshake (SPEC.md § Deployment).
+  #
+  # Trusting the bare "api" host is safe only because sanitize_regexp anchors
+  # it to an exact match (see the module comment above) *and* because nothing
+  # outside this container's own network can ever send a request with that
+  # Host header: cloudflared/config.yml's ingress only forwards the two named
+  # public hostnames to their services, never a catch-all into `api`. That
+  # ingress file is gitignored, so this guarantee lives outside this repo. A
+  # future ingress rule that forwards arbitrary hosts to `api` inherits this
+  # trust silently (SPEC.md § AllowedHosts).
   PATTERNS = [
     /kk-api\.chairulakmal\.com/i,
     /api/i

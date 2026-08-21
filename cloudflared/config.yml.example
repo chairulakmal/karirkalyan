@@ -5,6 +5,8 @@
 #   cloudflared tunnel login
 #   cloudflared tunnel create karirkalyan        # prints the tunnel ID below,
 #                                                 # writes ~/.cloudflared/<id>.json
+#   cp ~/.cloudflared/<id>.json ./cloudflared/    # see note below: the container
+#                                                 # never sees the home directory
 #   cloudflared tunnel route dns karirkalyan kk.chairulakmal.com
 #   cloudflared tunnel route dns karirkalyan kk-api.chairulakmal.com
 #   # Single-level on purpose: Cloudflare's default edge cert covers the apex
@@ -13,6 +15,11 @@
 # `route dns` creates the CNAME records automatically (pointing at
 # <tunnel-id>.cfargotunnel.com); no manual DNS edit is needed for either
 # hostname once this runs.
+#
+# The `cp` step above is required, not optional: `docker-compose.prod.yml`
+# bind-mounts ./cloudflared at /etc/cloudflared, so credentials-file: below
+# resolves inside the container against this directory, not against
+# ~/.cloudflared where `tunnel create` actually wrote the file.
 
 tunnel: <TUNNEL-ID>
 credentials-file: /etc/cloudflared/<TUNNEL-ID>.json

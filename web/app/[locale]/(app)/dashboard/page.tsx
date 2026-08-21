@@ -47,13 +47,11 @@ export default async function Dashboard({
     apiFetch<DashboardStats>("/dashboard"),
     apiFetch<TransitionTable>("/transitions"),
   ]);
-  // `ok` does not imply a populated `data` (apiFetch returns `null as T` for a
-  // 204 or a non-JSON 200), and a 200 does not imply *this* payload: web and api
-  // are separate containers restarted independently by `bin/deploy`, so during a
-  // restart window /transitions can
-  // answer from the release before active_states existed. Missing reads as
-  // absent, which is already the failure path (it drops the default to
-  // unfiltered below).
+  // `ok` does not imply a populated `data`: apiFetch returns `null` for a 204
+  // or a non-JSON 200. It is not a deploy guard: web gates on api: condition:
+  // service_healthy, and an api that is genuinely unreachable throws out of
+  // apiFetch rather than answering `ok`. Missing reads as absent, which is
+  // already the failure path (it drops the default to unfiltered below).
   const activeStates = tableRes.ok ? (tableRes.data?.active_states ?? []) : [];
   const states = tableRes.ok ? (tableRes.data?.states ?? []) : [];
   const byStatus: Partial<Record<Status, number>> = statsRes.ok ? (statsRes.data?.by_status ?? {}) : {};

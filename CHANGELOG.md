@@ -23,6 +23,7 @@ On `main` and deployed, carrying no version number. Deploys are manual since 202
 - **Fixed:** ghost risk counted calendar days, so holidays read as silence.
 - **Fixed:** a residents-only posting was recorded as "No sponsorship".
 - **Chore:** non-major dependency updates, and Dependabot actually turned off.
+- **Fixed:** the four self-hosting review findings.
 
 By the mechanical test, only dashboard pins and the screening success rate would have forced a **minor**; the rest are patches.
 

@@ -121,7 +121,13 @@ services:
     mem_limit: 512m
 
   cloudflared:
-    image: cloudflare/cloudflared:latest
+    # Pinned to the version already running on this host (`cloudflared --version`
+    # inside the container, checked 2026-08-21), the same real-tag convention
+    # postgres:18 uses above. `:latest` meant a redeploy after a `docker system
+    # prune`, disk pressure, or new hardware would silently pull an unreviewed
+    # release with no changelog read and no version to roll back to. Bump this
+    # deliberately, not by re-adding `:latest`.
+    image: cloudflare/cloudflared:2026.8.2
     restart: unless-stopped
     command: tunnel --config /etc/cloudflared/config.yml run
     volumes:
