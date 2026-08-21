@@ -32,7 +32,7 @@ RSpec.describe "Rack::Attack throttling", type: :request, skip_n_plus_one: true 
     # the former, so a client could hand us a fresh identity per request and rotate
     # through the limit. The Cloudflare Tunnel this app now sits behind closes that
     # path structurally, but rack_attack.rb still pins forwarded_priority to
-    # [:x_forwarded] as defense-in-depth (SPEC.md § Production lessons); this is
+    # [:x_forwarded] as defense-in-depth (notes/HISTORY.md § Production lessons); this is
     # the proof it holds regardless of which proxy fronts the app.
     it "ignores a spoofed Forwarded header when identifying the client" do
       5.times do |i|

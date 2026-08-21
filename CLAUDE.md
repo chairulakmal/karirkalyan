@@ -6,7 +6,7 @@ Full-stack job application tracker. Rails 8 API (`api/`) + Next.js 16 frontend (
 
 ## SPEC.md is the source of truth
 
-**All technical truth lives in [`SPEC.md`](SPEC.md)**: stack, data model, state machine, service layer, API contract, background jobs, security, i18n, testing, deployment, local dev, and the reasoning behind every decision. This file deliberately restates none of it. An earlier version of this file duplicated the stack, key conventions, and API routes, and drifted a full release behind the code: the same failure mode that killed `PLAN.md`, which spent an entire release describing Sidekiq and Redis after both had been removed.
+**All technical truth lives in [`SPEC.md`](SPEC.md)**: stack, data model, state machine, service layer, API contract, background jobs, security, i18n, testing, deployment, local dev, and versioning. It is a reference, not an essay; the reasoning behind each decision, the reversals, and the detailed release history live in [`notes/HISTORY.md`](notes/HISTORY.md), which is where an argument goes when it is too long for the spec. This file deliberately restates neither. An earlier version of this file duplicated the stack, key conventions, and API routes, and drifted a full release behind the code: the same failure mode that killed `PLAN.md`, which spent an entire release describing Sidekiq and Redis after both had been removed.
 
 **Read `SPEC.md` and `TODO.md` before starting work.**
 
@@ -19,16 +19,18 @@ The workflow is spec-first. **Change SPEC.md before you change code**:
 Consequences:
 
 - **If code and `SPEC.md` disagree, one of them is a bug.** Decide which, and fix that one. Never silently paper over the gap.
-- `SPEC.md` describes the system **as it is**, present tense. It is not a plan and not a history.
+- `SPEC.md` describes the system **as it is**, present tense. It is not a plan and not a history: `TODO.md` is the plan, `notes/HISTORY.md` is the history.
 - Behaviour-changing PRs update `SPEC.md` in the same PR (the PR template has a checkbox), and bump its "Last synced against the code" line.
 
 ## Where things live
 
 | Question | Answer lives in |
 | --- | --- |
-| How does X work, and why was it built that way? | `SPEC.md` |
+| How does X work? | `SPEC.md`, a reference: contracts, schemas, tables, invariants |
+| Why was it built that way, and what was tried first? | `notes/HISTORY.md` (decisions log, reversals, detailed release history, production lessons) |
 | Current release, what's next, open work | `TODO.md` (release status at the top) |
-| What shipped, and when | `CHANGELOG.md` (includes the pre-1.0.0 build phases) |
+| What shipped, and when | `CHANGELOG.md`, an index; each heading links to its full entry in `notes/HISTORY.md` |
+| How do I destroy an account or reset the demo? | `notes/OPS.md` (operator runbook) |
 | Local dev setup | `SPEC.md` § Local development |
 | Where the brand book lives, and the pending type change | `BRAND.md` |
 | What earns a major / minor / patch | `SPEC.md` § Versioning & releases |

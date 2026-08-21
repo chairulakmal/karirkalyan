@@ -3,7 +3,7 @@ import type { User } from "@/app/lib/types";
 
 /**
  * Who you are, and what you can take with you — one card, because they are one
- * thought. See SPEC.md § Exports → The download surface.
+ * thought. See SPEC.md § Exports.
  *
  * Takes the user as a prop and does not fetch one: /dashboard's payload already
  * carries it, which is why that page issues no second /me request. A component

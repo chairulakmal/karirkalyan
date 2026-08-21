@@ -38,7 +38,7 @@ https://github.com/user-attachments/assets/ecabba9e-b81d-40e6-9ab7-2a5911443c45
 | API | Rails 8.1（API-only）、Ruby 3.4.9、Devise + devise-jwt |
 | フロントエンド | Next.js 16.2、React 19.2、TypeScript 5、Tailwind CSS、next-intl |
 | データベース | PostgreSQL 18。ローカルも本番も Docker |
-| デプロイ | Docker Compose + Cloudflare Tunnel、セルフホスト（`SPEC.md` § Deployment） |
+| デプロイ | Docker Compose + Cloudflare Tunnel、著者自身のマシンでセルフホスト（`SPEC.md` § Deployment） |
 | テスト | RSpec（ユニット＋リクエストの2層）、Vitest（`web/` のユニット）、Playwright 1.60（E2E） |
 
 ## ローカルで動かす

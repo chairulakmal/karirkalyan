@@ -38,7 +38,7 @@ https://github.com/user-attachments/assets/862ca199-95e5-4e27-b9ef-ada7eb10a350
 | API | Rails 8.1 (API-only), Ruby 3.4.9, Devise + devise-jwt |
 | Frontend | Next.js 16.2, React 19.2, TypeScript 5, Tailwind CSS, next-intl |
 | Database | PostgreSQL 18 in Docker, both locally and in production |
-| Deployment | Docker Compose + Cloudflare Tunnel, self-hosted (`SPEC.md` § Deployment) |
+| Deployment | Docker Compose + Cloudflare Tunnel, self-hosted on the author's own machine (`SPEC.md` § Deployment) |
 | Tests | RSpec (unit and request tiers), Vitest (`web/` units), Playwright 1.60 end to end |
 
 ## Running locally

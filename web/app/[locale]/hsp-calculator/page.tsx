@@ -40,7 +40,7 @@ export async function generateMetadata({
  * session), so the header offers no "Sign in" link. It serves strangers, not the
  * app's one loyal user: the trade is portfolio/SEO value, and its numbers ride
  * the same annual visa-research pass as the in-app residence guidance
- * (SPEC.md § HSP calculator).
+ * (SPEC.md § Public pages).
  */
 export default async function HspCalculatorPage({
   params,
