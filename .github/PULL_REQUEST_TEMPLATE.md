@@ -15,5 +15,5 @@
 - [ ] Tests added or updated
 - [ ] `bundle exec rspec` passes locally (api changes)
 - [ ] `npm run lint && npm run lint:i18n && npm run lint:fsm && npx tsc --noEmit && npm test` passes locally (web changes)
-- [ ] `SPEC.md` updated **first** if behaviour changed: it is the technical source of truth
-- [ ] Other docs updated if behaviour changed (README, README.ja, swagger)
+- [ ] `SPEC.md` updated **first** if behavior changed: it is the technical source of truth
+- [ ] Other docs updated if behavior changed (README, README.ja, swagger)

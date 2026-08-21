@@ -71,7 +71,7 @@ Two predictions this file made about the work turned out wrong, and are correcte
 **Closed in v1.2.** The brand book used to be missing five things that ship in `web/`. All are now upstream:
 
 - `icon-maskable-512.png`, `icon-monochrome-512.png` and `icon-monogram-96.png`, each with a "Platform variants" card explaining what it is for. The monochrome file verifies as 512×512 RGBA with a real alpha channel, which is what `purpose: monochrome` requires.
-- `--kk-saffron-ink`, `--kk-danger` and `--kk-rule-strong`, carried into `tokens.css`, `tokens.json`, the README and the palette grid, each with its contrast measurement and an "Accessibility, do not remove" note. Dune is now labelled decorative-only everywhere.
+- `--kk-saffron-ink`, `--kk-danger` and `--kk-rule-strong`, carried into `tokens.css`, `tokens.json`, the README and the palette grid, each with its contrast measurement and an "Accessibility, do not remove" note. Dune is now labeled decorative-only everywhere.
 
 The palette is 12 tokens. `--kk-rule-strong` had never had a brand-book home at all, so this is the first time the shipped palette and the brand book agree.
 

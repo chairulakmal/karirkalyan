@@ -1,6 +1,6 @@
 # KarirKalyan: Next.js Frontend
 
-The operational README for `web/`, KarirKalyan's Next.js 16 App Router frontend: how it authenticates, routes, and runs locally. The most important rule in it: the JWT never reaches client JavaScript: sign-in exchanges the token through a route handler that sets an `httpOnly` cookie, which is one reason Next.js was chosen over a pure SPA. Contents: the stack, the auth design, i18n and its CI-enforced catalog parity, the screens, local setup, the Vitest unit suite, and the Playwright end-to-end suite. How the system works and why lives in [`SPEC.md`](../SPEC.md); this file is what you type.
+The operational README for `web/`, KarirKalyan's Next.js 16 App Router frontend: how it authenticates, routes, and runs locally. The most important rule in it: the JWT never reaches client JavaScript. Sign-in exchanges the token through a route handler that sets an `httpOnly` cookie. That is one reason Next.js was chosen over a pure SPA. Contents: the stack, the auth design, i18n and its CI-enforced catalog parity, the screens, local setup, the Vitest unit suite, and the Playwright end-to-end suite. How the system works, and why, lives in [`SPEC.md`](../SPEC.md). This file is the commands you type.
 
 ## Stack
 
@@ -19,7 +19,7 @@ This pattern requires a server component: it's one reason Next.js was chosen ove
 
 Every page lives under a `[locale]` segment: `en` and `ja` (`i18n/routing.ts`, messages in `messages/en.json` and `messages/ja.json`). Import `Link`, `redirect`, `useRouter` and friends from **`i18n/navigation.ts`**, never from `next/link` / `next/navigation` directly: the wrapped versions carry the active locale through, the originals silently drop it.
 
-**The two catalogs move together, and CI checks it.** `npm run lint:i18n` (`scripts/check-i18n-parity.mjs`) diffs their paths and fails on any path present in one and missing from the other, or whose value type differs. It runs in the web CI job ahead of the build, because a missing `ja` key builds clean: nothing about it is a type error. `i18n/request.ts` loads one catalog and sets no fallback locale, so there is no English to fall back to: next-intl renders the key path itself (`dashboard.yourData`) and console.errors into a server log nobody reads. Run it before pushing a copy change.
+**The two catalogs move together, and CI checks it.** `npm run lint:i18n` (`scripts/check-i18n-parity.mjs`) diffs their paths and fails on any path present in one and missing from the other, or whose value type differs. It runs in the web CI job ahead of the build, because a missing `ja` key builds clean: nothing about it is a type error. `i18n/request.ts` loads one catalog and sets no fallback locale, so there is no English to use instead. next-intl renders the key path itself (`dashboard.yourData`) and writes a `console.error` into a server log nobody reads. Run it before pushing a copy change.
 
 ## Screens
 
@@ -42,7 +42,7 @@ Every page lives under a `[locale]` segment: `en` and `ja` (`i18n/routing.ts`, m
 
 **Prerequisites:** Node 24 (matches production)
 
-Node 24 lives in three places, not one, since the move off Railway (`SPEC.md` § Local development): `.nvmrc`, which `actions/setup-node` reads via `node-version-file`; `package.json`'s `engines.node`, a holdover from when Railpack consulted that field first; and `web/Dockerfile`'s `ARG NODE_VERSION` default, since that Dockerfile is what builds the production image now. Nothing wires the three together, so a version bump needs all of them edited by hand; a CI runtime that differs from production's is how the `npm ci` lockfile divergence bit twice.
+Since the move off Railway, Node 24 lives in three places, not one (`SPEC.md` § Local development). `actions/setup-node` reads `.nvmrc` through `node-version-file`. `package.json`'s `engines.node` restates it, a holdover from when Railpack consulted that field first. `web/Dockerfile`'s `ARG NODE_VERSION` default restates it again, because that Dockerfile builds the production image now. Nothing connects the three, so a version change needs all of them edited by hand. A CI runtime that differs from production's is how the `npm ci` lockfile divergence broke the build twice.
 
 ```bash
 npm install
@@ -76,7 +76,7 @@ npm run test:e2e:ui         # interactive UI mode for debugging
 
 Playwright auto-starts the Rails API (`:3001`) and Next.js (`:3000`) via its `webServer` config; if they're already running, it reuses them.
 
-**The suite signs in once, not once per test.** The `setup` project (`e2e/auth.setup.ts`) signs in as the seeded `e2e` account and hands its session to every other project through Playwright's `storageState`, so the specs open already authenticated. Tests used to register a throwaway account each; that is the affordance v1.4.1 removed, and it is not the only reason: Rack::Attack is live outside the test environment and the suite drives the *development* server, where sign-in is throttled at 5/min per IP. A suite that signed in per test would walk into that ceiling as it grew.
+**The suite signs in once, not once per test.** The `setup` project (`e2e/auth.setup.ts`) signs in as the seeded `e2e` account and hands its session to every other project through Playwright's `storageState`, so the specs open already authenticated. Each test used to register a throwaway account. `v1.4.1` removed that ability, and throttling is the other reason for the change: Rack::Attack is live outside the test environment, and the suite drives the *development* server, where sign-in is throttled at 5 per minute per IP. A suite that signed in once per test would reach that limit as it grew.
 
 Two consequences worth knowing before adding a test:
 

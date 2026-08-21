@@ -10,7 +10,7 @@
 
 https://github.com/user-attachments/assets/ecabba9e-b81d-40e6-9ab7-2a5911443c45
 
-*38秒のデモ：カードを別のカラムへドラッグする。タイムラインに遷移が記録される。返信が止まった応募にゴースト予測のフラグが付く。*
+*38秒のデモ：カードを別のカラムへドラッグする。タイムラインに遷移が記録される。返信が止まった応募に音信不通リスクのフラグが付く。*
 
 <!-- SCREENSHOT: kanban board at /ja/board, Japanese locale, demo account data. Embed here once captured. -->
 
@@ -18,18 +18,18 @@ https://github.com/user-attachments/assets/ecabba9e-b81d-40e6-9ab7-2a5911443c45
 
 ## ハイライト
 
-- すべての書き込みは `lock_version` を持ちます。同時編集は上書きされず `409 Conflict` になり、ボードは差し戻されたドラッグを元に戻して再読み込みを求めます。詳細：[ARCHITECTURE.md § The state machine](ARCHITECTURE.md#the-state-machine-is-a-plain-ruby-module)（英語）、[§ The write path of a transition](ARCHITECTURE.md#the-write-path-of-a-transition)（英語）。
-- ゴースト予測は、返信が止まった応募にフラグを立てます。応募後は営業日15日、一次面接後は10日が目安です。土日と日本の祝日は日数に含めません。詳細：[ARCHITECTURE.md § Ghost prediction](ARCHITECTURE.md#ghost-prediction-is-derived-not-stored)（英語）。
-- フォローアップのデイリーダイジェストは JST 8:15 に届きます。週末と日本の祝日（年末年始、ゴールデンウィーク、お盆）はスキップし、スキップした日は翌営業日に1回だけ送ります。`/settings` で通知を有効にすると、同じダイジェストがプッシュ通知としても届き、失敗時は自動で再送します。詳細：[ARCHITECTURE.md § Digest scheduling](ARCHITECTURE.md#digest-scheduling-defers-never-drops)（英語）。
-- アプリは英語と日本語のバイリンガルです。CI が2つの言語カタログの一致と、状態機械が1ファイルにまとまっていることを確認します（`lint:i18n`、`lint:fsm`）。日本語のテキストは単語の途中ではなく文節の区切りで改行します。対応ブラウザでは `word-break: auto-phrase` を使い、それ以外では見出しに [BudouX](https://github.com/google/budoux) を使います。詳細：[ARCHITECTURE.md § i18n parity](ARCHITECTURE.md#i18n-parity-is-a-ci-check-not-a-convention)（英語）。
-- PostgreSQL 1つでバックグラウンドジョブ、キャッシュ、アップロードした PDF をすべて処理します。Redis もオブジェクトストレージも別のワーカーサービスも使いません。トレードオフ：[ARCHITECTURE.md § One PostgreSQL instance](ARCHITECTURE.md#one-postgresql-instance-no-redis)（英語）。
+- すべての書き込みは `lock_version` を持ちます。同時編集は上書きされず `409 Conflict` になり、ボードは差し戻されたドラッグを元に戻して再読み込みを求めます。詳細：[ARCHITECTURE.md § The state machine](ARCHITECTURE.md#the-state-machine-is-a-plain-ruby-module)（英語）、[§ How a status change is written](ARCHITECTURE.md#how-a-status-change-is-written-to-the-database)（英語）。
+- 音信不通リスクは、返信が止まった応募にフラグを立てます。応募後は営業日15日、一次面接後は10日が目安です。土日と日本の祝日は日数に含めません。詳細：[ARCHITECTURE.md § Ghost risk](ARCHITECTURE.md#ghost-risk-is-calculated-not-stored)（英語）。
+- フォローアップのデイリーダイジェストは JST 8:15 に届きます。週末と日本の祝日（年末年始、ゴールデンウィーク、お盆）はスキップし、スキップした日は翌営業日に1回だけ送ります。`/settings` で通知を有効にすると、同じダイジェストがプッシュ通知としても届き、失敗時は自動で再送します。詳細：[ARCHITECTURE.md § The reminder email](ARCHITECTURE.md#the-reminder-email-delays-messages-but-never-loses-them)（英語）。
+- アプリは英語と日本語のバイリンガルです。CI が2つの言語カタログの一致と、状態機械が1ファイルにまとまっていることを確認します（`lint:i18n`、`lint:fsm`）。日本語のテキストは単語の途中ではなく文節の区切りで改行します。CSS の `word-break: auto-phrase` と、見出しに対するサーバーサイドの [BudouX](https://github.com/google/budoux) の2層で実現しています。詳細：[ARCHITECTURE.md § Checking that English and Japanese text match](ARCHITECTURE.md#checking-that-english-and-japanese-text-match-is-automatic)（英語）。
+- PostgreSQL 1つでバックグラウンドジョブ、キャッシュ、アップロードした PDF をすべて処理します。Redis もオブジェクトストレージも別のワーカーサービスも使いません。トレードオフ：[ARCHITECTURE.md § One PostgreSQL database](ARCHITECTURE.md#one-postgresql-database-for-the-whole-app)（英語）。
 - サインインはパスキーにも対応します。WebAuthn を Devise に直接組み込んでおり（`webauthn` gem）、デスクトップで作ったパスキーは Proton Pass のようなパスワードマネージャーを通じてスマートフォンに同期します。パスワードフォームはフォールバックとして残り、パスキーの登録は `/settings` から行います。詳細：[ARCHITECTURE.md § The JWT never reaches the browser](ARCHITECTURE.md#the-jwt-never-reaches-the-browser)（英語）。
 - Android にインストールすると、アプリは共有ターゲットになります。任意のアプリ（LinkedIn、ブラウザのタブ、リクルーターのメール）から求人票を共有すると、AI プレフィルが読み込み中の新規応募フォームが開きます。リンクがない共有は貼り付けボックスに入ります。インストールは **Chrome** から行ってください。共有メニューには WebAPK が必要で、Brave はこれを作らないため、Brave でのインストールはこの機能のないショートカットになります。Brave *から*の共有は問題なく動きます。
 - インストール後は、ブラウザのフレームに入ったサイトではなく、本物のアプリのように動きます。スマートフォンではボトムタブバーが表示されます。ランチャーアイコンを長押しすると「新規応募」と「カンバン」のショートカットが出ます。`monochrome` アイコンにより、Android はロゴを暗くする代わりに色を付けられます。
 
 ## アーキテクチャ
 
-[ARCHITECTURE.md](ARCHITECTURE.md)（英語）は、各判断をファイルパス付きで解説します。状態機械と単一の遷移表、トランザクション境界と `409` の契約、監査ログから導くゴースト予測、祝日を考えたダイジェストのスケジューリング、バイリンガルカタログの構成、単一 Postgres 設計。各セクションは、選んだ理由と受け入れたトレードオフを述べます。[SPEC.md](SPEC.md) は完全な技術仕様で、コードとの同期を保つこのプロジェクトの唯一の情報源です。
+[ARCHITECTURE.md](ARCHITECTURE.md)（英語）は、各判断をファイルパス付きで解説します。状態機械と単一の遷移表、トランザクション境界と `409` の契約、監査ログから導く音信不通リスク、祝日を考えたダイジェストのスケジューリング、バイリンガルカタログの構成、単一 Postgres 設計。各セクションは、選んだ理由と受け入れたトレードオフを述べます。[SPEC.md](SPEC.md) は完全な技術仕様で、コードとの同期を保つこのプロジェクトの唯一の情報源です。
 
 | レイヤー | コードが固定しているもの |
 |---|---|

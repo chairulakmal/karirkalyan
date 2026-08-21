@@ -27,7 +27,7 @@ Last synced against the code: **2026-08-21**.
 - [Testing strategy](#testing-strategy)
 - [Deployment (Docker + Cloudflare Tunnel)](#deployment-docker--cloudflare-tunnel) · [Network exposure](#network-exposure-audited-2026-08-20) · [Backups](#backups)
 - [Local development](#local-development)
-- [Versioning & releases](#versioning--releases)
+- [Versioning & releases](#versioning--releases) · [The version number lives in the git tag](#the-version-number-lives-in-exactly-one-place-the-git-tag)
 - [What this project is demonstrating](#what-this-project-is-demonstrating)
 
 Not here, by design: the **decisions log** (including reversals) and the **production lessons** are in [`notes/HISTORY.md`](notes/HISTORY.md); the operator runbook is in [`notes/OPS.md`](notes/OPS.md).
@@ -86,7 +86,7 @@ namespace :api do
 
 ### Data model
 
-> **At a glance** · Six tables. `users` (Devise auth, `jti` for JWT revocation), `credentials` (WebAuthn passkeys: one row per enrolled authenticator), `push_subscriptions` (Web Push: one row per subscribed browser), `agencies` (recruitment agencies, a per-user vocabulary the recruiter channel resolves names into), `applications` (the core FSM entity: `status`, plus `resume`/`cover_letter` as `bytea` and the Japan-market columns), and `timeline_entries` (append-only audit log, one row per status change).
+> **At a glance** · Six tables. `users` holds Devise auth and the `jti` used for JWT revocation. `credentials` holds WebAuthn passkeys, one row per enrolled authenticator. `push_subscriptions` holds Web Push registrations, one row per subscribed browser. `agencies` holds recruitment agencies, a per-user vocabulary the recruiter channel resolves names into. `applications` is the core FSM entity: `status`, plus `resume`/`cover_letter` as `bytea`, plus the Japan-market columns. `timeline_entries` is an append-only audit log, one row per status change.
 
 #### `users`
 
@@ -267,11 +267,11 @@ ApplicationFSM::ACTIVE_STATES                # the 7 still in play: VALID_STATES
                                              #   TERMINAL_STATES, rejected, ghosted, withdrawn
 ```
 
-`valid_next_states` is serialised by `show` and `transition` only, **not by `index`**. A board gets the whole effective table in one request from `GET /api/v1/transitions`.
+`valid_next_states` is serialized by `show` and `transition` only, **not by `index`**. A board gets the whole effective table in one request from `GET /api/v1/transitions`.
 
 ### Service layer
 
-> **At a glance** · Writes go through explicit service objects, never model callbacks. `TransitionService` is the only path for a status change (FSM check + timeline row in one transaction). Also here: `UrlPrefillService` (AI pre-fill over an SSRF-guarded fetch), `Demo::ResetService`, and the two `Exports::*` artefact builders.
+> **At a glance** · Writes go through explicit service objects, never model callbacks. `TransitionService` is the only path for a status change (FSM check + timeline row in one transaction). Also here: `UrlPrefillService` (AI pre-fill over an SSRF-guarded fetch), `TalkingPointsService`, `Demo::ResetService`, and the three `Exports::*` builders.
 
 #### `Applications::TransitionService`
 
@@ -311,7 +311,7 @@ Failure taxonomy, and what the UI does with it: `prefill_blocked` and `prefill_f
 
 #### `Applications::TalkingPointsService`
 
-`POST /api/v1/applications/:id/talking_points` → `{ points: [...] }`. Reuses the same gem, model and typed-output pipeline as `UrlPrefillService`, and adds the one new thing: it reads **both** documents at once, the resume as a base64 PDF document content block and the posting text beside it (`posting_snapshot` when captured, else `notes`).
+`POST /api/v1/applications/:id/talking_points` → `{ points: [...] }`. It reuses the same gem, model and typed-output pipeline as `UrlPrefillService`. It adds one new thing: it reads **both** documents at once. The resume goes in as a base64 PDF document content block, and the posting text goes beside it (`posting_snapshot` when captured, else `notes`).
 
 - **Bullets, not a draft, by decision.** It extracts match points and stops; the user writes the letter.
 - **Nothing is persisted.** Points are generated on demand.
@@ -321,7 +321,7 @@ Failure taxonomy, and what the UI does with it: `prefill_blocked` and `prefill_f
 
 Wipes the shared demo account back to a clean seed. Invoked hourly by `DemoResetJob`, scoped to the demo user only.
 
-- **Nothing in `db/seeds.rb` carries a calendar date.** Dates are anchored to the run at a pinned hour in app time, and placed on both sides of the 7-day agenda window: a follow-up two days overdue, an interview in two days, an offer deadline in three, a wishlist reminder twelve days out, and the demo user's residence expiry 80 days out. A fixed-date fixture seeds cleanly and then shows a visitor two empty panels a month later.
+- **Nothing in `db/seeds.rb` carries a calendar date.** Dates are anchored to the run at a pinned hour in app time. They are placed on both sides of the 7-day agenda window: a follow-up two days overdue, an interview in two days, an offer deadline in three days, a wishlist reminder in twelve days, and the demo user's residence expiry in 80 days. A fixed-date fixture seeds cleanly, and then shows a visitor two empty panels a month later.
 - `follow_up_at` and `interview_at` are rewritten on **every** run, not only the creating run; a reset destroys the account first.
 - `reset_service_spec.rb` asserts the property (both sections populated), never the dates.
 - That overdue follow-up is why `FollowUpReminderJob` skips this account outright.
@@ -332,14 +332,14 @@ Signature: `new(user).call` → a `String` of bytes ready for `send_data`; each 
 
 - **`ApplicationsCsv` quotes every field (`force_quotes: true`)** and prefixes any cell opening with `=`, `+`, `-`, or `@` with a single quote. This is a file we hand a user and expect them to open in Excel, so the [OWASP CSV-injection](https://owasp.org/www-community/attacks/CSV_Injection) escape is not optional. Blobs are excluded, replaced by `has_resume` / `has_cover_letter` booleans.
 - **`AccountArchive`** builds the zip described under § API contract → Exports, and is one of exactly two places that re-merge `posting_snapshot`.
-- **`InterviewCalendar`** hand-writes an RFC 5545 VEVENT, folded on **octet** boundaries (a fold landing mid-multibyte-character is malformed, and `company`/`role` are routinely Japanese). Its `escape` collapses `\r\n`, a bare `\n`, **and a bare `\r`** to the escaped literal: nothing validates the format of `company`/`role`/`url`, so a planted lone CR would otherwise reach the file raw and a lenient parser would read what followed as real calendar properties.
-- The two are deliberately **not** given a common `Export` base class to share one `includes`: inheritance used as a hiding place.
+- **`InterviewCalendar`** hand-writes an RFC 5545 VEVENT, folded on **octet** boundaries (a fold landing mid-multibyte-character is malformed, and `company`/`role` are routinely Japanese). Its `escape` collapses `\r\n`, a bare `\n`, **and a bare `\r`** to the escaped literal. Nothing validates the format of `company`/`role`/`url`. Without that third case a planted lone CR would reach the file raw, and a lenient parser would read the text after it as real calendar properties.
+- `ApplicationsCsv` and `AccountArchive` are deliberately **not** given a common `Export` base class to share one `includes`: inheritance used as a hiding place.
 
 #### `AllowedHosts`: `app/lib/allowed_hosts.rb`
 
 **The patterns here are deliberately un-anchored.** `HostAuthorization::Permissions#sanitize_regexp` wraps every pattern as `/\A#{pattern}(:\d+)?\z/`. Adding your own `\z` makes that port group unmatchable and 403s every internal `web → api` call. This took production down once (`v1.0.1`): **verify a framework's own normalization before "hardening" a pattern it owns.**
 
-**Trusting the bare `api` host depends on a file this repo does not track.** Rails' anchoring makes `api` an exact-match host, not a rebinding hole, but that pattern exists at all only to let `web`'s internal calls through, and it stays safe only because `cloudflared/config.yml` (gitignored) never routes an external request to `api` except by its one named public hostname. A future ingress rule that forwards a different or catch-all hostname to `api` would inherit that trust silently, since nothing in `AllowedHosts` itself would notice.
+**Trusting the bare `api` host depends on a file this repo does not track.** Rails' anchoring makes `api` an exact-match host, not a rebinding hole. That pattern exists only to let `web`'s internal calls through, and it stays safe only because `cloudflared/config.yml` (gitignored) never routes an external request to `api` except by its one named public hostname. A future ingress rule that forwards a different or catch-all hostname to `api` would inherit that trust silently, since nothing in `AllowedHosts` itself would notice.
 
 #### `JobBoard`: `app/lib/job_board.rb`
 
@@ -370,7 +370,7 @@ Signature: `new(user:, status:, company:, source:, japanese_level:, q:, after:, 
 
 Signature: `new(user:).call`. Answers one question: **which applications has the user probably been ghosted on?**
 
-> **At a glance** · It dates each in-flight application from the last `timeline_entries` row that moved it (falling back to `applied_at`, then `created_at`), counts how many **business days** of silence have passed since, and flags anything in a monitored stage (`applied`, `phone_screen`) past that stage's fixed threshold. No new column, no new table: the audit log already holds everything it needs.
+> **At a glance** · It dates each in-flight application from the last `timeline_entries` row that moved it, falling back to `applied_at`, then to `created_at`. It counts how many **business days** of silence have passed since that date. It flags anything in a monitored stage (`applied`, `phone_screen`) past that stage's fixed threshold. No new column, no new table: the audit log already holds everything it needs.
 
 Stage entry moment, in SQL. Matching `to_status` would be wrong: creation writes no timeline entry, so an application added directly as `applied` has no row to anchor on.
 
@@ -498,7 +498,7 @@ GET    /api-docs/v1/swagger.yaml                  generated from request specs
 
 #### The ownership check: `GET /api/v1/applications/ownership_check`
 
-Candidate **ownership**: the first agency to submit you to a company owns that candidacy for roughly 12 to 18 months, and the placement fee follows the owner however you later reach that company, so a second submission is damaging rather than merely wasteful.
+Candidate **ownership**: the first agency to submit you to a company owns that candidacy for roughly 12 to 18 months. The placement fee follows the owner however you later reach that company. A second submission is therefore damaging, not merely wasteful.
 
 ```
 GET /api/v1/applications/ownership_check?company=Mercari
@@ -544,9 +544,9 @@ GET /api/v1/applications/ownership_check?company=Mercari
 - **`facets` is a `[company, board, status, japanese_level]` tuple** (widened in `v1.10.0`), one per row. The client computes **disjunctive faceting** across all four filters: each facet's counts reflect the *other* active filters, never its own selection.
 - **`user` is the former `GET /api/v1/me` payload, folded in.** `/me` still exists; `web/` no longer calls it.
 - **`upcoming` is the Upcoming agenda** (`v1.11.0`): follow-ups and future interviews across `ACTIVE_STATES`, plus `residence_expires_on` when within `AGENDA_RESIDENCE_WINDOW_DAYS` (90). Each item carries a `type` (`follow_up` / `interview` / `residence`); the list is chronological and capped at `AGENDA_LIMIT` (8).
-- **Stat cards ride the same payload**: `response_rate`, `screening_success_rate`, `ghost_rate` and `avg_days_in_stage`. All three rates read `timeline_entries`, so a later revival does not erase that a reply happened, and **both rates take their denominator from `applied_at`, not from the current status** (status is a pointer that keeps moving; archiving a `wishlist` row would otherwise change the denominator).
+- **Stat cards ride the same payload**: `response_rate`, `screening_success_rate`, `ghost_rate` and `avg_days_in_stage`. All three rates read `timeline_entries`, so a later revival does not erase that a reply happened. **Both rates take their denominator from `applied_at`, not from the current status.** Status is a pointer that keeps moving, so archiving a `wishlist` row would otherwise change the denominator.
 - **`screening_success_rate` is `response_rate` without the rejections**, counting the whole advanced set (`phone_screen`, `technical`, `final_round`, `offer`) because a company may skip the phone screen. The gap between the two rates is the point.
-- **`avg_days_to_offer` scopes the user *inside* its derived table.** It reads the offer moment from `timeline_entries` (not `updated_at`, which drifts on any edit) via a `DISTINCT ON` subquery for the first offer per application, and Postgres cannot push an outer `user_id` filter through `DISTINCT ON`.
+- **`avg_days_to_offer` scopes the user *inside* its derived table.** It reads the offer moment from `timeline_entries`, not from `updated_at`, which drifts on any edit. A `DISTINCT ON` subquery finds the first offer per application, and Postgres cannot push an outer `user_id` filter through `DISTINCT ON`.
 
 **Caching.** The aggregation is memoized in Solid Cache under a self-expiring key: user id, application count, `MAX(updated_at)`, `STATS_CACHE_VERSION` (currently **8**), and `Date.current`.
 
@@ -574,10 +574,10 @@ GET /api/v1/applications/ownership_check?company=Mercari
 | It is for | reading the data somewhere else | **getting the data back** |
 
 - The CSV's columns are a **hand-curated allow-list** (`Exports::ApplicationsCsv::COLUMNS`), not every column: the Japan-market and visa layers are deliberately absent. It recovers a table, not an account.
-- The archive is the **data-safety artefact**, and the leg the user can pull without a provider or a shell. **"Every column" means every column, so `AccountArchive` merges `posting_snapshot` back in the way `#show` does.**
+- The archive is the **data-safety artifact**, and the leg the user can pull without a provider or a shell. **"Every column" means every column, so `AccountArchive` merges `posting_snapshot` back in the way `#show` does.**
 - **`Zip.unicode_names = true`** is set once in `config/initializers/zip.rb`: rubyzip leaves the EFS flag (bit 11) unset by default, which is mojibake in strict extractors the moment an entry name is Japanese.
 - **The archive is built in memory** (`Zip::OutputStream.write_buffer`). Bounded by `MAX_PER_USER` × 2 MB = a **400 MB** worst case, which is the honest number rather than the expected one.
-- **The download links render even when the card has no user to show.** `/privacy` promises the user can get their data out, and this is the only surface that honours it. They are plain `<a>` tags (API routes, not localized pages, so `@next/next/no-html-link-for-pages` is disabled on those lines) with **no `download` attribute**: Rails already sends `Content-Disposition: attachment` and stays the one place that names the file.
+- **The download links render even when the card has no user to show.** `/privacy` promises the user can get their data out, and this is the only surface that honors it. They are plain `<a>` tags (API routes, not localized pages, so `@next/next/no-html-link-for-pages` is disabled on those lines) with **no `download` attribute**: Rails already sends `Content-Disposition: attachment` and stays the one place that names the file.
 - **`ProfileCard` takes the user as a prop and never fetches one.** The dashboard payload already carries `user`.
 
 #### Download filenames
@@ -656,12 +656,12 @@ Annual maintenance surface: one `bundle update holidays`.
 
 ### Security
 
-> **At a glance** · JWT auth with one JTI per user (sign-out revokes all devices). Rack::Attack throttles keyed per-IP *and* per-account/email through Solid Cache (with `forwarded_priority` pinned, so the client cannot choose its own IP), plus a hard 200-application ceiling per account and length caps on the free-text columns, which are the only things that bound storage. Optimistic locking on writes, magic-byte-checked uploads, `nosniff` downloads, credentials filtered from logs.
+> **At a glance** · JWT auth with one JTI per user (sign-out revokes all devices). Rack::Attack throttles are keyed per-IP *and* per-account/email through Solid Cache, with `forwarded_priority` pinned so the client cannot choose its own IP. A hard 200-application ceiling per account, plus length caps on the free-text columns, are the only things that bound storage. Optimistic locking on writes, magic-byte-checked uploads, `nosniff` downloads, credentials filtered from logs.
 
 - **Auth**: Devise + devise-jwt, token in the `Authorization` response header. **One JTI per user** via `JTIMatcher`: sign-out rotates it and therefore revokes *all* devices. 1-day expiry, no refresh flow, intended.
 - **Rack::Attack**: counters go through `Rails.cache` (Solid Cache), so they are shared across Puma workers rather than counted per worker.
   - **`Rack::Request.forwarded_priority` is pinned to `[:x_forwarded]`, and every per-IP throttle depends on it.** `Rack::Attack::Request` subclasses `Rack::Request` and overrides neither `#ip` nor reads `env["action_dispatch.remote_ip"]`, so `req.ip` follows *Rack's* rules, and Rack prefers the client-settable RFC 7239 `Forwarded:` header by default.
-  - **Every path guard keys off `Rack::Attack.normalized_path`, never `req.path`.** Rack::Attack runs *above* the router, so `req.path` is the raw `PATH_INFO` the client typed; Rails normalises it afterwards. This is the one rule in this section that is load-bearing rather than descriptive.
+  - **Every path guard keys off `Rack::Attack.normalized_path`, never `req.path`.** Rack::Attack runs *above* the router, so `req.path` is the raw `PATH_INFO` the client typed; Rails normalizes it afterwards. This is the one rule in this section that is load-bearing rather than descriptive.
   - **The sign-in email discriminator reads the JSON body first, then `req.params`**, so a throttle cannot be sidestepped by changing how the credentials are encoded.
 
 | Throttle family | Key | Caps |
@@ -683,7 +683,7 @@ Annual maintenance surface: one `bundle update holidays`.
 - **Optimistic locking**: `lock_version`; the second concurrent writer gets `StaleObjectError` → `409`. One column, one `rescue_from`, no library.
 - **Uploads**: size is checked from multipart metadata *before* `.read`, so an oversized file never enters memory. Then the 1 MB model cap (`MAX_FILE_BYTES`), then a PDF magic-byte check (`%PDF`), which renaming cannot spoof. The frontend's `accept=".pdf"` is UX only.
 - **Downloads**: `current_user`-scoped, `X-Content-Type-Options: nosniff` on every one, exports included (a CSV a browser decides to sniff as HTML is stored XSS).
-- **Param filtering**: lograge logs `request.filtered_parameters` **in full** on every production request, so `filter_parameter_logging.rb`'s list is the whole defence for anything carried in a request body. The `Authorization` header and cookies are never logged at all.
+- **Param filtering**: lograge logs `request.filtered_parameters` **in full** on every production request, so `filter_parameter_logging.rb`'s list is the whole defense for anything carried in a request body. The `Authorization` header and cookies are never logged at all.
 - **The pre-fill fetch caps the body while streaming**, stopping the chunked read at `MAX_BODY_BYTES`. `Net::HTTPResponse#body` buffers the whole response before any post-hoc slice sees a byte, so an unstreamed cap is decoration against an endless body; every response goes through the same capped read, redirects and error pages included.
 
 ### Passkeys (WebAuthn)
@@ -731,7 +731,7 @@ Every challenge is a **single-use** Solid Cache entry with a **five-minute TTL**
 - an **interview coming up within 24 hours** (the daily cadence makes it once per interview, since each falls in exactly one run's window);
 - a **residence-expiry warning** as the countdown crosses `90/60/30/14/7` days, carrying the same `Visa::COE_LEAD_TIME_DAYS` (**63**) guidance the settings page shows. The threshold set is what keeps a warning that stays true for ninety days from pushing every morning.
 
-**The service worker's notification `tag` is payload-driven** (`payload.tag || "follow-up-digest"`): the digest keeps its historical fixed tag by sending none, while each interview (`interview-:id`) and the residence warning (`residence-expiry`) carry their own, so a retry replaces its own notification and two different subjects stay two notifications. The launcher badge needs no code: on Android the notification itself produces the dot.
+**The service worker's notification `tag` is payload-driven** (`payload.tag || "follow-up-digest"`). The digest sends no tag, so it keeps its historical fixed one. Each interview (`interview-:id`) and the residence warning (`residence-expiry`) carry their own. A retry therefore replaces its own notification, and two different subjects stay two notifications. The launcher badge needs no code: on Android the notification itself produces the dot.
 
 ### Observability
 
@@ -755,10 +755,10 @@ Every challenge is a **single-use** Solid Cache entry with a **five-minute TTL**
 
 ### Design system
 
-> **At a glance** · `web/app/globals.css` is the single entry point where the brand tokens reach the app, via Tailwind v4's `@theme inline`. Twelve colours, one typeface (Plus Jakarta Sans) with labels on the system mono stack, **radius 0**: sharp corners are the editorial voice. No UI kit, no form library, no state library. The brand book itself is no longer in this repo; `BRAND.md` says where it lives.
+> **At a glance** · `web/app/globals.css` is the single entry point where the brand tokens reach the app, via Tailwind v4's `@theme inline`. Twelve colors, one typeface (Plus Jakarta Sans) with labels on the system mono stack, **radius 0**: sharp corners are the editorial voice. No UI kit, no form library, no state library. The brand book itself is no longer in this repo; `BRAND.md` says where it lives.
 
 - **`globals.css` is a hand-kept mirror.** Nothing imports the brand book at build time, so the values there are the ones that actually ship.
-- **Twelve colours**: the nine brand hues plus three that exist because the obvious choice failed a contrast requirement. `--color-danger` (`#96291D`) for destructive actions and error text, always through opacity modifiers, never stock Tailwind `red-*`; `--color-saffron-ink` (`#7A4D10`), since bare `text-saffron` is ~2:1 on linen (saffron carries meaning as a fill or ring, and any saffron *text* uses `saffron-ink`); `--color-rule-strong` (`#847D6B`) for interactive borders, `dune` being 1.36:1 on sand where WCAG 1.4.11 requires 3.0.
+- **Twelve colors**: the nine brand hues plus three that exist because the obvious choice failed a contrast requirement. `--color-danger` (`#96291D`) is for destructive actions and error text, always through opacity modifiers, never stock Tailwind `red-*`. `--color-saffron-ink` (`#7A4D10`) exists because bare `text-saffron` is about 2:1 on linen; saffron carries meaning as a fill or a ring, and any saffron *text* uses `saffron-ink`. `--color-rule-strong` (`#847D6B`) is for interactive borders, because `dune` is 1.36:1 on sand where WCAG 1.4.11 requires 3.0.
 - **One typeface**, Plus Jakarta Sans, loaded through `next/font/google` in both `[locale]/layout.tsx` and `global-not-found.tsx` in the same variable form, so the emitted files are content-hash-identical. Labels use the system mono stack.
 - **Radius `0`**, everywhere. The sharp corners are the editorial voice, not an oversight.
 - **Motion is set through Tailwind's own variables**, `--default-transition-duration` and `--default-transition-timing-function`, so every bare `transition` utility already in the codebase inherits the brand curve.
@@ -770,7 +770,7 @@ Every challenge is a **single-use** Solid Cache entry with a **five-minute TTL**
 
 ### Auth flow
 
-> **At a glance** · The JWT never reaches client JS. A Next route handler proxies sign-in to Rails, lifts the token from the `Authorization` header, and stores it in an `httpOnly` `session` cookie; server-side `apiFetch` re-attaches it as a Bearer. A companion `httpOnly` `account_email` cookie, set and cleared beside it, gives the header's account menu its email without a fetch. Origin checks guard the auth handlers: Next's built-in CSRF defence covers Server Actions, not route handlers.
+> **At a glance** · The JWT never reaches client JS. A Next route handler proxies sign-in to Rails, lifts the token from the `Authorization` header, and stores it in an `httpOnly` `session` cookie; server-side `apiFetch` re-attaches it as a Bearer. A companion `httpOnly` `account_email` cookie, set and cleared beside it, gives the header's account menu its email without a fetch. Origin checks guard the auth handlers: Next's built-in CSRF defense covers Server Actions, not route handlers.
 
 1. The sign-in form POSTs plain credentials to `app/api/auth/session/route.ts`. It is the only such handler: registration is closed, so there is no second credential-accepting entry point.
 2. It proxies to Rails, captures the JWT from the `Authorization` response header, and stores it in an `httpOnly` cookie named `session`.
@@ -780,7 +780,7 @@ Every challenge is a **single-use** Solid Cache entry with a **five-minute TTL**
 
 - **`apiFetch` detects `FormData` and leaves `Content-Type` to `fetch`**, so the multipart boundary is set correctly.
 - **Origin checks are mandatory on the auth route handlers.** Next's built-in CSRF protection covers Server Actions, *not* route handlers, so without an `Origin` allowlist a cross-site form can drive a login. `web/app/lib/csrf.ts` enforces same-origin by default, with `ALLOWED_ORIGIN` to pin it.
-- **Passkey sign-in reuses this whole shape.** The ceremony runs in browser JS (`navigator.credentials.get` exists nowhere else) but the JWT still never reaches it: the assertion is POSTed to a route handler that proxies to Rails and stores the token in the same cookie. The passkey button renders only when the browser has `PublicKeyCredential.parseRequestOptionsFromJSON`.
+- **Passkey sign-in reuses this whole shape.** The ceremony runs in browser JS, because `navigator.credentials.get` exists nowhere else. The JWT still never reaches that JS: the assertion is POSTed to a route handler, which proxies to Rails and stores the token in the same cookie. The passkey button renders only when the browser has `PublicKeyCredential.parseRequestOptionsFromJSON`.
 - **Enrollment lives on `/settings`** and goes through **server actions**, not route handlers, because the user is already authenticated there.
 - **The email reaches the header through a companion cookie, never a fetch.** `account_email` is set beside `session`, same attributes and one-day `maxAge`, and cleared on every path that clears `session`.
 - **Expired sessions bounce through `/api/auth/expired`**, which clears the cookie and redirects to `/sign-in?expired=1`. The redirect's `Location` is **relative**, never assembled from `request.url`: behind a proxy the Host this process sees is internal, and an absolute redirect sends the browser there.
@@ -797,10 +797,10 @@ Every challenge is a **single-use** Solid Cache entry with a **five-minute TTL**
 > **At a glance** · `/privacy` and `/terms`, both locales, reachable while signed in (`OPEN_PATHS`). They exist because the app holds resumes, and are written to be *true about the system as built*: six named recipients (Cloudflare, GitHub, Anthropic, Resend, Honeybadger, and the browser's own push service), three functional cookies, one `localStorage` key, no self-service delete. Never a promise the code does not keep.
 
 - **Collected**: an email address, application records, one resume and one cover letter per application, and **incidentally IP addresses** (Rack::Attack keys throttle counters on them and Honeybadger carries request context).
-- **Six recipients, all named**, because a recipient you decline to name is the one the policy exists to disclose: **Cloudflare** (TLS terminates at the edge, so it is a sub-processor of every request), **GitHub** (the nightly dump means it holds a copy of every resume), **Anthropic** (the stripped text of a posting, ≤12k chars, and nothing else: not the URL, not a resume), **Resend** (email addresses), **the browser's push service** (the one recipient that cannot read what it carries), **Honeybadger** (error reports only: `insights: enabled: false`).
+- **Six recipients, all named**, because a recipient you decline to name is the one the policy exists to disclose. **Cloudflare**: TLS terminates at the edge, so it is a sub-processor of every request. **GitHub**: the nightly dump means it holds a copy of every resume. **Anthropic**: the stripped text of a posting, 12,000 characters at most, and nothing else. Not the URL, and not a resume. **Resend**: email addresses. **The browser's push service**: the one recipient that cannot read what it carries. **Honeybadger**: error reports only (`insights: enabled: false`).
 - **Not a sub-processor**: the site hosting a job posting sees the *server's* IP during pre-fill, with no personal data attached.
 - **Three cookies, all functional**: `session`, next-intl's `NEXT_LOCALE`, and `account_email`. **One `localStorage` key**, `kk.pins.v1`. No analytics, no pixels, no third-party JavaScript.
-- **Do not write a promise the code does not keep.** No self-service delete button (there isn't one), no encryption-at-rest claim beyond what the deployment provides, no retention period the backups do not honour.
+- **Do not write a promise the code does not keep.** No self-service delete button (there isn't one), no encryption-at-rest claim beyond what the deployment provides, no retention period the backups do not honor.
 - `/terms` is correspondingly small: a portfolio demo, as-is, no uptime commitment, and a shared world-writable demo account that may be reset at any time.
 
 ### Route guard
@@ -816,7 +816,7 @@ Every challenge is a **single-use** Solid Cache entry with a **five-minute TTL**
 - **Export a function named `proxy`.** A `middleware.ts` file is ignored, silently.
 - **Authorization is presence of the `session` cookie.** There are no roles.
 - **`OPEN_PATHS` is checked first** and skips both redirects, so a signed-in reader is not bounced away from the pages that explain the build.
-- **`config.matcher` must exclude `/robots.txt`, `/sitemap.xml`, `/llms.txt` and `/sw.js`.** The first three make the whole SEO surface a `307` to sign-in; `/sw.js` fails more quietly, because the browser re-fetches a registered service worker on its own schedule, sometimes with an expired session.
+- **`config.matcher` must exclude `/robots.txt`, `/sitemap.xml`, `/llms.txt` and `/sw.js`.** Without the first three exclusions, the whole SEO surface becomes a `307` to sign-in. `/sw.js` fails more quietly: the browser re-fetches a registered service worker on its own schedule, sometimes with an expired session.
 - **The locale is resolved before the auth check**, so the guard always sees a locale-stripped pathname.
 - **`proxy.ts` sets the CSP**: per-request nonce, `script-src 'self' 'nonce-…' 'strict-dynamic'`, no `'unsafe-inline'`; development keeps `'unsafe-eval'` for HMR. Because nonces are applied only during SSR, **`await connection()` in the root layout opts the whole app into dynamic rendering**, which is why locale-prefixed routing costs nothing.
 - **`worker-src 'self'` is in the CSP explicitly.** Without it, worker scripts fall back to `script-src`, which is nonce-plus-`'strict-dynamic'`, under which `'self'` is ignored. A static `/sw.js` has no nonce, so the fallback blocks the very registration § The service worker exists for.
@@ -836,7 +836,7 @@ Every challenge is a **single-use** Solid Cache entry with a **five-minute TTL**
 
 ### Board view
 
-> **At a glance** · `/board` (labelled "Kanban"): one column per active status, cards moved by drag or menu, each move a real FSM transition. It *fetches* the legal-move table from `GET /api/v1/transitions` rather than mirroring it. Bounded fetch-all, native HTML5 drag, optimistic moves that revert on `409`.
+> **At a glance** · `/board` (labeled "Kanban"): one column per active status, cards moved by drag or menu, each move a real FSM transition. It *fetches* the legal-move table from `GET /api/v1/transitions` rather than mirroring it. Bounded fetch-all, native HTML5 drag, optimistic moves that revert on `409`.
 
 - **Applications**: the cursor-paginated list followed to exhaustion at `limit=100`, **capped at 10 pages**. A board is a view of everything, so pagination is the wrong UI, but a fetch-all against a cursor API must be bounded.
 - **The transition table is fetched, never mirrored.** `ApplicationFSM::TRANSITIONS` stays the only copy, which is the invariant that deferred this feature to `v1.2.0`.
@@ -860,7 +860,7 @@ Every challenge is a **single-use** Solid Cache entry with a **five-minute TTL**
 - **Pins therefore appear a beat after first paint.** Every route renders on the server (the CSP nonce requires it), and the server cannot know this device's `localStorage`.
 - **Two failures get a toast**, because in both the button appears to do nothing: a refused fourth pin, and a `setItem` that throws (private-mode Safari, a full quota).
 - **The cap refuses rather than evicts.** Three is small enough that the user knows what is pinned, so an unrequested eviction reads as the app losing one.
-- **Every row carries the control**, a real `<button aria-pressed>` beside the row's link (never nested inside it, which is invalid HTML), and the pinned state is shape, not colour.
+- **Every row carries the control**, a real `<button aria-pressed>` beside the row's link (never nested inside it, which is invalid HTML), and the pinned state is shape, not color.
 - **Scope: the dashboard list only.** The Board answers a different question and its cards are already grouped by the thing that orders them.
 
 ### Toast feedback
@@ -921,7 +921,7 @@ Every challenge is a **single-use** Solid Cache entry with a **five-minute TTL**
 #### Locale-sensitive formatting
 
 - `Intl.RelativeTimeFormat` and `toLocaleDateString` in `app/lib/format.ts` take the active locale. `<html lang>` and OpenGraph `locale` follow it too.
-- **`formatDate()` pins `timeZone: "Asia/Tokyo"`.** The API serialises in app time and a date-only field parses as UTC midnight, so without the pin a viewer west of UTC sees the previous day.
+- **`formatDate()` pins `timeZone: "Asia/Tokyo"`.** The API serializes in app time and a date-only field parses as UTC midnight, so without the pin a viewer west of UTC sees the previous day.
 - **`isOverdue()` pins the same zone, and must** (`v1.11.1`). It compares date strings against a "today", and deriving that from the ambient clock made it a **hydration bug, not a display quirk**: the server and the browser disagreed about the date.
 - **`format.ts` holds no copy.** Status labels and descriptions live in the catalogs' `status` namespace, keyed by status; an English copy in `format.ts` would give the FSM's vocabulary two sources of truth.
 
@@ -932,7 +932,7 @@ Two layers, deliberately:
 - **CSS, the broad layer.** `globals.css` declares `word-break: auto-phrase` under `:lang(ja)`, keyed off the `lang` attribute the locale layout already sets. Chromium 119+ breaks at phrase boundaries; everywhere else it is a no-op.
 - **Markup, the targeted layer.** `app/components/phrase.tsx` exports `<Phrase>`, a **server** component running BudouX (parser and ~15 KB model constructed once per process at module scope) over the headings that matter.
 
-Deliberately not covered: **board and list card titles** (they `truncate`, so a break annotation is dead markup); **client-rendered labels and buttons** (BudouX runs server-side precisely so the model never enters the client bundle, and importing `<Phrase>` from a client component would ship it); **long body text**, which mostly self-corrects. `Intl.Segmenter` was rejected: it segments dictionary words, not phrases.
+Three things are deliberately not covered. **Board and list card titles** use `truncate`, so a break annotation there is dead markup. **Client-rendered labels and buttons** are excluded because BudouX runs server-side so that the model never enters the client bundle, and importing `<Phrase>` from a client component would ship it. **Long body text** mostly self-corrects. `Intl.Segmenter` was rejected: it segments dictionary words, not phrases.
 
 #### What is not translated
 
@@ -964,7 +964,7 @@ The manifest declares a `share_target`: sharing a posting from any Android app s
 
 #### Shortcuts: static file, English labels, by decision
 
-**The labels ship English-only in a bilingual app, decided with eyes open.** Serving the manifest from a route handler that reads the locale cookie was rejected: a manifest is fetched at install and WebAPK-update time, so a cookie-derived manifest freezes whatever language happened to be active at install.
+**The labels ship English-only in a bilingual app, decided with eyes open.** Serving the manifest from a route handler that reads the locale cookie was rejected. A manifest is fetched at install time and at WebAPK-update time, so a cookie-derived manifest freezes whatever language was active at install.
 
 #### Icon purposes are split, because one icon cannot serve both
 
@@ -972,14 +972,14 @@ The manifest declares a `share_target`: sharing a posting from any Android app s
 
 - **`any`** is drawn as-is: a rounded-square plate with transparent corners.
 - **`maskable`** is full-bleed by contract: the launcher supplies the shape and crops to it, so transparency is a hole, not a rounded corner.
-- **The safe zone was measured, not assumed.** The guaranteed-visible area is a circle of 80% diameter (radius 204.8px at 512); the wordmark's furthest corner is **182.6px** from centre, so it clears.
-- **`monochrome` is a third purpose with a third contract: shape only.** Android themed icons tint a mask to the wallpaper, and a launcher given no monochrome icon dims the full-colour plate instead.
+- **The safe zone was measured, not assumed.** The guaranteed-visible area is a circle of 80% diameter (radius 204.8px at 512); the wordmark's furthest corner is **182.6px** from center, so it clears.
+- **`monochrome` is a third purpose with a third contract: shape only.** Android themed icons tint a mask to the wallpaper, and a launcher given no monochrome icon dims the full-color plate instead.
 
 #### The service worker: push-only, never a fetch handler
 
 `web/public/sw.js` exists for exactly two events: `push` and `notificationclick`.
 
-- **It must never gain a `fetch` handler.** Every route renders dynamically so its scripts carry a per-request nonce; a caching worker would serve a stale document whose nonce no longer matches the response header, and the page's own scripts would be blocked by its own CSP.
+- **It must never gain a `fetch` handler.** Every route renders dynamically, so its scripts carry a per-request nonce. A caching worker would serve a stale document whose nonce no longer matches the response header, and the page's own scripts would then be blocked by its own CSP.
 - **`worker-src 'self'` is in the CSP explicitly** (§ Route guard).
 - **`/sw.js` is excluded from the proxy matcher.** The browser re-fetches a registered worker's script on its own schedule, including after the session cookie has expired, and a fetch answering `307 /sign-in` is a failed update.
 - **Registration lives in a tiny client component in the `(app)` shell**, so a worker is never installed for visitors who only read the marketing pages.
@@ -1018,10 +1018,10 @@ The manifest declares a `share_target`: sharing a posting from any Android app s
 | `web` | built from `web/Dockerfile` | `next start`, `output: "standalone"` in `next.config.ts` |
 | `cloudflared` | `cloudflare/cloudflared:2026.8.2` | The only ingress point; holds the tunnel credentials and the ingress rules |
 
-- **`cloudflared` is pinned to a real tag, the same convention `postgres:18` uses, not `:latest`.** `docker compose build` only touches services with a `build:` key, so an unpinned `cloudflared` survives ordinary redeploys unchanged but silently pulls whatever `latest` resolves to after a `docker system prune`, disk pressure, or a move to new hardware, with no version recorded and no changelog read. Bump the tag deliberately when there's a reason to.
+- **`cloudflared` is pinned to a real tag, the same convention `postgres:18` uses, not `:latest`.** `docker compose build` only rebuilds services with a `build:` key, so an unpinned `cloudflared` survives ordinary redeploys unchanged. It would then silently pull whatever `latest` resolves to after a `docker system prune`, after disk pressure, or after a move to new hardware, with no version recorded and no changelog read. Raise the tag deliberately, when there is a reason to.
 - **Both app images are non-root, multi-stage, and self-check.** Each runs under a uid-1000 user (`rails`; `web/Dockerfile` reuses the `node` user the base image ships rather than creating a second one at the same uid, which collides). `api`'s `HEALTHCHECK` hits `/up` (the deep check); `web` has no health route, so its check is a `200` on `/`, which still proves the Next process, locale routing and `proxy.ts` are working. Both are wired into `depends_on: condition: service_healthy`.
 - **The health windows are sized for the slowest legitimate boot, not the typical one.** `api`'s `HEALTHCHECK` allows a **300 s start period**, probed every 5 s. `bin/docker-entrypoint` runs `db:prepare` to completion *before* Puma binds, so every probe fails until migrations finish, and both other services gate on `api`. Under the original 30 s window a first boot against an empty volume would have been marked unhealthy and started neither of the other two: a delay turned into an outage.
-- **`postgres`'s healthcheck authenticates rather than pings.** `POSTGRES_PASSWORD` is read only while initializing an *empty* data directory, so editing `DB_PASSWORD` against an existing volume leaves the old password authoritative while `api` rebuilds its credentials every boot, and `pg_isready` reports healthy either way. The check runs a real `psql SELECT 1` with the configured credentials over **`-h postgres`, not `127.0.0.1`**: initdb's generated `pg_hba` **trusts loopback**, so a loopback check passes with any password at all. Rotating is two ordered steps, `ALTER USER … PASSWORD` first, then the `.env` edit.
+- **`postgres`'s healthcheck authenticates rather than pings.** `POSTGRES_PASSWORD` is read only while initializing an *empty* data directory. Editing `DB_PASSWORD` against an existing volume therefore leaves the old password authoritative, while `api` rebuilds its credentials on every boot. `pg_isready` reports healthy either way. The check runs a real `psql SELECT 1` with the configured credentials over **`-h postgres`, not `127.0.0.1`**: initdb's generated `pg_hba` **trusts loopback**, so a loopback check passes with any password at all. Rotating is two ordered steps, `ALTER USER … PASSWORD` first, then the `.env` edit.
 
 **Memory limits.** All four containers carry a `mem_limit` of **1g**, set uniformly rather than tuned per-service.
 
@@ -1051,20 +1051,20 @@ The manifest declares a `share_target`: sharing a posting from any Android app s
 
 ### Network exposure, audited 2026-08-20
 
-**The origin's reachable surface is exactly the two ingress hostnames above, and that holds at three independent layers.** They are listed in order of how much weight they carry, and the first carries nearly all of it: it is a property of `docker-compose.prod.yml`, so it survives any firewall mistake, on any host.
+**The origin's reachable surface is exactly the two ingress hostnames above, and that holds at three independent layers.** They are listed in order of how much weight they carry. The first carries nearly all of it, because it is a property of `docker-compose.prod.yml`: it survives any firewall mistake, on any host.
 
 - **No service publishes a host port.** All four containers sit on the single `internal` bridge, `cloudflared` dials *out*, and the backups runner reaches Postgres through `docker exec` rather than TCP. Measured, not assumed: `ss -tlpn` filtered to non-loopback addresses returns **nothing at all**.
 - **`ufw` is active**: default deny incoming, allow outgoing, routed disabled. `openssh-server` is not installed.
 - **The usual "Docker punches a hole through `ufw`" caveat does not apply here, and the reason is a property of the runtime, not of this app.** Stock Docker Engine inserts DNAT rules that bypass the `INPUT` chain `ufw` filters on. This machine runs Docker Desktop for Linux, whose engine lives in a VM: `iptables -t nat -L DOCKER` reports no such chain, there is no `/var/run/docker.sock` on the host, and a published port surfaces as an ordinary userspace bind. **Moving to stock Docker Engine reintroduces the bypass**, and only the no-published-ports rule above would still hold.
 - **Containers run unprivileged**: `api` and `web` as uid 1000, `cloudflared` as 65532, `postgres`'s postmaster as `postgres`. None is `privileged`, none adds a capability.
-- **Every file holding a production secret is mode 600.** Four were **664** until this audit, all four created during the cutover: the older secrets already followed the convention and the new deploy artifacts simply did not inherit it, because nothing enforces the mode. **The mode defends against other host users, not against the container**: Docker Desktop's file-sharing layer does not enforce DAC on a bind mount, verified directly rather than inferred.
+- **Every file holding a production secret is mode 600.** Four were **664** until this audit, and all four were created during the move to self-hosting. The older secrets already followed the convention. The new deploy files did not inherit it, because nothing enforces the mode. **The mode defends against other host users, not against the container**: Docker Desktop's file-sharing layer does not enforce DAC on a bind mount, verified directly rather than inferred.
 - **The self-hosted runner's blast radius is bounded by one fact**: `karirkalyan-backups` is private and this repo's own workflows all run on `ubuntu-latest`. A self-hosted runner attached to a *public* repo is the classic RCE hole, because a fork's PR can propose the workflow that runs on it. What remains is not a network attack: push access to the private backups repo is code execution on this machine, which is GitHub account hygiene, and why the runner is registered to that one repo rather than to the account.
 
-**What the audit did not cover**, recorded so the gap is not mistaken for a clean result: Cloudflare's own edge configuration (WAF rules, rate limiting, Bot Fight Mode), the one layer in front of the origin that lives entirely outside this repo. `TODO.md` holds it.
+**What the audit did not cover**, recorded so the gap is not mistaken for a clean result: Cloudflare's own edge configuration, meaning WAF rules, rate limiting and Bot Fight Mode. That is the one layer in front of the origin that lives entirely outside this repo. `TODO.md` holds it.
 
 ### Backups
 
-**Backups stay on GitHub Actions; only where the job runs and how it reaches Postgres changed.** A home Postgres behind a Tunnel has no route a GitHub-hosted runner can reach and should not be given one, so `check.yml` and `backup.yml` run on a **self-hosted runner**, installed as a systemd service on this machine and registered to the private [`karirkalyan-backups`](https://github.com/chairulakmal/karirkalyan-backups) repo alone.
+**Backups stay on GitHub Actions; only where the job runs and how it reaches Postgres changed.** A home Postgres behind a Tunnel has no route a GitHub-hosted runner can reach, and it should not be given one. So `check.yml` and `backup.yml` run on a **self-hosted runner**. That runner is installed as a systemd service on this machine, and registered to the private [`karirkalyan-backups`](https://github.com/chairulakmal/karirkalyan-backups) repo alone.
 
 - Same cron (05:15 JST), same `scripts/fingerprint.sql`, same `actions/upload-artifact` with **60-day retention**, same `state/fingerprint` / `state/last-backup` commit.
 - `psql` / `pg_dump` run via **`docker exec`** into the `postgres` container, which drops the per-run `apt-get` that installed a version-matched client and the `DATABASE_URL` secret itself (a local `docker exec` authenticates over the container's Unix socket).
@@ -1088,7 +1088,7 @@ cd api && bundle install && bin/rails db:create db:migrate db:seed && bin/rails 
 cd web && npm install && npm run dev                                                    # :3000
 ```
 
-- **Node 24 lives in three places, not one.** `web/.nvmrc` is what `actions/setup-node` reads; `web/package.json`'s `engines.node` restates it (a Railpack holdover); `web/Dockerfile`'s `ARG NODE_VERSION` default restates it again, and that Dockerfile is what builds production now. Nothing wires them together, so a bump needs all three by hand. A CI runtime differing from production's is how the `npm ci` lockfile divergence bit twice.
+- **Node 24 lives in three places, not one.** `actions/setup-node` reads `web/.nvmrc`. `web/package.json`'s `engines.node` restates it (a Railpack holdover). `web/Dockerfile`'s `ARG NODE_VERSION` default restates it again, and that Dockerfile is what builds production now. Nothing connects the three, so a version change needs all three edited by hand. A CI runtime that differs from production's is how the `npm ci` lockfile divergence broke the build twice.
 - **Local Postgres tracks production's major version: both are 18.** They drifted apart once already, and a dev database a major version behind production is a bug waiting to be found in production.
 - **The `postgres:18` image moved its data directory**: `PGDATA` is `/var/lib/postgresql/18/docker` and the declared volume is `/var/lib/postgresql`. Mounting the old `/var/lib/postgresql/data` against an 18 image leaves Postgres writing outside the named volume, and the database silently empties on every `docker compose down`. Upgrading a machine with a 16 volume needs `docker compose down -v` and a fresh `db:setup`.
 - **`db:seed` is not optional.** Registration is closed, so a freshly migrated database has no account and no sign-up form to make one with. It is idempotent, and CI runs it after `db:migrate`. The operator's alternative is `bin/rails users:create`.
@@ -1103,7 +1103,7 @@ Semantic versioning, with **major redefined against the compatibility surfaces t
 | Level | Rule | Examples |
 | --- | --- | --- |
 | **major** | The previous image **cannot** be redeployed against the new database. Rolling back needs a plan. | An irreversible or destructive migration; `/api/v1` → `/api/v2`; removing or renaming a state in `ApplicationFSM` (stored `status` values stop validating); dropping a required env var. |
-| **minor** | New user-visible capability, and rollback is still a redeploy. | A feature (ghost prediction, the Kanban board); a new endpoint; a new optional field or additive migration. |
+| **minor** | New user-visible capability, and rollback is still a redeploy. | A feature (ghost risk, the Kanban board); a new endpoint; a new optional field or additive migration. |
 | **patch** | No new capability. | Bug fix, security fix, dependency refresh, performance work. |
 
 **The test for major is mechanical**: could the previous release's image be deployed against the database this release leaves behind, and would it boot and serve? If no, it is a major. The `positions` entity in `TODO.md` is the first plausible `2.0.0`: it adds a table *and* changes the state machine.
@@ -1114,7 +1114,7 @@ Semantic versioning, with **major redefined against the compatibility surfaces t
 
 #### `v1` has stopped being tagged, and `v1.11.1` is its last tag
 
-**Decided 2026-08-03. There is no `v1.11.2` and there will not be one; the next tag this repo cuts is `2.0.0`.** Under the feature freeze every remaining `v1` release would be a patch, and a patch tag buys nothing: nobody installs a package, `web/` is the only client, and the deploy has already happened.
+**Decided 2026-08-03. There is no `v1.11.2` and there will not be one; the next tag this repo cuts is `2.0.0`.** Under the feature freeze every remaining `v1` release would be a patch, and a patch tag gains nothing. Nobody installs a package, `web/` is the only client, and the deploy has already happened.
 
 What it costs, stated plainly so it is a known trade: **the deployed app has no version number at all.** The rule above still holds, so the honest description of production is `v1.11.1` plus however many commits. Nothing in the app displays a version and no client negotiates one, so nothing breaks.
 

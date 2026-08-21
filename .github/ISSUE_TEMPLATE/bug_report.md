@@ -6,7 +6,7 @@ labels: bug
 
 ## What happened
 
-<!-- The actual behaviour you saw. -->
+<!-- The actual behavior you saw. -->
 
 ## What you expected
 

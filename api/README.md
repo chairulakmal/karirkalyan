@@ -1,6 +1,6 @@
 # KarirKalyan: Rails API
 
-The operational README for `api/`, KarirKalyan's Rails 8 API-only backend: how to run it, deploy it, and test it. The most important line in it is the seed: registration is closed, so `bin/rails db:seed` is the only way to get a login. Contents: the stack, local setup, deployment env vars, background jobs and scheduled reminders, caching, the AI pre-fill and its guardrails, demo data and its hourly reset, running tests, regenerating the API docs, key files, and the route table. How the system works and why lives in [`SPEC.md`](../SPEC.md); this file is what you type.
+This is the operational README for `api/`, KarirKalyan's Rails 8 API-only backend. It explains how to run it, deploy it, and test it. The most important line in it is the seed command: registration is closed, so `bin/rails db:seed` is the only way to get a login. It covers the stack, local setup, deployment environment variables, background jobs and scheduled reminders, caching, the AI pre-fill and its safety limits, the demo data and its hourly reset, running the tests, regenerating the API docs, the key files, and the route table. How the system works, and why it was built that way, is in [`SPEC.md`](../SPEC.md). This file is what you type.
 
 ## Stack
 
@@ -34,15 +34,15 @@ bin/rails server
 
 API docs available at `http://localhost:3001/api-docs` once running.
 
-Jobs run in-process in development via the `:async` adapter (`config/environments/development.rb`), an in-memory thread pool, not Rails' separate `:inline` adapter, so there is **no worker process to start** alongside `rails server`. To exercise Solid Queue for real, set `SOLID_QUEUE_IN_PUMA=1` and drop that line.
+In development, jobs run inside the web server process through the `:async` adapter (`config/environments/development.rb`). That adapter is an in-memory thread pool, not Rails' separate `:inline` adapter, so there is **no worker process to start** next to `rails server`. To run Solid Queue itself in development, set `SOLID_QUEUE_IN_PUMA=1` and remove that adapter line.
 
 ## Deployment env vars
 
 | Variable | Source |
 |---|---|
-| `DB_USERNAME` / `DB_PASSWORD` / `DB_NAME` | Root `.env` (`.env.prod.example`), which also configures the `postgres` service itself. Read as discrete values by `config/database.yml`, so no character needs URL-escaping. Rotating the password takes an `ALTER USER` inside the container *and* an edit here; `.env.prod.example` has the order. |
+| `DB_USERNAME` / `DB_PASSWORD` / `DB_NAME` | Root `.env` (`.env.prod.example`), which also configures the `postgres` service itself. Read as separate values by `config/database.yml`, so no character needs URL-escaping. To rotate the password you must run `ALTER USER` inside the container *and* edit this file. `.env.prod.example` gives the correct order. |
 | `DB_HOST` | Set to the `postgres` service name by `docker-compose.prod.yml`. The only one of the five that is a property of the topology rather than the credentials. |
-| `SOLID_QUEUE_IN_PUMA` | Set to `1`. **Required**: `config/puma.rb` only loads `plugin :solid_queue` when it is present, and without the plugin no job ever runs (no separate worker service exists to pick up the slack). |
+| `SOLID_QUEUE_IN_PUMA` | Set to `1`. **Required**: `config/puma.rb` loads `plugin :solid_queue` only when this variable is set. Without the plugin, no job runs at all, and there is no separate worker service that could run them instead. |
 | `DEVISE_JWT_SECRET_KEY` | Generate: `ruby -e "require 'securerandom'; puts SecureRandom.hex(64)"` |
 | `FRONTEND_URL` | URL of the deployed `web` service (also used as the link host in reminder emails) |
 | `SECRET_KEY_BASE` | Generate: `bin/rails secret`. Preferred over `RAILS_MASTER_KEY`: this app stores no secrets in `credentials.yml.enc`, so sharing the master key with production is unnecessary. |
@@ -67,46 +67,66 @@ Recurring work is declared in `config/recurring.yml`:
 | `reset_demo_account` | hourly, at :42 | `DemoResetJob`; see [Demo data](#demo-data) |
 | `clear_solid_queue_finished_jobs` | hourly, at :12 | Keeps the jobs table from growing unbounded |
 
-`FollowUpReminderJob`: it collects every application whose `follow_up_at` has fallen due (reaching back 30 days, so nothing that was held is lost), writes a `TimelineEntry` per application (the exactly-once idempotency anchor), groups the winners **by user**, and enqueues one `FollowUpMailer.digest` via `deliver_later` on the `mailers` queue: one email per user per day, not one per application. The same per-user batch also fans into a second channel: one `PushDigestJob` per user delivers the digest as a Web Push notification (`web-push` gem, VAPID) to every enrolled device. The timeline claim stays the single exactly-once anchor, so decoupling delivery means a transient SMTP failure retries the email without ever duplicating the timeline entry, a push failure retries without re-mailing, and a subscription the push service reports gone (`404`/`410`) deletes itself.
+`FollowUpReminderJob` runs in four steps:
 
-The job **holds** on any day `JapanCalendar` does not call a business day: weekends, national holidays (via the `holidays` gem, so 春分の日 tracks the equinox and 振替休日 is applied), New Year, Golden Week, Obon. Held is not dropped: the idempotency key is derived from `follow_up_at`, **not** from the day the job runs, so the next business day picks the reminder up and sends it exactly once. The same property means an overdue application is not re-nudged every morning, and moving `follow_up_at` re-arms it.
+1. It collects every application whose `follow_up_at` has come due, looking back up to 30 days, so a reminder held on an earlier day is not lost.
+2. It writes one `TimelineEntry` per application. That row is the anchor that makes each reminder send exactly once.
+3. It takes the applications whose `TimelineEntry` was created successfully in step 2, groups them **by user**, and enqueues one `FollowUpMailer.digest` per user through `deliver_later` on the `mailers` queue. The result is one email per user per day, not one email per application.
+4. The same per-user batch also goes to a second channel: one `PushDigestJob` per user sends the digest as a Web Push notification (`web-push` gem, VAPID) to every enrolled device.
 
-There is **no job dashboard**. The `Sidekiq::Web` mount was removed with Sidekiq; inspect the queue in `psql` (`solid_queue_*` tables) or add Mission Control if it's ever worth a screen.
+The timeline row is the only exactly-once anchor, and delivery is kept separate from it. A temporary SMTP failure therefore retries the email without writing a second timeline entry, a push failure retries without sending the email again, and a subscription that the push service reports as gone (`404` / `410`) deletes itself.
+
+The job **holds** the reminder on any day that `JapanCalendar` does not count as a business day: weekends, national holidays (through the `holidays` gem, so 春分の日 follows the equinox and 振替休日 is applied), New Year, Golden Week, and Obon. Held is not dropped. The idempotency key comes from `follow_up_at`, **not** from the day the job runs, so the run on the next business day finds the reminder and sends it exactly once. The same property means an overdue application is not reminded again every morning. Setting `follow_up_at` to a new date arms the reminder again.
+
+There is **no job dashboard**. The `Sidekiq::Web` mount was removed together with Sidekiq. Inspect the queue in `psql` (the `solid_queue_*` tables), or add Mission Control if a dedicated screen ever becomes worth building.
 
 Locally, mail is **not** sent by default: preview rendered email at `http://localhost:3001/rails/mailers`. Set the `SMTP_*` env vars in development to send real mail (e.g. to test Resend end-to-end).
 
 ### Caching
 
-Production `Rails.cache` is `:solid_cache_store`: Postgres-backed, so throttle counters and cached values are shared across all Puma workers with no extra service (`config/cache.yml`; development uses `:memory_store`). Two things ride on it:
+Production `Rails.cache` is `:solid_cache_store`, which is backed by Postgres. Throttle counters and cached values are therefore shared across all Puma workers with no extra service (`config/cache.yml`; development uses `:memory_store`). Two things depend on it:
 
-- **Rack::Attack throttle counters** (`Rack::Attack.cache.store = Rails.cache`), which have to be shared across processes to actually throttle anything.
+- **Rack::Attack throttle counters** (`Rack::Attack.cache.store = Rails.cache`). These counters must be shared across processes, or the throttle does not work.
 - **The dashboard's aggregation query**, cached for 12 hours under a key derived from the user's application count + latest `updated_at`, so it self-invalidates on any change (`app/controllers/api/v1/dashboard_controller.rb`).
 
 ### AI job-URL pre-fill
 
-`POST /api/v1/applications/prefill` takes a job-posting **`url` or pasted `text`** (the paste path landed in `v1.6.0`, for postings a fetcher cannot read) and returns the structured fields for the user to review and edit before saving: `company`, `role`, `notes`, plus the Japan-market set added in `v1.8.0`–`v1.9.0` (`channel`, `agency`, `japanese_level`, `sponsorship`, `hiring_entity`, `company_timezone`, `overlap_hours_required`, and the four 年収 compensation fields), with `url` and `posting_text` merged on top: the AI fills the form, it never writes to the database. Logic lives in `Applications::UrlPrefillService`: it fetches the page, strips the HTML to text, and asks **Claude Haiku 4.5** (official `anthropic` gem) to extract the fields via a tool/JSON schema, so the response is structured data rather than free text to parse. Claude reads Japanese postings natively: the same flow works on a Wantedly listing, a Greenhouse page, or a company careers site without a per-site parser, which is the point for a Tokyo job search.
+`POST /api/v1/applications/prefill` takes a job posting as a **`url` or as pasted `text`**. The paste path was added in `v1.6.0`, for postings that the fetcher cannot read. The endpoint returns structured fields for the user to review and edit before saving: `company`, `role`, `notes`, plus the Japan-market set added in `v1.8.0`–`v1.9.0` (`channel`, `agency`, `japanese_level`, `sponsorship`, `hiring_entity`, `company_timezone`, `overlap_hours_required`, and the four 年収 compensation fields). `url` and `posting_text` are merged on top. **The AI fills the form. It never writes to the database.**
+
+The logic lives in `Applications::UrlPrefillService`. It fetches the page, strips the HTML down to text, and asks **Claude Haiku 4.5** (the official `anthropic` gem) to extract the fields. The request uses a tool with a JSON schema, so the answer comes back as structured data instead of free text that would have to be parsed. Claude reads Japanese postings directly, so the same flow works on a Wantedly listing, a Greenhouse page, or a company careers site, with no parser written for each site. That is the whole point for a Tokyo job search.
 
 Because the server fetches a user-supplied URL, two safeguards apply:
-- **SSRF guard**: the host is resolved and any private / loopback / link-local address (including the cloud metadata endpoint `169.254.169.254`) is refused, re-checked on every redirect hop. One internal address rejects the whole URL, and the connection is then pinned to an address that passed the check (`http.ipaddr`), so Net::HTTP cannot re-resolve to something else between the check and the connect.
+- **SSRF guard**: the host is resolved, and any private, loopback, or link-local address is refused, including the cloud metadata endpoint `169.254.169.254`. The check runs again after every redirect. One internal address rejects the whole URL. The connection is then pinned to an address that passed the check (`http.ipaddr`), so Net::HTTP cannot resolve the host again to a different address between the check and the connection.
 - **Cost & abuse control**: the endpoint is auth-gated and rate-limited via Rack::Attack (10/min per IP), with a body-size cap on the fetch and a character cap on the text sent to Claude to bound token usage.
 
-Errors are typed, because the six ways this fails ask the user for six different things: the URL itself being bad or private → `422` `invalid_url`; a site refusing an automated reader → `422` `prefill_blocked` (the URL is fine; retrying hits the same wall); the page not being fetchable at all → `502` `prefill_unreachable`, which is also where an upstream `429` lands, since that refusal is the one that lifts and a retry is worth asking for; the page being fetched but yielding nothing usable, whether empty of text or an AI failure → `502` `prefill_failed`; a pasted posting over `MAX_TEXT_CHARS` once stripped to text → `422` `prefill_paste_too_long`, which only the paste path can raise (a fetched page over the cap is truncated in silence, because the user never saw its length); missing `ANTHROPIC_API_KEY` → `503` `prefill_unavailable`. The model only ever receives text the server already fetched: Anthropic's server-side web-search/fetch tools are deliberately **not** used, which keeps the SSRF guard, rate limiting, and cost under the app's control. Haiku 4.5 is chosen because extraction is a small, well-defined task: a typical posting costs a fraction of a cent.
+Errors are typed, because these six failures ask the user to do six different things:
 
-**Fetch behaviour & limitations.** The fetch sends an honest, identifying `User-Agent` (`KarirKalyan-Prefill/1.0 (+https://kk.chairulakmal.com)`) rather than impersonating a browser: a site that wants to recognise the request can. Because it's a plain server-side `Net::HTTP` GET, it works on pages that serve their content as static HTML, but it will **not** reliably fetch every site, and that's by design rather than a bug:
+| What went wrong | Response | Notes |
+|---|---|---|
+| The URL is malformed, or it points to a private address | `422` `invalid_url` | The SSRF guard above rejects it. |
+| A site refuses an automated reader | `422` `prefill_blocked` | The URL is correct. Retrying gives the same result. |
+| The page cannot be fetched at all | `502` `prefill_unreachable` | An upstream `429` also lands here. That refusal is temporary, so a retry is worth asking for. |
+| The page was fetched, but produced nothing usable | `502` `prefill_failed` | Either the page held no text, or the AI extraction failed. |
+| Pasted text is longer than `MAX_TEXT_CHARS` after stripping to text | `422` `prefill_paste_too_long` | Only the paste path can raise this. A fetched page over the limit is truncated silently, because the user never saw its length. |
+| `ANTHROPIC_API_KEY` is missing | `503` `prefill_unavailable` | Pre-fill is off; the rest of the app is unaffected. |
+
+The model only ever receives text that the server has already fetched. Anthropic's server-side web-search and web-fetch tools are deliberately **not** used, which keeps the SSRF guard, the rate limiting, and the cost under this app's control. Haiku 4.5 is the chosen model because extraction is a small, well-defined task: a typical posting costs a fraction of a cent.
+
+**Fetch behavior and limitations.** The fetch sends an honest `User-Agent` that identifies the app (`KarirKalyan-Prefill/1.0 (+https://kk.chairulakmal.com)`). It does not pretend to be a browser, so a site that wants to recognize the request can do so. The fetch is a plain server-side `Net::HTTP` GET. It works on pages that serve their content as static HTML. It will **not** fetch every site reliably, and that limit is deliberate:
 
 - **Bot-managed sites** (Cloudflare / Akamai challenge pages) return a `403` or a JS-challenge page instead of content.
 - **Aggressive anti-scraping** (e.g. LinkedIn) returns a login wall: effectively unfetchable server-side without authentication.
 - **JS-rendered SPAs** return a near-empty HTML shell, since the job text is loaded by client-side JavaScript the server doesn't execute.
 
-In every one of these cases the failure is graceful, and it names which case it was: a challenge/403 (or a `cf-mitigated` header on any status) surfaces as `BlockedError` → `prefill_blocked`, and an empty shell as `UnreadableError` → `prefill_failed`. Both tell the user to fill the form by hand, because both are permanent: neither is the "your URL is malformed" that all of this used to be reported as. Defeating bot management or rendering SPAs would mean a headless browser or a third-party scraping API: heavier infrastructure that isn't worth it for a personal tracker, so the limitation is accepted deliberately.
+In all three cases the failure is graceful, and it names which case happened. A challenge page or a `403` (or a `cf-mitigated` header on any status) becomes `BlockedError` → `prefill_blocked`. An empty HTML shell becomes `UnreadableError` → `prefill_failed`. Both messages ask the user to fill the form manually, because both failures are permanent. Earlier versions reported all of these as "your URL is malformed", which was wrong: the URL is correct. Defeating bot management, or rendering a single-page app, would require a headless browser or a third-party scraping service. That is heavier infrastructure than a personal tracker justifies, so the limit is accepted deliberately.
 
-The service also does **not** consult `robots.txt`. This is a single, user-initiated fetch of a URL the user themselves pasted (closer to a link-preview "unfurl" than to autonomous crawling), so it's treated as out of scope; it would be the first thing to add if pre-fill ever fetched URLs on its own.
+The service also does **not** read `robots.txt`. This is one fetch, started by the user, of a URL that the user pasted. It is closer to the link preview a chat app generates than to a crawler that visits pages on its own, so `robots.txt` is treated as out of scope. It would be the first thing to add if pre-fill ever fetched URLs by itself.
 
 ## Demo data
 
-The "Try demo account" button signs every visitor into one shared user (`demo@karirkalyan.com`), so its data drifts as people explore. In production the `reset_demo_account` recurring task wipes it back to a clean seed **every hour at :42** (`DemoResetJob` → `Demo::ResetService`), scoped to the demo user: real accounts are never touched.
+The "Try demo account" button signs every visitor into one shared user (`demo@karirkalyan.com`), so its data changes as people explore. In production, the `reset_demo_account` recurring task returns it to a clean seed **every hour at :42** (`DemoResetJob` → `Demo::ResetService`). The task is scoped to the demo user, so real accounts are never touched.
 
-Seeds are idempotent (`find_or_create_by!`), but only *create*: they won't refresh rows that already exist, which is why the reset destroys before reseeding rather than re-running seeds on top.
+Seeds are idempotent (`find_or_create_by!`), but they only *create*. They do not refresh rows that already exist. That is why the reset destroys the demo user first and then reseeds, instead of running the seeds again on top of the old rows.
 
 ```bash
 bin/rails db:seed       # idempotent: adds any missing demo data, never duplicates
@@ -114,7 +134,7 @@ bin/rails demo:reset    # full refresh: destroys the demo user (cascades to its
                         # applications + timeline) and reseeds; real users untouched
 ```
 
-The hourly task makes a manual reset rarely necessary, but you can force one via `docker compose -f docker-compose.prod.yml exec api bin/rails demo:reset`. `demo:reset` deletes only the demo user's records rather than reaching for `db:reset`/`db:drop`, the same scoped approach the Railway-era Postgres needed (its role couldn't drop the connected database) and still the right one here, since the demo user's records are the only thing that should ever be wiped. Logic lives in `Demo::ResetService`.
+The hourly task makes a manual reset rarely necessary, but you can force one with `docker compose -f docker-compose.prod.yml exec api bin/rails demo:reset`. `demo:reset` deletes only the demo user's records; it does not use `db:reset` or `db:drop`. The Railway-era Postgres required this scoped approach, because its role could not drop the connected database. It is still the right approach here, because the demo user's records are the only data that should ever be erased. The logic lives in `Demo::ResetService`.
 
 ## Running tests
 
@@ -134,7 +154,7 @@ Two-tier strategy:
 
 **Coverage:** SimpleCov runs by default and writes to `/coverage/` (gitignored). Open `coverage/index.html` in a browser after a run. Branch coverage enabled; 80% line minimum enforced.
 
-**N+1 detection:** `prosopite` wraps every request spec and raises `Prosopite::NPlusOneQueriesError` on detection. Opt-out per spec with `RSpec.describe "...", type: :request, skip_n_plus_one: true do` (use sparingly; usually a real signal).
+**N+1 detection:** an N+1 query is one where the code runs a separate query for every row instead of one query for all rows. `prosopite` wraps every request spec and raises `Prosopite::NPlusOneQueriesError` when it finds one. Opt out for a single spec with `RSpec.describe "...", type: :request, skip_n_plus_one: true do` (use sparingly; usually a real signal).
 
 ## Regenerating API docs
 
