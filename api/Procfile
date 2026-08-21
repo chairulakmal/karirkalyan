@@ -1,5 +1,5 @@
-# For local dev via `foreman start`. NOT used in production: Railway builds from
-# the Dockerfile and ignores this Procfile. There is no worker line because there
-# is no worker process — Solid Queue runs inside Puma in production, and on the
-# `:async` adapter in development.
+# For local dev via `foreman start`. NOT used in production: the Docker image
+# (api/Dockerfile) has its own CMD and never reads this file. There is no worker
+# line because there is no worker process: Solid Queue runs inside Puma in
+# production, and on the `:async` adapter in development.
 web: bundle exec rails server -b 0.0.0.0 -p ${PORT:-3001}

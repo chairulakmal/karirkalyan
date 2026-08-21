@@ -1,6 +1,6 @@
 class CreateSolidQueueAndSolidCacheTables < ActiveRecord::Migration[8.1]
   # Single-database setup: Solid Queue and Solid Cache live in the primary
-  # Postgres (no separate `queue`/`cache` databases, no extra Railway service).
+  # Postgres (no separate `queue`/`cache` databases, no extra service).
   # Tables copied from the gems' generated db/queue_schema.rb / db/cache_schema.rb.
   def change
     create_table "solid_queue_blocked_executions" do |t|

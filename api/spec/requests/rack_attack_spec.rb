@@ -28,10 +28,12 @@ RSpec.describe "Rack::Attack throttling", type: :request, skip_n_plus_one: true 
 
     # Every per-IP throttle rests on req.ip, and req.ip is only as trustworthy as the
     # header Rack reads it from. Rack 3.2 consults the RFC-7239 `Forwarded:` header
-    # ahead of `X-Forwarded-For`, and Railway normalises the latter but does not strip
+    # ahead of `X-Forwarded-For`, and Railway normalised the latter but did not strip
     # the former, so a client could hand us a fresh identity per request and rotate
-    # through the limit. rack_attack.rb pins forwarded_priority to [:x_forwarded] to
-    # close it; this is the proof.
+    # through the limit. The Cloudflare Tunnel this app now sits behind closes that
+    # path structurally, but rack_attack.rb still pins forwarded_priority to
+    # [:x_forwarded] as defense-in-depth (notes/HISTORY.md § Production lessons); this is
+    # the proof it holds regardless of which proxy fronts the app.
     it "ignores a spoofed Forwarded header when identifying the client" do
       5.times do |i|
         post "/api/v1/auth/sign_in", params: body, as: :json,

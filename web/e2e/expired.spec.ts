@@ -1,12 +1,14 @@
 import { expect, test } from "@playwright/test";
 
 /**
- * The expired-session bounce must emit a *relative* Location. Behind Railway's
- * proxy the app sees `Host: localhost:8080`, so an absolute URL built from
- * `request.url` sent real browsers to https://localhost:8080 — the bug these
- * specs pin. Fresh request contexts, not the shared `request` fixture: the
- * suite's storageState carries a session cookie, and the ja assertion needs
- * the proxy to see no session at all, exactly like a just-expired visitor.
+ * The expired-session bounce must emit a *relative* Location. Behind
+ * Railway's proxy the app once saw `Host: localhost:8080`, so an absolute
+ * URL built from `request.url` sent real browsers to https://localhost:8080,
+ * the bug these specs pin. The fix generalises to any reverse proxy,
+ * including the Cloudflare Tunnel this app now sits behind. Fresh request
+ * contexts, not the shared `request` fixture: the suite's storageState
+ * carries a session cookie, and the ja assertion needs the proxy to see no
+ * session at all, exactly like a just-expired visitor.
  */
 test.describe("expired session bounce", () => {
   test("redirects with a relative Location and clears the cookie", async ({

@@ -1,4 +1,5 @@
-# Single-line JSON logs in production so Railway's log viewer can parse and filter.
+# Single-line JSON logs in production so `docker compose logs` and any log
+# viewer reading them can parse and filter.
 # Keeps :request_id in the payload (set as a log tag in production.rb) for tracing.
 Rails.application.configure do
   config.lograge.enabled              = Rails.env.production?

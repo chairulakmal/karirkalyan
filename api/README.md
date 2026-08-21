@@ -40,13 +40,14 @@ Jobs run in-process in development via the `:async` adapter (`config/environment
 
 | Variable | Source |
 |---|---|
-| `DATABASE_URL` | Railway managed Postgres (reference variable) |
+| `DB_USERNAME` / `DB_PASSWORD` / `DB_NAME` | Root `.env` (`.env.prod.example`), which also configures the `postgres` service itself. Read as discrete values by `config/database.yml`, so no character needs URL-escaping. Rotating the password takes an `ALTER USER` inside the container *and* an edit here; `.env.prod.example` has the order. |
+| `DB_HOST` | Set to the `postgres` service name by `docker-compose.prod.yml`. The only one of the five that is a property of the topology rather than the credentials. |
 | `SOLID_QUEUE_IN_PUMA` | Set to `1`. **Required**: `config/puma.rb` only loads `plugin :solid_queue` when it is present, and without the plugin no job ever runs (no separate worker service exists to pick up the slack). |
 | `DEVISE_JWT_SECRET_KEY` | Generate: `ruby -e "require 'securerandom'; puts SecureRandom.hex(64)"` |
 | `FRONTEND_URL` | URL of the deployed `web` service (also used as the link host in reminder emails) |
 | `SECRET_KEY_BASE` | Generate: `bin/rails secret`. Preferred over `RAILS_MASTER_KEY`: this app stores no secrets in `credentials.yml.enc`, so sharing the master key with production is unnecessary. |
 | `SMTP_HOST` | SMTP server for outbound mail. Resend: `smtp.resend.com`. The mailer is provider-agnostic: any SMTP host works. |
-| `SMTP_PORT` | SMTP port. Defaults to `587` (STARTTLS). **On Railway use `2587`**: Railway blocks outbound 587/465; `2587`/`2465` are Resend's alternate ports. |
+| `SMTP_PORT` | SMTP port. Defaults to `587` (STARTTLS). Production uses `2587`, Resend's alternate STARTTLS port, kept from the Railway-era setup since many networks block outbound 587/465; `2465` is the implicit-TLS alternate. |
 | `SMTP_USER` | SMTP username. For Resend this is the literal string `resend`. |
 | `SMTP_PASS` | SMTP password / API key. For Resend, a `re_…` API key. |
 | `MAILER_FROM` | `From:` address for outbound mail, e.g. `KarirKalyan <reminders@kk.chairulakmal.com>`. Must be on a domain verified with the SMTP provider. |
@@ -113,7 +114,7 @@ bin/rails demo:reset    # full refresh: destroys the demo user (cascades to its
                         # applications + timeline) and reseeds; real users untouched
 ```
 
-The hourly task makes a manual reset rarely necessary, but on Railway you can force one via `railway ssh --service api bin/rails demo:reset`. Note that `db:reset`/`db:drop` do **not** work on Railway's managed Postgres (the role can't drop the connected database); `demo:reset` sidesteps that by deleting only the demo user's records. Logic lives in `Demo::ResetService`.
+The hourly task makes a manual reset rarely necessary, but you can force one via `docker compose -f docker-compose.prod.yml exec api bin/rails demo:reset`. `demo:reset` deletes only the demo user's records rather than reaching for `db:reset`/`db:drop`, the same scoped approach the Railway-era Postgres needed (its role couldn't drop the connected database) and still the right one here, since the demo user's records are the only thing that should ever be wiped. Logic lives in `Demo::ResetService`.
 
 ## Running tests
 

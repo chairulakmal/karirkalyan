@@ -1,6 +1,6 @@
 Rails.application.routes.draw do
   # Deep health check — overrides Rails 8 default (which only verifies boot).
-  # Pings Postgres so Railway healthchecks fail fast on dependency loss.
+  # Pings Postgres so the Docker HEALTHCHECK fails fast on dependency loss.
   get "up" => "health#show", as: :rails_health_check
 
   mount Rswag::Ui::Engine => "/api-docs"

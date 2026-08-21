@@ -47,11 +47,12 @@ export default async function BoardPage() {
     apiFetch<TransitionTable>("/transitions"),
   ]);
 
-  // A 200 is not a promise about shape. `apiFetch` casts rather than parses, and
-  // web/api are separate Railway services — so mid-deploy this can be the payload
-  // from before `active_states` existed, with `ok: true` over the top of it. The
-  // dashboard can shrug that off; the board cannot, because `active_states` *is*
-  // its columns. An unusable table is a failed table.
+  // A 200 is not a promise about shape. `apiFetch` casts rather than parses, so
+  // a 204 or a non-JSON 200 surfaces as `ok: true` over a hollow `data`. It is
+  // not a deploy guard: web gates on api: condition: service_healthy, and an api
+  // that is genuinely unreachable throws out of apiFetch rather than answering
+  // `ok`. The dashboard can shrug a hollow table off; the board cannot, because
+  // `active_states` *is* its columns. An unusable table is a failed table.
   const table =
     tableRes.ok && Array.isArray(tableRes.data?.active_states) ? tableRes.data : null;
 

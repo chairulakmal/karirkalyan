@@ -2,7 +2,7 @@ name: karirkalyan
 
 services:
   postgres:
-    # Matches the Railway production image (postgres-ssl:18). Keep the majors in step.
+    # Matches production's postgres:18 image (docker-compose.prod.yml). Keep the majors in step.
     image: postgres:18
     environment:
       POSTGRES_USER:     ${DB_USERNAME:-karirkalyan}

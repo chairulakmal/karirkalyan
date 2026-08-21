@@ -3,8 +3,9 @@ import { redirect } from "next/navigation";
 
 /**
  * Where `web/`'s server-side code reaches Rails. Server-to-server only: in
- * production this resolves to the private `api.railway.internal` address, which
- * a browser cannot reach at all.
+ * production this resolves to `http://api:8080`, the `api` container's address
+ * on the internal Docker Compose network (SPEC.md § Deployment), which a
+ * browser cannot reach at all.
  *
  * Not to be confused with `PUBLIC_API_ORIGIN` (app/lib/links.ts) — that is the
  * API's public URL, and exists only to build outbound doc links for a browser
@@ -35,7 +36,8 @@ export type ApiFailure = {
  * `data` is `T | null`, not `T`, and the null is load-bearing.
  *
  * Two of the three success paths below genuinely return no body: a 204, and a
- * non-JSON 200 (a Railway holding page mid-deploy, a proxy interstitial). Those
+ * non-JSON 200 (a proxy interstitial, or anything in front of the api that
+ * answers 200 with a page rather than a payload). Those
  * used to be written `data: null as T`, an assertion that told the compiler the
  * value was a `T` at exactly the boundary where types are erased and the value
  * is least trustworthy. The cost was real: dashboard/page.tsx destructured

@@ -5,11 +5,13 @@ import { ACCOUNT_EMAIL_COOKIE_NAME, SESSION_COOKIE_NAME } from "@/app/lib/api";
 // apiFetch redirects here because render contexts can't modify cookies;
 // this handler clears the stale session cookie and sends the user to sign-in.
 //
-// The Location is deliberately relative. Behind Railway's proxy this process
-// sees `Host: localhost:8080`, so an absolute URL built from `request.url`
-// resolves to the internal origin — a real 307 to https://localhost:8080
-// shipped exactly that way. A relative Location resolves against whatever
-// origin the browser is already on.
+// The Location is deliberately relative. This process sits behind a reverse
+// proxy (Railway's, historically; a Cloudflare Tunnel now), and whichever one
+// fronts it can hand the process a Host header that names an internal origin
+// rather than the public one, so an absolute URL built from `request.url` is
+// not trustworthy: a real 307 to https://localhost:8080 shipped exactly that
+// way under Railway. A relative Location resolves against whatever origin the
+// browser is already on regardless of what the proxy did to the request.
 //
 // The path is unprefixed on purpose: the follow-up request goes through the
 // proxy and next-intl, which resolve the locale from the NEXT_LOCALE cookie

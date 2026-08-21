@@ -14,7 +14,7 @@ https://github.com/user-attachments/assets/862ca199-95e5-4e27-b9ef-ada7eb10a350
 
 <!-- SCREENSHOT: kanban board at /board, English locale, demo account data. Embed here once captured. -->
 
-**Live demo:** [kk.chairulakmal.com](https://kk.chairulakmal.com). The demo account is one click ("Try demo account" on the sign-in page) and comes prefilled with 12 applications spread across the pipeline, from `wishlist` through to `accepted`. API docs are served as Swagger UI at [`/api-docs`](https://api-production-4899.up.railway.app/api-docs).
+**Live demo:** [kk.chairulakmal.com](https://kk.chairulakmal.com). The demo account is one click ("Try demo account" on the sign-in page) and comes prefilled with 12 applications spread across the pipeline, from `wishlist` through to `accepted`. API docs are served as Swagger UI at [`/api-docs`](https://kk-api.chairulakmal.com/api-docs).
 
 ## Highlights
 
@@ -37,7 +37,8 @@ https://github.com/user-attachments/assets/862ca199-95e5-4e27-b9ef-ada7eb10a350
 |---|---|
 | API | Rails 8.1 (API-only), Ruby 3.4.9, Devise + devise-jwt |
 | Frontend | Next.js 16.2, React 19.2, TypeScript 5, Tailwind CSS, next-intl |
-| Database | PostgreSQL 18, Docker locally, Railway managed in production |
+| Database | PostgreSQL 18 in Docker, both locally and in production |
+| Deployment | Docker Compose + Cloudflare Tunnel, self-hosted (`SPEC.md` § Deployment) |
 | Tests | RSpec (unit and request tiers), Vitest (`web/` units), Playwright 1.60 end to end |
 
 ## Running locally

@@ -1,0 +1,146 @@
+# Self-hosted production stack (Docker + Cloudflare Tunnel). Contrast with
+# api/docker-compose.yml, which is dev-only: Postgres alone, ports open to the
+# host, no built images. This file replaces Railway's two app services plus its
+# managed Postgres; SPEC.md § Deployment is the source of truth for the
+# reasoning, this file is just its executable form.
+#
+# No service publishes a host port. cloudflared is the only ingress: it reaches
+# `api` and `web` by service name over the `internal` network, which is also the
+# only network any container is on, so nothing here is reachable except through
+# the tunnel, however the host firewall is configured. The backups self-hosted
+# runner (SPEC.md § Backups) does not need one either: it reaches `postgres` via
+# `docker exec` into this container, not a TCP connection from the host.
+#
+#   docker compose -f docker-compose.prod.yml up -d --build
+#
+# `name:` deliberately differs from api/docker-compose.yml's ("karirkalyan"):
+# Compose derives volume and network names from the project name, and this file
+# ran against api/docker-compose.yml's dev Postgres volume once already under a
+# shared name, failing on a stale password from a data directory it didn't
+# initialize. Same name would mean this stack and dev share one database.
+
+name: karirkalyan-prod
+
+services:
+  postgres:
+    # Matches production's major version, same as api/docker-compose.yml.
+    image: postgres:18
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${DB_USERNAME}
+      POSTGRES_PASSWORD: ${DB_PASSWORD}
+      POSTGRES_DB: ${DB_NAME:-api_production}
+    volumes:
+      # postgres:18 declares its volume at /var/lib/postgresql, not .../data:
+      # see api/docker-compose.yml's comment for why the old path silently
+      # loses data across `down`.
+      - postgres_data:/var/lib/postgresql
+    healthcheck:
+      # Authenticates rather than pings. POSTGRES_PASSWORD is read only when the
+      # entrypoint initializes an *empty* data directory, so editing DB_PASSWORD
+      # in .env against an existing volume leaves the old password authoritative.
+      # `pg_isready` reports healthy either way, while api rebuilds its
+      # credentials from .env on every boot, so the stack would crash-loop on
+      # auth errors with `docker compose ps` showing postgres perfectly fine.
+      # Failing the check instead keeps api from starting and names the cause.
+      #
+      # `-h postgres`, not 127.0.0.1: initdb's own pg_hba entry trusts loopback,
+      # and only the entrypoint's appended `host all all all scram-sha-256` rule
+      # verifies a password. The service name resolves to this container's
+      # network address, so the check takes the same path api's connection does.
+      #
+      # Rotating the password means `ALTER USER ... PASSWORD` inside the
+      # container first, then editing .env to match. Changing .env alone does
+      # nothing to the database.
+      test:
+        [
+          "CMD-SHELL",
+          'PGPASSWORD="$$POSTGRES_PASSWORD" psql -h postgres -U "$$POSTGRES_USER" -d "$$POSTGRES_DB" -c "SELECT 1" >/dev/null 2>&1',
+        ]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      # A fresh volume runs initdb and the entrypoint's bootstrap before TCP is
+      # listening at all; without this the first boot burns the retries.
+      start_period: 60s
+    networks: [internal]
+
+  api:
+    build: ./api
+    restart: unless-stopped
+    env_file: .env
+    environment:
+      # Discrete keys, not a DATABASE_URL. This used to interpolate the
+      # credentials into a connection string, which made any password
+      # containing ":", "@" or "/" either fail to parse or, worse, parse into a
+      # URL pointing somewhere else, with only a comment guarding against it.
+      # api/config/database.yml (production) reads these as plain values, so
+      # nothing in a password needs escaping.
+      #
+      # Only DB_HOST belongs here: DB_USERNAME/DB_PASSWORD/DB_NAME reach the
+      # container through `env_file: .env`, the same file the postgres service
+      # above is configured from, so the two halves cannot drift.
+      DB_HOST: postgres
+    depends_on:
+      # Puma boots against Postgres immediately; without this, api starts
+      # racing an unready database on every fresh `up` and fails on migrate.
+      postgres:
+        condition: service_healthy
+    networks: [internal]
+    # 512m was Railway's plan sizing carried over unexamined, and on this host
+    # it was a ceiling rather than a cap. Measured 2026-08-21 against 13 hours
+    # of uptime: memory.current 510 MiB of the 512 MiB limit, `anon` 493 MiB
+    # (real Ruby heap, not reclaimable), `file` and `inactive_file` both zero,
+    # and memory.events `max` at 92. That combination is the tell: the kernel
+    # had evicted every page of cache to stay under the limit and re-entered
+    # reclaim 92 times, so Rails was re-reading from disk on every miss. No
+    # `oom_kill` and no restart, which is exactly why it stayed invisible.
+    # 768m restores headroom on a host with ~48 GiB free; the limit stays a
+    # limit so a leak still gets contained rather than eating the machine.
+    mem_limit: 768m
+
+  web:
+    build: ./web
+    restart: unless-stopped
+    # Its own file, not the root .env api reads: web is the internet-facing
+    # process and has no business holding Postgres/Devise/mailer/API-key
+    # secrets it never touches (.env.web.example).
+    env_file: .env.web
+    environment:
+      # Server-side only (never shipped to the browser): API_URL points at the
+      # api container's internal name, not a public hostname, mirroring how
+      # Railway's private network resolved it before.
+      API_URL: http://api:8080
+    depends_on:
+      # Waits on api's own HEALTHCHECK (its /up dependency check), not just
+      # process start, so web never comes up fronting a Rails process that
+      # can't reach its own database.
+      api:
+        condition: service_healthy
+    networks: [internal]
+    mem_limit: 512m
+
+  cloudflared:
+    # Pinned to the version already running on this host (`cloudflared --version`
+    # inside the container, checked 2026-08-21), the same real-tag convention
+    # postgres:18 uses above. `:latest` meant a redeploy after a `docker system
+    # prune`, disk pressure, or new hardware would silently pull an unreviewed
+    # release with no changelog read and no version to roll back to. Bump this
+    # deliberately, not by re-adding `:latest`.
+    image: cloudflare/cloudflared:2026.8.2
+    restart: unless-stopped
+    command: tunnel --config /etc/cloudflared/config.yml run
+    volumes:
+      - ./cloudflared:/etc/cloudflared:ro
+    depends_on:
+      web:
+        condition: service_healthy
+      api:
+        condition: service_healthy
+    networks: [internal]
+
+networks:
+  internal:
+
+volumes:
+  postgres_data:

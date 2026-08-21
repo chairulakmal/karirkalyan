@@ -1,15 +1,23 @@
-# local research notes — not for the repo
-/notes
+# local research notes: not for the repo
+/notes/*
 /.claude
+!/notes/HISTORY.md
+!/notes/OPS.md
 
 # Secrets
 .env
+.env.web
 .env.local
 .env*.local
+!.env.prod.example
+
+# Cloudflare Tunnel: names a real tunnel ID and points at its credentials file
+cloudflared/config.yml
+cloudflared/*.json
 
 # macOS
 .DS_Store
 
-# demo recordings — uploaded via the GitHub editor, never committed
+# demo recordings: uploaded via the GitHub editor, never committed
 *.webm
 *.mp4

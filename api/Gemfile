@@ -29,7 +29,7 @@ gem "solid_cache"
 gem "rswag-api"
 gem "rswag-ui"
 
-# Structured single-line JSON logs in production for Railway log aggregation
+# Structured single-line JSON logs in production for log aggregation
 gem "lograge"
 
 # AI job-URL pre-fill — extracts company/role/notes from a pasted posting URL.

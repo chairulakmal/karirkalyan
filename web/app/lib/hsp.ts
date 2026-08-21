@@ -6,7 +6,7 @@
 // table), the 70-point threshold and the PR fast-track years from the MOJ 高度
 // 専門職 status page, and the J-Skip gate from the ISA 特別高度人材制度 page.
 // Verified against those primary sources 2026-07-21; re-confirm on the annual
-// visa-research pass (SPEC.md § HSP calculator, TODO.md perishable-facts rule).
+// visa-research pass (SPEC.md § Public pages, TODO.md perishable-facts rule).
 //
 // This models the engineer's column only. Of the table's bonus points, the three
 // that live purely in the 経営・管理 (management) column are out of scope: position

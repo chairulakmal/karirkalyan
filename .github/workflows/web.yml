@@ -83,7 +83,8 @@ jobs:
     if: needs.changes.outputs.code == 'true'
     runs-on: ubuntu-latest
     env:
-      # Build-time placeholder; real value comes from Railway in production.
+      # Build-time placeholder; real value comes from docker-compose.prod.yml
+      # in production (the api container's internal service name and port).
       API_URL: http://localhost:3001
 
     steps:

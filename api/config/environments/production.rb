@@ -20,14 +20,14 @@ Rails.application.configure do
   # Enable serving of images, stylesheets, and JavaScripts from an asset server.
   # config.asset_host = "http://assets.example.com"
 
-  # Railway terminates TLS at the edge; trust its X-Forwarded-Proto header
-  # so Rails treats incoming requests as HTTPS.
+  # cloudflared terminates TLS at Cloudflare's edge and forwards plain HTTP,
+  # setting X-Forwarded-Proto; trust it so Rails treats incoming requests as HTTPS.
   config.assume_ssl = true
 
   # Force HTTPS, set HSTS, mark cookies as secure.
   config.force_ssl = true
 
-  # Health check endpoint stays plain HTTP so Railway's prober isn't redirected.
+  # Health check endpoint stays plain HTTP so the Docker HEALTHCHECK's curl isn't redirected.
   config.ssl_options = { redirect: { exclude: ->(request) { request.path == "/up" } } }
 
   # Log to STDOUT with the current request id as a default log tag.
@@ -74,13 +74,13 @@ Rails.application.configure do
   # Only use :id for inspections in production.
   config.active_record.attributes_for_inspect = [ :id ]
 
-  # DNS-rebinding protection. Production domain + Railway-issued preview/prod
-  # subdomains + private-network hostnames for service-to-service calls.
+  # DNS-rebinding protection. Production domain + the Cloudflare Tunnel's public
+  # API subdomain + the Docker Compose service name for internal calls.
   # An additional host can be supplied at runtime via APP_HOST. Patterns and the
   # "don't anchor them" rationale live in AllowedHosts, which spec/lib covers.
   config.hosts.concat(AllowedHosts.all)
 
-  # Health check endpoint skips host authorization so the platform's prober
-  # (which may use an internal hostname) keeps working.
+  # Health check endpoint skips host authorization so the Docker HEALTHCHECK
+  # (which uses the internal hostname) keeps working.
   config.host_authorization = { exclude: ->(request) { request.path == "/up" } }
 end
