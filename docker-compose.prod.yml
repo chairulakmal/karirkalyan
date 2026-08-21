@@ -87,7 +87,17 @@ services:
       postgres:
         condition: service_healthy
     networks: [internal]
-    mem_limit: 512m
+    # 512m was Railway's plan sizing carried over unexamined, and on this host
+    # it was a ceiling rather than a cap. Measured 2026-08-21 against 13 hours
+    # of uptime: memory.current 510 MiB of the 512 MiB limit, `anon` 493 MiB
+    # (real Ruby heap, not reclaimable), `file` and `inactive_file` both zero,
+    # and memory.events `max` at 92. That combination is the tell: the kernel
+    # had evicted every page of cache to stay under the limit and re-entered
+    # reclaim 92 times, so Rails was re-reading from disk on every miss. No
+    # `oom_kill` and no restart, which is exactly why it stayed invisible.
+    # 768m restores headroom on a host with ~48 GiB free; the limit stays a
+    # limit so a leak still gets contained rather than eating the machine.
+    mem_limit: 768m
 
   web:
     build: ./web
