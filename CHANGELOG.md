@@ -10,6 +10,7 @@ Open work lives in [`TODO.md`](TODO.md), and how the system works today lives in
 
 On `main` and deployed, carrying no version number. Deploys are manual since 2026-08-19: `bin/deploy` from the repo root after merging.
 
+- **Added:** the four stat cards read on the Kanban board, not only on the dashboard.
 - **Changed:** deployment moves off Railway to a self-hosted Docker Compose stack behind a Cloudflare Tunnel.
 - **Added:** the screening success rate, and the gap that makes it readable.
 - **Changed:** the dashboard is ordered by what you do with it, and Upcoming means this week.
@@ -25,7 +26,7 @@ On `main` and deployed, carrying no version number. Deploys are manual since 202
 - **Chore:** non-major dependency updates, and Dependabot actually turned off.
 - **Fixed:** the four self-hosting review findings.
 
-By the mechanical test, only dashboard pins and the screening success rate would have forced a **minor**; the rest are patches.
+By the mechanical test, only dashboard pins, the screening success rate and the board's stat cards would have forced a **minor**; the rest are patches.
 
 ---
 

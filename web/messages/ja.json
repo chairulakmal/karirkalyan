@@ -454,11 +454,6 @@
     "email": "メールアドレス",
     "memberSince": "登録日",
     "avgDays": "応募から内定までの平均日数:",
-    "responseRate": "返信率",
-    "screeningSuccessRate": "書類通過率",
-    "ghostRate": "音信不通率",
-    "timeInStage": "平均滞在日数",
-    "daysValue": "{days}日",
     "avgDaysAria": "この平均に含まれる応募について",
     "avgDaysTooltip": "内定・内定承諾・内定辞退に到達した応募が対象です。応募日から、監査ログに内定ステータスが記録された日までを計測しています。",
     "failedToLoad": "読み込みに失敗しました: {message}",
@@ -494,6 +489,13 @@
       "showMore": "他{count}件を表示",
       "showLess": "表示を減らす"
     }
+  },
+  "stats": {
+    "responseRate": "返信率",
+    "screeningSuccessRate": "書類通過率",
+    "ghostRate": "音信不通率",
+    "timeInStage": "平均滞在日数",
+    "daysValue": "{days}日"
   },
   "board": {
     "eyebrow": "パイプライン",

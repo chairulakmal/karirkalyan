@@ -2,7 +2,7 @@
 
 > The technical source of truth for KarirKalyan, a full-stack job application tracker: Rails 8 API (`api/`) + Next.js 16 frontend (`web/`). It describes the system **as it is**, and the most important rule about it is **spec-first: change this file before you change code**; if code and spec disagree, one of them is a bug. It is a reference, not an essay: callouts, tables, schemas and invariant lists covering both apps end to end (data model, state machine, services, API contract, jobs, security, auth, i18n, the installable app), plus testing, deployment, local dev and versioning. The full table of contents is under [Contents](#contents); the reasoning behind each decision, and the release archaeology that used to sit inline here, live in [`notes/HISTORY.md`](notes/HISTORY.md).
 
-Last synced against the code: **2026-08-21**.
+Last synced against the code: **2026-08-28**.
 
 ---
 
@@ -544,7 +544,7 @@ GET /api/v1/applications/ownership_check?company=Mercari
 - **`facets` is a `[company, board, status, japanese_level]` tuple** (widened in `v1.10.0`), one per row. The client computes **disjunctive faceting** across all four filters: each facet's counts reflect the *other* active filters, never its own selection.
 - **`user` is the former `GET /api/v1/me` payload, folded in.** `/me` still exists; `web/` no longer calls it.
 - **`upcoming` is the Upcoming agenda** (`v1.11.0`): follow-ups and future interviews across `ACTIVE_STATES`, plus `residence_expires_on` when within `AGENDA_RESIDENCE_WINDOW_DAYS` (90). Each item carries a `type` (`follow_up` / `interview` / `residence`); the list is chronological and capped at `AGENDA_LIMIT` (8).
-- **Stat cards ride the same payload**: `response_rate`, `screening_success_rate`, `ghost_rate` and `avg_days_in_stage`. All three rates read `timeline_entries`, so a later revival does not erase that a reply happened. **Both rates take their denominator from `applied_at`, not from the current status.** Status is a pointer that keeps moving, so archiving a `wishlist` row would otherwise change the denominator.
+- **Stat cards ride the same payload**: `response_rate`, `screening_success_rate`, `ghost_rate` and `avg_days_in_stage`. **`/board` fetches this endpoint for those four figures and nothing else**, so the cards are the same numbers on both pages. All three rates read `timeline_entries`, so a later revival does not erase that a reply happened. **Both rates take their denominator from `applied_at`, not from the current status.** Status is a pointer that keeps moving, so archiving a `wishlist` row would otherwise change the denominator.
 - **`screening_success_rate` is `response_rate` without the rejections**, counting the whole advanced set (`phone_screen`, `technical`, `final_round`, `offer`) because a company may skip the phone screen. The gap between the two rates is the point.
 - **`avg_days_to_offer` scopes the user *inside* its derived table.** It reads the offer moment from `timeline_entries`, not from `updated_at`, which drifts on any edit. A `DISTINCT ON` subquery finds the first offer per application, and Postgres cannot push an outer `user_id` filter through `DISTINCT ON`.
 
@@ -833,6 +833,7 @@ Every challenge is a **single-use** Solid Cache entry with a **five-minute TTL**
 - **Your data is last** because it is not part of the day's work.
 - **The Upcoming agenda shows the next seven days plus anything overdue** (`AGENDA_WINDOW_DAYS`, `web/app/lib/agenda.ts`). **No lower bound**, because an overdue follow-up is the most actionable row on the page. **`residence` is exempt**: a Certificate of Eligibility takes 63 days (`Visa::COE_LEAD_TIME_DAYS`), so a clock that first appears a week before expiry appears too late to act on. **Nothing is dropped**: whatever falls outside folds behind "Show more".
 - **Both action cards cap visible rows at three** and re-rank their own three for the read the section is for. `GhostRiskCard` sorts fewest `business_days_in_stage` first, which is the opposite of the server's longest-silence ordering, and the wire ordering is unchanged.
+- **The stat cards are a shared block, not a dashboard section** (2026-08-28). `web/app/components/stat-cards.tsx` owns the row, and `/board` renders the same component (§ Board view). Their labels live in the `stats` message namespace rather than `dashboard`, because a label two pages read is not one page's. The **`avg_days_to_offer` line stays on `/dashboard` alone**: it carries a tooltip that explains a denominator, which is a read for the page you visit to read.
 
 ### Board view
 
@@ -846,6 +847,7 @@ Every challenge is a **single-use** Solid Cache entry with a **five-minute TTL**
 - **The card menu is the accessible path**, not a fallback: native HTML5 drag is unusable by keyboard, so every move is reachable from a real menu.
 - **Optimistic moves revert on `409`**, with the reason surfaced through the toast primitive.
 - The board's `days_in_stage` is **calendar** days, distinct from ghost risk's `business_days_in_stage`. The two must never be read as the same number, which is why the names differ.
+- **The four stat cards render above the columns** (2026-08-28), from the same `GET /api/v1/dashboard` payload the dashboard reads. The figures are **account-wide**, so neither the 10-page fetch cap nor a truncated board changes them: a truncated board shows a complete rate, which is the honest pairing rather than a coincidence. **A failed `/dashboard` does not fail the board.** The applications and the transition table are the board and still hard-fail; the cards are a read beside it, so they hide the way they hide on a fresh account.
 
 ### Pinned applications
 
