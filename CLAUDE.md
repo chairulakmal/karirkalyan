@@ -64,7 +64,7 @@ How much ceremony a change gets depends on what kind of change it is:
 
 "Docs" means documentation only: `*.md`, comments, `llms.txt`. A change that touches docs *and* code is not a docs change: classify it by the code.
 
-**Cadence: combine PRs as much as possible, ideally one per day.** The exception is a fatal bug fix, which ships alone and immediately. Everything else headed for a PR rides together with the day's other work rather than each change opening its own. The table above still decides *whether* a change needs a PR; this rule only batches the ones that do. The reason is operational, not aesthetic: every merge under a watch path triggers a deploy, deploy overlap is a known source of memory spikes (the 2026-07 investigation traced every observed spike to it), and each PR burns two CI runs.
+**Cadence: combine PRs as much as possible, ideally one per day.** The exception is a fatal bug fix, which ships alone and immediately. Everything else headed for a PR rides together with the day's other work rather than each change opening its own. The table above still decides *whether* a change needs a PR; this rule only batches the ones that do. The reason is operational, not aesthetic: each PR burns two CI runs, and every merge to `main` is one more manual `bin/deploy` for the operator to run and verify (`SPEC.md` § Deployment).
 
 ### What actually enforces this
 
