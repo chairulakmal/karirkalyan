@@ -1,7 +1,8 @@
 import { getTranslations } from "next-intl/server";
 import { apiFetch } from "@/app/lib/api";
-import type { Application, Paginated, TransitionTable } from "@/app/lib/types";
+import type { Application, DashboardStats, Paginated, TransitionTable } from "@/app/lib/types";
 import { Phrase } from "@/app/components/phrase";
+import { StatCards } from "@/app/components/stat-cards";
 import { Board } from "./board";
 
 // A board is a view of *everything*, so the cursor-paginated index is followed
@@ -41,10 +42,14 @@ async function fetchAllApplications(): Promise<FetchAll> {
 }
 
 export default async function BoardPage() {
-  const [t, appsRes, tableRes] = await Promise.all([
+  // /dashboard is fetched for the stat cards alone (SPEC.md § Board view). It is
+  // a fourth parallel request against a memoized endpoint, and nothing below it
+  // is gated on the result: the cards are a read beside the board, not the board.
+  const [t, appsRes, tableRes, statsRes] = await Promise.all([
     getTranslations("board"),
     fetchAllApplications(),
     apiFetch<TransitionTable>("/transitions"),
+    apiFetch<DashboardStats>("/dashboard"),
   ]);
 
   // A 200 is not a promise about shape. `apiFetch` casts rather than parses, so
@@ -65,6 +70,11 @@ export default async function BoardPage() {
     );
   }
 
+  // `ok` is not a promise of a body: apiFetch returns null for a 204 or a
+  // non-JSON 200, and <StatCards> takes that null as "nothing to show" rather
+  // than crashing the page the applications fetch already succeeded in loading.
+  const stats = statsRes.ok ? statsRes.data : null;
+
   return (
     <div className="space-y-8">
       <header className="border-b border-dune pb-6">
@@ -82,6 +92,12 @@ export default async function BoardPage() {
           {t("truncated", { count: appsRes.applications.length })}
         </p>
       )}
+
+      {/* Above the columns, because the columns are the page: a rate is a glance
+          on the way to the board, never something to scroll back up for. The
+          figures are account-wide, so a truncated board still shows complete
+          numbers (SPEC.md § Board view). */}
+      <StatCards stats={stats} />
 
       <Board applications={appsRes.applications} table={table} />
     </div>

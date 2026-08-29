@@ -12,6 +12,7 @@ import { InfoPopover } from "@/app/components/info-popover";
 import { ToastFromParam } from "@/app/components/toast-from-param";
 import { Phrase } from "@/app/components/phrase";
 import { ProfileCard } from "@/app/components/profile-card";
+import { StatCards } from "@/app/components/stat-cards";
 import { ApplicationsList } from "./applications-list";
 import { GhostRiskCard } from "./ghost-risk-card";
 import { UpcomingAgenda } from "./upcoming-agenda";
@@ -185,38 +186,10 @@ export default async function Dashboard({
       {/* Stat cards (v1.10.0): response rate, screening success rate,
           time-in-stage, ghost rate, beside the avg-days line rather than on a
           dedicated /insights page: a new route and nav weight for one user is not
-          worth it (SPEC.md). Each hides until it has data, so a fresh account shows
-          none rather than "0%".
-
-          The screening success rate sits directly under the response rate: it is
-          that number without the rejections, and neither is worth much alone.
-          The gap between them is what separates a targeting problem from a
-          resume problem (SPEC.md § The dashboard payload). It is the freeze's
-          third recorded exception, TODO.md § The rule. */}
-      {stats &&
-        (stats.response_rate != null ||
-          stats.screening_success_rate != null ||
-          stats.avg_days_in_stage != null ||
-          stats.ghost_rate != null) && (
-        <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
-          {stats.response_rate != null && (
-            <StatCard label={t("responseRate")} value={`${stats.response_rate}%`} />
-          )}
-          {stats.screening_success_rate != null && (
-            <StatCard label={t("screeningSuccessRate")} value={`${stats.screening_success_rate}%`} />
-          )}
-          {stats.avg_days_in_stage != null && (
-            <StatCard label={t("timeInStage")} value={t("daysValue", { days: stats.avg_days_in_stage })} />
-          )}
-          {stats.ghost_rate != null && (
-            <StatCard
-              label={t("ghostRate")}
-              value={`${stats.ghost_rate}%`}
-              danger={stats.ghost_rate >= 30}
-            />
-          )}
-        </div>
-      )}
+          worth it (SPEC.md). The row itself lives in <StatCards>, which /board
+          also renders (SPEC.md § Dashboard layout); what stays here is only its
+          position in the page order. */}
+      <StatCards stats={stats} />
 
       {stats?.avg_days_to_offer != null && (
         // <div>, not <p>: InfoPopover renders a <details>, which is flow
@@ -246,16 +219,6 @@ export default async function Dashboard({
           export links are a page you visit deliberately, never something you
           scroll past on the way to the list. */}
       <ProfileCard user={me} />
-    </div>
-  );
-}
-
-// A compact stat tile. `danger` tints a bad ghost rate; nothing else changes.
-function StatCard({ label, value, danger = false }: { label: string; value: string; danger?: boolean }) {
-  return (
-    <div className="border border-dune bg-linen p-3">
-      <p className="kk-label">{label}</p>
-      <p className={`mt-1 font-mono text-xl ${danger ? "text-danger" : "text-midnight"}`}>{value}</p>
     </div>
   );
 }

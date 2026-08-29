@@ -454,11 +454,6 @@
     "email": "Email",
     "memberSince": "Member since",
     "avgDays": "Average days from apply → offer:",
-    "responseRate": "Response rate",
-    "screeningSuccessRate": "Screening success rate",
-    "ghostRate": "Ghost rate",
-    "timeInStage": "Avg time in stage",
-    "daysValue": "{days}d",
     "avgDaysAria": "What counts toward this average",
     "avgDaysTooltip": "Counts applications that reached offer, accepted, or declined. Measured from your applied date to when the offer status was recorded in the audit log.",
     "failedToLoad": "Failed to load: {message}",
@@ -494,6 +489,13 @@
       "showMore": "Show {count} more",
       "showLess": "Show less"
     }
+  },
+  "stats": {
+    "responseRate": "Response rate",
+    "screeningSuccessRate": "Screening success rate",
+    "ghostRate": "Ghost rate",
+    "timeInStage": "Avg time in stage",
+    "daysValue": "{days}d"
   },
   "board": {
     "eyebrow": "Pipeline",
