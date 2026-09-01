@@ -138,6 +138,12 @@ services:
     image: cloudflare/cloudflared:2026.8.2
     restart: unless-stopped
     command: tunnel --config /etc/cloudflared/config.yml run
+    # The image defaults to uid 65532, which cannot read the mode-600 tunnel
+    # credentials in ./cloudflared (owned by uid 1000). Native Docker Engine
+    # passes bind-mount ownership straight through; Docker Desktop used to mask
+    # it. Run as 1000 to match the files instead of widening them to 644.
+    # SPEC.md § Network exposure carries the reasoning.
+    user: "1000:1000"
     volumes:
       - ./cloudflared:/etc/cloudflared:ro
     depends_on:
