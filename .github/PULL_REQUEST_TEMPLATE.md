@@ -16,4 +16,4 @@
 - [ ] `bundle exec rspec` passes locally (api changes)
 - [ ] `npm run lint && npm run lint:i18n && npm run lint:fsm && npx tsc --noEmit && npm test` passes locally (web changes)
 - [ ] `SPEC.md` updated **first** if behavior changed: it is the technical source of truth
-- [ ] Other docs updated if behavior changed (README, README.ja, swagger)
+- [ ] Other docs updated if behavior changed: `README.md` **and** `README.ja.md` (never one without the other), `CHANGELOG.md`, `notes/HISTORY.md`, swagger, `llms.txt` (`CLAUDE.md` § Releases has the list and the reason)

@@ -83,7 +83,7 @@ The load-bearing part: **display is a class (`.kk-display`), not an element.** A
 
 Two things changed beyond the four gaps, both consequences of them. `Brand Assets.html` gained a Type scale section rendering the four roles with live samples, since a brand book that documents a scale ought to show it, and its own `<style>` now reads the scale tokens instead of carrying a fourth tracking value (`-0.028em`) of its own. Every file also came back free of em-dashes, per the standing writing rule.
 
-**The new icons are upstream only.** `web/public/brand/` still holds the originals, and copying is a deliberate step, not a sync. The maskable art was redrawn (the brand book now cites a max ink radius of 180px where `SPEC.md` § Installable app measured 182.6px on the old file), so if the new file replaces the shipped one, that section's bounding-box numbers have to be re-measured rather than assumed.
+**The new icons are upstream only.** `web/public/brand/icons/` (with its `png/` subdirectory) still serves the older files, and copying is a deliberate step, not a sync. Upstream holds the originals, here and everywhere else in this file: the repo's copies are what is deployed, never the source. So "upstream only" means the redraw has not been brought down yet, not that the repo is ahead. The maskable art was redrawn (the brand book now cites a max ink radius of 180px where `SPEC.md` § Installable app measured 182.6px on the old file), so if the new file replaces the shipped one, that section's bounding-box numbers have to be re-measured rather than assumed.
 
 ## Sync rule
 

@@ -27,12 +27,14 @@ Consequences:
 | Question | Answer lives in |
 | --- | --- |
 | How does X work? | `SPEC.md`, a reference: contracts, schemas, tables, invariants |
+| The same, but shorter and for a reader who is not fluent in English | `ARCHITECTURE.md`: eight decisions, each as choice + reason + trade-off, with a file path beside almost every claim. A view onto `SPEC.md`, never a second source of truth: when they disagree, `ARCHITECTURE.md` is the one that is wrong |
 | Why was it built that way, and what was tried first? | `notes/HISTORY.md` (decisions log, reversals, detailed release history, production lessons) |
 | Current release, what's next, open work | `TODO.md` (release status at the top) |
 | What shipped, and when | `CHANGELOG.md`, an index; each heading links to its full entry in `notes/HISTORY.md` |
 | How do I destroy an account or reset the demo? | `notes/OPS.md` (operator runbook) |
 | Local dev setup | `SPEC.md` § Local development |
-| Where the brand book lives, and the pending type change | `BRAND.md` |
+| Where the brand book lives, and what the repo still owes it | `BRAND.md`. T1 (Plus Jakarta Sans solo) shipped on 2026-08-05; what is still open is the icon copy-back, since the redrawn maskable art is upstream only |
+| Why a Japanese FSM state name is the word it is | `web/messages/TERMINOLOGY.md`: the 13 state names, each with the reason it beat the literal translation. Read it before "correcting" one |
 | What earns a major / minor / patch | `SPEC.md` § Versioning & releases |
 
 Do not restate release status, versions, or scope in this file: that is `TODO.md`'s job, and copies here go stale.
@@ -78,18 +80,20 @@ CI is path-aware **per tree**: a docs commit pays for neither suite, a `web/` co
 
 **`v1` stopped being tagged on 2026-08-03: `v1.11.1` is its last tag and the next one is `2.0.0`** (`SPEC.md` § Versioning & releases). So everything in this section about tagging, digits and `gh release create` is **dormant, not deleted**: it describes the ritual that resumes at `2.0.0`. What still binds today is the first rule below, since docs must keep pace with the code whether or not a tag is coming, and `CHANGELOG.md`'s untagged section is where landed work goes.
 
-`SPEC.md` moves in the same PR as the behavior change (rule above). The **rest** of the documentation surface is not allowed to wait for release day either: **after each feature lands, and before the release that ships it is tagged**, bring the other docs up to date: `README.md` *and* `README.ja.md` (always together, never one without the other), `CHANGELOG.md`, the swagger/rswag output, `llms.txt`. Tagging a release whose docs still describe the previous release is the `PLAN.md` failure mode with a version number on it.
+`SPEC.md` moves in the same PR as the behavior change (rule above). The **rest** of the documentation surface is not allowed to wait for release day either: **after each feature lands, and before the release that ships it is tagged**, bring the other docs up to date: `README.md` *and* `README.ja.md` (always together, never one without the other), `CHANGELOG.md` *and* the `notes/HISTORY.md` entry it indexes (also always together: `CHANGELOG.md` is a list of links, so a bullet with no entry behind it is a broken index), the swagger/rswag output, `llms.txt`. Tagging a release whose docs still describe the previous release is the `PLAN.md` failure mode with a version number on it. The `.github/PULL_REQUEST_TEMPLATE.md` checkbox names this same list, and drifted behind it once already: a chore landed with no `CHANGELOG.md` line because the checkbox did not ask for one.
 
-**Which digit moves** is decided by one mechanical test, not by how big the release feels. `SPEC.md` § Versioning & releases states the test, lists what counts as a major, and explains why SemVer's own definition of major cannot fire on this project: read it there rather than from a copy here, which is what this file's opening sentence promises and what this paragraph used to break. The `docs-auditor` subagent exists for exactly this post-feature sweep.
+**Which digit moves** is decided by one mechanical test, not by how big the release feels. `SPEC.md` § Versioning & releases states the test, lists what counts as a major, and explains why SemVer's own definition of major cannot fire on this project: read it there rather than from a copy here, which is what this file's opening sentence promises and what this paragraph used to break. § Subagents describes how to run this post-feature sweep as a cold read.
 
 **The tag is not the last step: `gh release create` closes the release**, with notes drawn from the `CHANGELOG.md` entry. `SPEC.md` § Versioning & releases has always named it as part of the ritual, but `v1.7.0` still shipped tagged and release-less for a day because this list did not, so it now does.
 
 ## Subagents
 
-Delegate to a subagent when the task genuinely warrants it: a wide search whose file dumps you don't need, or a review that benefits from a cold read of the diff:
+Delegate to a subagent when the task genuinely warrants it: a wide search whose file dumps you don't need, or a review that benefits from a cold read of the diff.
 
-- **`Explore`**: broad searches across `api/` and `web/` when you need the conclusion, not the file contents.
-- **`code-reviewer`**: senior review of a finished unit of TypeScript or Rails work. Worth running on anything headed for a PR under the table above.
-- **`docs-auditor`**: check docs against implementation after a behavior change.
+**This repo defines no subagents of its own.** There is no `.claude/agents/`, so the only names available are the harness's built-ins, and the two jobs below are prompts you write rather than agents you can call by name. An earlier version of this section named a `code-reviewer` and a `docs-auditor` as though they existed here; they never did, which is the same failure mode as the rest of this file drifting, one level up.
 
-Not for tasks you can do inline. Each subagent starts cold and re-derives context you already have, so a multi-part task is not by itself a reason to spawn one.
+- **`Explore`** (built-in): broad searches across `api/` and `web/` when you need the conclusion, not the file contents.
+- **A cold review of a finished unit** of TypeScript or Rails work, worth running on anything headed for a PR under the table above. Spawn a general-purpose subagent and give it the diff plus this file; the point is the cold read, so do not also hand it your reasoning.
+- **A docs-against-implementation sweep** after a behavior change, which is the post-feature pass § Releases describes. Same shape: a general-purpose subagent, pointed at the changed code and at the doc list in that section.
+
+Not for tasks you can do inline. Each subagent starts cold and re-derives context you already have, so a multi-part task is not by itself a reason to spawn one. If either of the two passes above becomes routine enough to deserve a real definition, that is a `.claude/agents/` file and a line here, not a name invented at the call site.

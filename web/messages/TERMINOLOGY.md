@@ -21,7 +21,9 @@ second-guessed later.
 | `withdrawn` | 選考辞退 | Candidate withdraws from the **selection process**, before any offer. |
 | `archived` | アーカイブ済み | Standard. |
 
-The `declined` / `withdrawn` pair is the one `TODO.md` flagged as tripping people up in English.
-Japanese disambiguates it for free: 内定辞退 declines an offer, 選考辞退 exits the process. The
-distinction is in the noun, so the two can never be confused the way "declined" and "withdrawn"
-are.
+The `declined` / `withdrawn` pair is the one that trips people up in English, both of them being
+things the candidate does. Japanese disambiguates it for free: 内定辞退 declines an offer, 選考辞退
+exits the process. The distinction is in the noun, so the two can never be confused the way
+"declined" and "withdrawn" are. The FSM enforces the same split: `declined` is reachable only from
+`offer`, and `withdrawn` only from the four pipeline states, so there is no status an application
+could take either way.

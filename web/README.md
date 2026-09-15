@@ -29,8 +29,8 @@ Every page lives under a `[locale]` segment: `en` and `ja` (`i18n/routing.ts`, m
 |---|---|
 | `/` | Landing page |
 | `/sign-in` | The only auth form: POSTs to Rails, exchanges the token through `/api/auth/session`. There is **no** `/sign-up`: registration is closed (SPEC.md § Registration is closed) |
-| `/dashboard` | Applications list with status badges and `follow_up_at` indicators, plus stats summary |
-| `/board` | Kanban board: drag a card to run an FSM transition; legality read from `GET /api/v1/transitions`, optimistic with a `409` snap-back |
+| `/dashboard` | The applications list with status badges and `follow_up_at` indicators, under the stat-card row and the two action cards (ghost risk, and the Upcoming agenda: follow-ups, interviews and the residence-expiry clock, next seven days plus anything overdue, three visible rows each). Up to three applications can be pinned to the top of the list, device-local in `localStorage`, no column and no endpoint. Ordering and the reasoning for it: `SPEC.md` § Dashboard layout |
+| `/board` | Kanban board: drag a card to run an FSM transition; legality read from `GET /api/v1/transitions`, optimistic with a `409` snap-back. Every card also carries a menu of its legal next states, which is the keyboard-accessible path. The same stat-card row as the dashboard renders above the columns (`app/components/stat-cards.tsx`, one component both pages read), and the two candidate-side columns show triage cards. A failed `/dashboard` hides the cards without failing the board |
 | `/applications/new` | Create a new application; includes the AI job-URL pre-fill |
 | `/applications/[id]` | Detail view: FSM transition buttons (from `valid_next_states`), timeline entries, resume/cover letter upload |
 | `/settings` | Passkey enrollment (create and revoke; feature-detected, desktop-first) and the push-notification toggle for the follow-up digest. The only place the notification-permission prompt can fire |

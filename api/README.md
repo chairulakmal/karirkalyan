@@ -64,6 +64,7 @@ Recurring work is declared in `config/recurring.yml`:
 | Task | Schedule | What it does |
 |---|---|---|
 | `follow_up_reminders` | `15 8 * * * Asia/Tokyo` (08:15 JST, the user's morning) | `FollowUpReminderJob` |
+| `interview_reminders` | `0 8 * * * Asia/Tokyo` (08:00 JST, just ahead of the digest) | `InterviewReminderJob`: push reminders for an upcoming interview and for residence-expiry thresholds. Deliberately the earlier of the two, so one morning brings one wave of notifications rather than two |
 | `reset_demo_account` | hourly, at :42 | `DemoResetJob`; see [Demo data](#demo-data) |
 | `clear_solid_queue_finished_jobs` | hourly, at :12 | Keeps the jobs table from growing unbounded |
 

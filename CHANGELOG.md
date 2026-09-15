@@ -11,6 +11,7 @@ Open work lives in [`TODO.md`](TODO.md), and how the system works today lives in
 On `main` and deployed, carrying no version number. Deploys are manual since 2026-08-19: `bin/deploy` from the repo root after merging.
 
 - **Added:** the four stat cards read on the Kanban board, not only on the dashboard.
+- **Chore:** all four production containers take a uniform 1g memory limit.
 - **Changed:** deployment moves off Railway to a self-hosted Docker Compose stack behind a Cloudflare Tunnel.
 - **Added:** the screening success rate, and the gap that makes it readable.
 - **Changed:** the dashboard is ordered by what you do with it, and Upcoming means this week.
