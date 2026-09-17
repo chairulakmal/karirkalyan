@@ -7,6 +7,7 @@
 # Secrets
 .env
 .env.web
+.env.postgres
 .env.local
 .env*.local
 !.env.prod.example
