@@ -54,23 +54,35 @@ services:
       - FOWNER
       - SETGID
       - SETUID
+    # Two roles, two files. .env.postgres holds the superuser the image
+    # bootstraps (POSTGRES_USER / POSTGRES_PASSWORD) and is read by this
+    # service alone, so it never enters api's environment. APP_DB_* are the
+    # app's own non-superuser role: the same DB_USERNAME / DB_PASSWORD api
+    # reads from the root .env, handed to this container so the healthcheck
+    # below can authenticate as api does, and so postgres/initdb/10-app-role.sh
+    # can create the role when a volume is initialized from empty.
+    # SPEC.md § Deployment.
+    env_file: .env.postgres
     environment:
-      POSTGRES_USER: ${DB_USERNAME}
-      POSTGRES_PASSWORD: ${DB_PASSWORD}
       POSTGRES_DB: ${DB_NAME:-api_production}
+      APP_DB_USER: ${DB_USERNAME}
+      APP_DB_PASSWORD: ${DB_PASSWORD}
     volumes:
       # postgres:18 declares its volume at /var/lib/postgresql, not .../data:
       # see api/docker-compose.yml's comment for why the old path silently
       # loses data across `down`.
       - postgres_data:/var/lib/postgresql
+      # The image runs these only while initializing an empty data directory.
+      - ./postgres/initdb:/docker-entrypoint-initdb.d:ro
     healthcheck:
-      # Authenticates rather than pings. POSTGRES_PASSWORD is read only when the
-      # entrypoint initializes an *empty* data directory, so editing DB_PASSWORD
-      # in .env against an existing volume leaves the old password authoritative.
-      # `pg_isready` reports healthy either way, while api rebuilds its
-      # credentials from .env on every boot, so the stack would crash-loop on
-      # auth errors with `docker compose ps` showing postgres perfectly fine.
-      # Failing the check instead keeps api from starting and names the cause.
+      # Authenticates as the app's role rather than pinging. Passwords are read
+      # only when the entrypoint initializes an *empty* data directory, so
+      # editing DB_PASSWORD in .env against an existing volume leaves the old
+      # password authoritative. `pg_isready` reports healthy either way, while
+      # api rebuilds its credentials from .env on every boot, so the stack would
+      # crash-loop on auth errors with `docker compose ps` showing postgres
+      # perfectly fine. Failing the check instead keeps api from starting and
+      # names the cause.
       #
       # `-h postgres`, not 127.0.0.1: initdb's own pg_hba entry trusts loopback,
       # and only the entrypoint's appended `host all all all scram-sha-256` rule
@@ -78,12 +90,12 @@ services:
       # network address, so the check takes the same path api's connection does.
       #
       # Rotating the password means `ALTER USER ... PASSWORD` inside the
-      # container first, then editing .env to match. Changing .env alone does
-      # nothing to the database.
+      # container first, then editing .env to match (notes/OPS.md). Changing
+      # .env alone does nothing to the database.
       test:
         [
           "CMD-SHELL",
-          'PGPASSWORD="$$POSTGRES_PASSWORD" psql -h postgres -U "$$POSTGRES_USER" -d "$$POSTGRES_DB" -c "SELECT 1" >/dev/null 2>&1',
+          'PGPASSWORD="$$APP_DB_PASSWORD" psql -h postgres -U "$$APP_DB_USER" -d "$$POSTGRES_DB" -c "SELECT 1" >/dev/null 2>&1',
         ]
       interval: 10s
       timeout: 5s
@@ -115,7 +127,9 @@ services:
       #
       # Only DB_HOST belongs here: DB_USERNAME/DB_PASSWORD/DB_NAME reach the
       # container through `env_file: .env`, the same file the postgres service
-      # above is configured from, so the two halves cannot drift.
+      # above takes its APP_DB_* values from, so the two halves cannot drift.
+      # That role is not a superuser; the superuser lives in .env.postgres,
+      # which this container never reads.
       DB_HOST: postgres
     depends_on:
       # Puma boots against Postgres immediately; without this, api starts
