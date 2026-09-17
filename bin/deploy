@@ -8,10 +8,22 @@ set -euo pipefail
 # Migrations need no separate step: api/bin/docker-entrypoint runs `db:prepare`
 # on every boot of a "rails server" command, so `up -d` alone brings the schema
 # current.
+#
+# NO_CACHE=1 forces a full rebuild. The apt-get layers in both Dockerfiles are
+# cache hits on an ordinary build, so OS security patches only land when the
+# cache is bypassed; run it that way about once a month.
 
 cd "$(dirname "$0")/.."
 
+# `build` reads the working tree, not the commit, so an uncommitted edit would
+# ship as production without a trace in git.
+if [[ -n "$(git status --porcelain)" ]]; then
+  echo "bin/deploy: working tree is not clean; commit or stash first:" >&2
+  git status --short >&2
+  exit 1
+fi
+
 git pull --ff-only
-docker compose -f docker-compose.prod.yml build
+docker compose -f docker-compose.prod.yml build --pull ${NO_CACHE:+--no-cache}
 docker compose -f docker-compose.prod.yml up -d
 docker compose -f docker-compose.prod.yml ps

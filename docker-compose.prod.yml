@@ -21,11 +21,39 @@
 
 name: karirkalyan-prod
 
+# Applied to every service below via `<<: *hardening`. None of the four
+# processes needs a capability at boot except postgres, whose root entrypoint
+# adds back the five it uses to chown the data directory and drop to the
+# `postgres` user (see its own `cap_add`). `no-new-privileges` blocks setuid
+# binaries from regaining what was dropped. The log cap bounds the json-file
+# driver, which is otherwise unlimited: Rails logs every request at `info`, and
+# a full disk on this host takes Postgres down with it.
+x-hardening: &hardening
+  security_opt:
+    - no-new-privileges:true
+  cap_drop:
+    - ALL
+  logging:
+    driver: json-file
+    options:
+      max-size: "10m"
+      max-file: "3"
+
 services:
   postgres:
     # Matches production's major version, same as api/docker-compose.yml.
     image: postgres:18
     restart: unless-stopped
+    <<: *hardening
+    # The official image starts as root, fixes ownership of PGDATA, then execs
+    # the server as `postgres` via gosu. That path needs exactly these five; a
+    # healthcheck failure after editing this list is the first thing to suspect.
+    cap_add:
+      - CHOWN
+      - DAC_OVERRIDE
+      - FOWNER
+      - SETGID
+      - SETUID
     environment:
       POSTGRES_USER: ${DB_USERNAME}
       POSTGRES_PASSWORD: ${DB_PASSWORD}
@@ -75,6 +103,7 @@ services:
   api:
     build: ./api
     restart: unless-stopped
+    <<: *hardening
     env_file: .env
     environment:
       # Discrete keys, not a DATABASE_URL. This used to interpolate the
@@ -110,6 +139,7 @@ services:
   web:
     build: ./web
     restart: unless-stopped
+    <<: *hardening
     # Its own file, not the root .env api reads: web is the internet-facing
     # process and has no business holding Postgres/Devise/mailer/API-key
     # secrets it never touches (.env.web.example).
@@ -137,6 +167,7 @@ services:
     # deliberately, not by re-adding `:latest`.
     image: cloudflare/cloudflared:2026.8.2
     restart: unless-stopped
+    <<: *hardening
     command: tunnel --config /etc/cloudflared/config.yml run
     # The image defaults to uid 65532, which cannot read the mode-600 tunnel
     # credentials in ./cloudflared (owned by uid 1000). Native Docker Engine
