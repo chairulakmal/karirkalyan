@@ -17,10 +17,8 @@ const securityHeaders = [
 ];
 
 const nextConfig: NextConfig = {
-  // Self-hosted Docker image only: bundles a minimal server into .next/standalone
-  // instead of shipping full node_modules. Railpack's own build (still used if
-  // Railway ever comes back) ignores this and runs `next start` against the
-  // normal build output either way.
+  // Bundles a minimal server into .next/standalone for the Docker image,
+  // instead of shipping full node_modules.
   output: "standalone",
   async headers() {
     return [{ source: "/:path*", headers: securityHeaders }];
