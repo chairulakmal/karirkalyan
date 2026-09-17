@@ -1,9 +1,7 @@
 # syntax=docker/dockerfile:1
 # check=error=true
 
-# Self-hosted production image (Docker + Cloudflare Tunnel). Railway builds this
-# tree with Railpack instead and never reads this file; see the header comment on
-# api/Dockerfile for the equivalent note on that side.
+# Production image, built by docker-compose.prod.yml (SPEC.md § Deployment).
 
 ARG NODE_VERSION=24
 FROM docker.io/library/node:$NODE_VERSION-slim AS base
