@@ -41,6 +41,24 @@ RSpec.describe FollowUpReminderJob, type: :job do
       expect { described_class.new.perform }.to change(TimelineEntry, :count).by(1)
     end
 
+    # Not terminal, since each revives to applied, but nobody owes a reply in them.
+    %w[rejected ghosted withdrawn].each do |status|
+      it "skips #{status} applications" do
+        create(:application, user: user, status: status, follow_up_at: Time.current)
+        expect { described_class.new.perform }.to change(TimelineEntry, :count).by(1)
+      end
+    end
+
+    # The date survives the move out of play, so reviving the application is
+    # enough to bring back a reminder that was never sent.
+    it "reminds about a ghosted application once it is revived" do
+      revived = create(:application, user: user, status: "ghosted", follow_up_at: Time.current)
+      described_class.new.perform
+      revived.update_columns(status: "applied")
+
+      expect { described_class.new.perform }.to change(TimelineEntry.where(application: revived), :count).by(1)
+    end
+
     # The demo seed carries a permanently overdue follow-up on purpose, and the
     # hourly reset destroys the claim that would settle it, so without this the
     # one shared account earns a digest every morning forever.

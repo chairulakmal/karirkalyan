@@ -2,7 +2,7 @@
 
 > The technical source of truth for KarirKalyan, a full-stack job application tracker: Rails 8 API (`api/`) + Next.js 16 frontend (`web/`). It describes the system **as it is**, and the most important rule about it is **spec-first: change this file before you change code**; if code and spec disagree, one of them is a bug. It is a reference, not an essay: callouts, tables, schemas and invariant lists covering both apps end to end (data model, state machine, services, API contract, jobs, security, auth, i18n, the installable app), plus testing, deployment, local dev and versioning. The full table of contents is under [Contents](#contents); the reasoning behind each decision, and the release archaeology that used to sit inline here, live in [`notes/HISTORY.md`](notes/HISTORY.md).
 
-Last synced against the code: **2026-09-17**.
+Last synced against the code: **2026-09-24**.
 
 ---
 
@@ -616,7 +616,7 @@ Every PDF is named by **`Application#download_basename(kind:)`**, `kind` being `
 #### `FollowUpReminderJob`: one digest per user, deferred out of dead zones
 
 1. **It stops on a dead zone.** Not a Japanese business day → immediate return: no timeline entries, no mail.
-2. **It collects what is due, including what is overdue.** Scope: `follow_up_at <= end of today` (JST), non-terminal, no further back than `LOOKBACK` (**30 days**). "Due exactly today" would turn step 1 into a deletion; the backward reach is what makes deferral work, and the lookback stops an eight-month-old date resurrecting itself.
+2. **It collects what is due, including what is overdue.** Scope: `follow_up_at <= end of today` (JST), status in `ACTIVE_STATES`, no further back than `LOOKBACK` (**30 days**). Non-terminal is not enough: `rejected`, `ghosted` and `withdrawn` are not terminal, but nobody owes a reply in them, and the Upcoming agenda already hides their follow-ups. The date is kept, so reviving an application to `applied` re-arms any reminder still inside `LOOKBACK`. "Due exactly today" would turn step 1 into a deletion; the backward reach is what makes deferral work, and the lookback stops an eight-month-old date resurrecting itself.
 3. **It sends one email per user, not one per application.** Inbox cost scales with days, not with how well the search is going.
 
 **The shared demo account is excluded from the scope.** `Demo::ResetService` destroys it hourly, taking the `TimelineEntry` that claims the reminder with it, so its deliberately overdue seeded follow-up would earn a fresh digest every morning.
