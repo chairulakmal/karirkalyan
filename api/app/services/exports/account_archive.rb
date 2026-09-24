@@ -12,10 +12,10 @@ module Exports
   #   resumes/              {company}-{role}-{MMDD}-{id}-resume.pdf
   #   cover-letters/        {company}-{role}-{MMDD}-{id}-cover-letter.pdf
   #
-  # Built in memory, which is a deliberate cap rather than an oversight: blobs are capped
-  # at 1 MB each and this is a single-user app, so the peak is bounded by
-  # applications × 2 MB. If that ever stops being true the fix is streaming — the
-  # per-account throttle on the endpoint is what buys the time to notice.
+  # Written to a Tempfile, reading the PDFs BLOB_BATCH applications at a time, so the
+  # peak memory is one batch (about 20 MB) rather than the whole account. Built in
+  # memory it was every blob plus the zip, around 800 MB at the 200-application cap,
+  # inside a 1 GB container and reachable from the public demo account.
   class AccountArchive
     # Bumped when the shape of account.json changes, so a future importer can tell what
     # it is reading rather than guessing from the keys present.
@@ -23,21 +23,28 @@ module Exports
 
     DIRECTORIES = { resume: "resumes", cover_letter: "cover-letters" }.freeze
 
+    BLOB_BATCH = 10
+
     def initialize(user)
       @user = user
     end
 
+    # Returns the finished archive as a rewound Tempfile; the caller streams it
+    # and then calls close! on it.
     def call
-      buffer = Zip::OutputStream.write_buffer do |zip|
+      file = Tempfile.new([ "karirkalyan-account", ".zip" ], binmode: true)
+      Zip::OutputStream.write_buffer(file) do |zip|
         zip.put_next_entry("account.json")
         zip.write(JSON.pretty_generate(manifest))
 
-        applications.each do |application|
-          Application::DOWNLOAD_KINDS.each { |kind| write_blob(zip, application, kind) }
-        end
+        applications.each_slice(BLOB_BATCH) { |batch| write_blobs(zip, batch) }
       end
-
-      buffer.string
+      file.flush
+      file.rewind
+      file
+    rescue StandardError
+      file&.close!
+      raise
     end
 
     def filename
@@ -50,6 +57,10 @@ module Exports
 
     def applications
       @applications ||= user.applications
+        .without_blobs
+        .select(:posting_snapshot,
+                "COALESCE(octet_length(applications.resume), 0) > 0 AS has_resume",
+                "COALESCE(octet_length(applications.cover_letter), 0) > 0 AS has_cover_letter")
         .includes(:timeline_entries)
         .order(created_at: :asc)
         .to_a
@@ -85,15 +96,20 @@ module Exports
     end
 
     def blob_path_if_present(application, kind)
-      application.public_send(kind).present? ? blob_path(application, kind) : nil
+      application.read_attribute(:"has_#{kind}") ? blob_path(application, kind) : nil
     end
 
-    def write_blob(zip, application, kind)
-      blob = application.public_send(kind)
-      return if blob.blank?
+    def write_blobs(zip, batch)
+      by_id = batch.index_by(&:id)
+      Application.where(id: by_id.keys).order(:created_at)
+                 .pluck(:id, *Application::DOWNLOAD_KINDS).each do |id, *blobs|
+        Application::DOWNLOAD_KINDS.zip(blobs).each do |kind, blob|
+          next if blob.blank?
 
-      zip.put_next_entry(blob_path(application, kind))
-      zip.write(blob)
+          zip.put_next_entry(blob_path(by_id.fetch(id), kind))
+          zip.write(blob)
+        end
+      end
     end
 
     # Application#download_basename is the one place a PDF gets named, so an archived file and

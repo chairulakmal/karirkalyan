@@ -73,5 +73,14 @@ RSpec.describe Applications::TalkingPointsService do
       expect { described_class.new(application, client: client).call }
         .to raise_error(described_class::ExtractionError)
     end
+
+    # A 529, a 5xx or a timeout from the SDK must become the talking_points_failed
+    # 502, not escape as a bare 500.
+    it "raises ExtractionError when the Claude API call fails" do
+      allow(messages_api).to receive(:create).and_raise(Anthropic::Errors::Error)
+
+      expect { described_class.new(application_with_resume, client: client).call }
+        .to raise_error(described_class::ExtractionError)
+    end
   end
 end

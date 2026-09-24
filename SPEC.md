@@ -134,6 +134,8 @@ push_subscriptions
   index (endpoint) unique
 ```
 
+- **The endpoint must be a browser vendor's push service**: https on port 443, host `fcm.googleapis.com`, `updates.push.services.mozilla.com`, `*.push.apple.com` or `*.notify.windows.com` (`PushSubscription::PUSH_SERVICE_HOSTS`). The jobs POST to it from the home host, so an unchecked endpoint is a server-side request to an address the caller chose, and the demo password is public. `p256dh` must decode to a 65-byte uncompressed P-256 point and `auth` to 16 bytes, because a malformed key raises inside `web-push` at send time.
+
 #### `agencies`
 
 ```
@@ -222,7 +224,7 @@ timeline_entries
 ```
 
 - **Append-only.** No update path, no delete path; the only writer is `Applications::TransitionService` (plus `FollowUpReminderJob`, which writes a keyed entry).
-- **Creation writes no entry.** An application created directly as `applied` has no `to_status = 'applied'` row, which is why `GhostRiskQuery` dates a stage by `MAX(created_at)` with fallbacks rather than by matching `to_status`.
+- **Creation writes no entry.** An application created directly as `applied` has no `to_status = 'applied'` row, which is why `GhostRiskQuery` dates a stage by `MAX(created_at)` with fallbacks rather than by matching `to_status`. Reminder rows (`from_status = to_status`) are excluded from that `MAX`.
 - `note` is capped at `TimelineEntry::NOTE_MAX_LENGTH` = **2,000**.
 
 ### State machine
@@ -321,8 +323,10 @@ Failure taxonomy, and what the UI does with it: `prefill_blocked` and `prefill_f
 
 Wipes the shared demo account back to a clean seed. Invoked hourly by `DemoResetJob`, scoped to the demo user only.
 
+- **It keeps the `users` row and deletes the data, in one transaction.** Timeline entries, applications, agencies, passkeys and push subscriptions go by `delete_all`, the `jti` is rotated (which signs every demo session out), and the seed runs. Two reasons it no longer calls `destroy!`: `destroy!` loads every application with its PDFs into memory first, and a new user each hour meant a new id, and every per-account throttle keys on the JWT `sub`, so the public demo got a fresh daily AI budget every hour.
+
 - **Nothing in `db/seeds.rb` carries a calendar date.** Dates are anchored to the run at a pinned hour in app time. They are placed on both sides of the 7-day agenda window: a follow-up two days overdue, an interview in two days, an offer deadline in three days, a wishlist reminder in twelve days, and the demo user's residence expiry in 80 days. A fixed-date fixture seeds cleanly, and then shows a visitor two empty panels a month later.
-- `follow_up_at` and `interview_at` are rewritten on **every** run, not only the creating run; a reset destroys the account first.
+- `follow_up_at` and `interview_at` are rewritten on **every** run, not only the creating run.
 - `reset_service_spec.rb` asserts the property (both sections populated), never the dates.
 - That overdue follow-up is why `FollowUpReminderJob` skips this account outright.
 
@@ -348,6 +352,8 @@ Signature: `new(user).call` → a `String` of bytes ready for `send_data`; each 
 ### Query layer
 
 > **At a glance** · `api/app/queries/`, the read-side counterpart to services: non-trivial read models that mutate nothing. Two live here: `ListQuery`, which turns the application index's filter and cursor params into a page of records, and `GhostRiskQuery`, which flags applications the user has probably been ghosted on.
+
+**Bulk reads never select the blob columns.** `Application.without_blobs` selects every column except `resume`, `cover_letter` and `posting_snapshot` (`Application::BLOB_COLUMNS`). `ListQuery`, the CSV export, `FollowUpReminderJob`, `PushDigestJob` and `InterviewReminderJob` use it; otherwise Postgres de-TOASTs every PDF and Ruby holds it, and one page of 100 rows can weigh 200 MB in a 1 GB container. The CSV's `has_resume` / `has_cover_letter` come from `octet_length` in SQL. A record that will be saved is loaded whole, because the PDF validations read the columns.
 
 #### `Applications::ListQuery`
 
@@ -376,11 +382,14 @@ Stage entry moment, in SQL. Matching `to_status` would be wrong: creation writes
 
 ```sql
 COALESCE(
-  (SELECT MAX(created_at) FROM timeline_entries WHERE application_id = applications.id),
+  (SELECT MAX(created_at) FROM timeline_entries
+     WHERE application_id = applications.id AND from_status <> to_status),
   applications.applied_at,
   applications.created_at
 )
 ```
+
+- **Only a row that changed the status counts.** `FollowUpReminderJob` writes a `from_status = to_status` row as its exactly-once claim; that row is a reminder, not a stage change, so it must not restart the clock. The same anchor, with the same filter, serves the board's `days_in_stage` and the dashboard's `avg_days_in_stage`.
 
 - **`RISK_STAGES` = `applied`, `phone_screen`**: the two stages where the next move is the company's. `THRESHOLDS` is a fixed count of business days, **`applied: 15`, `phone_screen: 10`**, and *strictly past* the threshold flags; exactly on it is still a normal wait.
 - **Silence is counted in business days, against the same `JapanCalendar` `FollowUpReminderJob` uses**, so the two features cannot disagree about what a dead zone is. Counting calendar days would shrink every threshold exactly when companies are least responsive, and a false flag invites the user to close a live application.
@@ -576,7 +585,7 @@ GET /api/v1/applications/ownership_check?company=Mercari
 - The CSV's columns are a **hand-curated allow-list** (`Exports::ApplicationsCsv::COLUMNS`), not every column: the Japan-market and visa layers are deliberately absent. It recovers a table, not an account.
 - The archive is the **data-safety artifact**, and the leg the user can pull without a provider or a shell. **"Every column" means every column, so `AccountArchive` merges `posting_snapshot` back in the way `#show` does.**
 - **`Zip.unicode_names = true`** is set once in `config/initializers/zip.rb`: rubyzip leaves the EFS flag (bit 11) unset by default, which is mojibake in strict extractors the moment an entry name is Japanese.
-- **The archive is built in memory** (`Zip::OutputStream.write_buffer`). Bounded by `MAX_PER_USER` × 2 MB = a **400 MB** worst case, which is the honest number rather than the expected one.
+- **The archive is written to a `Tempfile` and streamed back in 64 KB chunks.** The rows are read `without_blobs`, and the PDFs are read `AccountArchive::BLOB_BATCH` (10) applications at a time, so the peak memory is one batch, about **20 MB**. Built in memory it was every blob plus the zip, around 800 MB at the 200-application cap, inside a 1 GB container and reachable from the public demo account.
 - **The download links render even when the card has no user to show.** `/privacy` promises the user can get their data out, and this is the only surface that honors it. They are plain `<a>` tags (API routes, not localized pages, so `@next/next/no-html-link-for-pages` is disabled on those lines) with **no `download` attribute**: Rails already sends `Content-Disposition: attachment` and stays the one place that names the file.
 - **`ProfileCard` takes the user as a prop and never fetches one.** The dashboard payload already carries `user`.
 
@@ -619,7 +628,7 @@ Every PDF is named by **`Application#download_basename(kind:)`**, `kind` being `
 2. **It collects what is due, including what is overdue.** Scope: `follow_up_at <= end of today` (JST), status in `ACTIVE_STATES`, no further back than `LOOKBACK` (**30 days**). Non-terminal is not enough: `rejected`, `ghosted` and `withdrawn` are not terminal, but nobody owes a reply in them, and the Upcoming agenda already hides their follow-ups. The date is kept, so reviving an application to `applied` re-arms any reminder still inside `LOOKBACK`. "Due exactly today" would turn step 1 into a deletion; the backward reach is what makes deferral work, and the lookback stops an eight-month-old date resurrecting itself.
 3. **It sends one email per user, not one per application.** Inbox cost scales with days, not with how well the search is going.
 
-**The shared demo account is excluded from the scope.** `Demo::ResetService` destroys it hourly, taking the `TimelineEntry` that claims the reminder with it, so its deliberately overdue seeded follow-up would earn a fresh digest every morning.
+**The shared demo account is excluded from the scope.** `Demo::ResetService` wipes its data hourly, taking the `TimelineEntry` that claims the reminder with it, so its deliberately overdue seeded follow-up would earn a fresh digest every morning.
 
 #### Idempotency: keyed on the follow-up date, not the day it fires
 
@@ -661,6 +670,7 @@ Annual maintenance surface: one `bundle update holidays`.
 - **Auth**: Devise + devise-jwt, token in the `Authorization` response header. **One JTI per user** via `JTIMatcher`: sign-out rotates it and therefore revokes *all* devices. 1-day expiry, no refresh flow, intended.
 - **Rack::Attack**: counters go through `Rails.cache` (Solid Cache), so they are shared across Puma workers rather than counted per worker.
   - **`Rack::Request.forwarded_priority` is pinned to `[:x_forwarded]`, and every per-IP throttle depends on it.** `Rack::Attack::Request` subclasses `Rack::Request` and overrides neither `#ip` nor reads `env["action_dispatch.remote_ip"]`, so `req.ip` follows *Rack's* rules, and Rack prefers the client-settable RFC 7239 `Forwarded:` header by default.
+  - **`web` forwards the browser's IP on every call to Rails.** Browser traffic reaches Rails through `web`, so without help `req.ip` is the `web` container's private address and every per-IP throttle becomes one bucket shared by all visitors. `web/app/lib/api.ts` (`clientIpHeaders`) copies Cloudflare's `CF-Connecting-IP` into `X-Forwarded-For` on each upstream request. Rack trusts the private `REMOTE_ADDR` of `web` as a proxy and takes the forwarded address. A client cannot set `CF-Connecting-IP` itself, because Cloudflare overwrites it and the tunnel is the only path to `web`.
   - **Every path guard keys off `Rack::Attack.normalized_path`, never `req.path`.** Rack::Attack runs *above* the router, so `req.path` is the raw `PATH_INFO` the client typed; Rails normalizes it afterwards. This is the one rule in this section that is load-bearing rather than descriptive.
   - **The sign-in email discriminator reads the JSON body first, then `req.params`**, so a throttle cannot be sidestepped by changing how the credentials are encoded.
 
@@ -671,7 +681,7 @@ Annual maintenance surface: one `bundle update holidays`.
 | `passkeys/write` | per-account | 10/min, 30/hour; `DELETE` exempt |
 | `prefill` | per-IP **and** per-account (JWT `sub`) | 10/min, 50/hour, 100/day |
 | `ai/talking_points` | per-account only | 5/min, 30/hour, 60/day. The most expensive call in the app: it base64-encodes a 1 MB resume into a paid Claude request inside a Puma thread. No per-IP leg, because the endpoint requires a decodable JWT |
-| `exports` | per-account | 10/min, 60/hour. A *work* vector, not a money one: `/exports/account` assembles every blob in memory |
+| `exports` | per-account | 10/min, 60/hour. A *work* vector, not a money one: `/exports/account` reads every blob the account holds and writes them to disk |
 | `applications/write` | per-account | 30/min, 300/hour on `POST /applications` and `PATCH\|PUT /applications/:id`, the two requests that carry a blob |
 | `applications/transition` | per-account | 30/min, 300/hour. It matched nothing until 2026-07-28: it fails the `/\d+\z` anchor and no other guard claimed it, so the discriminator returned `nil` and the guard **failed open** |
 | `push_subscriptions/write` | per-account | 10/min, 30/hour; `DELETE` exempt |
@@ -726,7 +736,7 @@ Every challenge is a **single-use** Solid Cache entry with a **five-minute TTL**
 
 #### A second push channel: interview and residence reminders (`v1.10.0`)
 
-`InterviewReminderJob`, daily at 08:00 JST, pushes two things fed by data the pages already show:
+`InterviewReminderJob`, daily at 08:00 JST, pushes two things fed by data the pages already show. Like the digest, it skips the shared demo account:
 
 - an **interview coming up within 24 hours** (the daily cadence makes it once per interview, since each falls in exactly one run's window);
 - a **residence-expiry warning** as the countdown crosses `90/60/30/14/7` days, carrying the same `Visa::COE_LEAD_TIME_DAYS` (**63**) guidance the settings page shows. The threshold set is what keeps a warning that stays true for ninety days from pushing every morning.

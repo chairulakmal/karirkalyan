@@ -216,7 +216,8 @@ module Api
           .pick(Arel.sql(<<~SQL.squish))
             AVG(EXTRACT(epoch FROM (now() - COALESCE(
               (SELECT MAX(created_at) FROM timeline_entries
-                 WHERE timeline_entries.application_id = applications.id),
+                 WHERE timeline_entries.application_id = applications.id
+                   AND #{TimelineEntry::STAGE_CHANGE_SQL}),
               applied_at, created_at))) / 86400.0)
           SQL
           &.to_f&.round(1)

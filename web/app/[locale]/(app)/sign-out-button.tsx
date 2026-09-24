@@ -13,9 +13,11 @@ export function SignOutButton({
   const router = useRouter();
   const [pending, startTransition] = useTransition();
 
-  async function onClick() {
-    await fetch("/api/auth/session", { method: "DELETE" });
-    startTransition(() => {
+  // The fetch runs inside the transition so `pending` disables the button
+  // from the first click, not only after the request returns.
+  function onClick() {
+    startTransition(async () => {
+      await fetch("/api/auth/session", { method: "DELETE" }).catch(() => null);
       // Home, not `/sign-in`: signing out is leaving, and the sign-in form is
       // one click away from the marketing page anyway. Landing on the form
       // reads as "you have been kicked out, sign back in", which is the

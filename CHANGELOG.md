@@ -10,6 +10,8 @@ Open work lives in [`TODO.md`](TODO.md), and how the system works today lives in
 
 On `main` and deployed, carrying no version number. Deploys are manual since 2026-08-19: `bin/deploy` from the repo root after merging.
 
+- **Security:** the 2026-09-24 review's abuse findings: a shared sign-in throttle, an hourly demo budget, blob-heavy reads, and unchecked push endpoints.
+- **Fixed:** a follow-up reminder restarted the ghost-risk clock, and uploads near 1 MB lost the form.
 - **Fixed:** rejected, ghosted and withdrawn applications still sent follow-up reminders.
 - **Security:** the app no longer connects to Postgres as the superuser.
 - **Fixed:** the container review's hardening findings: dropped capabilities, capped logs, base layers that refresh, and a deploy that refuses a dirty tree.

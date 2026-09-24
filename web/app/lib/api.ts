@@ -1,4 +1,5 @@
-import { cookies } from "next/headers";
+import { isIP } from "node:net";
+import { cookies, headers as requestHeaders } from "next/headers";
 import { redirect } from "next/navigation";
 
 /**
@@ -19,6 +20,23 @@ const SESSION_COOKIE = "session";
 // account chip reads it server-side. Set and cleared only beside the session
 // cookie, never on its own.
 export const ACCOUNT_EMAIL_COOKIE_NAME = "account_email";
+
+// Longer than the slowest legitimate call (a URL prefill: page fetch plus a
+// Claude call, both capped on the Rails side) and shorter than Cloudflare's
+// 100 s origin timeout, so a hung upstream fails here with a real response.
+export const UPSTREAM_TIMEOUT_MS = 90_000;
+
+/**
+ * The browser's IP for Rails, as `X-Forwarded-For`. Without it every request
+ * reaches Rails from this container's address, and each per-IP throttle is one
+ * bucket shared by all visitors (SPEC.md § Security). Cloudflare sets
+ * `CF-Connecting-IP` and a client cannot override it, since the tunnel is the
+ * only path here. Absent in local development, where nothing is forwarded.
+ */
+export async function clientIpHeaders(): Promise<Record<string, string>> {
+  const ip = (await requestHeaders()).get("cf-connecting-ip")?.trim();
+  return ip && isIP(ip) ? { "X-Forwarded-For": ip } : {};
+}
 
 import { type ApiErrorDetail, isApiErrorDetail } from "./api-error";
 
@@ -79,12 +97,25 @@ export async function apiFetch<T = unknown>(
   }
   headers.set("Accept", "application/json");
   if (token) headers.set("Authorization", token);
+  for (const [name, value] of Object.entries(await clientIpHeaders())) {
+    headers.set(name, value);
+  }
 
-  const response = await fetch(`${INTERNAL_API_URL}/api/v1${path}`, {
-    ...init,
-    headers,
-    cache: "no-store",
-  });
+  let response: Response;
+  try {
+    response = await fetch(`${INTERNAL_API_URL}/api/v1${path}`, {
+      ...init,
+      headers,
+      cache: "no-store",
+      signal: init.signal ?? AbortSignal.timeout(UPSTREAM_TIMEOUT_MS),
+    });
+  } catch (error) {
+    // A timeout or a refused connection (the api container restarting during
+    // a deploy) is a failed request, not an exception: callers already render
+    // ApiFailure, and a throw would discard a half-filled form.
+    console.error(`apiFetch ${path} failed:`, error);
+    return { ok: false, status: 503, error: "The service is unavailable right now" };
+  }
 
   // Expired/revoked JWT. The cookie can only be cleared in a route handler or
   // server action (not during render), so bounce through /api/auth/expired,
@@ -127,12 +158,13 @@ export async function apiFetch<T = unknown>(
 export async function apiProxy(path: string): Promise<Response> {
   const cookieStore = await cookies();
   const token = cookieStore.get(SESSION_COOKIE)?.value;
-  const headers = new Headers();
+  const headers = new Headers(await clientIpHeaders());
   if (token) headers.set("Authorization", token);
 
   const upstream = await fetch(`${INTERNAL_API_URL}/api/v1${path}`, {
     headers,
     cache: "no-store",
+    signal: AbortSignal.timeout(UPSTREAM_TIMEOUT_MS),
   });
 
   const responseHeaders = new Headers();

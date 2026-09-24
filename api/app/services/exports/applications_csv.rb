@@ -17,7 +17,9 @@ module Exports
     # is a file we hand a user and expect them to open in a spreadsheet, which is the
     # whole of the CSV-injection threat model. Prefixing with a single quote is the
     # OWASP-recommended escape: https://owasp.org/www-community/attacks/CSV_Injection
-    FORMULA_PREFIXES = %w[= + - @].freeze
+    # Tab and carriage return are on OWASP's list too: some spreadsheets strip
+    # them and then read the formula behind them.
+    FORMULA_PREFIXES = [ "=", "+", "-", "@", "\t", "\r" ].freeze
 
     def initialize(user)
       @user = user
@@ -38,15 +40,19 @@ module Exports
 
     attr_reader :user
 
+    # The two flags come from SQL so the PDFs themselves are never loaded.
     def applications
-      user.applications.order(created_at: :asc)
+      user.applications
+          .without_blobs
+          .select("COALESCE(octet_length(applications.resume), 0) > 0 AS has_resume",
+                  "COALESCE(octet_length(applications.cover_letter), 0) > 0 AS has_cover_letter")
+          .order(created_at: :asc)
     end
 
     def cell(application, column)
       value =
         case column
-        when "has_resume"       then application.resume.present?
-        when "has_cover_letter" then application.cover_letter.present?
+        when "has_resume", "has_cover_letter" then application.read_attribute(column)
         when "applied_at", "follow_up_at", "created_at", "updated_at"
           application.public_send(column)&.iso8601
         else application.public_send(column)

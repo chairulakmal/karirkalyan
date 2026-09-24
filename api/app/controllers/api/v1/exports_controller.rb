@@ -13,7 +13,20 @@ module Api
 
       def account
         export = Exports::AccountArchive.new(current_user)
-        send_data export.call, filename: export.filename, type: "application/zip", disposition: "attachment"
+        file = export.call
+
+        response.headers["Content-Type"] = "application/zip"
+        response.headers["Content-Length"] = file.size.to_s
+        response.headers["Content-Disposition"] =
+          ActionDispatch::Http::ContentDisposition.format(disposition: "attachment", filename: export.filename)
+        # Streamed from disk in chunks, so the archive never sits in memory whole.
+        self.response_body = Enumerator.new do |chunks|
+          while (chunk = file.read(64.kilobytes))
+            chunks << chunk
+          end
+        ensure
+          file.close!
+        end
       end
 
       private

@@ -1,4 +1,4 @@
-import { INTERNAL_API_URL } from "@/app/lib/api";
+import { clientIpHeaders, INTERNAL_API_URL } from "@/app/lib/api";
 import { forbiddenOrigin, isAllowedOrigin } from "@/app/lib/csrf";
 
 // First leg of the passkey sign-in ceremony (SPEC.md § Auth flow, § Passkeys):
@@ -11,6 +11,7 @@ export async function POST(request: Request) {
 
   const upstream = await fetch(`${INTERNAL_API_URL}/api/v1/auth/passkey/options`, {
     method: "POST",
+    headers: await clientIpHeaders(),
   });
 
   const body = (await upstream.json().catch(() => null)) as Record<string, unknown> | null;

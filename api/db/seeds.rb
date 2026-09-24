@@ -286,7 +286,7 @@ seed_data.each do |entry|
   # run that creates the row. Both feed the Upcoming agenda, whose window is
   # seven days wide, so a local database seeded a fortnight ago would show an
   # agenda that had quietly emptied itself. In production this is moot: the
-  # hourly Demo::ResetService destroys the account before re-seeding, which is
+  # hourly Demo::ResetService wipes the account's data before re-seeding, which is
   # also why re-running the seed is allowed to overwrite whatever a visitor did
   # to these two fields.
   app.update!(follow_up_at: app_attrs[:follow_up_at], interview_at: app_attrs[:interview_at])

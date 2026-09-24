@@ -129,6 +129,24 @@ Newest first. `v1.11.1` (2026-07-28) is the last tag `v1` will ever carry; every
 
 By the mechanical test all of it **except dashboard pins, the screening success rate and the board's stat cards** would have been a **patch**: no migration, no new capability. Those three are new capabilities and would each have forced a **minor**, which is exactly why they needed the freeze broken rather than argued around; none adds a migration, so a minor is as far as they reach. The rate does widen the dashboard payload, which pins did not: it is an addition, so no existing consumer breaks, and `STATS_CACHE_VERSION` is bumped so no cached payload outlives the shape. The dashboard payload does narrow (`ghost_risk` loses `basis` and `sample_sizes`), which is a contract change in the strict sense; it is treated as a patch because `web/` is the only consumer and both halves deploy together, and `STATS_CACHE_VERSION` is bumped so no cached payload outlives the shape. The FSM also loses two legal moves, which narrows what `PATCH /applications/:id/transition` accepts; the same reading applies, and it removes no capability the app needs, since the state those moves reached is still reachable by the move that actually describes the act.
 
+#### Security: the 2026-09-24 review's abuse findings
+
+**By the mechanical test this is a patch:** no migration, no endpoint, no payload change. Each item stops something the app already does from being abused, most of it through the public demo account.
+
+- **Every per-IP throttle was one bucket.** `web` called Rails without the browser's IP, so `req.ip` was the `web` container for every visitor, and five bad sign-ins a minute from anyone locked everyone out. The 2026-08-20 audit checked the `cloudflared` to `api` path and missed the `web` to `api` hop. `web` now copies `CF-Connecting-IP` into `X-Forwarded-For` (`clientIpHeaders` in `web/app/lib/api.ts`), and a request spec pins two visitors behind one `web` address to two buckets.
+- **The demo's daily AI caps reset every hour.** The per-account throttles key on the JWT `sub`, and the hourly reset destroyed and re-created the demo user with a new id. `Demo::ResetService` now keeps the user row, deletes its data with `delete_all` in one transaction, and rotates the `jti`, which still signs every demo session out.
+- **The demo account could kill the `api` container.** Bulk reads selected both PDF columns (`ListQuery`, the CSV, the reminder jobs), the account archive held every PDF plus the zip in memory, and the reset's `destroy!` loaded every PDF too. A demo account filled to the cap then failed its own reset every hour. `Application.without_blobs` now serves every bulk read, and the archive is written to a `Tempfile` 10 applications at a time and streamed back.
+- **Push endpoints were a blind SSRF.** Any string was stored and POSTed to from the home host, and `InterviewReminderJob` did not skip the demo. Endpoints must now be a browser vendor's push service over https on port 443, the keys must have the right size, and the job skips the demo.
+- **The Anthropic client used the gem defaults**, a 600 s timeout and 2 retries, inside a 2-thread Puma. It is now 30 s and 1 retry, and `TalkingPointsService` rescues API errors into its `talking_points_failed` code instead of a bare 500.
+
+#### Fixed: a follow-up reminder restarted the ghost-risk clock, and uploads near 1 MB lost the form
+
+**By the mechanical test this is a patch:** no migration, no endpoint, no payload change.
+
+- **The reminder claim looked like a stage change.** `FollowUpReminderJob` writes a `from_status = to_status` row as its exactly-once claim, and four readers took the unfiltered `MAX(timeline_entries.created_at)` as the date the stage began. An application with a reminder was flagged as ghosted weeks late, and its board card dropped to 0 days. `TimelineEntry::STAGE_CHANGE_SQL` now filters all four. `SPEC.md` already said "the row that moved it", so the code was the bug.
+- **Server Action bodies were capped at Next's 1 MB default**, the same number as the file limit, so one legal PDF plus form fields could fail with a 413 and send the new-application form to the error boundary. The limit is now `3 × MAX_FILE_BYTES`.
+- **Three smaller failures.** Sign-out now clears the cookies when Rails cannot be reached, and the button disables on the first click. `apiFetch` has a 90 s timeout and turns a network error into a failure result instead of a thrown exception. A `RecordInvalid` (for example a transition note over the cap) now returns the `validation_failed` envelope. The CSV formula escape also covers tab and carriage return.
+
 #### Fixed: rejected, ghosted and withdrawn applications still sent follow-up reminders
 
 **By the mechanical test this is a patch:** no migration, no endpoint, no payload change. The reminder digest now sends only what the rest of the app already calls active.

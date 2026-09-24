@@ -29,7 +29,7 @@ Requires the `demo:reset` task to be deployed (`bin/deploy` after merging).
 docker compose -f docker-compose.prod.yml exec api bin/rails demo:reset
 ```
 
-Destroys `demo@karirkalyan.com` and its cascaded data, then reseeds. Real users untouched. Backed by `Demo::ResetService`; see `api/README.md` → "Demo data".
+Deletes the data of `demo@karirkalyan.com` (applications, timeline, agencies, passkeys, push subscriptions), signs out every demo session by rotating its `jti`, then reseeds. The user row and its id are kept, so the per-account throttles do not reset. Real users untouched. Backed by `Demo::ResetService`; see `api/README.md` → "Demo data".
 
 ## Move the app off the superuser
 

@@ -1,6 +1,7 @@
 import { cookies } from "next/headers";
 import {
   ACCOUNT_EMAIL_COOKIE_NAME,
+  clientIpHeaders,
   INTERNAL_API_URL,
   SESSION_COOKIE_NAME,
 } from "@/app/lib/api";
@@ -24,7 +25,7 @@ export async function POST(request: Request) {
 
   const upstream = await fetch(`${INTERNAL_API_URL}/api/v1/auth/sign_in`, {
     method: "POST",
-    headers: { "Content-Type": "application/json" },
+    headers: { "Content-Type": "application/json", ...(await clientIpHeaders()) },
     body: JSON.stringify({ user: { email: body.email, password: body.password } }),
   });
 
@@ -85,11 +86,19 @@ export async function DELETE(request: Request) {
   const cookieStore = await cookies();
   const token = cookieStore.get(SESSION_COOKIE_NAME)?.value;
 
+  // The local cookies are cleared even when Rails cannot be reached (a deploy
+  // restarting the api container): a user who clicked "Sign out" on a shared
+  // device must not stay signed in here. The JTI rotation is best effort.
   if (token) {
-    await fetch(`${INTERNAL_API_URL}/api/v1/auth/sign_out`, {
-      method: "DELETE",
-      headers: { Authorization: token },
-    });
+    try {
+      await fetch(`${INTERNAL_API_URL}/api/v1/auth/sign_out`, {
+        method: "DELETE",
+        headers: { Authorization: token, ...(await clientIpHeaders()) },
+        signal: AbortSignal.timeout(10_000),
+      });
+    } catch (error) {
+      console.error("sign-out upstream failed:", error);
+    }
   }
 
   cookieStore.delete(SESSION_COOKIE_NAME);

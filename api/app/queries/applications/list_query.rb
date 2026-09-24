@@ -57,7 +57,8 @@ module Applications
     LAST_STAGE_AT = <<~SQL.squish
       COALESCE(
         (SELECT MAX(timeline_entries.created_at) FROM timeline_entries
-          WHERE timeline_entries.application_id = applications.id),
+          WHERE timeline_entries.application_id = applications.id
+            AND #{TimelineEntry::STAGE_CHANGE_SQL}),
         applications.applied_at,
         applications.created_at
       )
@@ -65,7 +66,8 @@ module Applications
 
     def scope
       relation = user.applications
-                     .select("applications.*", "#{LAST_STAGE_AT} AS last_stage_at")
+                     .without_blobs
+                     .select("#{LAST_STAGE_AT} AS last_stage_at")
                      .order(created_at: :desc)
       relation = filter_by_status(relation)
       relation = filter_by_company(relation)

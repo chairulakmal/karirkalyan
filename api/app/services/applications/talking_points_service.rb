@@ -61,6 +61,8 @@ module Applications
       raise ExtractionError, "The AI couldn't find talking points. Try again." if points.empty?
 
       points
+    rescue Anthropic::Errors::Error
+      raise ExtractionError, "The AI service is unavailable right now. Try again later."
     end
 
     private
@@ -102,7 +104,9 @@ module Applications
         api_key = ENV["ANTHROPIC_API_KEY"].to_s
         raise ConfigError, "AI features aren't configured on this server." if api_key.blank?
 
-        Anthropic::Client.new(api_key: api_key)
+        Anthropic::Client.new(api_key: api_key,
+                              timeout:     UrlPrefillService::ANTHROPIC_TIMEOUT_SECONDS,
+                              max_retries: UrlPrefillService::ANTHROPIC_MAX_RETRIES)
       end
     end
   end

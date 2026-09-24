@@ -13,6 +13,12 @@ class TimelineEntry < ApplicationRecord
   # meets the limit as a stop rather than as a 422.
   NOTE_MAX_LENGTH = 2_000
 
+  # A reminder claim is a from == to row: it is not a stage change, so every
+  # "when did this stage begin" anchor must skip it (SPEC.md § GhostRiskQuery).
+  STAGE_CHANGE_SQL = "timeline_entries.from_status <> timeline_entries.to_status".freeze
+
+  scope :stage_changes, -> { where(STAGE_CHANGE_SQL) }
+
   belongs_to :application
   belongs_to :actor, class_name: "User"
 
