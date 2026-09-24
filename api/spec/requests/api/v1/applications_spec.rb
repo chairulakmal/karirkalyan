@@ -1305,4 +1305,30 @@ RSpec.describe "Applications", type: :request do
       expect(record.reload.status).to eq("draft")
     end
   end
+
+  describe "POST /api/v1/applications/prefill: the shared demo account" do
+    let(:demo) { create(:user, email: Demo::ResetService::DEMO_EMAIL) }
+
+    # A URL prefill makes the server fetch the URL from the home host, and the
+    # demo password is public, so anyone could learn the host's IP.
+    it "refuses a URL prefill without fetching anything" do
+      expect(Applications::UrlPrefillService).not_to receive(:new)
+
+      post "/api/v1/applications/prefill", params: { url: "https://example.com/jobs/1" },
+           headers: { "Authorization" => jwt_for(demo) }, as: :json
+
+      expect(response).to have_http_status(:forbidden)
+      expect(JSON.parse(response.body)).to include("code" => "prefill_url_disabled")
+    end
+
+    it "still accepts a pasted posting" do
+      service = instance_double(Applications::UrlPrefillService, call: { company: "Mercari" })
+      allow(Applications::UrlPrefillService).to receive(:new).and_return(service)
+
+      post "/api/v1/applications/prefill", params: { text: "Backend Engineer at Mercari" },
+           headers: { "Authorization" => jwt_for(demo) }, as: :json
+
+      expect(response).to have_http_status(:ok)
+    end
+  end
 end

@@ -242,6 +242,7 @@
       "prefill_failed": "No job posting could be read from that.",
       "prefill_paste_too_long": "That posting is too long to read in one go, even once its formatting is stripped. Trim it and try again.",
       "prefill_unavailable": "URL pre-fill is temporarily unavailable.",
+      "prefill_url_disabled": "The shared demo account can't fetch URLs. Open the posting, copy its text, and paste it below. The AI reads it the same way.",
       "talking_points_missing_input": "Add a resume and save the posting text first, then try again.",
       "talking_points_unavailable": "AI features aren't set up on this server.",
       "talking_points_failed": "The talking points couldn't be generated. Try again.",
