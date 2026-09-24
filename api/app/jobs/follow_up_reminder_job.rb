@@ -61,7 +61,7 @@ class FollowUpReminderJob < ApplicationJob
     Application
       .includes(:user)
       .where(follow_up_at: (today - LOOKBACK).beginning_of_day..today.end_of_day)
-      .where.not(status: ApplicationFSM::TERMINAL_STATES)
+      .where(status: ApplicationFSM::ACTIVE_STATES)
       .where.not(user: User.where(email: Demo::ResetService::DEMO_EMAIL))
       .order(:follow_up_at)
   end

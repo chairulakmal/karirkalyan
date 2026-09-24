@@ -10,6 +10,7 @@ Open work lives in [`TODO.md`](TODO.md), and how the system works today lives in
 
 On `main` and deployed, carrying no version number. Deploys are manual since 2026-08-19: `bin/deploy` from the repo root after merging.
 
+- **Fixed:** rejected, ghosted and withdrawn applications still sent follow-up reminders.
 - **Security:** the app no longer connects to Postgres as the superuser.
 - **Fixed:** the container review's hardening findings: dropped capabilities, capped logs, base layers that refresh, and a deploy that refuses a dirty tree.
 - **Added:** the four stat cards read on the Kanban board, not only on the dashboard.

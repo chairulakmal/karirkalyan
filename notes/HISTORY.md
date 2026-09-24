@@ -129,6 +129,13 @@ Newest first. `v1.11.1` (2026-07-28) is the last tag `v1` will ever carry; every
 
 By the mechanical test all of it **except dashboard pins, the screening success rate and the board's stat cards** would have been a **patch**: no migration, no new capability. Those three are new capabilities and would each have forced a **minor**, which is exactly why they needed the freeze broken rather than argued around; none adds a migration, so a minor is as far as they reach. The rate does widen the dashboard payload, which pins did not: it is an addition, so no existing consumer breaks, and `STATS_CACHE_VERSION` is bumped so no cached payload outlives the shape. The dashboard payload does narrow (`ghost_risk` loses `basis` and `sample_sizes`), which is a contract change in the strict sense; it is treated as a patch because `web/` is the only consumer and both halves deploy together, and `STATS_CACHE_VERSION` is bumped so no cached payload outlives the shape. The FSM also loses two legal moves, which narrows what `PATCH /applications/:id/transition` accepts; the same reading applies, and it removes no capability the app needs, since the state those moves reached is still reachable by the move that actually describes the act.
 
+#### Fixed: rejected, ghosted and withdrawn applications still sent follow-up reminders
+
+**By the mechanical test this is a patch:** no migration, no endpoint, no payload change. The reminder digest now sends only what the rest of the app already calls active.
+
+- **The bug.** `FollowUpReminderJob` excluded `TERMINAL_STATES` (`accepted`, `declined`, `archived`). `rejected`, `ghosted` and `withdrawn` are not terminal, because each can revive to `applied`, so an application in one of them with a recent `follow_up_at` still got an email and a push. The Upcoming agenda and `InterviewReminderJob` already used `ACTIVE_STATES`, so the dashboard hid the same follow-up that the email sent.
+- **The fix is the scope, not the data.** The job now selects `ACTIVE_STATES`. Clearing `follow_up_at` in `TransitionService` was rejected: it deletes what the user entered, a revived application loses its date, and it adds a second place that must agree with the FSM. With the date kept, a revived application's reminder re-arms if it is still inside `LOOKBACK` and was never claimed.
+
 #### Security: the app no longer connects to Postgres as the superuser
 
 **By the mechanical test this is a patch:** no migration, no endpoint, no payload change. What changed is which database role `api` authenticates as, and the compose and env layout that carries the two roles.
