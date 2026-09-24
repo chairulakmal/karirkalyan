@@ -13,7 +13,7 @@ RSpec.describe FollowUpMailer, type: :mailer do
     end
 
     context "with one application" do
-      let(:mail) { described_class.digest(user, [ mercari ]) }
+      let(:mail) { described_class.digest(user, [ mercari.id ]) }
 
       it "addresses the email to the user" do
         expect(mail.to).to eq([ "candidate@example.com" ])
@@ -47,7 +47,7 @@ RSpec.describe FollowUpMailer, type: :mailer do
     end
 
     context "with several applications" do
-      let(:mail) { described_class.digest(user, [ mercari, smartnews ]) }
+      let(:mail) { described_class.digest(user, [ mercari.id, smartnews.id ]) }
 
       it "counts them in the subject instead of naming one" do
         expect(mail.subject).to eq("2 follow-ups due today")
@@ -57,6 +57,26 @@ RSpec.describe FollowUpMailer, type: :mailer do
         body = mail.body.encoded
         expect(body).to include("Mercari", "SmartNews")
         expect(body).to include("/applications/#{mercari.id}", "/applications/#{smartnews.id}")
+      end
+    end
+
+    # The mail waits in the queue, possibly through SMTP retries, so an
+    # application can be deleted before it is built.
+    context "when an application was deleted after the reminder was claimed" do
+      it "leaves it out and sends the rest" do
+        ids = [ mercari.id, smartnews.id ]
+        smartnews.destroy!
+
+        mail = described_class.digest(user, ids)
+
+        expect(mail.subject).to eq("Follow up on your Mercari application")
+      end
+
+      it "sends nothing when none are left" do
+        ids = [ mercari.id ]
+        mercari.destroy!
+
+        expect(described_class.digest(user, ids).message).to be_a(ActionMailer::Base::NullMail)
       end
     end
   end

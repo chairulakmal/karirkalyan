@@ -242,6 +242,7 @@
       "prefill_failed": "そこから読み取れる求人情報がありませんでした。",
       "prefill_paste_too_long": "この求人情報は長すぎて一度に読み取れません。書式を除いた状態でも上限を超えています。短くしてからやり直してください。",
       "prefill_unavailable": "URLからの自動入力は一時的に利用できません。",
+      "prefill_url_disabled": "共有のデモアカウントでは URL を取得できません。求人ページを開いて本文をコピーし、下に貼り付けてください。AI は同じように読み取ります。",
       "talking_points_missing_input": "先に履歴書を添付し、求人票のテキストを保存してからお試しください。",
       "talking_points_unavailable": "このサーバーではAI機能が設定されていません。",
       "talking_points_failed": "トーキングポイントを生成できませんでした。もう一度お試しください。",

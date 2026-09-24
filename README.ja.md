@@ -14,7 +14,7 @@ https://github.com/user-attachments/assets/ecabba9e-b81d-40e6-9ab7-2a5911443c45
 
 <!-- SCREENSHOT: kanban board at /ja/board, Japanese locale, demo account data. Embed here once captured. -->
 
-**ライブデモ：** [kk.chairulakmal.com](https://kk.chairulakmal.com)。サインインページの「Try demo account」を押すだけで、デモアカウントに入れます。ウィッシュリストから内定承諾まで、12件の応募データが最初から入っています。API ドキュメントは Swagger UI として [`/api-docs`](https://kk-api.chairulakmal.com/api-docs) で公開しています。
+**ライブデモ：** [kk.chairulakmal.com](https://kk.chairulakmal.com)。サインインページの「Try demo account」を押すだけで、デモアカウントに入れます。ウィッシュリストから内定承諾まで、12件の応募データが最初から入っています。デモアカウントでは、AI による自動入力は貼り付けた求人本文だけを読み、URL からの取得はしません。URL を取得すると、サーバーの自宅回線から相手のサイトにアクセスすることになるためです。API ドキュメントは Swagger UI として [`/api-docs`](https://kk-api.chairulakmal.com/api-docs) で公開しています。
 
 ## ハイライト
 

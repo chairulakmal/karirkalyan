@@ -10,6 +10,7 @@ Open work lives in [`TODO.md`](TODO.md), and how the system works today lives in
 
 On `main` and deployed, carrying no version number. Deploys are manual since 2026-08-19: `bin/deploy` from the repo root after merging.
 
+- **Fixed:** an SMTP or push-service hiccup lost a reminder for good, and the demo could make the server fetch any URL.
 - **Chore:** a deploy that waits for health and rolls itself back, pinned CI actions and Postgres, a weekly dependency audit, and Next.js 16.3.6.
 - **Security:** the 2026-09-24 review's abuse findings: a shared sign-in throttle, an hourly demo budget, blob-heavy reads, and unchecked push endpoints.
 - **Fixed:** a follow-up reminder restarted the ghost-risk clock, and uploads near 1 MB lost the form.
