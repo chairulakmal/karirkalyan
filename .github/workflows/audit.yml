@@ -1,0 +1,55 @@
+name: dependency-audit
+
+# The CI audits run only when their half of the repo changes, and under the v1
+# freeze it rarely does. A new advisory against an unchanged lockfile would
+# then go unreported, so this runs the same checks weekly on its own. A failed
+# scheduled run is the alert: GitHub emails the repo owner.
+on:
+  schedule:
+    - cron: "0 0 * * 1" # Monday 09:00 JST
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  gems:
+    name: bundler-audit
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: api
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - name: Set up Ruby
+        uses: ruby/setup-ruby@762794c140bbeda0f1224786aa33b4b46783a6c1 # v1.326.0
+        with:
+          bundler-cache: true
+          working-directory: api
+
+      - name: bundler-audit (fresh advisory database)
+        run: bin/bundler-audit check --update
+
+  npm:
+    name: npm audit
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: web
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - name: Set up Node
+        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version-file: web/.nvmrc
+
+      # Production dependencies only, and high or above. The two moderate uuid
+      # advisories arrive through budoux -> gaxios, and neither package is in
+      # the standalone bundle the web container runs (checked 2026-09-24 by
+      # listing its node_modules).
+      - name: npm audit
+        run: npm audit --omit=dev --audit-level=high
