@@ -58,13 +58,25 @@ fi
 export DEPLOY_TAG
 DEPLOY_TAG="$(git rev-parse --short=12 HEAD)"
 
+# Retried, not tried once: Compose recreates cloudflared whenever api or web is
+# recreated, and it has no healthcheck, so `up --wait` returns the moment it
+# starts. The tunnel then needs a few seconds to reconnect, and until it does
+# Cloudflare answers with an error. A single attempt rolled back a healthy
+# release on 2026-09-24.
+PUBLIC_CHECK_ATTEMPTS=12
+PUBLIC_CHECK_INTERVAL=5
+
 public_urls_ok() {
-  local url
+  local url attempt
   for url in "${PUBLIC_URLS[@]}"; do
-    if ! curl --fail --silent --show-error --output /dev/null --max-time 20 "$url"; then
-      echo "bin/deploy: $url did not return a success status." >&2
-      return 1
-    fi
+    for ((attempt = 1; attempt <= PUBLIC_CHECK_ATTEMPTS; attempt++)); do
+      if curl --fail --silent --output /dev/null --max-time 20 "$url"; then
+        continue 2
+      fi
+      sleep "$PUBLIC_CHECK_INTERVAL"
+    done
+    echo "bin/deploy: $url did not return a success status after $PUBLIC_CHECK_ATTEMPTS attempts." >&2
+    return 1
   done
 }
 
