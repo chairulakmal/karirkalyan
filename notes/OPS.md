@@ -33,6 +33,8 @@ Deletes the data of `demo@karirkalyan.com` (applications, timeline, agencies, pa
 
 ## Move the app off the superuser
 
+**Done on production 2026-09-24.** Kept for the case that needs it again: a restore from a dump taken before that date, into a database whose tables the superuser still owns. A fresh volume does not need it, because `postgres/initdb/10-app-role.sh` creates the role.
+
 One-time, on the live database, in this order. `api` keeps running as the superuser until step 6, so nothing before the deploy causes downtime. A wrong value in the `.env` edits does not let `api` boot against bad credentials: the `postgres` healthcheck authenticates as the app role and reports `unhealthy` instead. Requires the compose change that introduced `.env.postgres` to be merged, since step 6 relies on it.
 
 1. Pick a password for the new role and keep it for step 5. `openssl rand -base64 32` is fine.

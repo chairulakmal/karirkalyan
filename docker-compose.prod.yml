@@ -27,8 +27,14 @@ name: karirkalyan-prod
 # `postgres` user (see its own `cap_add`). `no-new-privileges` blocks setuid
 # binaries from regaining what was dropped. The log cap bounds the json-file
 # driver, which is otherwise unlimited: Rails logs every request at `info`, and
-# a full disk on this host takes Postgres down with it.
+# a full disk on this host takes Postgres down with it. The PID cap stops a fork
+# bomb after a compromise from exhausting the host's process table, which would
+# take the other containers and the backups runner down too. 256 is uniform like
+# mem_limit: measured 2026-09-24, api ran 31 tasks, cloudflared 18, postgres 14
+# and web 11, and postgres needs room for one process per connection (its
+# default max_connections is 100).
 x-hardening: &hardening
+  pids_limit: 256
   security_opt:
     - no-new-privileges:true
   cap_drop:
@@ -41,8 +47,12 @@ x-hardening: &hardening
 
 services:
   postgres:
-    # Matches production's major version, same as api/docker-compose.yml.
-    image: postgres:18
+    # Pinned to the minor version, raised deliberately. A bare `postgres:18`
+    # never updates here: `build --pull` re-resolves only Dockerfile FROM lines,
+    # and `up` does not pull an image it already has, so production stayed on
+    # whatever 18.x the first pull found. Changing this tag makes `up` pull it.
+    # Dev and CI track the major (api/docker-compose.yml, the workflows).
+    image: postgres:18.6
     restart: unless-stopped
     <<: *hardening
     # The official image starts as root, fixes ownership of PGDATA, then execs
@@ -114,6 +124,10 @@ services:
 
   api:
     build: ./api
+    # bin/deploy sets DEPLOY_TAG to the commit being deployed, so the previous
+    # image survives under its own tag and a failed deploy can go back to it.
+    # A bare `docker compose up` falls back to `latest`.
+    image: karirkalyan-prod-api:${DEPLOY_TAG:-latest}
     restart: unless-stopped
     <<: *hardening
     env_file: .env
@@ -131,6 +145,9 @@ services:
       # That role is not a superuser; the superuser lives in .env.postgres,
       # which this container never reads.
       DB_HOST: postgres
+      # Ties each Honeybadger error to the commit that was running. The build
+      # context has no .git, so the gem cannot find the revision itself.
+      HONEYBADGER_REVISION: ${DEPLOY_TAG:-}
     depends_on:
       # Puma boots against Postgres immediately; without this, api starts
       # racing an unready database on every fresh `up` and fails on migrate.
@@ -152,6 +169,7 @@ services:
 
   web:
     build: ./web
+    image: karirkalyan-prod-web:${DEPLOY_TAG:-latest}
     restart: unless-stopped
     <<: *hardening
     # Its own file, not the root .env api reads: web is the internet-facing

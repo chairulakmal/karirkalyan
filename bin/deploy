@@ -1,19 +1,30 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-# Manual deploy for the self-hosted stack (SPEC.md § Deployment). Railway's
-# watch-path deploys had no equivalent step: a merge under a watch path was the
-# deploy. Here the operator runs this after merging to main, from the repo root.
+# Manual deploy for the self-hosted stack (SPEC.md § Deployment). The operator
+# runs this after merging to main, from the repo root.
 #
 # Migrations need no separate step: api/bin/docker-entrypoint runs `db:prepare`
-# on every boot of a "rails server" command, so `up -d` alone brings the schema
+# on every boot of a "rails server" command, so `up` alone brings the schema
 # current.
+#
+# Each deploy tags the api and web images with the commit (DEPLOY_TAG, read by
+# docker-compose.prod.yml), waits for every healthcheck, then checks both
+# public hostnames. If any of that fails, it brings the previous tag back up.
+# A rollback restores code only, never the schema: a migration that already
+# ran stays applied, so migrations must keep the previous release working.
 #
 # NO_CACHE=1 forces a full rebuild. The apt-get layers in both Dockerfiles are
 # cache hits on an ordinary build, so OS security patches only land when the
 # cache is bypassed; run it that way about once a month.
 
 cd "$(dirname "$0")/.."
+
+COMPOSE=(docker compose -f docker-compose.prod.yml)
+PUBLIC_URLS=(https://kk.chairulakmal.com/ https://kk-api.chairulakmal.com/up)
+# api's start period is 300 s (a first boot runs every migration), plus the
+# retries after it.
+WAIT_TIMEOUT=420
 
 # `build` reads the working tree, not the commit, so an uncommitted edit would
 # ship as production without a trace in git.
@@ -23,7 +34,70 @@ if [[ -n "$(git status --porcelain)" ]]; then
   exit 1
 fi
 
+# The same checkout is used for development, so a feature branch left checked
+# out would otherwise be deployed as production.
+branch="$(git rev-parse --abbrev-ref HEAD)"
+if [[ "$branch" != "main" ]]; then
+  echo "bin/deploy: on branch '$branch'; check out main first." >&2
+  exit 1
+fi
+
 git pull --ff-only
-docker compose -f docker-compose.prod.yml build --pull ${NO_CACHE:+--no-cache}
-docker compose -f docker-compose.prod.yml up -d
-docker compose -f docker-compose.prod.yml ps
+
+# Tag the exact images the running containers use as `rollback`, by image ID.
+# A tag name is not enough: a build whose `up` then failed moves `latest` (or a
+# reused commit tag) to code that never ran.
+previous=""
+if docker inspect karirkalyan-prod-api-1 karirkalyan-prod-web-1 >/dev/null 2>&1; then
+  for service in api web; do
+    docker tag "$(docker inspect --format '{{.Image}}' "karirkalyan-prod-$service-1")" \
+      "karirkalyan-prod-$service:rollback"
+  done
+  previous="rollback"
+fi
+export DEPLOY_TAG
+DEPLOY_TAG="$(git rev-parse --short=12 HEAD)"
+
+public_urls_ok() {
+  local url
+  for url in "${PUBLIC_URLS[@]}"; do
+    if ! curl --fail --silent --show-error --output /dev/null --max-time 20 "$url"; then
+      echo "bin/deploy: $url did not return a success status." >&2
+      return 1
+    fi
+  done
+}
+
+rollback() {
+  if [[ -z "$previous" ]]; then
+    echo "bin/deploy: nothing was running before, so there is nothing to roll back to." >&2
+    return 1
+  fi
+  echo "bin/deploy: rolling back to the images that were running before." >&2
+  DEPLOY_TAG="$previous" "${COMPOSE[@]}" up -d --no-build --wait --wait-timeout "$WAIT_TIMEOUT"
+}
+
+echo "bin/deploy: building $DEPLOY_TAG."
+"${COMPOSE[@]}" build --pull ${NO_CACHE:+--no-cache}
+
+if ! "${COMPOSE[@]}" up -d --wait --wait-timeout "$WAIT_TIMEOUT" || ! public_urls_ok; then
+  "${COMPOSE[@]}" ps >&2
+  rollback || echo "bin/deploy: ROLLBACK FAILED; the stack needs manual attention." >&2
+  exit 1
+fi
+
+"${COMPOSE[@]}" ps
+
+# Keep the running tag and `rollback` (the release before it). Older
+# tags and dangling layers only fill the disk, and a full disk takes Postgres
+# down with it.
+for repo in karirkalyan-prod-api karirkalyan-prod-web; do
+  docker image ls "$repo" --format '{{.Tag}}' | while read -r tag; do
+    if [[ "$tag" != "$DEPLOY_TAG" && "$tag" != "$previous" ]]; then
+      docker image rm "$repo:$tag" >/dev/null 2>&1 || true
+    fi
+  done
+done
+docker image prune --force >/dev/null
+
+echo "bin/deploy: $DEPLOY_TAG is live."
