@@ -120,6 +120,15 @@ class Application < ApplicationRecord
   before_save :touch_resume_timestamp,       if: :will_save_change_to_resume?
   before_save :touch_cover_letter_timestamp, if: :will_save_change_to_cover_letter?
 
+  # Up to 2 MB of PDF plus the posting text per row. A bulk read that selects
+  # them makes Postgres de-TOAST every blob and Ruby hold it, so a page of 100
+  # rows can weigh 200 MB inside a 1 GB container (SPEC.md § Query layer).
+  # Read-only paths use without_blobs; a record that will be saved must not,
+  # because the PDF validations read the columns.
+  BLOB_COLUMNS = %w[resume cover_letter posting_snapshot].freeze
+
+  scope :without_blobs, -> { select(*(column_names - BLOB_COLUMNS).map { |name| arel_table[name] }) }
+
   # posting_snapshot is excluded the way the blobs are: index and board fetch
   # every row, and 12k of text per row is blob weight in a text costume.
   # ApplicationsController#show merges it back explicitly.

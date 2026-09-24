@@ -29,8 +29,14 @@ class InterviewReminderJob < ApplicationJob
     # and retry_on would then re-abort at the same flaky endpoint every attempt.
     # The per-notification tag makes the retry a visual no-op on already-notified
     # devices, so re-sending the earlier users costs nothing.
+    #
+    # The shared demo account is excluded, as in FollowUpReminderJob: anyone
+    # holding its published password can register a push endpoint, and this
+    # job must not POST to an address a stranger chose.
     first_transient = nil
-    User.joins(:push_subscriptions).distinct.find_each do |user|
+    User.joins(:push_subscriptions)
+        .where.not(email: Demo::ResetService::DEMO_EMAIL)
+        .distinct.find_each do |user|
       notifications(user).each do |payload|
         error = Push::Notifier.new(user).deliver(payload, ttl: TTL)
         first_transient ||= error
@@ -51,6 +57,7 @@ class InterviewReminderJob < ApplicationJob
     # for a dead process is noise, the same reasoning that suppresses overdue
     # markers on closed rows.
     user.applications
+      .without_blobs
       .where(status: ApplicationFSM::ACTIVE_STATES)
       .where(interview_at: Time.current..(Time.current + WINDOW))
       .order(:interview_at)

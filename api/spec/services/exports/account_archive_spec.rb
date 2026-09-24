@@ -5,7 +5,10 @@ RSpec.describe Exports::AccountArchive do
   let(:user) { create(:user, email: "candidate@example.com") }
 
   def archive
-    Zip::File.open_buffer(StringIO.new(described_class.new(user).call))
+    file = described_class.new(user).call
+    Zip::File.open_buffer(StringIO.new(file.read))
+  ensure
+    file&.close!
   end
 
   def manifest
@@ -89,6 +92,14 @@ RSpec.describe Exports::AccountArchive do
         "resumes/#{application.download_basename(kind: :resume)}",
         "cover-letters/#{application.download_basename(kind: :cover_letter)}"
       )
+    end
+
+    # The PDFs are read BLOB_BATCH applications at a time; every batch must land.
+    it "writes every file when the account spans several blob batches", skip_n_plus_one: true do
+      count = described_class::BLOB_BATCH + 2
+      create_list(:application, count, :with_resume, user: user)
+
+      expect(entry_names.count { |name| name.start_with?("resumes/") }).to eq(count)
     end
 
     it "names its files the way the download endpoints do" do

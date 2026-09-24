@@ -53,12 +53,13 @@ class FollowUpReminderJob < ApplicationJob
   # The shared demo account is excluded, and the reason is the claim below rather
   # than politeness. Its seed carries a deliberately overdue follow-up so the
   # dashboard's Upcoming section is never empty for a visitor, and Demo::ResetService
-  # destroys the account hourly, taking the TimelineEntry that claim() writes with
-  # it. The exactly-once anchor is therefore erased every hour, so that one seeded
+  # wipes the account's data hourly, taking the TimelineEntry that claim() writes
+  # with it. The exactly-once anchor is therefore erased every hour, so that one seeded
   # row would earn a fresh digest every single day, addressed to a mailbox that
   # exists to be logged into rather than read.
   def due_on_or_before(today)
     Application
+      .without_blobs
       .includes(:user)
       .where(follow_up_at: (today - LOOKBACK).beginning_of_day..today.end_of_day)
       .where(status: ApplicationFSM::ACTIVE_STATES)

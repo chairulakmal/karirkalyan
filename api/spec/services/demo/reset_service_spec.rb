@@ -15,14 +15,41 @@ RSpec.describe Demo::ResetService do
     it "replaces drifted demo data with a fresh set" do
       described_class.call
       demo = User.find_by(email: described_class::DEMO_EMAIL)
-      original_id = demo.id
       demo.applications.first.update!(company: "Edited by a visitor")
 
       described_class.call
 
       reseeded = User.find_by(email: described_class::DEMO_EMAIL)
-      expect(reseeded.id).not_to eq(original_id) # destroyed and recreated
       expect(reseeded.applications.pluck(:company)).not_to include("Edited by a visitor")
+      expect(reseeded.applications.count).to eq(demo.applications.count)
+    end
+
+    # The per-account throttles key on the JWT `sub`. A new id every hour gave the
+    # public demo a fresh daily AI budget every hour.
+    it "keeps the demo user's id, so per-account throttles survive the reset" do
+      described_class.call
+      original_id = User.find_by(email: described_class::DEMO_EMAIL).id
+
+      described_class.call
+
+      expect(User.find_by(email: described_class::DEMO_EMAIL).id).to eq(original_id)
+    end
+
+    it "signs every demo session out and removes what visitors added" do
+      described_class.call
+      demo = User.find_by(email: described_class::DEMO_EMAIL)
+      old_jti = demo.jti
+      create(:push_subscription, user: demo)
+      create(:credential, user: demo)
+      create(:application, :with_resume, user: demo, company: "Uploaded by a visitor")
+
+      described_class.call
+
+      demo.reload
+      expect(demo.jti).not_to eq(old_jti)
+      expect(demo.push_subscriptions).to be_empty
+      expect(demo.credentials).to be_empty
+      expect(demo.applications.pluck(:company)).not_to include("Uploaded by a visitor")
     end
 
     # The demo account is the portfolio walkthrough, and the two dashboard

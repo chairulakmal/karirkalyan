@@ -101,6 +101,19 @@ RSpec.describe Applications::GhostRiskQuery do
       expect(entry[:threshold]).to eq(10)
     end
 
+    # FollowUpReminderJob's claim is a from == to row. It is a reminder, not a
+    # stage change, so it must not restart the silence count.
+    it "ignores follow-up reminder rows when dating the stage" do
+      application = applied_on("2026-05-27")
+      create(:timeline_entry,
+        application: application, actor: user,
+        from_status: "applied", to_status: "applied",
+        idempotency_key: "reminder-#{application.id}-2026-06-22",
+        created_at: at("2026-06-22"))
+
+      expect(result[:at_risk].first[:business_days_in_stage]).to eq(20)
+    end
+
     it "sorts longest silence first" do
       quiet   = applied_on("2026-05-27")            # 20 business days
       quieter = applied_on("2026-04-01", company: "Freee") # further back still

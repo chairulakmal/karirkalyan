@@ -6,6 +6,12 @@ class ApplicationController < ActionController::API
   rescue_from ApplicationFSM::InvalidTransitionError, with: :render_invalid_transition
   rescue_from ActiveRecord::StaleObjectError,          with: :render_conflict
   rescue_from ActiveRecord::RecordNotFound,            with: :render_not_found
+  # A create!/update! that fails validation (a transition note over the cap, for
+  # one) gets the same validation_failed envelope as a plain save, not Rails'
+  # default 422 body with no code.
+  rescue_from ActiveRecord::RecordInvalid do |error|
+    render_validation_failed(error.record)
+  end
 
   private
 

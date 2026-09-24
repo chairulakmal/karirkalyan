@@ -221,7 +221,7 @@ module Api
           if record.has_attribute?(:last_stage_at)
             record.read_attribute(:last_stage_at)
           else
-            record.timeline_entries.maximum(:created_at) || record.applied_at || record.created_at
+            record.timeline_entries.stage_changes.maximum(:created_at) || record.applied_at || record.created_at
           end
         return nil if anchor.blank?
 

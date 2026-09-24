@@ -45,6 +45,27 @@ RSpec.describe "Rack::Attack throttling", type: :request, skip_n_plus_one: true 
 
       expect(response).to have_http_status(:too_many_requests)
     end
+
+    # Browser sign-ins reach Rails from the `web` container's private address,
+    # with the real client in X-Forwarded-For (web/app/lib/api.ts). Two visitors
+    # behind that one hop must not share a bucket, or five bad sign-ins from
+    # anyone lock out everyone.
+    it "keys per visitor when the request comes through the web container" do
+      web = { "REMOTE_ADDR" => "172.18.0.4" }
+
+      5.times do
+        post "/api/v1/auth/sign_in", params: body, as: :json,
+          headers: web.merge("HTTP_X_FORWARDED_FOR" => "203.0.113.7")
+      end
+
+      post "/api/v1/auth/sign_in", params: body, as: :json,
+        headers: web.merge("HTTP_X_FORWARDED_FOR" => "198.51.100.8")
+      expect(response).to have_http_status(:unauthorized)
+
+      post "/api/v1/auth/sign_in", params: body, as: :json,
+        headers: web.merge("HTTP_X_FORWARDED_FOR" => "203.0.113.7")
+      expect(response).to have_http_status(:too_many_requests)
+    end
   end
 
   # The auth/sign_up throttle was deleted along with the endpoint it protected
@@ -97,7 +118,7 @@ RSpec.describe "Rack::Attack throttling", type: :request, skip_n_plus_one: true 
     let(:user)  { create(:user) }
     let(:token) { jwt_for(user) }
     let(:body) do
-      { subscription: { endpoint: "https://push.example/one", keys: { p256dh: "k", auth: "a" } } }
+      { subscription: { endpoint: PushKeys.endpoint("one"), keys: { p256dh: PushKeys.p256dh, auth: PushKeys.auth } } }
     end
 
     before { allow(PushVapid).to receive_messages(configured?: true, public_key: "pub") }
@@ -113,7 +134,7 @@ RSpec.describe "Rack::Attack throttling", type: :request, skip_n_plus_one: true 
            headers: { "Authorization" => token }, as: :json
       expect(response).to have_http_status(:too_many_requests)
 
-      delete "/api/v1/push_subscriptions", params: { endpoint: "https://push.example/one" },
+      delete "/api/v1/push_subscriptions", params: { endpoint: PushKeys.endpoint("one") },
              headers: { "Authorization" => token }, as: :json
       expect(response).to have_http_status(:no_content)
     end

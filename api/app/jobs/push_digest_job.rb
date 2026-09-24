@@ -25,7 +25,7 @@ class PushDigestJob < ApplicationJob
   def perform(user, application_ids)
     return unless PushVapid.configured?
 
-    applications = user.applications.where(id: application_ids).order(:follow_up_at).to_a
+    applications = user.applications.without_blobs.where(id: application_ids).order(:follow_up_at).to_a
     return if applications.empty?
 
     # Notifier delivers to every subscription and returns the first transient

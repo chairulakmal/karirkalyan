@@ -66,7 +66,9 @@ module Applications
         SELECT
           a.id, a.company, a.role, a.status, a.lock_version,
           COALESCE(
-            (SELECT MAX(te.created_at) FROM timeline_entries te WHERE te.application_id = a.id),
+            (SELECT MAX(timeline_entries.created_at) FROM timeline_entries
+              WHERE timeline_entries.application_id = a.id
+                AND #{TimelineEntry::STAGE_CHANGE_SQL}),
             a.applied_at,
             a.created_at
           ) AS entered_at

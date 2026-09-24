@@ -300,6 +300,19 @@ RSpec.describe "Applications", type: :request do
 
       expect(JSON.parse(response.body)["data"].first["days_in_stage"]).to eq(3)
     end
+
+    it "does not restart days_in_stage on a follow-up reminder row" do
+      application = create(:application, :applied, user: user, created_at: 40.days.ago, applied_at: 40.days.ago)
+      create(:timeline_entry, application: application, actor: user,
+             from_status: "applied", to_status: "applied",
+             idempotency_key: "reminder-#{application.id}-x", created_at: 1.day.ago)
+
+      get "/api/v1/applications", headers: headers
+      expect(JSON.parse(response.body)["data"].first["days_in_stage"]).to eq(40)
+
+      get "/api/v1/applications/#{application.id}", headers: headers
+      expect(JSON.parse(response.body)["days_in_stage"]).to eq(40)
+    end
   end
 
   describe "GET /api/v1/applications — filtering" do
@@ -1271,6 +1284,25 @@ RSpec.describe "Applications", type: :request do
         expect(record.reload.cover_letter).to be_present
         expect(record.cover_letter_updated_at).to be_present
       end
+    end
+  end
+
+  describe "PATCH /api/v1/applications/:id/transition: validation envelope" do
+    # The note cap fails inside TransitionService's create!, which raises rather
+    # than returning false. It must still answer with the validation_failed
+    # envelope, not Rails' default 422 body.
+    it "returns validation_failed with details for a note over the cap" do
+      record = create(:application, :draft, user: user)
+
+      patch "/api/v1/applications/#{record.id}/transition",
+            params: { status: "applied", note: "x" * (TimelineEntry::NOTE_MAX_LENGTH + 1) },
+            headers: { "Authorization" => jwt_for(user) }, as: :json
+
+      expect(response).to have_http_status(:unprocessable_content)
+      body = JSON.parse(response.body)
+      expect(body).to include("code" => "validation_failed")
+      expect(body["details"]).to include("field" => "note", "code" => "too_long")
+      expect(record.reload.status).to eq("draft")
     end
   end
 end

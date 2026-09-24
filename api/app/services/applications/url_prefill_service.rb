@@ -61,6 +61,12 @@ module Applications
 
     MODEL          = "claude-haiku-4-5-20251001"
     MAX_REDIRECTS  = 3
+    # The gem defaults are a 600 s timeout and 2 retries, which during an
+    # Anthropic incident holds one of Puma's two threads for up to 30 minutes.
+    # Worst case here is 2 × 30 s, under web's 90 s upstream timeout.
+    ANTHROPIC_TIMEOUT_SECONDS = 30
+    ANTHROPIC_MAX_RETRIES = 1
+
     MAX_BODY_BYTES = 2_000_000   # cap the HTML we read (~2 MB), enforced while streaming
     MAX_TEXT_CHARS = 12_000      # cap the text sent to Claude (~3-4k tokens)
     OPEN_TIMEOUT   = 5           # seconds
@@ -488,7 +494,8 @@ module Applications
         api_key = ENV["ANTHROPIC_API_KEY"].to_s
         raise ConfigError, "AI pre-fill isn't configured on this server." if api_key.blank?
 
-        Anthropic::Client.new(api_key: api_key)
+        Anthropic::Client.new(api_key: api_key, timeout: ANTHROPIC_TIMEOUT_SECONDS,
+                              max_retries: ANTHROPIC_MAX_RETRIES)
       end
     end
   end

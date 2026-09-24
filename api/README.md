@@ -126,12 +126,12 @@ The service also does **not** read `robots.txt`. This is one fetch, started by t
 
 The "Try demo account" button signs every visitor into one shared user (`demo@karirkalyan.com`), so its data changes as people explore. In production, the `reset_demo_account` recurring task returns it to a clean seed **every hour at :42** (`DemoResetJob` → `Demo::ResetService`). The task is scoped to the demo user, so real accounts are never touched.
 
-Seeds are idempotent (`find_or_create_by!`), but they only *create*. They do not refresh rows that already exist. That is why the reset destroys the demo user first and then reseeds, instead of running the seeds again on top of the old rows.
+Seeds are idempotent (`find_or_create_by!`), but they only *create*. They do not refresh rows that already exist. That is why the reset deletes the demo user's data first and then reseeds, instead of running the seeds again on top of the old rows. The user row itself is kept, so its id, and the per-account rate limits keyed on it, survive the reset.
 
 ```bash
 bin/rails db:seed       # idempotent: adds any missing demo data, never duplicates
-bin/rails demo:reset    # full refresh: destroys the demo user (cascades to its
-                        # applications + timeline) and reseeds; real users untouched
+bin/rails demo:reset    # full refresh: deletes the demo user's data, signs its
+                        # sessions out, and reseeds; real users untouched
 ```
 
 The hourly task makes a manual reset rarely necessary, but you can force one with `docker compose -f docker-compose.prod.yml exec api bin/rails demo:reset`. `demo:reset` deletes only the demo user's records; it does not use `db:reset` or `db:drop`. The Railway-era Postgres required this scoped approach, because its role could not drop the connected database. It is still the right approach here, because the demo user's records are the only data that should ever be erased. The logic lives in `Demo::ResetService`.

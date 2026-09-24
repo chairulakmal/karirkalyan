@@ -66,19 +66,19 @@ RSpec.describe "Push subscriptions", type: :request do
       response "201", "subscription registered" do
         let(:Authorization) { token }
         let(:body) do
-          { subscription: { endpoint: "https://push.example/abc",
-                            keys: { p256dh: "client-key", auth: "client-auth" } } }
+          { subscription: { endpoint: PushKeys.endpoint("abc"),
+                            keys: { p256dh: PushKeys.p256dh, auth: PushKeys.auth } } }
         end
 
         run_test! do |response|
           expect(response.parsed_body.keys).to match_array(%w[id created_at])
-          expect(user.push_subscriptions.sole.endpoint).to eq("https://push.example/abc")
+          expect(user.push_subscriptions.sole.endpoint).to eq(PushKeys.endpoint("abc"))
         end
       end
 
       response "422", "validation failed: blank keys, or the per-user ceiling" do
         let(:Authorization) { token }
-        let(:body) { { subscription: { endpoint: "https://push.example/abc", keys: {} } } }
+        let(:body) { { subscription: { endpoint: PushKeys.endpoint("abc"), keys: {} } } }
 
         run_test! do |response|
           expect(response.parsed_body).to include("code" => "validation_failed")
@@ -115,14 +115,16 @@ RSpec.describe "Push subscriptions", type: :request do
     it "updates keys in place instead of duplicating the row" do
       existing = create(:push_subscription, user: user)
 
+      rotated = PushKeys.p256dh
+
       expect do
         post "/api/v1/push_subscriptions",
              params: { subscription: { endpoint: existing.endpoint,
-                                       keys: { p256dh: "rotated", auth: "rotated-auth" } } },
+                                       keys: { p256dh: rotated, auth: PushKeys.auth } } },
              headers: { "Authorization" => token }, as: :json
       end.not_to change(PushSubscription, :count)
 
-      expect(existing.reload.p256dh).to eq("rotated")
+      expect(existing.reload.p256dh).to eq(rotated)
     end
 
     it "reassigns the row to whoever is signed in — the endpoint's owner is the browser" do
@@ -131,7 +133,7 @@ RSpec.describe "Push subscriptions", type: :request do
 
       post "/api/v1/push_subscriptions",
            params: { subscription: { endpoint: row.endpoint,
-                                     keys: { p256dh: "new", auth: "new-auth" } } },
+                                     keys: { p256dh: PushKeys.p256dh, auth: PushKeys.auth } } },
            headers: { "Authorization" => token }, as: :json
 
       expect(row.reload.user).to eq(user)
@@ -145,8 +147,8 @@ RSpec.describe "Push subscriptions", type: :request do
       create(:push_subscription, user: user)
 
       post "/api/v1/push_subscriptions",
-           params: { subscription: { endpoint: "https://push.example/over",
-                                     keys: { p256dh: "k", auth: "a" } } },
+           params: { subscription: { endpoint: PushKeys.endpoint("over"),
+                                     keys: { p256dh: PushKeys.p256dh, auth: PushKeys.auth } } },
            headers: { "Authorization" => token }, as: :json
 
       expect(response).to have_http_status(:unprocessable_entity)
@@ -174,8 +176,8 @@ RSpec.describe "Push subscriptions", type: :request do
 
     it "refuses a subscribe with 503 push_unavailable, not a 500" do
       post "/api/v1/push_subscriptions",
-           params: { subscription: { endpoint: "https://push.example/x",
-                                     keys: { p256dh: "k", auth: "a" } } },
+           params: { subscription: { endpoint: PushKeys.endpoint("x"),
+                                     keys: { p256dh: PushKeys.p256dh, auth: PushKeys.auth } } },
            headers: { "Authorization" => token }, as: :json
 
       expect(response).to have_http_status(:service_unavailable)
@@ -199,6 +201,51 @@ RSpec.describe "Push subscriptions", type: :request do
       expect do
         delete "/api/v1/auth/account", headers: { "Authorization" => token }
       end.to change(PushSubscription, :count).by(-1)
+    end
+  end
+
+  describe "endpoint and key validation" do
+    before { allow(PushVapid).to receive_messages(configured?: true, public_key: "pub") }
+
+    def subscribe(endpoint:, p256dh: PushKeys.p256dh, auth: PushKeys.auth)
+      post "/api/v1/push_subscriptions",
+           params: { subscription: { endpoint: endpoint, keys: { p256dh: p256dh, auth: auth } } },
+           headers: { "Authorization" => token }, as: :json
+    end
+
+    # The reminder jobs POST to the stored endpoint from the home host, so an
+    # arbitrary one is a server-side request to an address the caller chose.
+    [
+      "https://192.168.1.1/x",
+      "https://attacker.example/fcm/send/x",
+      "http://fcm.googleapis.com/fcm/send/x",
+      "https://fcm.googleapis.com:8443/fcm/send/x",
+      "https://fcm.googleapis.com.attacker.example/x",
+      "https://user@fcm.googleapis.com/fcm/send/x"
+    ].each do |endpoint|
+      it "refuses #{endpoint}" do
+        subscribe(endpoint: endpoint)
+
+        expect(response).to have_http_status(:unprocessable_content)
+        expect(PushSubscription.count).to eq(0)
+      end
+    end
+
+    it "accepts the browser vendors' push services", skip_n_plus_one: true do
+      %w[
+        https://fcm.googleapis.com/fcm/send/a
+        https://updates.push.services.mozilla.com/wpush/v2/b
+        https://web.push.apple.com/c
+        https://wns2-sg2p.notify.windows.com/w/?token=d
+      ].each { |endpoint| subscribe(endpoint: endpoint) }
+
+      expect(PushSubscription.count).to eq(4)
+    end
+
+    it "refuses malformed keys, which would raise inside web-push at send time" do
+      subscribe(endpoint: PushKeys.endpoint, p256dh: "k", auth: "a")
+
+      expect(response).to have_http_status(:unprocessable_content)
     end
   end
 end

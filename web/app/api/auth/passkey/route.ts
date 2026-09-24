@@ -1,4 +1,4 @@
-import { INTERNAL_API_URL } from "@/app/lib/api";
+import { clientIpHeaders, INTERNAL_API_URL } from "@/app/lib/api";
 import { forbiddenOrigin, isAllowedOrigin } from "@/app/lib/csrf";
 import { setSessionCookies } from "@/app/lib/session-cookie";
 
@@ -20,7 +20,7 @@ export async function POST(request: Request) {
 
   const upstream = await fetch(`${INTERNAL_API_URL}/api/v1/auth/passkey`, {
     method: "POST",
-    headers: { "Content-Type": "application/json" },
+    headers: { "Content-Type": "application/json", ...(await clientIpHeaders()) },
     body: JSON.stringify({ challenge: body.challenge, credential: body.credential }),
   });
 
