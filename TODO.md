@@ -32,6 +32,14 @@ The plan: open work only. The most important thing here is a rule, not a list: *
 
 ### Open on `v1`
 
+**Next up, in order (noted 2026-09-24, end of the review day):**
+
+1. **Merge PR #119 when CI passes, then `bin/deploy` from `main`.** The checkout was left on `fix/review-medium-items`, and `bin/deploy` refuses any branch but `main`. After the deploy, check that `api` and `web` run the new commit tag and that both hostnames return 200.
+2. **Backup encryption, in `karirkalyan-backups`.** First generate an `age` keypair and keep the private key offline. Only the public key goes to that repo, as a variable. Then change `backup.yml` to encrypt before upload, install `age` on the host runner, and run the restore drill again with the new dumps.
+3. **Decide on Honeybadger alerting.** Uptime checks on both hostnames are console settings. Check-ins from the reminder jobs and `backup.yml` mean Honeybadger receives more than error reports, so `/privacy` (both locales) and `SPEC.md` § Legal pages must change in the same PR (`api/config/honeybadger.yml` explains why). A disk-space check needs a small host cron job.
+4. **Turn on GitHub vulnerability alerts** for this repo: alerts only, no version-update PRs.
+5. **The low-item batch** below, as one PR.
+
 - [ ] **Fix the findings of the 2026-09-24 code review: this is the next work.** The review ran after the self-hosted deploy went live and covered API security, API correctness and performance, `web/`, and the deploy and CI setup. Every item below fixes existing behavior or stops abuse, so each one passes the admission test. The lessons for the rewrite are in the `2.0.0` cluster under § Carry into the rewrite.
   - **The high items and the ones in the same files shipped in #116** (`CHANGELOG.md` has them).
   - **Still open from the deploy, backups and CI scope** (the rest shipped in #117 and #118):
