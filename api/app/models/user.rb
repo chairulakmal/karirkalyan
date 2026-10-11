@@ -32,6 +32,11 @@ class User < ApplicationRecord
   # Whole days until the current status expires, or nil when there is no expiry
   # to count down (no date recorded, or a status that does not expire). Negative
   # when already lapsed, which the UI surfaces rather than clamps.
+  # The shared account anyone can sign in to with the published password.
+  def demo?
+    email == Demo::ResetService::DEMO_EMAIL
+  end
+
   def residence_days_remaining
     return nil if residence_expires_on.blank?
     return nil if residence_status.in?(NO_EXPIRY_STATUSES)

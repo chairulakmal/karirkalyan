@@ -54,6 +54,14 @@ module Api
         # a Claude call on garbage. `url` needs no such guard: anything that isn't a
         # URL dies in validated_uri. This one has no backstop, so it gets one here.
         text   = params[:text].is_a?(String) ? params[:text] : nil
+        # A URL prefill makes this host fetch the URL, which shows the home IP
+        # to whoever runs that site, and the demo password is public. A paste
+        # fetches nothing, so it stays on.
+        if current_user.demo? && text.blank?
+          return render_error("The shared demo account can't fetch URLs. Paste the posting text instead; the AI reads it the same way.",
+                              code: "prefill_url_disabled", status: :forbidden)
+        end
+
         fields = Applications::UrlPrefillService.new(params[:url], text: text).call
         render json: fields
       # Order matters twice over: BlockedError subclasses FetchError, and every

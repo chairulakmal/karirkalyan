@@ -7,13 +7,20 @@ module Push
   # rather than a drifting copy of it. SPEC.md § Push notifications.
   class Notifier
     # Failures that plausibly pass on a later attempt: network-level errors the
-    # web-push gem does not wrap, plus the push service's own 429. The caller's
-    # retry_on keys on this same list, so the two cannot drift.
+    # web-push gem does not wrap, plus the push service's own 429 and 5xx. The
+    # caller's retry_on keys on this same list, so the two cannot drift. An
+    # error missing from here escapes the delivery loop and skips every later
+    # user in InterviewReminderJob, so the list errs toward inclusion.
     TRANSIENT_ERRORS = [
-      WebPush::TooManyRequests,
-      Net::OpenTimeout, Net::ReadTimeout, SocketError,
-      OpenSSL::SSL::SSLError, Errno::ECONNRESET, Errno::ECONNREFUSED
+      WebPush::TooManyRequests, WebPush::PushServiceError,
+      Net::OpenTimeout, Net::ReadTimeout, Net::WriteTimeout, SocketError, IOError,
+      OpenSSL::SSL::SSLError, Errno::ECONNRESET, Errno::ECONNREFUSED,
+      Errno::ETIMEDOUT, Errno::EHOSTUNREACH, Errno::ENETUNREACH
     ].freeze
+
+    # Net::HTTP's defaults are 60 s each, and the jobs deliver to every device
+    # in sequence, so one hung push service would hold a worker for minutes.
+    TIMEOUTS = { open_timeout: 5, read_timeout: 10, ssl_timeout: 5 }.freeze
 
     def initialize(user)
       @user = user
@@ -45,7 +52,8 @@ module Push
         p256dh:   subscription.p256dh,
         auth:     subscription.auth,
         ttl:      ttl,
-        vapid:    PushVapid.vapid_options
+        vapid:    PushVapid.vapid_options,
+        **TIMEOUTS
       )
       nil
     rescue WebPush::ExpiredSubscription, WebPush::InvalidSubscription

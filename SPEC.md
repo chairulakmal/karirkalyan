@@ -309,7 +309,7 @@ The SSRF guard, which is the part most easily broken by a well-meant edit:
 - **A guard rejection past hop 0 is a `FetchError`, not an `InvalidUrlError`.** The user chose hop 0; the site chose the rest.
 - **Every guard rejection returns one message** ("That URL can't be fetched."), whatever actually failed. Distinct copy would turn a blind SSRF into an internal-hostname oracle.
 
-Failure taxonomy, and what the UI does with it: `prefill_blocked` and `prefill_failed` are the two codes that offer the paste box, because pasting is what cures them. `invalid_url`, `prefill_unreachable`, `prefill_paste_too_long` and `prefill_unavailable` do not. `prefill_failed`'s copy names no source, since both entry points reach it.
+Failure taxonomy, and what the UI does with it: `prefill_blocked`, `prefill_failed` and `prefill_url_disabled` are the codes that offer the paste box, because pasting is what cures them. `invalid_url`, `prefill_unreachable`, `prefill_paste_too_long` and `prefill_unavailable` do not. `prefill_failed`'s copy names no source, since both entry points reach it.
 
 #### `Applications::TalkingPointsService`
 
@@ -481,6 +481,7 @@ GET    /api-docs/v1/swagger.yaml                  generated from request specs
 | `prefill_unreachable` | `502` | The pre-fill page could not be fetched: DNS, connect, TLS, timeout, redirect loop, or an HTTP error the site did not refuse us with (`FetchError`) |
 | `prefill_failed` | `502` | The page was fetched but yielded nothing usable: no readable text (`UnreadableError`), or the Claude call failed or came back empty (`ExtractionError`) |
 | `prefill_unavailable` | `503` | `ANTHROPIC_API_KEY` missing; the rest of the app keeps working |
+| `prefill_url_disabled` | `403` | A URL pre-fill from the shared demo account. The server would fetch the URL from the home host, which shows its IP to whoever runs the site, and the demo password is public. A paste still works, so the UI opens the paste box |
 | `talking_points_missing_input` | `422` | No resume on the application, or no posting text to compare it against, caught before any Claude call (`MissingInputError`) |
 | `talking_points_failed` | `502` | The Claude call failed or returned nothing usable (`ExtractionError`) |
 | `talking_points_unavailable` | `503` | `ANTHROPIC_API_KEY` missing; the same degradation as `prefill_unavailable` (`ConfigError`) |
@@ -660,7 +661,8 @@ Annual maintenance surface: one `bundle update holidays`.
 
 - `ActionMailer` is re-enabled in `config/application.rb` (the `--api` default disables it). Production sends over SMTP; development previews only; test collects in `deliveries`.
 - `WelcomeMailer` is sent by the `users:create` Rake task via **`deliver_later`**: with `raise_delivery_errors = true`, a `deliver_now` failure would take account creation down with it.
-- `FollowUpMailer#digest(user, applications)` names the company when there is exactly one application and counts them when there are several.
+- `FollowUpMailer#digest(user, application_ids)` names the company when there is exactly one application and counts them when there are several. It takes ids and loads the rows when the mail is built, so an application deleted while the mail waits drops out instead of failing the whole digest; with none left, nothing is sent.
+- **Every mailer delivers through `RetryingMailDeliveryJob`** (`ApplicationMailer.delivery_job`), which retries transient SMTP failures (a 4xx, a timeout, a refused or reset connection, a TLS or DNS error) 10 times with polynomial backoff, about two hours in total. Rails' own `MailDeliveryJob` has no retry, and `FollowUpReminderJob` spends its exactly-once claim before it enqueues the mail, so without this one SMTP hiccup lost that day's reminder for good. A 5xx or an auth error does not retry.
 - **Port `2587`, not 587/465.** Railway blocked outbound SMTP on the standard ports; the home connection does not, but a working config stays. The `From:` domain must be verified in Resend first.
 
 ### Security
@@ -915,7 +917,7 @@ Every challenge is a **single-use** Solid Cache entry with a **five-minute TTL**
 3. **The status**: `401`, `403`, `404`, `409`, `422`, `429`, `502`, `503`. This catches non-JSON failures and codes the catalog has not learned yet.
 4. `errors.unknown`.
 
-**The `code` also decides what recovery is offered**, not just which sentence is shown: `prefill_blocked` and `prefill_failed` open the paste box, the rest do not.
+**The `code` also decides what recovery is offered**, not just which sentence is shown: `prefill_blocked`, `prefill_failed` and `prefill_url_disabled` open the paste box, the rest do not.
 
 #### Catalog parity is checked in CI
 
@@ -1059,7 +1061,7 @@ The manifest declares a `share_target`: sharing a posting from any Android app s
 
 **Ingress and deploys.**
 
-- **The tunnel is outbound-only**, so there is no port to forward and no residential IP exposed. `cloudflared/config.yml` (gitignored; `.example` committed) carries two ingress rules: `kk.chairulakmal.com` → `web:3000` and `kk-api.chairulakmal.com` → `api:8080`.
+- **The tunnel is outbound-only**, so there is no port to forward, and inbound traffic never learns the home IP. **Requests the server makes itself do leave from the home IP:** a URL pre-fill fetches the posting, and the push jobs POST to the browser vendors. So the shared demo account cannot pre-fill from a URL (`prefill_url_disabled`), and a push endpoint must be a known vendor host (§ `push_subscriptions`). `cloudflared/config.yml` (gitignored; `.example` committed) carries two ingress rules: `kk.chairulakmal.com` → `web:3000` and `kk-api.chairulakmal.com` → `api:8080`.
 - **`kk-api`, not `api.kk`.** Cloudflare's default edge certificate covers the apex plus one wildcard level, and the two-level shape failed the TLS handshake outright.
 - **The domain is orange-clouded** (proxied), which Railway's ACME HTTP-01 challenge used to forbid. DNS cutover was 2026-08-20.
 - **Deploys are manual: `bin/deploy`.** A merge to `main` is no longer itself a deploy. The script refuses any branch but `main`, runs `git pull --ff-only`, tags the images the running `api` and `web` containers use as `rollback` (by image ID, because a failed deploy can leave `:latest` on code that never ran), builds new images tagged with the commit (`DEPLOY_TAG`, also passed to Honeybadger as the revision), runs `up -d --wait`, and then requests both public hostnames, retrying for up to a minute. The retry is needed because Compose recreates `cloudflared` along with `api` or `web`, `cloudflared` has no healthcheck, and the tunnel takes a few seconds to reconnect after `up --wait` returns. If any of that fails, it brings the `rollback` images back up. After success it keeps only the current and `rollback` tags and prunes dangling images. **A rollback restores code, never the schema**, so a migration must keep the previous release working. Migrations need no separate step, since `bin/docker-entrypoint` runs `db:prepare` on every boot of a `rails server` command.

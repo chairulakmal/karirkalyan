@@ -27,7 +27,7 @@ module Api
           # is invited to press is also a button any of them can use to delete the
           # portfolio's centrepiece. DemoResetJob would rebuild it, but only on the
           # hour, so "Try demo account" could 401 for up to 59 minutes.
-          if current_user.email == Demo::ResetService::DEMO_EMAIL
+          if current_user.demo?
             return render_error("The demo account cannot be erased.",
                                 code: "forbidden", status: :forbidden)
           end

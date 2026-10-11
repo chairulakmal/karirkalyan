@@ -4,6 +4,8 @@ class ApplicationMailer < ActionMailer::Base
   # that only works once kk.chairulakmal.com is verified in Resend.
   default from: ENV.fetch("MAILER_FROM", "KarirKalyan <reminders@kk.chairulakmal.com>")
 
+  self.delivery_job = RetryingMailDeliveryJob
+
   private
 
   # Origin of the deployed web app — used to build absolute links in emails.

@@ -51,13 +51,16 @@ type PrefillCode =
   | "prefill_failed"
   | "prefill_unreachable"
   | "prefill_paste_too_long"
-  | "prefill_unavailable";
+  | "prefill_unavailable"
+  | "prefill_url_disabled";
 
 /* Typed on the way in so a typo cannot compile, widened on the way out so `.has`
    still takes the `string | undefined` an ActionFailure carries. */
 const PASTE_CURES: ReadonlySet<string> = new Set<PrefillCode>([
   "prefill_blocked",
   "prefill_failed",
+  // The shared demo account cannot pre-fill from a URL, but a paste works.
+  "prefill_url_disabled",
 ]);
 
 export function NewApplicationForm({

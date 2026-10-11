@@ -103,7 +103,9 @@ pipeline. Built as a portfolio project by Chairul Akmal (https://chairulakmal.co
 There is no sign-up form and no sign-up endpoint. The app holds resumes (the most PII-dense
 document most people own) and it is deliberately not built to be anyone's custodian but its
 author's. Visitors sign in to the shared demo account below, which is the full app with twelve
-applications already in it, not a stripped sandbox. Sign-in supports passkeys (WebAuthn)
+applications already in it, not a stripped sandbox. One exception: on the demo account, AI
+pre-fill reads pasted posting text but does not fetch a URL, because the server would fetch it
+from its own home connection. Sign-in supports passkeys (WebAuthn)
 alongside the password form; the demo account uses the password. Accounts are created by the
 operator with `bin/rails users:create`. Data and erasure requests go to
 karirkalyan@cypherpunkzero.com; there is no self-service delete button, and the app does not
