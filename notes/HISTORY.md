@@ -137,6 +137,13 @@ By the mechanical test all of it **except dashboard pins, the screening success 
 - **The push retry list was too narrow.** `EOFError`, `ETIMEDOUT`, host and network unreachable, a write timeout and the push service's own 5xx were missing. Any of them escaped the delivery loop, and in `InterviewReminderJob` that skipped every later user with no retry. The list now includes them, and every push request has 5 to 10 second timeouts instead of Net::HTTP's 60.
 - **URL pre-fill from the demo account.** A URL pre-fill makes the server fetch the URL from the home host, so anyone with the public demo password could learn its IP. The demo now gets `403 prefill_url_disabled`, and the form opens the paste box, since a paste fetches nothing. `SPEC.md` and `ARCHITECTURE.md` had said the home IP was never exposed; they now say that is true for inbound traffic only.
 
+#### Security: Next.js 16.4.0 and patched `sharp` and `source-map-js`
+
+**By the mechanical test this is a patch:** no migration, no endpoint, no application behavior change.
+
+- **The audit failed on `main`.** `npm audit --omit=dev --audit-level=high` reported six advisories in Next.js 16.0.0 to 16.3.7, and high-severity ones in `sharp` and `source-map-js`. `next` and `eslint-config-next` move from 16.3.6 to 16.4.0, and `npm audit fix` moves `sharp` to 0.35.5. The two moderate `uuid` advisories remain, through `budoux`; they are below the gate, and neither package is in the running bundle.
+- **Checked for regressions.** Lint, typecheck, the unit tests and `next build` pass, and the standalone server answers on `/`, `/ja` and `/sitemap.xml`.
+
 #### Chore: a deploy that waits for health and rolls itself back, pinned CI actions and Postgres, a weekly dependency audit, and Next.js 16.3.6
 
 **By the mechanical test this is a patch:** no migration, no endpoint, no application behavior change. It is the second PR from the 2026-09-24 review.
